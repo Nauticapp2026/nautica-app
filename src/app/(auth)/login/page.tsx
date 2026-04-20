@@ -3,50 +3,86 @@
 import { useActionState } from 'react';
 import Link from 'next/link';
 import { login, type ActionResult } from '@/app/actions/auth';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Logo } from '@/components/shared/logo';
+
+const inputCls =
+  'w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none transition focus:border-[#1B3C4E] focus:ring-1 focus:ring-[#1B3C4E]';
 
 export default function LoginPage() {
   const [state, formAction, pending] = useActionState<ActionResult | null, FormData>(login, null);
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4">
-      <Card className="w-full max-w-sm">
-        <CardHeader>
-          <CardTitle>Ingresar</CardTitle>
-          <CardDescription>Accedé a tu guardería náutica</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form action={formAction} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" name="email" type="email" required />
-              {state?.fieldErrors?.email && (
-                <p className="text-destructive text-sm">{state.fieldErrors.email[0]}</p>
-              )}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Contraseña</Label>
-              <Input id="password" name="password" type="password" required />
-              {state?.fieldErrors?.password && (
-                <p className="text-destructive text-sm">{state.fieldErrors.password[0]}</p>
-              )}
-            </div>
-            {state?.error && <p className="text-destructive text-sm">{state.error}</p>}
-            <Button type="submit" className="w-full" disabled={pending}>
-              {pending ? 'Ingresando...' : 'Ingresar'}
-            </Button>
-            <p className="text-muted-foreground text-center text-sm">
-              ¿No tenés cuenta?{' '}
-              <Link href="/signup" className="underline">
-                Registrate
-              </Link>
-            </p>
-          </form>
-        </CardContent>
-      </Card>
+    <div className="w-full max-w-sm rounded-3xl bg-white p-8 shadow-2xl">
+      <div className="mb-6 flex justify-center">
+        <Logo size={52} />
+      </div>
+
+      <form action={formAction} className="space-y-4">
+        <div className="space-y-1.5">
+          <label className="text-sm font-semibold" style={{ color: '#1B3C4E' }}>
+            Email
+          </label>
+          <input
+            name="email"
+            type="email"
+            placeholder="tu@email.com"
+            required
+            className={inputCls}
+          />
+          {state?.fieldErrors?.email && (
+            <p className="text-sm text-red-500">{state.fieldErrors.email[0]}</p>
+          )}
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-sm font-semibold" style={{ color: '#1B3C4E' }}>
+            Contraseña
+          </label>
+          <input
+            name="password"
+            type="password"
+            placeholder="••••••••"
+            required
+            className={inputCls}
+          />
+          {state?.fieldErrors?.password && (
+            <p className="text-sm text-red-500">{state.fieldErrors.password[0]}</p>
+          )}
+        </div>
+
+        {state?.error && <p className="text-sm text-red-500">{state.error}</p>}
+
+        <button
+          type="submit"
+          disabled={pending}
+          className="mt-2 w-full rounded-xl py-3 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
+          style={{ background: '#1B3C4E' }}
+        >
+          {pending ? 'Ingresando...' : 'Ingresar'}
+        </button>
+
+        <div className="space-y-1 pt-1 text-center">
+          <p className="text-sm">
+            <span className="text-gray-500">¿No tienes cuenta? </span>
+            <Link
+              href="/onboarding"
+              className="font-medium underline transition hover:opacity-80"
+              style={{ color: '#2A8A9A' }}
+            >
+              Regístrese
+            </Link>
+          </p>
+          <p className="text-sm">
+            <Link
+              href="/forgot-password"
+              className="underline transition hover:opacity-80"
+              style={{ color: '#2A8A9A' }}
+            >
+              ¿Olvidaste tu contraseña?
+            </Link>
+          </p>
+        </div>
+      </form>
     </div>
   );
 }
