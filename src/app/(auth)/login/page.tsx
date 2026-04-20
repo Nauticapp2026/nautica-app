@@ -6,7 +6,7 @@ import { login, type ActionResult } from '@/app/actions/auth';
 import { Logo } from '@/components/shared/logo';
 
 const inputCls =
-  'w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none transition focus:border-[#1B3C4E] focus:ring-1 focus:ring-[#1B3C4E]';
+  'w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none transition focus:border-[#175861] focus:ring-1 focus:ring-[#175861]';
 
 export default function LoginPage() {
   const [state, formAction, pending] = useActionState<ActionResult | null, FormData>(login, null);
@@ -19,7 +19,7 @@ export default function LoginPage() {
 
       <form action={formAction} className="space-y-4">
         <div className="space-y-1.5">
-          <label className="text-sm font-semibold" style={{ color: '#1B3C4E' }}>
+          <label className="text-sm font-semibold" style={{ color: '#175861' }}>
             Email
           </label>
           <input
@@ -35,7 +35,7 @@ export default function LoginPage() {
         </div>
 
         <div className="space-y-1.5">
-          <label className="text-sm font-semibold" style={{ color: '#1B3C4E' }}>
+          <label className="text-sm font-semibold" style={{ color: '#175861' }}>
             Contraseña
           </label>
           <input
@@ -56,7 +56,7 @@ export default function LoginPage() {
           type="submit"
           disabled={pending}
           className="mt-2 w-full rounded-xl py-3 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
-          style={{ background: '#1B3C4E' }}
+          style={{ background: '#175861' }}
         >
           {pending ? 'Ingresando...' : 'Ingresar'}
         </button>
@@ -67,7 +67,7 @@ export default function LoginPage() {
             <Link
               href="/onboarding"
               className="font-medium underline transition hover:opacity-80"
-              style={{ color: '#2A8A9A' }}
+              style={{ color: '#669E9D' }}
             >
               Regístrese
             </Link>
@@ -76,7 +76,7 @@ export default function LoginPage() {
             <Link
               href="/forgot-password"
               className="underline transition hover:opacity-80"
-              style={{ color: '#2A8A9A' }}
+              style={{ color: '#669E9D' }}
             >
               ¿Olvidaste tu contraseña?
             </Link>

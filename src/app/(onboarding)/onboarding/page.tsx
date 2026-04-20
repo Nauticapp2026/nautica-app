@@ -139,7 +139,7 @@ function Shell({ step, children }: { step: number; children: React.ReactNode }) 
             <div
               key={i}
               className="h-1 flex-1 transition-colors duration-300"
-              style={{ background: i < step ? '#1B3C4E' : '#D1D5DB' }}
+              style={{ background: i < step ? '#175861' : '#D1D5DB' }}
             />
           ))}
         </div>
@@ -149,7 +149,7 @@ function Shell({ step, children }: { step: number; children: React.ReactNode }) 
       <div
         className="flex flex-1 items-center justify-center p-4 py-10"
         style={{
-          background: 'linear-gradient(135deg, #1B3C4E 0%, #2D6860 55%, #4A8A70 100%)',
+          background: 'linear-gradient(180deg, #175861 0%, #669E9D 60%, #ABC2B3 100%)',
         }}
       >
         <div className="w-full max-w-xl rounded-3xl bg-white p-8 shadow-2xl">{children}</div>
@@ -162,11 +162,11 @@ function StepHeader({ title, subtitle }: { title: string; subtitle?: React.React
   return (
     <div className="mb-6 flex flex-col items-center gap-2 text-center">
       <Logo size={48} />
-      <h1 className="mt-2 text-2xl font-bold" style={{ color: '#1B3C4E' }}>
+      <h1 className="mt-2 text-2xl font-bold" style={{ color: '#175861' }}>
         {title}
       </h1>
       {subtitle && (
-        <p className="text-sm" style={{ color: '#1B3C4E', opacity: 0.7 }}>
+        <p className="text-sm" style={{ color: '#175861', opacity: 0.7 }}>
           {subtitle}
         </p>
       )}
@@ -204,7 +204,7 @@ function NavButtons({
         onClick={onNext}
         disabled={pending}
         className="flex flex-1 items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
-        style={{ background: '#1B3C4E' }}
+        style={{ background: '#175861' }}
       >
         {nextLabel} <ChevronRight className="h-4 w-4" />
       </button>
@@ -227,7 +227,7 @@ function Field({
 }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <Label className="text-sm font-semibold" style={{ color: '#1B3C4E' }}>
+      <Label className="text-sm font-semibold" style={{ color: '#175861' }}>
         {label}
         {required && '*'}
       </Label>
@@ -237,7 +237,7 @@ function Field({
 }
 
 const inputCls =
-  'h-12 rounded-xl border border-gray-200 bg-white px-4 text-sm focus:border-[#1B3C4E] focus:ring-1 focus:ring-[#1B3C4E] focus:outline-none';
+  'h-12 rounded-xl border border-gray-200 bg-white px-4 text-sm focus:border-[#175861] focus:ring-1 focus:ring-[#175861] focus:outline-none';
 
 // ─── Steps ──────────────────────────────────────────────────────────────────
 
@@ -316,11 +316,11 @@ function Step1({
           />
           <label htmlFor="terms" className="text-sm text-gray-600">
             Acepto los{' '}
-            <span className="cursor-pointer underline" style={{ color: '#2A8A9A' }}>
+            <span className="cursor-pointer underline" style={{ color: '#669E9D' }}>
               Términos y Condiciones
             </span>{' '}
             y la{' '}
-            <span className="cursor-pointer underline" style={{ color: '#2A8A9A' }}>
+            <span className="cursor-pointer underline" style={{ color: '#669E9D' }}>
               Política de Privacidad
             </span>
           </label>
@@ -353,8 +353,8 @@ function Step2({
         title="Datos de tu guardería"
         subtitle={
           <>
-            Configurá la <span style={{ color: '#2A8A9A' }}>información principal</span> de{' '}
-            <span style={{ color: '#2A8A9A' }}>tu</span> establecimiento
+            Configurá la <span style={{ color: '#669E9D' }}>información principal</span> de{' '}
+            <span style={{ color: '#669E9D' }}>tu</span> establecimiento
           </>
         }
       />
@@ -502,13 +502,13 @@ function Step3({
       <FieldGroup>
         <div>
           <div className="mb-3 flex items-center justify-between">
-            <p className="font-semibold" style={{ color: '#1B3C4E' }}>
+            <p className="font-semibold" style={{ color: '#175861' }}>
               Horarios detallados
             </p>
             <button
               type="button"
               className="text-xs underline"
-              style={{ color: '#2A8A9A' }}
+              style={{ color: '#669E9D' }}
               onClick={() => setAllTimes('09:00', '18:00')}
             >
               Cambiar todos los horarios juntos
@@ -522,7 +522,7 @@ function Step3({
                   key={dia}
                   className="flex items-center gap-2 rounded-xl border border-gray-200 p-2"
                 >
-                  <span className="w-20 text-xs font-semibold" style={{ color: '#1B3C4E' }}>
+                  <span className="w-20 text-xs font-semibold" style={{ color: '#175861' }}>
                     {DIAS_LABELS[dia]}
                   </span>
                   <input
@@ -552,7 +552,7 @@ function Step3({
         </div>
 
         <div>
-          <p className="mb-2 font-semibold" style={{ color: '#1B3C4E' }}>
+          <p className="mb-2 font-semibold" style={{ color: '#175861' }}>
             Fotos de tu guardería
           </p>
           <div className="flex min-h-24 cursor-pointer items-center justify-center rounded-xl border-2 border-dashed border-gray-300 text-sm text-gray-400 transition hover:border-gray-400">
@@ -598,8 +598,8 @@ function Step4({
         title="Armá tu equipo de trabajo"
         subtitle={
           <>
-            Invitá a <span style={{ color: '#2A8A9A' }}>operarios</span>,{' '}
-            <span style={{ color: '#2A8A9A' }}>administradores</span> y responsables
+            Invitá a <span style={{ color: '#669E9D' }}>operarios</span>,{' '}
+            <span style={{ color: '#669E9D' }}>administradores</span> y responsables
           </>
         }
       />
@@ -681,7 +681,7 @@ function Step4({
         type="button"
         onClick={onAddMember}
         className="mb-4 flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90"
-        style={{ background: '#1B3C4E' }}
+        style={{ background: '#175861' }}
       >
         <Plus className="h-4 w-4" /> Agregar miembro del equipo
       </button>
@@ -698,7 +698,7 @@ function Step4({
           type="button"
           onClick={onSkip}
           className="flex-1 rounded-xl border py-3 text-sm font-medium transition hover:bg-gray-50"
-          style={{ borderColor: '#2A8A9A', color: '#2A8A9A' }}
+          style={{ borderColor: '#669E9D', color: '#669E9D' }}
         >
           Lo configuro más tarde
         </button>
@@ -706,7 +706,7 @@ function Step4({
           type="button"
           onClick={onNext}
           className="flex flex-1 items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold text-white hover:opacity-90"
-          style={{ background: '#1B3C4E' }}
+          style={{ background: '#175861' }}
         >
           Continuar <ChevronRight className="h-4 w-4" />
         </button>
@@ -732,13 +732,13 @@ function Step5({
         title="Configuración de espacios"
         subtitle={
           <>
-            Define la estructura de <span style={{ color: '#2A8A9A' }}>naves</span> y peines de tu
+            Define la estructura de <span style={{ color: '#669E9D' }}>naves</span> y peines de tu
             guardería
           </>
         }
       />
       <div className="mb-6 rounded-2xl p-5" style={{ background: '#FEF3E8' }}>
-        <p className="mb-4 font-semibold" style={{ color: '#1B3C4E' }}>
+        <p className="mb-4 font-semibold" style={{ color: '#175861' }}>
           Paso 1: Cantidad de naves y peines
         </p>
         <div className="grid grid-cols-2 gap-4">
@@ -765,14 +765,14 @@ function Step5({
           <button
             type="button"
             className="rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition hover:opacity-90"
-            style={{ background: '#1B3C4E' }}
+            style={{ background: '#175861' }}
           >
             Generar naves
           </button>
           <button
             type="button"
             className="rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition hover:opacity-90"
-            style={{ background: '#1B3C4E' }}
+            style={{ background: '#175861' }}
           >
             Generar peines
           </button>
@@ -828,7 +828,7 @@ function Step6({
         title="Últimos ajustes"
         subtitle={
           <>
-            Configurá las <span style={{ color: '#2A8A9A' }}>funcionalidades</span> que necesitás
+            Configurá las <span style={{ color: '#669E9D' }}>funcionalidades</span> que necesitás
           </>
         }
       />
@@ -839,10 +839,10 @@ function Step6({
             className="flex items-center justify-between rounded-2xl border border-gray-200 px-4 py-4"
           >
             <div>
-              <p className="text-sm font-bold" style={{ color: '#1B3C4E' }}>
+              <p className="text-sm font-bold" style={{ color: '#175861' }}>
                 {f.label}
               </p>
-              <p className="text-xs" style={{ color: '#2A8A9A' }}>
+              <p className="text-xs" style={{ color: '#669E9D' }}>
                 {f.desc}
               </p>
             </div>
@@ -851,7 +851,7 @@ function Step6({
               onCheckedChange={(v) => onToggle(f.key, v)}
               style={
                 (data[f.key] as boolean)
-                  ? ({ '--switch-bg': '#1B3C4E' } as React.CSSProperties)
+                  ? ({ '--switch-bg': '#175861' } as React.CSSProperties)
                   : undefined
               }
             />
@@ -880,7 +880,7 @@ function Step7({
         title="Elegí tu plan de NauticApp"
         subtitle={
           <>
-            Seleccioná el plan que mejor se adapte a <span style={{ color: '#2A8A9A' }}>tu</span>{' '}
+            Seleccioná el plan que mejor se adapte a <span style={{ color: '#669E9D' }}>tu</span>{' '}
             guardería
           </>
         }
@@ -893,11 +893,11 @@ function Step7({
             <div
               key={p}
               className="flex flex-col overflow-hidden rounded-2xl border border-gray-200 transition"
-              style={selected ? { boxShadow: '0 0 0 2px #1B3C4E' } : undefined}
+              style={selected ? { boxShadow: '0 0 0 2px #175861' } : undefined}
             >
               <div
                 className="px-4 py-4 text-center"
-                style={{ background: selected ? '#1B3C4E' : '#9CA3AF' }}
+                style={{ background: selected ? '#175861' : '#9CA3AF' }}
               >
                 <p className="text-sm font-bold text-white">{info.label}</p>
                 <p className="mt-1 text-xs text-white/80">{info.precio}</p>
@@ -908,9 +908,9 @@ function Step7({
                     <li key={feat} className="flex items-start gap-1.5">
                       <Check
                         className="mt-0.5 h-3.5 w-3.5 shrink-0"
-                        style={{ color: selected ? '#2A8A9A' : '#9CA3AF' }}
+                        style={{ color: selected ? '#669E9D' : '#9CA3AF' }}
                       />
-                      <span className="text-xs" style={{ color: selected ? '#1B3C4E' : '#9CA3AF' }}>
+                      <span className="text-xs" style={{ color: selected ? '#175861' : '#9CA3AF' }}>
                         {feat}
                       </span>
                     </li>
@@ -920,7 +920,7 @@ function Step7({
                   type="button"
                   onClick={() => onSelect(p)}
                   className="w-full rounded-xl py-2.5 text-xs font-semibold text-white transition hover:opacity-90"
-                  style={{ background: selected ? '#1B3C4E' : '#9CA3AF' }}
+                  style={{ background: selected ? '#175861' : '#9CA3AF' }}
                 >
                   Seleccionar Plan
                 </button>
@@ -949,22 +949,22 @@ function Step8({ data, onNext, onBack }: { data: Data; onNext: () => void; onBac
         subtitle={
           <>
             Completá los datos para finalizar tu{' '}
-            <span style={{ color: '#2A8A9A' }}>suscripción</span>
+            <span style={{ color: '#669E9D' }}>suscripción</span>
           </>
         }
       />
       <div className="mb-6">
-        <p className="mb-3 font-semibold" style={{ color: '#1B3C4E' }}>
+        <p className="mb-3 font-semibold" style={{ color: '#175861' }}>
           Resumen del plan
         </p>
         <div
           className="flex items-center justify-between rounded-xl px-4 py-3"
           style={{ background: '#FEF3E8' }}
         >
-          <span className="text-sm" style={{ color: '#2A8A9A' }}>
+          <span className="text-sm" style={{ color: '#669E9D' }}>
             {info.label}
           </span>
-          <span className="font-semibold" style={{ color: '#1B3C4E' }}>
+          <span className="font-semibold" style={{ color: '#175861' }}>
             {info.precio}
           </span>
         </div>
@@ -1003,7 +1003,7 @@ function Step10() {
       >
         <Check className="h-8 w-8" style={{ color: '#1B9A5A' }} />
       </div>
-      <h1 className="text-2xl font-bold" style={{ color: '#1B3C4E' }}>
+      <h1 className="text-2xl font-bold" style={{ color: '#175861' }}>
         ¡Bienvenido a NauticApp!
       </h1>
       <p className="text-sm text-gray-500">
@@ -1013,13 +1013,13 @@ function Step10() {
         type="button"
         onClick={() => router.push('/dashboard')}
         className="mt-2 flex items-center gap-2 rounded-xl px-8 py-3 text-sm font-semibold text-white transition hover:opacity-90"
-        style={{ background: '#1B3C4E' }}
+        style={{ background: '#175861' }}
       >
         Ir al Dashboard <ChevronRight className="h-4 w-4" />
       </button>
       <p className="mt-2 text-xs text-gray-400">
         ¿Necesitás ayuda? Contactanos en{' '}
-        <a href="mailto:soporte@nauticapp.com" style={{ color: '#2A8A9A' }} className="underline">
+        <a href="mailto:soporte@nauticapp.com" style={{ color: '#669E9D' }} className="underline">
           soporte@nauticapp.com
         </a>
       </p>
