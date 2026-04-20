@@ -180,13 +180,16 @@ function NavButtons({
   nextLabel = 'Continuar',
   extraButton,
   pending,
+  disabled,
 }: {
   onBack?: () => void;
   onNext: () => void;
   nextLabel?: string;
   extraButton?: React.ReactNode;
   pending?: boolean;
+  disabled?: boolean;
 }) {
+  const isDisabled = pending || disabled;
   return (
     <div className="mt-6 flex gap-3">
       {onBack && (
@@ -202,8 +205,8 @@ function NavButtons({
       <button
         type="button"
         onClick={onNext}
-        disabled={pending}
-        className="flex flex-1 items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
+        disabled={isDisabled}
+        className="flex flex-1 items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-40"
         style={{ background: '#175861' }}
       >
         {nextLabel} <ChevronRight className="h-4 w-4" />
@@ -255,6 +258,13 @@ function Step1({
   pending: boolean;
 }) {
   const [accepted, setAccepted] = useState(false);
+  const isValid =
+    !!data.nombre.trim() &&
+    !!data.apellido.trim() &&
+    !!data.email.trim() &&
+    !!data.telefono.trim() &&
+    data.password.length >= 8 &&
+    accepted;
 
   return (
     <>
@@ -326,7 +336,7 @@ function Step1({
           </label>
         </div>
         {error && <p className="text-sm text-red-600">{error}</p>}
-        <NavButtons onNext={onNext} pending={pending || !accepted} />
+        <NavButtons onNext={onNext} pending={pending} disabled={!isValid} />
       </FieldGroup>
     </>
   );
@@ -347,6 +357,17 @@ function Step2({
   error?: string;
   pending: boolean;
 }) {
+  const isValid =
+    !!data.guarderiaName.trim() &&
+    !!data.cuit.trim() &&
+    !!data.tipo &&
+    !!data.direccion.trim() &&
+    !!data.ciudad.trim() &&
+    !!data.provincia.trim() &&
+    !!data.codigoPostal.trim() &&
+    !!data.telefonoOperativo.trim() &&
+    !!data.emailOperativo.trim();
+
   return (
     <>
       <StepHeader
@@ -463,7 +484,7 @@ function Step2({
           </Field>
         </div>
         {error && <p className="text-sm text-red-600">{error}</p>}
-        <NavButtons onBack={onBack} onNext={onNext} pending={pending} />
+        <NavButtons onBack={onBack} onNext={onNext} pending={pending} disabled={!isValid} />
       </FieldGroup>
     </>
   );
