@@ -38,8 +38,11 @@ export async function createSocioAction(data: CreateSocioData): Promise<SocioRes
   const emailLower = data.email.toLowerCase().trim();
 
   // 1. Create auth user and send invite email for password setup
-  const { data: inviteData, error: inviteError } =
-    await admin.auth.admin.inviteUserByEmail(emailLower);
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
+  const { data: inviteData, error: inviteError } = await admin.auth.admin.inviteUserByEmail(
+    emailLower,
+    { redirectTo: `${appUrl}/auth/callback?next=/crear-cuenta` },
+  );
 
   if (inviteError) {
     if (
