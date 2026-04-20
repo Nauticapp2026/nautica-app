@@ -147,12 +147,12 @@ function Shell({ step, children }: { step: number; children: React.ReactNode }) 
 
       {/* Gradient content area */}
       <div
-        className="flex flex-1 items-center justify-center p-6"
+        className="flex flex-1 items-center justify-center px-4 py-12"
         style={{
           background: 'linear-gradient(180deg, #175861 0%, #669E9D 60%, #ABC2B3 100%)',
         }}
       >
-        <div className="w-full max-w-xl rounded-3xl bg-white px-8 py-12 shadow-2xl">{children}</div>
+        <div className="w-full max-w-xl rounded-3xl bg-white px-8 py-8 shadow-2xl">{children}</div>
       </div>
     </div>
   );
