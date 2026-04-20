@@ -5,6 +5,7 @@ import { db } from '@/lib/db';
 import { profiles, memberships, embarcaciones, movimientosCuentaCorriente } from '@/lib/db/schema';
 import { getActiveMarina } from '@/lib/auth/session';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { eq } from 'drizzle-orm';
 
 export type CreateSocioData = {
   nombre: string;
@@ -128,5 +129,43 @@ export async function createSocioAction(data: CreateSocioData): Promise<SocioRes
     // Clean up orphaned auth user if DB writes fail
     await admin.auth.admin.deleteUser(profileId).catch(() => null);
     return { error: 'Error al registrar el socio. Intentá de nuevo.' };
+  }
+}
+
+export type UpdateSocioData = {
+  socioId: string;
+  nombre: string;
+  apellido: string;
+  telefono: string;
+  tipoDocumento: string;
+  numeroDocumento: string;
+  direccion: string;
+  razonSocial: string;
+  condicionIva: string;
+};
+
+export async function updateSocioAction(data: UpdateSocioData): Promise<{ error?: string }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+
+  try {
+    await db
+      .update(profiles)
+      .set({
+        nombre: data.nombre.trim() || null,
+        apellido: data.apellido.trim() || null,
+        telefono: data.telefono.trim() || null,
+        tipoDocumento: (data.tipoDocumento || null) as never,
+        numeroDocumento: data.numeroDocumento.trim() || null,
+        direccion: data.direccion.trim() || null,
+        razonSocial: data.razonSocial.trim() || null,
+        condicionIva: (data.condicionIva || null) as never,
+      })
+      .where(eq(profiles.id, data.socioId));
+
+    revalidatePath(`/usuarios/${data.socioId}`);
+    return {};
+  } catch {
+    return { error: 'Error al actualizar los datos.' };
   }
 }

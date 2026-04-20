@@ -18,6 +18,7 @@ import {
   X,
 } from 'lucide-react';
 import { addMovimientoAction, marcarPagadasAction } from '@/app/actions/movimientos';
+import { updateSocioAction } from '@/app/actions/socios';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -635,6 +636,53 @@ export function SocioDetail({
   const [modalPagoOpen, setModalPagoOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
+  // Generales edit mode
+  const [editando, setEditando] = useState(false);
+  const [editForm, setEditForm] = useState({
+    nombre: socio.nombre ?? '',
+    apellido: socio.apellido ?? '',
+    telefono: socio.telefono ?? '',
+    tipoDocumento: socio.tipoDocumento ?? '',
+    numeroDocumento: socio.numeroDocumento ?? '',
+    direccion: socio.direccion ?? '',
+    razonSocial: socio.razonSocial ?? '',
+    condicionIva: socio.condicionIva ?? '',
+  });
+  const [editError, setEditError] = useState<string | null>(null);
+  const [isSaving, startSaving] = useTransition();
+
+  function setField(k: keyof typeof editForm) {
+    return (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+      setEditForm((f) => ({ ...f, [k]: e.target.value }));
+  }
+
+  function handleCancelar() {
+    setEditForm({
+      nombre: socio.nombre ?? '',
+      apellido: socio.apellido ?? '',
+      telefono: socio.telefono ?? '',
+      tipoDocumento: socio.tipoDocumento ?? '',
+      numeroDocumento: socio.numeroDocumento ?? '',
+      direccion: socio.direccion ?? '',
+      razonSocial: socio.razonSocial ?? '',
+      condicionIva: socio.condicionIva ?? '',
+    });
+    setEditError(null);
+    setEditando(false);
+  }
+
+  function handleGuardar() {
+    setEditError(null);
+    startSaving(async () => {
+      const res = await updateSocioAction({ socioId: socio.id, ...editForm });
+      if (res.error) {
+        setEditError(res.error);
+      } else {
+        setEditando(false);
+      }
+    });
+  }
+
   const nombre = [socio.nombre, socio.apellido].filter(Boolean).join(' ') || socio.email;
   const inicial = (socio.nombre?.[0] ?? socio.email[0]).toUpperCase();
 
@@ -722,28 +770,76 @@ export function SocioDetail({
       {/* Generales */}
       {activeTab === 'generales' && (
         <div className="rounded-2xl border border-gray-200 bg-white p-6">
-          <p className="mb-4 text-[18px] font-bold" style={{ color: '#101828' }}>
-            Datos Personales
-          </p>
+          <div className="mb-4 flex items-center justify-between">
+            <p className="text-[18px] font-bold" style={{ color: '#101828' }}>
+              Datos Personales
+            </p>
+            {!editando ? (
+              <button
+                onClick={() => setEditando(true)}
+                className="rounded-[10px] border border-[#d1d5dc] px-4 py-2 text-sm font-medium text-[#364153] transition hover:bg-gray-50"
+              >
+                Editar
+              </button>
+            ) : (
+              <div className="flex gap-2">
+                <button
+                  onClick={handleCancelar}
+                  disabled={isSaving}
+                  className="rounded-[10px] border border-[#d1d5dc] px-4 py-2 text-sm font-medium text-[#364153] transition hover:bg-gray-50 disabled:opacity-40"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleGuardar}
+                  disabled={isSaving}
+                  className="rounded-[10px] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-40"
+                  style={{ background: '#175861' }}
+                >
+                  {isSaving ? 'Guardando...' : 'Guardar'}
+                </button>
+              </div>
+            )}
+          </div>
+
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="mb-1.5 block text-xs font-semibold text-gray-500">Nombre</label>
-                <input className={inputCls} defaultValue={socio.nombre ?? ''} readOnly />
+                <input
+                  className={inputCls}
+                  value={editForm.nombre}
+                  onChange={setField('nombre')}
+                  readOnly={!editando}
+                />
               </div>
               <div>
                 <label className="mb-1.5 block text-xs font-semibold text-gray-500">Apellido</label>
-                <input className={inputCls} defaultValue={socio.apellido ?? ''} readOnly />
+                <input
+                  className={inputCls}
+                  value={editForm.apellido}
+                  onChange={setField('apellido')}
+                  readOnly={!editando}
+                />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="mb-1.5 block text-xs font-semibold text-gray-500">Email</label>
-                <input className={inputCls} defaultValue={socio.email} readOnly />
+                <input
+                  className={`${inputCls} cursor-not-allowed bg-gray-50 text-gray-400`}
+                  defaultValue={socio.email}
+                  readOnly
+                />
               </div>
               <div>
                 <label className="mb-1.5 block text-xs font-semibold text-gray-500">Teléfono</label>
-                <input className={inputCls} defaultValue={socio.telefono ?? ''} readOnly />
+                <input
+                  className={inputCls}
+                  value={editForm.telefono}
+                  onChange={setField('telefono')}
+                  readOnly={!editando}
+                />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -751,7 +847,12 @@ export function SocioDetail({
                 <label className="mb-1.5 block text-xs font-semibold text-gray-500">
                   Tipo Documento
                 </label>
-                <select className={inputCls} defaultValue={socio.tipoDocumento ?? ''} disabled>
+                <select
+                  className={inputCls}
+                  value={editForm.tipoDocumento}
+                  onChange={setField('tipoDocumento')}
+                  disabled={!editando}
+                >
                   <option value="">—</option>
                   {TIPO_DOC_OPTS.map((o) => (
                     <option key={o.value} value={o.value}>
@@ -762,25 +863,45 @@ export function SocioDetail({
               </div>
               <div>
                 <label className="mb-1.5 block text-xs font-semibold text-gray-500">Número</label>
-                <input className={inputCls} defaultValue={socio.numeroDocumento ?? ''} readOnly />
+                <input
+                  className={inputCls}
+                  value={editForm.numeroDocumento}
+                  onChange={setField('numeroDocumento')}
+                  readOnly={!editando}
+                />
               </div>
             </div>
             <div>
               <label className="mb-1.5 block text-xs font-semibold text-gray-500">Dirección</label>
-              <input className={inputCls} defaultValue={socio.direccion ?? ''} readOnly />
+              <input
+                className={inputCls}
+                value={editForm.direccion}
+                onChange={setField('direccion')}
+                readOnly={!editando}
+              />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="mb-1.5 block text-xs font-semibold text-gray-500">
                   Razón social
                 </label>
-                <input className={inputCls} defaultValue={socio.razonSocial ?? ''} readOnly />
+                <input
+                  className={inputCls}
+                  value={editForm.razonSocial}
+                  onChange={setField('razonSocial')}
+                  readOnly={!editando}
+                />
               </div>
               <div>
                 <label className="mb-1.5 block text-xs font-semibold text-gray-500">
                   Condición frente IVA
                 </label>
-                <select className={inputCls} defaultValue={socio.condicionIva ?? ''} disabled>
+                <select
+                  className={inputCls}
+                  value={editForm.condicionIva}
+                  onChange={setField('condicionIva')}
+                  disabled={!editando}
+                >
                   <option value="">—</option>
                   {CONDICION_IVA_OPTS.map((o) => (
                     <option key={o.value} value={o.value}>
@@ -790,6 +911,8 @@ export function SocioDetail({
                 </select>
               </div>
             </div>
+
+            {editError && <p className="text-sm text-red-600">{editError}</p>}
           </div>
         </div>
       )}
