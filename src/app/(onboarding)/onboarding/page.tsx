@@ -125,29 +125,33 @@ const PLAN_INFO = {
 function Shell({ step, children }: { step: number; children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen flex-col">
-      {/* Progress bar */}
-      <div className="flex h-1.5 w-full">
-        {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
-          <div
-            key={i}
-            className="flex-1 transition-colors duration-300"
-            style={{
-              background: i < step ? '#1B3C4E' : 'rgba(255,255,255,0.25)',
-              marginRight: i < TOTAL_STEPS - 1 ? 2 : 0,
-            }}
-          />
-        ))}
+      {/* White header */}
+      <div className="bg-white">
+        <div className="flex items-center justify-between px-6 py-3">
+          <Logo size={36} />
+          <span className="text-xs text-gray-400">
+            Paso {step} de {TOTAL_STEPS}
+          </span>
+        </div>
+        {/* Segmented progress bar */}
+        <div className="flex gap-1 px-0">
+          {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
+            <div
+              key={i}
+              className="h-1 flex-1 transition-colors duration-300"
+              style={{ background: i < step ? '#1B3C4E' : '#D1D5DB' }}
+            />
+          ))}
+        </div>
       </div>
 
-      {/* Step indicator */}
-      <div className="flex justify-end px-6 pt-3">
-        <span className="text-xs font-medium text-white/70">
-          Paso {step} de {TOTAL_STEPS}
-        </span>
-      </div>
-
-      {/* Card */}
-      <div className="flex flex-1 items-center justify-center p-4 py-8">
+      {/* Gradient content area */}
+      <div
+        className="flex flex-1 items-center justify-center p-4 py-10"
+        style={{
+          background: 'linear-gradient(135deg, #1B3C4E 0%, #2D6860 55%, #4A8A70 100%)',
+        }}
+      >
         <div className="w-full max-w-xl rounded-3xl bg-white p-8 shadow-2xl">{children}</div>
       </div>
     </div>
