@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useTransition } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   ArrowLeft,
   User,
@@ -12,7 +13,11 @@ import {
   Clock,
   FileText,
   Ship,
+  TrendingUp,
+  AlertTriangle,
+  X,
 } from 'lucide-react';
+import { addMovimientoAction } from '@/app/actions/movimientos';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -40,15 +45,25 @@ type Embarcacion = {
   seguro: string | null;
 };
 
-// ─── Constants ───────────────────────────────────────────────────────────────
-
-const TIPO_DOC_LABELS: Record<string, string> = {
-  dni: 'DNI',
-  cuit: 'CUIT',
-  cuil: 'CUIL',
-  pasaporte: 'Pasaporte',
-  cdi: 'CDI',
+type Movimiento = {
+  id: string;
+  fecha: string | null;
+  concepto: string | null;
+  tipo: string | null;
+  estado: string | null;
+  debe: string | null;
+  haber: string | null;
+  servicioNombre: string | null;
+  servicioId: string | null;
 };
+
+type Servicio = {
+  id: string;
+  nombre: string;
+  precio: string | null;
+};
+
+// ─── Constants ───────────────────────────────────────────────────────────────
 
 const CONDICION_IVA_OPTS = [
   { value: 'consumidor_final', label: 'Consumidor Final' },
@@ -82,7 +97,34 @@ type TabId = (typeof TABS)[number]['id'];
 const inputCls =
   'h-11 w-full rounded-[10px] border border-gray-200 bg-white px-4 text-sm text-[#101828] focus:border-[#175861] focus:outline-none focus:ring-1 focus:ring-[#175861]';
 
-// ─── Empty tab content ────────────────────────────────────────────────────────
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function fmt(amount: number) {
+  return `$${amount.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`;
+}
+
+function fmtDate(iso: string | null) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('es-AR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+}
+
+const ESTADO_BADGE: Record<string, string> = {
+  pagado: 'bg-gray-100 text-gray-600',
+  facturado: 'bg-amber-100 text-amber-700',
+  no_pagado: 'bg-red-100 text-red-700',
+};
+
+const ESTADO_LABEL: Record<string, string> = {
+  pagado: 'Pagado',
+  facturado: 'Facturado',
+  no_pagado: 'Pendiente',
+};
+
+// ─── Empty tab ────────────────────────────────────────────────────────────────
 
 function EmptyTab({ icon, text }: { icon: React.ReactNode; text: string }) {
   return (
@@ -95,16 +137,178 @@ function EmptyTab({ icon, text }: { icon: React.ReactNode; text: string }) {
   );
 }
 
+// ─── Agregar Servicio Modal ───────────────────────────────────────────────────
+
+function AgregarServicioModal({
+  open,
+  onClose,
+  socioId,
+  socioNombre,
+  servicios,
+}: {
+  open: boolean;
+  onClose: () => void;
+  socioId: string;
+  socioNombre: string;
+  servicios: Servicio[];
+}) {
+  const router = useRouter();
+  const [servicioId, setServicioId] = useState('');
+  const [concepto, setConcepto] = useState('');
+  const [monto, setMonto] = useState('');
+  const [fecha, setFecha] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  const isValid = Boolean(servicioId && monto);
+
+  function handleServicioChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const id = e.target.value;
+    setServicioId(id);
+    const s = servicios.find((s) => s.id === id);
+    if (s?.precio) setMonto(s.precio);
+  }
+
+  function handleClose() {
+    setServicioId('');
+    setConcepto('');
+    setMonto('');
+    setFecha('');
+    setError(null);
+    onClose();
+  }
+
+  function handleSubmit() {
+    setError(null);
+    startTransition(async () => {
+      const res = await addMovimientoAction({ socioId, servicioId, concepto, monto, fecha });
+      if (res.error) {
+        setError(res.error);
+      } else {
+        handleClose();
+        router.refresh();
+      }
+    });
+  }
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl">
+        <div className="flex items-start justify-between p-6 pb-4">
+          <div>
+            <h2 className="text-lg font-bold" style={{ color: '#101828' }}>
+              Agregar servicio
+            </h2>
+            <p className="mt-0.5 text-sm" style={{ color: '#669E9D' }}>
+              Registre el servicio consumido por {socioNombre}
+            </p>
+          </div>
+          <button
+            onClick={handleClose}
+            className="rounded-[8px] p-1 text-gray-400 hover:bg-gray-100"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="border-t border-gray-200" />
+
+        <div className="space-y-4 p-6">
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
+              Servicio
+            </label>
+            <select className={inputCls} value={servicioId} onChange={handleServicioChange}>
+              <option value="">Seleccione un servicio</option>
+              {servicios.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.nombre}
+                  {s.precio ? ` — ${fmt(parseFloat(s.precio))}` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
+              Detalle del servicio
+            </label>
+            <input
+              className={inputCls}
+              placeholder="Descripción opcional"
+              value={concepto}
+              onChange={(e) => setConcepto(e.target.value)}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
+                Monto
+              </label>
+              <input
+                className={inputCls}
+                placeholder="$0,00"
+                value={monto ? fmt(parseFloat(monto)) : ''}
+                onChange={(e) => setMonto(e.target.value.replace(/[^0-9.]/g, ''))}
+              />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
+                Fecha
+              </label>
+              <input
+                type="date"
+                className={inputCls}
+                value={fecha}
+                onChange={(e) => setFecha(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {error && <p className="text-sm text-red-600">{error}</p>}
+        </div>
+
+        <div className="border-t border-gray-200 p-6">
+          <div className="flex gap-3">
+            <button
+              onClick={handleClose}
+              className="flex-1 rounded-[10px] border border-[#d1d5dc] bg-white py-2.5 text-sm font-medium text-[#364153] transition hover:bg-gray-50"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={isPending || !isValid}
+              className="flex-1 rounded-[10px] py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+              style={{ background: '#175861' }}
+            >
+              {isPending ? 'Guardando...' : 'Agregar servicio'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export function SocioDetail({
   socio,
   embarcaciones,
+  movimientos,
+  servicios,
 }: {
   socio: SocioData;
   embarcaciones: Embarcacion[];
+  movimientos: Movimiento[];
+  servicios: Servicio[];
 }) {
   const [activeTab, setActiveTab] = useState<TabId>('generales');
+  const [modalServicioOpen, setModalServicioOpen] = useState(false);
 
   const nombre = [socio.nombre, socio.apellido].filter(Boolean).join(' ') || socio.email;
   const inicial = (socio.nombre?.[0] ?? socio.email[0]).toUpperCase();
@@ -115,8 +319,21 @@ export function SocioDetail({
     year: 'numeric',
   });
 
+  const totalIngresos = movimientos.reduce((sum, m) => sum + parseFloat(m.debe ?? '0'), 0);
+  const totalPendiente = movimientos
+    .filter((m) => m.estado === 'no_pagado')
+    .reduce((sum, m) => sum + parseFloat(m.debe ?? '0'), 0);
+
   return (
     <div className="p-8">
+      <AgregarServicioModal
+        open={modalServicioOpen}
+        onClose={() => setModalServicioOpen(false)}
+        socioId={socio.id}
+        socioNombre={nombre}
+        servicios={servicios}
+      />
+
       {/* Back */}
       <Link
         href="/usuarios"
@@ -161,7 +378,7 @@ export function SocioDetail({
         ))}
       </div>
 
-      {/* Tab content */}
+      {/* Generales */}
       {activeTab === 'generales' && (
         <div className="rounded-2xl border border-gray-200 bg-white p-6">
           <p className="mb-4 text-sm font-bold" style={{ color: '#101828' }}>
@@ -236,6 +453,7 @@ export function SocioDetail({
         </div>
       )}
 
+      {/* Embarcación */}
       {activeTab === 'embarcacion' && (
         <div className="rounded-2xl border border-gray-200 bg-white p-6">
           {embarcaciones.length === 0 ? (
@@ -288,15 +506,98 @@ export function SocioDetail({
         </div>
       )}
 
+      {/* Cuenta Corriente */}
       {activeTab === 'cuenta-corriente' && (
         <div className="rounded-2xl border border-gray-200 bg-white p-6">
-          <EmptyTab
-            icon={<CreditCard className="h-7 w-7 opacity-40" />}
-            text="No hay movimientos en la cuenta corriente."
-          />
+          {/* Header */}
+          <div className="mb-5 flex items-center justify-between">
+            <p className="text-sm font-bold" style={{ color: '#101828' }}>
+              Movimientos de cuenta
+            </p>
+            <button
+              onClick={() => setModalServicioOpen(true)}
+              className="rounded-[10px] border border-[#d1d5dc] px-4 py-2 text-sm font-medium text-[#364153] transition hover:bg-gray-50"
+            >
+              Agregar servicio
+            </button>
+          </div>
+
+          {/* Metric cards */}
+          <div className="mb-6 flex gap-4">
+            <div className="flex flex-1 items-center gap-3 rounded-[10px] border border-gray-100 bg-gray-50 p-4">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-green-100">
+                <TrendingUp className="h-4 w-4 text-green-600" />
+              </div>
+              <div>
+                <p className="text-lg font-bold" style={{ color: '#101828' }}>
+                  {fmt(totalIngresos)}
+                </p>
+                <p className="text-xs text-gray-400">Ingresos</p>
+              </div>
+            </div>
+            <div className="flex flex-1 items-center gap-3 rounded-[10px] border border-gray-100 bg-gray-50 p-4">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-amber-100">
+                <AlertTriangle className="h-4 w-4 text-amber-600" />
+              </div>
+              <div>
+                <p className="text-lg font-bold" style={{ color: '#101828' }}>
+                  {fmt(totalPendiente)}
+                </p>
+                <p className="text-xs text-gray-400">Falta abonar</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Table */}
+          {movimientos.length === 0 ? (
+            <EmptyTab
+              icon={<CreditCard className="h-7 w-7 opacity-40" />}
+              text="No hay movimientos en la cuenta corriente."
+            />
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 text-left text-xs font-semibold text-gray-500">
+                  <th className="w-10 px-4 py-3"></th>
+                  <th className="px-4 py-3">Fecha</th>
+                  <th className="px-4 py-3">Servicio</th>
+                  <th className="px-4 py-3">Concepto</th>
+                  <th className="px-4 py-3 text-right">Total</th>
+                  <th className="px-4 py-3 text-right">Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {movimientos.map((m) => (
+                  <tr key={m.id} className="border-t border-gray-100 hover:bg-gray-50/50">
+                    <td className="px-4 py-3">
+                      <input type="checkbox" className="rounded" />
+                    </td>
+                    <td className="px-4 py-3 text-gray-500">{fmtDate(m.fecha)}</td>
+                    <td className="px-4 py-3 font-medium" style={{ color: '#175861' }}>
+                      {m.servicioNombre ?? '—'}
+                    </td>
+                    <td className="px-4 py-3 text-gray-500">{m.concepto ?? '—'}</td>
+                    <td className="px-4 py-3 text-right font-medium" style={{ color: '#101828' }}>
+                      {fmt(parseFloat(m.debe ?? '0'))}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <span
+                        className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${
+                          ESTADO_BADGE[m.estado ?? ''] ?? 'bg-gray-100 text-gray-500'
+                        }`}
+                      >
+                        {ESTADO_LABEL[m.estado ?? ''] ?? m.estado ?? '—'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       )}
 
+      {/* Facturación */}
       {activeTab === 'facturacion' && (
         <div className="rounded-2xl border border-gray-200 bg-white p-6">
           <EmptyTab
@@ -306,6 +607,7 @@ export function SocioDetail({
         </div>
       )}
 
+      {/* Navegantes */}
       {activeTab === 'navegantes' && (
         <div className="rounded-2xl border border-gray-200 bg-white p-6">
           <EmptyTab
@@ -315,6 +617,7 @@ export function SocioDetail({
         </div>
       )}
 
+      {/* Salidas */}
       {activeTab === 'salidas' && (
         <div className="rounded-2xl border border-gray-200 bg-white p-6">
           <EmptyTab
@@ -324,6 +627,7 @@ export function SocioDetail({
         </div>
       )}
 
+      {/* Documentación */}
       {activeTab === 'documentacion' && (
         <div className="rounded-2xl border border-gray-200 bg-white p-6">
           <EmptyTab

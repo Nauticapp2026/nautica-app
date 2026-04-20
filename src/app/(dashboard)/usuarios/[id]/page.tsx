@@ -1,8 +1,14 @@
 import { redirect } from 'next/navigation';
 import { getActiveMarina } from '@/lib/auth/session';
 import { db } from '@/lib/db';
-import { profiles, memberships, embarcaciones } from '@/lib/db/schema';
-import { eq, and } from 'drizzle-orm';
+import {
+  profiles,
+  memberships,
+  embarcaciones,
+  servicios as serviciosTable,
+  movimientosCuentaCorriente,
+} from '@/lib/db/schema';
+import { eq, and, desc } from 'drizzle-orm';
 import { SocioDetail } from './socio-detail';
 
 export default async function SocioPage({ params }: { params: Promise<{ id: string }> }) {
@@ -44,16 +50,44 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
 
   const socio = rows[0];
 
-  const embarcacionesList = await db
-    .select({
-      id: embarcaciones.id,
-      nombre: embarcaciones.nombre,
-      matricula: embarcaciones.matricula,
-      modelo: embarcaciones.modelo,
-      seguro: embarcaciones.seguro,
-    })
-    .from(embarcaciones)
-    .where(and(eq(embarcaciones.profileId, id), eq(embarcaciones.guarderiaId, gId)));
+  const [embarcacionesList, movimientosList, serviciosList] = await Promise.all([
+    db
+      .select({
+        id: embarcaciones.id,
+        nombre: embarcaciones.nombre,
+        matricula: embarcaciones.matricula,
+        modelo: embarcaciones.modelo,
+        seguro: embarcaciones.seguro,
+      })
+      .from(embarcaciones)
+      .where(and(eq(embarcaciones.profileId, id), eq(embarcaciones.guarderiaId, gId))),
+
+    db
+      .select({
+        id: movimientosCuentaCorriente.id,
+        fecha: movimientosCuentaCorriente.fecha,
+        concepto: movimientosCuentaCorriente.concepto,
+        tipo: movimientosCuentaCorriente.tipo,
+        estado: movimientosCuentaCorriente.estado,
+        debe: movimientosCuentaCorriente.debe,
+        haber: movimientosCuentaCorriente.haber,
+        servicioNombre: serviciosTable.nombre,
+        servicioId: movimientosCuentaCorriente.servicioId,
+      })
+      .from(movimientosCuentaCorriente)
+      .leftJoin(serviciosTable, eq(serviciosTable.id, movimientosCuentaCorriente.servicioId))
+      .where(eq(movimientosCuentaCorriente.socioId, id))
+      .orderBy(desc(movimientosCuentaCorriente.fecha)),
+
+    db
+      .select({
+        id: serviciosTable.id,
+        nombre: serviciosTable.nombre,
+        precio: serviciosTable.precio,
+      })
+      .from(serviciosTable)
+      .where(and(eq(serviciosTable.guarderiaId, gId), eq(serviciosTable.estado, 'activo'))),
+  ]);
 
   return (
     <SocioDetail
@@ -65,6 +99,11 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
         estadoSocio: socio.estadoSocio ?? null,
       }}
       embarcaciones={embarcacionesList}
+      movimientos={movimientosList.map((m) => ({
+        ...m,
+        fecha: m.fecha?.toISOString() ?? null,
+      }))}
+      servicios={serviciosList}
     />
   );
 }
