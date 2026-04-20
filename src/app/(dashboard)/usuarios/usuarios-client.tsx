@@ -98,6 +98,14 @@ function CrearSocioModal({ open, onClose }: { open: boolean; onClose: () => void
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
+  const isValid = Boolean(
+    form.nombre.trim() &&
+    form.apellido.trim() &&
+    form.email.trim() &&
+    form.telefono.trim() &&
+    form.direccion.trim(),
+  );
+
   const set =
     (k: keyof typeof EMPTY_FORM) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
       setForm((f) => ({ ...f, [k]: e.target.value }));
@@ -320,8 +328,8 @@ function CrearSocioModal({ open, onClose }: { open: boolean; onClose: () => void
             </button>
             <button
               onClick={handleSubmit}
-              disabled={isPending}
-              className="flex-1 rounded-[10px] py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
+              disabled={isPending || !isValid}
+              className="flex-1 rounded-[10px] py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
               style={{ background: '#175861' }}
             >
               {isPending ? 'Guardando...' : 'Guardar socio'}
