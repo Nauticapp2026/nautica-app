@@ -484,7 +484,7 @@ export function UsuariosClient({ socios }: { socios: Socio[] }) {
                         </td>
                         <td className="px-4 py-3 text-right">
                           <Link
-                            href={`/dashboard/usuarios/${s.profileId}`}
+                            href={`/usuarios/${s.profileId}`}
                             className="inline-flex items-center gap-1.5 text-xs font-medium transition hover:opacity-70"
                             style={{ color: '#669E9D' }}
                           >

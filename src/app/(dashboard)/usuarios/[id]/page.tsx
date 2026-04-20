@@ -40,7 +40,7 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
     .where(eq(profiles.id, id))
     .limit(1);
 
-  if (!rows.length) redirect('/dashboard/usuarios');
+  if (!rows.length) redirect('/usuarios');
 
   const socio = rows[0];
 

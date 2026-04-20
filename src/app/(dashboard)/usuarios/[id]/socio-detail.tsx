@@ -119,7 +119,7 @@ export function SocioDetail({
     <div className="p-8">
       {/* Back */}
       <Link
-        href="/dashboard/usuarios"
+        href="/usuarios"
         className="mb-6 inline-flex items-center gap-1.5 text-sm transition hover:opacity-70"
         style={{ color: '#669E9D' }}
       >

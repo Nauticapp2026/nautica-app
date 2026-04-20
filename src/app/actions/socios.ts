@@ -119,7 +119,7 @@ export async function createSocioAction(data: CreateSocioData): Promise<SocioRes
       proximoPago: nextMonthStart(),
     });
 
-    revalidatePath('/dashboard/usuarios');
+    revalidatePath('/usuarios');
     return { socioId: profileId };
   } catch {
     // Clean up orphaned auth user if DB writes fail
