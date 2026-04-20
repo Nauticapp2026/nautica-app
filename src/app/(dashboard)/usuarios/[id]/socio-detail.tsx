@@ -239,7 +239,7 @@ function FormaPagoModal({
         {/* Header */}
         <div className="flex items-start justify-between p-6 pb-4">
           <div>
-            <h2 className="text-lg font-bold" style={{ color: '#101828' }}>
+            <h2 className="text-[18px] font-bold" style={{ color: '#101828' }}>
               Forma de pago
             </h2>
             <p className="mt-0.5 text-sm" style={{ color: '#669E9D' }}>
@@ -522,7 +522,7 @@ function AgregarServicioModal({
       <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl">
         <div className="flex items-start justify-between p-6 pb-4">
           <div>
-            <h2 className="text-lg font-bold" style={{ color: '#101828' }}>
+            <h2 className="text-[18px] font-bold" style={{ color: '#101828' }}>
               Agregar servicio
             </h2>
             <p className="mt-0.5 text-sm" style={{ color: '#669E9D' }}>
@@ -694,7 +694,7 @@ export function SocioDetail({
           {inicial}
         </div>
         <div>
-          <h1 className="text-xl font-bold" style={{ color: '#101828' }}>
+          <h1 className="text-[18px] font-bold" style={{ color: '#101828' }}>
             {nombre}
           </h1>
           <p className="text-sm text-gray-400">Usuario desde {memberDate}</p>
@@ -722,7 +722,7 @@ export function SocioDetail({
       {/* Generales */}
       {activeTab === 'generales' && (
         <div className="rounded-2xl border border-gray-200 bg-white p-6">
-          <p className="mb-4 text-sm font-bold" style={{ color: '#101828' }}>
+          <p className="mb-4 text-[18px] font-bold" style={{ color: '#101828' }}>
             Datos Personales
           </p>
           <div className="space-y-4">
@@ -852,7 +852,7 @@ export function SocioDetail({
         <div className="rounded-2xl border border-gray-200 bg-white p-6">
           {/* Header */}
           <div className="mb-5 flex items-center justify-between">
-            <p className="text-sm font-bold" style={{ color: '#101828' }}>
+            <p className="text-[18px] font-bold" style={{ color: '#101828' }}>
               Movimientos de cuenta
             </p>
             <button
@@ -864,27 +864,37 @@ export function SocioDetail({
           </div>
 
           {/* Metric cards */}
-          <div className="mb-6 flex gap-4">
-            <div className="flex flex-1 items-center gap-3 rounded-[10px] border border-gray-100 bg-gray-50 p-4">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-green-100">
-                <TrendingUp className="h-4 w-4 text-green-600" />
+          <div className="mb-6 grid grid-cols-2 gap-4">
+            <div className="flex items-center gap-4 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+              <div
+                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl"
+                style={{ background: '#E6F4F1' }}
+              >
+                <TrendingUp className="h-5 w-5" style={{ color: '#175861' }} />
               </div>
               <div>
-                <p className="text-lg font-bold" style={{ color: '#101828' }}>
+                <p className="text-xs font-semibold tracking-wide text-gray-400 uppercase">
+                  Ingresos
+                </p>
+                <p className="text-[18px] font-bold" style={{ color: '#101828' }}>
                   {fmt(totalIngresos)}
                 </p>
-                <p className="text-xs text-gray-400">Ingresos</p>
               </div>
             </div>
-            <div className="flex flex-1 items-center gap-3 rounded-[10px] border border-gray-100 bg-gray-50 p-4">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-amber-100">
-                <AlertTriangle className="h-4 w-4 text-amber-600" />
+            <div className="flex items-center gap-4 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+              <div
+                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl"
+                style={{ background: '#FEF0E6' }}
+              >
+                <AlertTriangle className="h-5 w-5" style={{ color: '#E87040' }} />
               </div>
               <div>
-                <p className="text-lg font-bold" style={{ color: '#101828' }}>
+                <p className="text-xs font-semibold tracking-wide text-gray-400 uppercase">
+                  Falta abonar
+                </p>
+                <p className="text-[18px] font-bold" style={{ color: '#101828' }}>
                   {fmt(totalPendiente)}
                 </p>
-                <p className="text-xs text-gray-400">Falta abonar</p>
               </div>
             </div>
           </div>
