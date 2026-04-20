@@ -1,0 +1,20 @@
+// Los scripts a agregar al "scripts" del package.json que genera `create-next-app`.
+// Reemplazá el bloque "scripts" del package.json por este:
+
+{
+  "scripts": {
+    "dev": "next dev --turbopack",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,md,css}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json,md,css}\"",
+    "typecheck": "tsc --noEmit",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio",
+    "seed": "tsx scripts/seed.ts",
+    "prepare": "husky"
+  }
+}
