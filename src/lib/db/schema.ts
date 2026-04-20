@@ -514,7 +514,10 @@ export const embarcaciones = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
-  (t) => [index('embarcaciones_guarderia_idx').on(t.guarderiaId)],
+  (t) => [
+    index('embarcaciones_guarderia_idx').on(t.guarderiaId),
+    index('embarcaciones_profile_idx').on(t.profileId),
+  ],
 );
 
 export const documentos = pgTable(
@@ -732,7 +735,10 @@ export const movimientosCuentaCorriente = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
-  (t) => [index('movimientos_socio_idx').on(t.socioId)],
+  (t) => [
+    index('movimientos_socio_idx').on(t.socioId),
+    index('movimientos_servicio_idx').on(t.servicioId),
+  ],
 );
 
 export const facturacion = pgTable(
@@ -762,6 +768,7 @@ export const facturacion = pgTable(
   (t) => [
     index('facturacion_guarderia_idx').on(t.guarderiaId),
     index('facturacion_socio_idx').on(t.socioId),
+    index('facturacion_emision_idx').on(t.emision),
   ],
 );
 

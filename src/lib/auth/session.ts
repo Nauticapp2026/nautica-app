@@ -1,3 +1,4 @@
+import { cache } from 'react';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
@@ -8,13 +9,14 @@ import type { Rol } from '@/config/roles';
 
 export const ACTIVE_GUARDERIA_COOKIE = 'active_guarderia_id';
 
-export async function getCurrentUser() {
+// cache() deduplicates within a single render cycle — layout + page share the result
+export const getCurrentUser = cache(async function getCurrentUser() {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   return user;
-}
+});
 
 export async function requireUser() {
   const user = await getCurrentUser();
@@ -26,12 +28,11 @@ export async function getUserContext() {
   const user = await getCurrentUser();
   if (!user) return null;
 
-  const [profile] = await db.select().from(profiles).where(eq(profiles.id, user.id));
-  if (!profile) return null;
-
-  const userMemberships = await db
+  // Single JOIN query instead of two round-trips
+  const rows = await db
     .select({
-      id: memberships.id,
+      profile: profiles,
+      membershipId: memberships.id,
       rol: memberships.rol,
       status: memberships.status,
       guarderiaId: memberships.guarderiaId,
@@ -42,14 +43,29 @@ export async function getUserContext() {
         logoUrl: guarderias.logoUrl,
       },
     })
-    .from(memberships)
+    .from(profiles)
+    .innerJoin(
+      memberships,
+      and(eq(memberships.userId, profiles.id), eq(memberships.status, 'active')),
+    )
     .innerJoin(guarderias, eq(guarderias.id, memberships.guarderiaId))
-    .where(and(eq(memberships.userId, user.id), eq(memberships.status, 'active')));
+    .where(eq(profiles.id, user.id));
+
+  if (!rows.length) return null;
+
+  const profile = rows[0].profile;
+  const userMemberships = rows.map((r) => ({
+    id: r.membershipId,
+    rol: r.rol,
+    status: r.status,
+    guarderiaId: r.guarderiaId,
+    guarderia: r.guarderia,
+  }));
 
   return { user, profile, memberships: userMemberships };
 }
 
-export async function getActiveMarina() {
+export const getActiveMarina = cache(async function getActiveMarina() {
   const ctx = await getUserContext();
   if (!ctx || ctx.memberships.length === 0) return null;
 
@@ -63,7 +79,7 @@ export async function getActiveMarina() {
     activeMembership: active,
     activeGuarderia: active.guarderia,
   };
-}
+});
 
 export async function requireRole(allowed: Rol[]) {
   const ctx = await getActiveMarina();
