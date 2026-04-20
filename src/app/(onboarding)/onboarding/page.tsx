@@ -152,7 +152,7 @@ function Shell({ step, children }: { step: number; children: React.ReactNode }) 
           background: 'linear-gradient(180deg, #175861 0%, #669E9D 60%, #ABC2B3 100%)',
         }}
       >
-        <div className="w-full max-w-xl rounded-3xl bg-white px-8 py-8 shadow-2xl">{children}</div>
+        <div className="w-full max-w-xl rounded-2xl bg-white px-8 py-8 shadow-2xl">{children}</div>
       </div>
     </div>
   );
@@ -196,7 +196,7 @@ function NavButtons({
         <button
           type="button"
           onClick={onBack}
-          className="flex-1 rounded-xl border border-gray-300 py-3 text-sm font-medium text-gray-600 transition hover:bg-gray-50"
+          className="flex-1 rounded-[10px] border border-[#d1d5dc] bg-white py-3 text-sm font-medium text-[#364153] transition hover:bg-gray-50"
         >
           Atras
         </button>
@@ -206,7 +206,7 @@ function NavButtons({
         type="button"
         onClick={onNext}
         disabled={isDisabled}
-        className="flex flex-1 items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-40"
+        className="flex flex-1 items-center justify-center gap-2 rounded-[10px] py-3 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-40"
         style={{ background: '#175861' }}
       >
         {nextLabel} <ChevronRight className="h-4 w-4" />
@@ -230,7 +230,7 @@ function Field({
 }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <Label className="text-sm font-semibold" style={{ color: '#175861' }}>
+      <Label className="text-sm font-semibold" style={{ color: '#101828' }}>
         {label}
         {required && '*'}
       </Label>
@@ -240,7 +240,7 @@ function Field({
 }
 
 const inputCls =
-  'h-12 rounded-xl border border-gray-200 bg-white px-4 text-sm focus:border-[#175861] focus:ring-1 focus:ring-[#175861] focus:outline-none';
+  'h-12 rounded-[10px] border border-gray-200 bg-white px-4 text-sm focus:border-[#175861] focus:ring-1 focus:ring-[#175861] focus:outline-none';
 
 // ─── Steps ──────────────────────────────────────────────────────────────────
 
@@ -324,7 +324,7 @@ function Step1({
             onCheckedChange={(v) => setAccepted(!!v)}
             className="mt-0.5"
           />
-          <label htmlFor="terms" className="text-sm text-gray-600">
+          <label htmlFor="terms" className="text-sm" style={{ color: '#101828' }}>
             Acepto los{' '}
             <span className="cursor-pointer underline" style={{ color: '#669E9D' }}>
               Términos y Condiciones
@@ -541,7 +541,7 @@ function Step3({
               return (
                 <div
                   key={dia}
-                  className="flex items-center gap-2 rounded-xl border border-gray-200 p-2"
+                  className="flex items-center gap-2 rounded-[10px] border border-gray-200 p-2"
                 >
                   <span className="w-20 text-xs font-semibold" style={{ color: '#175861' }}>
                     {DIAS_LABELS[dia]}
@@ -576,7 +576,7 @@ function Step3({
           <p className="mb-2 font-semibold" style={{ color: '#175861' }}>
             Fotos de tu guardería
           </p>
-          <div className="flex min-h-24 cursor-pointer items-center justify-center rounded-xl border-2 border-dashed border-gray-300 text-sm text-gray-400 transition hover:border-gray-400">
+          <div className="flex min-h-24 cursor-pointer items-center justify-center rounded-[10px] border-2 border-dashed border-gray-300 text-sm text-gray-400 transition hover:border-gray-400">
             Click para subir fotos
           </div>
         </div>
@@ -584,7 +584,7 @@ function Step3({
         <Field label="Descripción de tu guardería">
           <Textarea
             placeholder="Contanos sobre tu guardería: servicios, ubicación, historia..."
-            className="min-h-24 rounded-xl border-gray-200 text-sm"
+            className="min-h-24 rounded-[10px] border-gray-200 text-sm"
             value={data.descripcion}
             onChange={(e) => onChangeDesc(e.target.value)}
           />
@@ -649,28 +649,28 @@ function Step4({
           {data.equipo.map((m, i) => (
             <div
               key={i}
-              className="flex items-center gap-1.5 rounded-xl border border-gray-200 p-2"
+              className="flex items-center gap-1.5 rounded-[10px] border border-gray-200 p-2"
             >
               <Input
-                className="h-8 flex-1 rounded-lg border-gray-200 px-2 text-xs"
+                className="h-8 flex-1 rounded-[10px] border-gray-200 px-2 text-xs"
                 placeholder="Nombre"
                 value={m.nombre}
                 onChange={(e) => onChangeMember(i, 'nombre', e.target.value)}
               />
               <Input
-                className="h-8 flex-1 rounded-lg border-gray-200 px-2 text-xs"
+                className="h-8 flex-1 rounded-[10px] border-gray-200 px-2 text-xs"
                 placeholder="Apellido"
                 value={m.apellido}
                 onChange={(e) => onChangeMember(i, 'apellido', e.target.value)}
               />
               <Input
-                className="h-8 flex-1 rounded-lg border-gray-200 px-2 text-xs"
+                className="h-8 flex-1 rounded-[10px] border-gray-200 px-2 text-xs"
                 placeholder="email@ej"
                 value={m.email}
                 onChange={(e) => onChangeMember(i, 'email', e.target.value)}
               />
               <select
-                className="h-8 rounded-lg border border-gray-200 px-1 text-xs"
+                className="h-8 rounded-[10px] border border-gray-200 px-1 text-xs"
                 value={m.rol}
                 onChange={(e) => onChangeMember(i, 'rol', e.target.value)}
               >
@@ -681,7 +681,7 @@ function Step4({
                 <option value="mantenimiento">Mantenimiento</option>
               </select>
               <Input
-                className="h-8 w-24 rounded-lg border-gray-200 px-2 text-xs"
+                className="h-8 w-24 rounded-[10px] border-gray-200 px-2 text-xs"
                 placeholder="+54 11..."
                 value={m.telefono}
                 onChange={(e) => onChangeMember(i, 'telefono', e.target.value)}
@@ -689,7 +689,7 @@ function Step4({
               <button
                 type="button"
                 onClick={() => onRemoveMember(i)}
-                className="rounded-lg p-1.5 text-red-400 hover:bg-red-50"
+                className="rounded-[10px] p-1.5 text-red-400 hover:bg-red-50"
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
@@ -701,7 +701,7 @@ function Step4({
       <button
         type="button"
         onClick={onAddMember}
-        className="mb-4 flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90"
+        className="mb-4 flex items-center gap-2 rounded-[10px] px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90"
         style={{ background: '#175861' }}
       >
         <Plus className="h-4 w-4" /> Agregar miembro del equipo
@@ -711,14 +711,14 @@ function Step4({
         <button
           type="button"
           onClick={onBack}
-          className="flex-1 rounded-xl border border-gray-300 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50"
+          className="flex-1 rounded-[10px] border border-[#d1d5dc] bg-white py-3 text-sm font-medium text-[#364153] hover:bg-gray-50"
         >
           Atras
         </button>
         <button
           type="button"
           onClick={onSkip}
-          className="flex-1 rounded-xl border py-3 text-sm font-medium transition hover:bg-gray-50"
+          className="flex-1 rounded-[10px] border py-3 text-sm font-medium transition hover:bg-gray-50"
           style={{ borderColor: '#669E9D', color: '#669E9D' }}
         >
           Lo configuro más tarde
@@ -726,7 +726,7 @@ function Step4({
         <button
           type="button"
           onClick={onNext}
-          className="flex flex-1 items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold text-white hover:opacity-90"
+          className="flex flex-1 items-center justify-center gap-2 rounded-[10px] py-3 text-sm font-semibold text-white hover:opacity-90"
           style={{ background: '#175861' }}
         >
           Continuar <ChevronRight className="h-4 w-4" />
@@ -785,14 +785,14 @@ function Step5({
         <div className="mt-4 flex gap-3">
           <button
             type="button"
-            className="rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition hover:opacity-90"
+            className="rounded-[10px] px-5 py-2.5 text-sm font-semibold text-white transition hover:opacity-90"
             style={{ background: '#175861' }}
           >
             Generar naves
           </button>
           <button
             type="button"
-            className="rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition hover:opacity-90"
+            className="rounded-[10px] px-5 py-2.5 text-sm font-semibold text-white transition hover:opacity-90"
             style={{ background: '#175861' }}
           >
             Generar peines
@@ -940,7 +940,7 @@ function Step7({
                 <button
                   type="button"
                   onClick={() => onSelect(p)}
-                  className="w-full rounded-xl py-2.5 text-xs font-semibold text-white transition hover:opacity-90"
+                  className="w-full rounded-[10px] py-2.5 text-xs font-semibold text-white transition hover:opacity-90"
                   style={{ background: selected ? '#175861' : '#9CA3AF' }}
                 >
                   Seleccionar Plan
@@ -953,7 +953,7 @@ function Step7({
       <button
         type="button"
         onClick={onBack}
-        className="w-full rounded-xl border border-gray-300 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50"
+        className="w-full rounded-[10px] border border-[#d1d5dc] bg-white py-3 text-sm font-medium text-[#364153] hover:bg-gray-50"
       >
         Atras
       </button>
@@ -979,7 +979,7 @@ function Step8({ data, onNext, onBack }: { data: Data; onNext: () => void; onBac
           Resumen del plan
         </p>
         <div
-          className="flex items-center justify-between rounded-xl px-4 py-3"
+          className="flex items-center justify-between rounded-[10px] px-4 py-3"
           style={{ background: '#FEF3E8' }}
         >
           <span className="text-sm" style={{ color: '#669E9D' }}>
@@ -1027,13 +1027,13 @@ function Step10() {
       <h1 className="text-2xl font-bold" style={{ color: '#175861' }}>
         ¡Bienvenido a NauticApp!
       </h1>
-      <p className="text-sm text-gray-500">
+      <p className="text-sm" style={{ color: '#101828' }}>
         Tu cuenta está lista. Es momento de comenzar a gestionar tu guardería náutica.
       </p>
       <button
         type="button"
         onClick={() => router.push('/dashboard')}
-        className="mt-2 flex items-center gap-2 rounded-xl px-8 py-3 text-sm font-semibold text-white transition hover:opacity-90"
+        className="mt-2 flex items-center gap-2 rounded-[10px] px-8 py-3 text-sm font-semibold text-white transition hover:opacity-90"
         style={{ background: '#175861' }}
       >
         Ir al Dashboard <ChevronRight className="h-4 w-4" />

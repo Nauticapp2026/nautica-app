@@ -6,20 +6,20 @@ import { login, type ActionResult } from '@/app/actions/auth';
 import { Logo } from '@/components/shared/logo';
 
 const inputCls =
-  'w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none transition focus:border-[#175861] focus:ring-1 focus:ring-[#175861]';
+  'w-full rounded-[10px] border border-gray-200 px-4 py-3 text-sm outline-none transition focus:border-[#175861] focus:ring-1 focus:ring-[#175861]';
 
 export default function LoginPage() {
   const [state, formAction, pending] = useActionState<ActionResult | null, FormData>(login, null);
 
   return (
-    <div className="w-full max-w-sm rounded-3xl bg-white p-8 shadow-2xl">
+    <div className="w-full max-w-sm rounded-2xl bg-white p-8 shadow-2xl">
       <div className="mb-6 flex justify-center">
         <Logo size={52} />
       </div>
 
       <form action={formAction} className="space-y-4">
         <div className="space-y-1.5">
-          <label className="text-sm font-semibold" style={{ color: '#175861' }}>
+          <label className="text-sm font-semibold" style={{ color: '#101828' }}>
             Email
           </label>
           <input
@@ -35,7 +35,7 @@ export default function LoginPage() {
         </div>
 
         <div className="space-y-1.5">
-          <label className="text-sm font-semibold" style={{ color: '#175861' }}>
+          <label className="text-sm font-semibold" style={{ color: '#101828' }}>
             Contraseña
           </label>
           <input
@@ -55,7 +55,7 @@ export default function LoginPage() {
         <button
           type="submit"
           disabled={pending}
-          className="mt-2 w-full rounded-xl py-3 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
+          className="mt-2 w-full rounded-[10px] py-3 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
           style={{ background: '#175861' }}
         >
           {pending ? 'Ingresando...' : 'Ingresar'}
