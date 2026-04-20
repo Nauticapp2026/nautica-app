@@ -1,4 +1,7 @@
 import { getActiveMarina } from '@/lib/auth/session';
+import { db } from '@/lib/db';
+import { embarcaciones, memberships, profiles, facturacion, comunicaciones } from '@/lib/db/schema';
+import { count, sum, eq, and, gte, lte, desc } from 'drizzle-orm';
 import {
   Ship,
   Users,
@@ -10,55 +13,7 @@ import {
   MessageSquare,
 } from 'lucide-react';
 
-const ROL_LABELS: Record<string, string> = {
-  administrador_general: 'Administrador general',
-  operario: 'Operario',
-  contable: 'Contable',
-  mantenimiento: 'Mantenimiento',
-  comunicaciones: 'Comunicaciones',
-  restaurantes: 'Restaurantes',
-  socio: 'Socio',
-  invitado: 'Invitado',
-  proveedor: 'Proveedor',
-};
-
-const ALERTS = [
-  {
-    id: 1,
-    text: 'Pago vencido - Juan Pérez (Embarcación #234)',
-    time: '2 horas',
-    cls: 'border-amber-400 bg-amber-50 text-amber-900',
-  },
-  {
-    id: 2,
-    text: 'Nueva reserva de amarra - Sector B',
-    time: '2 horas',
-    cls: 'border-blue-400 bg-blue-50 text-blue-900',
-  },
-  {
-    id: 3,
-    text: 'Seguro vencido - Embarcación Sirena (Mat. 5678)',
-    time: '2 horas',
-    cls: 'border-red-400 bg-red-50 text-red-900',
-  },
-  {
-    id: 4,
-    text: 'Operario solicitó mantenimiento - Muelle C',
-    time: '2 horas',
-    cls: 'border-slate-300 bg-slate-50 text-slate-700',
-  },
-];
-
-const COMUNICACIONES = [
-  { id: 1, titulo: 'Test 3', fecha: '18 Feb', audiencia: 'Socios' },
-  { id: 2, titulo: 'Test', fecha: '18 Feb', audiencia: 'Socios' },
-  { id: 3, titulo: 'Test flor', fecha: '18 Feb', audiencia: 'Pública' },
-];
-
-const AUDIENCIA_CLS: Record<string, string> = {
-  Socios: 'bg-purple-100 text-purple-700',
-  Pública: 'bg-blue-100 text-blue-700',
-};
+// ─── Helpers ────────────────────────────────────────────────────────────────
 
 function formatDate() {
   const now = new Date();
@@ -68,6 +23,25 @@ function formatDate() {
   const year = now.getFullYear();
   return `${weekday[0].toUpperCase()}${weekday.slice(1)}, ${day} ${month[0].toUpperCase()}${month.slice(1)} ${year}`;
 }
+
+function formatCurrency(value: string | null): string {
+  const n = parseFloat(value ?? '0');
+  if (n === 0) return '$0';
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1).replace('.0', '')}M`;
+  if (n >= 1_000) return `$${(n / 1_000).toFixed(0)}K`;
+  return new Intl.NumberFormat('es-AR', {
+    style: 'currency',
+    currency: 'ARS',
+    maximumFractionDigits: 0,
+  }).format(n);
+}
+
+function formatShortDate(date: Date | null): string {
+  if (!date) return '';
+  return date.toLocaleDateString('es-AR', { day: 'numeric', month: 'short' });
+}
+
+// ─── Sub-components ──────────────────────────────────────────────────────────
 
 function MetricCard({
   icon,
@@ -98,11 +72,135 @@ function MetricCard({
   );
 }
 
+function EmptyState({ icon, text }: { icon: React.ReactNode; text: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center gap-3 py-10 text-gray-400">
+      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gray-100">
+        {icon}
+      </div>
+      <p className="text-sm">{text}</p>
+    </div>
+  );
+}
+
+const TIPO_LABEL: Record<string, string> = {
+  socios: 'Socios',
+  publica: 'Pública',
+};
+
+const TIPO_CLS: Record<string, string> = {
+  socios: 'bg-purple-100 text-purple-700',
+  publica: 'bg-blue-100 text-blue-700',
+};
+
+const ROL_LABELS: Record<string, string> = {
+  administrador_general: 'Administrador general',
+  operario: 'Operario',
+  contable: 'Contable',
+  mantenimiento: 'Mantenimiento',
+  comunicaciones: 'Comunicaciones',
+  restaurantes: 'Restaurantes',
+  socio: 'Socio',
+  invitado: 'Invitado',
+  proveedor: 'Proveedor',
+};
+
+// ─── Page ────────────────────────────────────────────────────────────────────
+
 export default async function DashboardPage() {
   const ctx = await getActiveMarina();
   if (!ctx) return null;
 
+  const gId = ctx.activeMembership.guarderiaId;
   const rolLabel = ROL_LABELS[ctx.activeMembership.rol] ?? ctx.activeMembership.rol;
+
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+
+  const [
+    [{ totalEmbarcaciones }],
+    [{ totalSocios }],
+    [{ totalIngresos }],
+    [{ totalAlertas }],
+    alertasList,
+    operariosList,
+    comunicacionesList,
+  ] = await Promise.all([
+    db
+      .select({ totalEmbarcaciones: count() })
+      .from(embarcaciones)
+      .where(eq(embarcaciones.guarderiaId, gId)),
+
+    db
+      .select({ totalSocios: count() })
+      .from(memberships)
+      .where(
+        and(
+          eq(memberships.guarderiaId, gId),
+          eq(memberships.rol, 'socio'),
+          eq(memberships.status, 'active'),
+        ),
+      ),
+
+    db
+      .select({ totalIngresos: sum(facturacion.importe) })
+      .from(facturacion)
+      .where(
+        and(
+          eq(facturacion.guarderiaId, gId),
+          eq(facturacion.estado, 'pagada'),
+          gte(facturacion.emision, startOfMonth),
+          lte(facturacion.emision, endOfMonth),
+        ),
+      ),
+
+    db
+      .select({ totalAlertas: count() })
+      .from(facturacion)
+      .where(and(eq(facturacion.guarderiaId, gId), eq(facturacion.estado, 'vencida'))),
+
+    db
+      .select({
+        id: facturacion.id,
+        descripcion: facturacion.descripcion,
+        importe: facturacion.importe,
+        vencimiento: facturacion.vencimiento,
+      })
+      .from(facturacion)
+      .where(and(eq(facturacion.guarderiaId, gId), eq(facturacion.estado, 'vencida')))
+      .orderBy(desc(facturacion.vencimiento))
+      .limit(8),
+
+    db
+      .select({
+        id: memberships.id,
+        nombre: profiles.nombre,
+        apellido: profiles.apellido,
+        email: profiles.email,
+      })
+      .from(memberships)
+      .innerJoin(profiles, eq(profiles.id, memberships.userId))
+      .where(
+        and(
+          eq(memberships.guarderiaId, gId),
+          eq(memberships.rol, 'operario'),
+          eq(memberships.status, 'active'),
+        ),
+      ),
+
+    db
+      .select({
+        id: comunicaciones.id,
+        titulo: comunicaciones.titulo,
+        tipo: comunicaciones.tipo,
+        fecha: comunicaciones.fecha,
+      })
+      .from(comunicaciones)
+      .where(eq(comunicaciones.guarderiaId, gId))
+      .orderBy(desc(comunicaciones.createdAt))
+      .limit(3),
+  ]);
 
   return (
     <div className="space-y-6 p-8">
@@ -121,25 +219,25 @@ export default async function DashboardPage() {
         <MetricCard
           icon={<Ship className="h-5 w-5 text-white" />}
           iconBg="#175861"
-          value="8"
+          value={String(totalEmbarcaciones)}
           label="Embarcaciones en guardería"
         />
         <MetricCard
           icon={<Users className="h-5 w-5 text-white" />}
           iconBg="#669E9D"
-          value="7"
+          value={String(totalSocios)}
           label="Socios activos"
         />
         <MetricCard
           icon={<TrendingUp className="h-5 w-5 text-white" />}
           iconBg="#ABC2B3"
-          value="$2.4M"
+          value={formatCurrency(totalIngresos)}
           label="Ingresos del mes"
         />
         <MetricCard
           icon={<AlertTriangle className="h-5 w-5 text-white" />}
           iconBg="#4B5563"
-          value="8"
+          value={String(totalAlertas)}
           label="Alertas pendientes"
         />
       </div>
@@ -154,17 +252,29 @@ export default async function DashboardPage() {
               Alertas
             </h2>
           </div>
-          <div className="space-y-3">
-            {ALERTS.map((a) => (
-              <div
-                key={a.id}
-                className={`flex items-center justify-between rounded-[10px] border px-4 py-3 ${a.cls}`}
-              >
-                <span className="text-sm font-medium">{a.text}</span>
-                <span className="ml-3 shrink-0 text-xs opacity-60">{a.time}</span>
-              </div>
-            ))}
-          </div>
+          {alertasList.length === 0 ? (
+            <EmptyState
+              icon={<Bell className="h-7 w-7 opacity-40" />}
+              text="No hay alertas pendientes."
+            />
+          ) : (
+            <div className="space-y-3">
+              {alertasList.map((a) => (
+                <div
+                  key={a.id}
+                  className="flex items-center justify-between rounded-[10px] border border-amber-400 bg-amber-50 px-4 py-3"
+                >
+                  <span className="text-sm font-medium text-amber-900">
+                    {a.descripcion ?? 'Pago vencido'}
+                    {a.importe ? ` — $${parseFloat(a.importe).toLocaleString('es-AR')}` : ''}
+                  </span>
+                  <span className="ml-3 shrink-0 text-xs text-amber-700 opacity-80">
+                    {formatShortDate(a.vencimiento)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Operarios */}
@@ -184,12 +294,38 @@ export default async function DashboardPage() {
               Nuevo operario
             </button>
           </div>
-          <div className="flex flex-col items-center justify-center gap-3 py-10 text-gray-400">
-            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gray-100">
-              <Ship className="h-7 w-7 opacity-40" />
+          {operariosList.length === 0 ? (
+            <EmptyState
+              icon={<Ship className="h-7 w-7 opacity-40" />}
+              text="No hay operarios cargados."
+            />
+          ) : (
+            <div className="space-y-2">
+              {operariosList.map((o) => {
+                const nombre = [o.nombre, o.apellido].filter(Boolean).join(' ') || o.email;
+                const inicial = (o.nombre?.[0] ?? o.email?.[0] ?? '?').toUpperCase();
+                return (
+                  <div
+                    key={o.id}
+                    className="flex items-center gap-3 rounded-[10px] border border-gray-100 bg-gray-50 px-4 py-3"
+                  >
+                    <div
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
+                      style={{ background: '#669E9D' }}
+                    >
+                      {inicial}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium" style={{ color: '#101828' }}>
+                        {nombre}
+                      </p>
+                      <p className="truncate text-xs text-gray-400">{o.email}</p>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-            <p className="text-sm">No hay operarios cargados.</p>
-          </div>
+          )}
         </div>
       </div>
 
@@ -201,27 +337,40 @@ export default async function DashboardPage() {
             Comunicaciones recientes
           </h2>
         </div>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          {COMUNICACIONES.map((c) => (
-            <div key={c.id} className="rounded-[10px] border border-gray-100 bg-gray-50 px-4 py-3">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <p className="text-sm font-semibold" style={{ color: '#101828' }}>
-                    {c.titulo}
-                  </p>
-                  <p className="mt-0.5 text-xs text-gray-400">{c.fecha}</p>
-                </div>
-                <span
-                  className={`mt-0.5 shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                    AUDIENCIA_CLS[c.audiencia] ?? 'bg-gray-100 text-gray-600'
-                  }`}
+        {comunicacionesList.length === 0 ? (
+          <EmptyState
+            icon={<MessageSquare className="h-7 w-7 opacity-40" />}
+            text="No hay comunicaciones publicadas aún."
+          />
+        ) : (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            {comunicacionesList.map((c) => {
+              const tipoKey = c.tipo ?? 'socios';
+              return (
+                <div
+                  key={c.id}
+                  className="rounded-[10px] border border-gray-100 bg-gray-50 px-4 py-3"
                 >
-                  {c.audiencia}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold" style={{ color: '#101828' }}>
+                        {c.titulo}
+                      </p>
+                      <p className="mt-0.5 text-xs text-gray-400">{formatShortDate(c.fecha)}</p>
+                    </div>
+                    <span
+                      className={`mt-0.5 shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                        TIPO_CLS[tipoKey] ?? 'bg-gray-100 text-gray-600'
+                      }`}
+                    >
+                      {TIPO_LABEL[tipoKey] ?? tipoKey}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
