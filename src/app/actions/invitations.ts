@@ -7,12 +7,22 @@ import { z } from 'zod';
 import { db } from '@/lib/db';
 import { invitations, memberships } from '@/lib/db/schema';
 import { and, eq } from 'drizzle-orm';
-import { requireUser, getActiveMarina, ACTIVE_MARINA_COOKIE } from '@/lib/auth/session';
-import { ROLES, type Role } from '@/config/roles';
+import { requireUser, getActiveMarina, ACTIVE_GUARDERIA_COOKIE } from '@/lib/auth/session';
+import { ROLES, type Rol } from '@/config/roles';
 
 const inviteSchema = z.object({
   email: z.string().email('Email inválido'),
-  role: z.enum([ROLES.MARINA_ADMIN, ROLES.OPERATOR, ROLES.MEMBER, ROLES.PROVIDER, ROLES.GUEST]),
+  rol: z.enum([
+    ROLES.ADMINISTRADOR_GENERAL,
+    ROLES.OPERARIO,
+    ROLES.CONTABLE,
+    ROLES.MANTENIMIENTO,
+    ROLES.COMUNICACIONES,
+    ROLES.RESTAURANTES,
+    ROLES.SOCIO,
+    ROLES.INVITADO,
+    ROLES.PROVEEDOR,
+  ]),
 });
 
 export type InviteResult = {
@@ -29,13 +39,13 @@ export async function createInvitation(
   const ctx = await getActiveMarina();
   if (!ctx) return { error: 'No hay guardería activa' };
 
-  // Autorización: solo marina_admin o super_admin pueden invitar
-  const canInvite = ctx.profile.isSuperAdmin || ctx.activeMembership.role === ROLES.MARINA_ADMIN;
+  const canInvite =
+    ctx.profile.isSuperAdmin || ctx.activeMembership.rol === ROLES.ADMINISTRADOR_GENERAL;
   if (!canInvite) return { error: 'No autorizado' };
 
   const parsed = inviteSchema.safeParse({
     email: formData.get('email'),
-    role: formData.get('role'),
+    rol: formData.get('rol'),
   });
 
   if (!parsed.success) {
@@ -45,9 +55,9 @@ export async function createInvitation(
   const token = randomBytes(32).toString('base64url');
 
   await db.insert(invitations).values({
-    marinaId: ctx.activeMembership.marinaId,
+    guarderiaId: ctx.activeMembership.guarderiaId,
     email: parsed.data.email.toLowerCase(),
-    role: parsed.data.role as Role,
+    rol: parsed.data.rol as Rol,
     token,
     invitedBy: user.id,
   });
@@ -59,10 +69,7 @@ export async function createInvitation(
   return { success: { inviteUrl } };
 }
 
-/**
- * Cambia la guardería activa del usuario. Valida que tenga membership.
- */
-export async function switchMarina(marinaId: string) {
+export async function switchGuarderia(guarderiaId: string) {
   const user = await requireUser();
 
   const [membership] = await db
@@ -71,7 +78,7 @@ export async function switchMarina(marinaId: string) {
     .where(
       and(
         eq(memberships.userId, user.id),
-        eq(memberships.marinaId, marinaId),
+        eq(memberships.guarderiaId, guarderiaId),
         eq(memberships.status, 'active'),
       ),
     )
@@ -82,12 +89,12 @@ export async function switchMarina(marinaId: string) {
   }
 
   const cookieStore = await cookies();
-  cookieStore.set(ACTIVE_MARINA_COOKIE, marinaId, {
+  cookieStore.set(ACTIVE_GUARDERIA_COOKIE, guarderiaId, {
     httpOnly: true,
     sameSite: 'lax',
     secure: process.env.NODE_ENV === 'production',
     path: '/',
-    maxAge: 60 * 60 * 24 * 365, // 1 año
+    maxAge: 60 * 60 * 24 * 365,
   });
 
   revalidatePath('/', 'layout');

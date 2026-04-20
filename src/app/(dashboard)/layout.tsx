@@ -19,13 +19,15 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <span className="font-semibold">Náutica</span>
           <MarinaSwitcher
             memberships={ctx.memberships}
-            activeMarinaId={ctx.activeMembership.marinaId}
+            activeGuarderiaId={ctx.activeMembership.guarderiaId}
           />
         </div>
         <UserMenu
           email={ctx.profile.email}
-          fullName={ctx.profile.fullName}
-          role={ctx.activeMembership.role}
+          fullName={
+            ctx.profile.nombre ? `${ctx.profile.nombre} ${ctx.profile.apellido ?? ''}`.trim() : null
+          }
+          rol={ctx.activeMembership.rol}
         />
       </header>
       <main className="flex-1 p-6">{children}</main>

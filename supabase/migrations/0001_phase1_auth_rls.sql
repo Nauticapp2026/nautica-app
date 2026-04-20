@@ -1,6 +1,6 @@
 -- =============================================================================
 -- Phase 1 — Auth, roles, multi-tenancy
--- Ejecutar DESPUÉS de `pnpm db:push` (que crea tablas y enums desde Drizzle).
+-- Ejecutar DESPUÉS de `pnpm db:migrate` (que crea tablas y enums desde Drizzle).
 -- =============================================================================
 
 -- -----------------------------------------------------------------------------
@@ -20,11 +20,11 @@ security definer
 set search_path = public
 as $$
 begin
-  insert into public.profiles (id, email, full_name)
+  insert into public.profiles (id, email, nombre)
   values (
     new.id,
     new.email,
-    coalesce(new.raw_user_meta_data ->> 'full_name', '')
+    coalesce(new.raw_user_meta_data ->> 'nombre', new.raw_user_meta_data ->> 'full_name', '')
   )
   on conflict (id) do nothing;
   return new;
@@ -56,7 +56,7 @@ as $$
 $$;
 
 -- ¿El usuario actual pertenece a esta guardería con algún rol activo?
-create or replace function public.is_marina_member(p_marina_id uuid)
+create or replace function public.is_guarderia_member(p_guarderia_id uuid)
 returns boolean
 language sql
 stable
@@ -66,28 +66,28 @@ as $$
   select exists (
     select 1 from public.memberships
     where user_id = auth.uid()
-      and marina_id = p_marina_id
+      and guarderia_id = p_guarderia_id
       and status = 'active'
   );
 $$;
 
 -- Rol del usuario actual en una guardería (null si no pertenece).
-create or replace function public.marina_role(p_marina_id uuid)
-returns app_role
+create or replace function public.guarderia_rol(p_guarderia_id uuid)
+returns "rol"
 language sql
 stable
 security definer
 set search_path = public
 as $$
-  select role from public.memberships
+  select rol from public.memberships
   where user_id = auth.uid()
-    and marina_id = p_marina_id
+    and guarderia_id = p_guarderia_id
     and status = 'active'
   limit 1;
 $$;
 
--- ¿Es admin (marina_admin o super_admin) de esta guardería?
-create or replace function public.is_marina_admin(p_marina_id uuid)
+-- ¿Es admin (administrador_general o super_admin) de esta guardería?
+create or replace function public.is_guarderia_admin(p_guarderia_id uuid)
 returns boolean
 language sql
 stable
@@ -95,9 +95,9 @@ security definer
 set search_path = public
 as $$
   select public.is_super_admin() or (
-    select coalesce(role = 'marina_admin' and status = 'active', false)
+    select coalesce(rol = 'administrador_general' and status = 'active', false)
     from public.memberships
-    where user_id = auth.uid() and marina_id = p_marina_id
+    where user_id = auth.uid() and guarderia_id = p_guarderia_id
     limit 1
   );
 $$;
@@ -105,7 +105,7 @@ $$;
 -- -----------------------------------------------------------------------------
 -- 4. Habilitar RLS en todas las tablas
 -- -----------------------------------------------------------------------------
-alter table public.marinas enable row level security;
+alter table public.guarderias enable row level security;
 alter table public.profiles enable row level security;
 alter table public.memberships enable row level security;
 alter table public.invitations enable row level security;
@@ -113,7 +113,6 @@ alter table public.invitations enable row level security;
 -- -----------------------------------------------------------------------------
 -- 5. Políticas: profiles
 -- -----------------------------------------------------------------------------
--- Un usuario puede ver y editar su propio perfil.
 create policy "profiles_select_own"
   on public.profiles for select
   using (id = auth.uid() or public.is_super_admin());
@@ -121,19 +120,21 @@ create policy "profiles_select_own"
 create policy "profiles_update_own"
   on public.profiles for update
   using (id = auth.uid())
-  with check (id = auth.uid() and is_super_admin = (select is_super_admin from public.profiles where id = auth.uid()));
--- ^ evita que un usuario se auto-promueva a super_admin.
+  with check (
+    id = auth.uid()
+    and is_super_admin = (select is_super_admin from public.profiles where id = auth.uid())
+  );
 
--- Los admins de una guardería pueden ver perfiles de sus miembros.
-create policy "profiles_select_marina_members"
+-- Admins de una guardería pueden ver perfiles de sus miembros.
+create policy "profiles_select_guarderia_members"
   on public.profiles for select
   using (
     exists (
       select 1
       from public.memberships m1
-      join public.memberships m2 on m2.marina_id = m1.marina_id
+      join public.memberships m2 on m2.guarderia_id = m1.guarderia_id
       where m1.user_id = auth.uid()
-        and m1.role in ('marina_admin', 'operator')
+        and m1.rol in ('administrador_general', 'operario')
         and m1.status = 'active'
         and m2.user_id = profiles.id
         and m2.status = 'active'
@@ -141,81 +142,69 @@ create policy "profiles_select_marina_members"
   );
 
 -- -----------------------------------------------------------------------------
--- 6. Políticas: marinas
+-- 6. Políticas: guarderias
 -- -----------------------------------------------------------------------------
--- Ver: super_admin ve todo; miembros activos ven su guardería.
-create policy "marinas_select"
-  on public.marinas for select
-  using (public.is_super_admin() or public.is_marina_member(id));
+create policy "guarderias_select"
+  on public.guarderias for select
+  using (public.is_super_admin() or public.is_guarderia_member(id));
 
--- Crear: solo super_admin (onboarding manual en Fase 1).
-create policy "marinas_insert"
-  on public.marinas for insert
+create policy "guarderias_insert"
+  on public.guarderias for insert
   with check (public.is_super_admin());
 
--- Editar: super_admin o marina_admin.
-create policy "marinas_update"
-  on public.marinas for update
-  using (public.is_super_admin() or public.is_marina_admin(id));
+create policy "guarderias_update"
+  on public.guarderias for update
+  using (public.is_super_admin() or public.is_guarderia_admin(id));
 
--- Borrar: solo super_admin.
-create policy "marinas_delete"
-  on public.marinas for delete
+create policy "guarderias_delete"
+  on public.guarderias for delete
   using (public.is_super_admin());
 
 -- -----------------------------------------------------------------------------
 -- 7. Políticas: memberships
 -- -----------------------------------------------------------------------------
--- Ver: el propio usuario ve sus memberships; admins ven las de su guardería.
 create policy "memberships_select_own"
   on public.memberships for select
   using (user_id = auth.uid());
 
-create policy "memberships_select_marina_admin"
+create policy "memberships_select_guarderia_admin"
   on public.memberships for select
-  using (public.is_super_admin() or public.is_marina_admin(marina_id));
+  using (public.is_super_admin() or public.is_guarderia_admin(guarderia_id));
 
--- Crear: solo admins (invitar alta manual).
 create policy "memberships_insert"
   on public.memberships for insert
-  with check (public.is_super_admin() or public.is_marina_admin(marina_id));
+  with check (public.is_super_admin() or public.is_guarderia_admin(guarderia_id));
 
--- Editar: admins (cambiar rol, suspender).
 create policy "memberships_update"
   on public.memberships for update
-  using (public.is_super_admin() or public.is_marina_admin(marina_id));
+  using (public.is_super_admin() or public.is_guarderia_admin(guarderia_id));
 
--- Borrar: admins.
 create policy "memberships_delete"
   on public.memberships for delete
-  using (public.is_super_admin() or public.is_marina_admin(marina_id));
+  using (public.is_super_admin() or public.is_guarderia_admin(guarderia_id));
 
 -- -----------------------------------------------------------------------------
 -- 8. Políticas: invitations
 -- -----------------------------------------------------------------------------
--- Ver: admins de la guardería.
 create policy "invitations_select"
   on public.invitations for select
-  using (public.is_super_admin() or public.is_marina_admin(marina_id));
+  using (public.is_super_admin() or public.is_guarderia_admin(guarderia_id));
 
--- Crear/editar/borrar: admins.
 create policy "invitations_insert"
   on public.invitations for insert
-  with check (public.is_super_admin() or public.is_marina_admin(marina_id));
+  with check (public.is_super_admin() or public.is_guarderia_admin(guarderia_id));
 
 create policy "invitations_update"
   on public.invitations for update
-  using (public.is_super_admin() or public.is_marina_admin(marina_id));
+  using (public.is_super_admin() or public.is_guarderia_admin(guarderia_id));
 
 create policy "invitations_delete"
   on public.invitations for delete
-  using (public.is_super_admin() or public.is_marina_admin(marina_id));
+  using (public.is_super_admin() or public.is_guarderia_admin(guarderia_id));
 
 -- -----------------------------------------------------------------------------
 -- 9. Función para aceptar invitación (transaccional, via service role)
 -- -----------------------------------------------------------------------------
--- Se llama desde la Server Action con el service_role después de validar el token.
--- Crea la membership y marca la invitación como aceptada.
 create or replace function public.accept_invitation(
   p_token text,
   p_user_id uuid
@@ -239,10 +228,10 @@ begin
     raise exception 'Invitation not found, expired or already used';
   end if;
 
-  insert into public.memberships (user_id, marina_id, role)
-  values (p_user_id, v_invitation.marina_id, v_invitation.role)
-  on conflict (user_id, marina_id) do update
-    set role = excluded.role,
+  insert into public.memberships (user_id, guarderia_id, rol)
+  values (p_user_id, v_invitation.guarderia_id, v_invitation.rol)
+  on conflict (user_id, guarderia_id) do update
+    set rol = excluded.rol,
         status = 'active',
         updated_at = now()
   returning id into v_membership_id;
@@ -257,7 +246,7 @@ end;
 $$;
 
 -- -----------------------------------------------------------------------------
--- 10. Trigger para updated_at automático
+-- 10. Triggers para updated_at automático
 -- -----------------------------------------------------------------------------
 create or replace function public.touch_updated_at()
 returns trigger language plpgsql as $$
@@ -267,8 +256,8 @@ begin
 end;
 $$;
 
-create trigger marinas_touch_updated_at
-  before update on public.marinas
+create trigger guarderias_touch_updated_at
+  before update on public.guarderias
   for each row execute function public.touch_updated_at();
 
 create trigger profiles_touch_updated_at

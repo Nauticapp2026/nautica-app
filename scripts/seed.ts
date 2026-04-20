@@ -1,25 +1,24 @@
 /**
  * Seed inicial para bootstrap de la plataforma.
  *
- * Uso: pnpm tsx scripts/seed.ts
- *
- * Esto:
- *  1. Crea una guardería de ejemplo.
- *  2. Marca al user con email SUPER_ADMIN_EMAIL como is_super_admin = true.
- *  3. Le crea membership como marina_admin en esa guardería.
+ * Uso: pnpm seed
  *
  * Requiere que el usuario ya exista en auth.users (registralo primero via /signup).
+ * Variables necesarias en .env.local:
+ *   SUPER_ADMIN_EMAIL, NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
  */
 
-import 'dotenv/config';
+import { config } from 'dotenv';
+config({ path: '.env.local' });
+
 import { createClient } from '@supabase/supabase-js';
 
 const SUPER_ADMIN_EMAIL = process.env.SUPER_ADMIN_EMAIL;
-const MARINA_NAME = process.env.SEED_MARINA_NAME ?? 'Guardería Demo';
-const MARINA_SLUG = process.env.SEED_MARINA_SLUG ?? 'demo';
+const GUARDERIA_NOMBRE = process.env.SEED_GUARDERIA_NOMBRE ?? 'Guardería Demo';
+const GUARDERIA_SLUG = process.env.SEED_GUARDERIA_SLUG ?? 'demo';
 
 if (!SUPER_ADMIN_EMAIL) {
-  console.error('Falta SUPER_ADMIN_EMAIL en .env');
+  console.error('Falta SUPER_ADMIN_EMAIL en .env.local');
   process.exit(1);
 }
 
@@ -50,24 +49,27 @@ async function main() {
   if (profileErr) throw profileErr;
   console.log(`✓ ${SUPER_ADMIN_EMAIL} marcado como super_admin`);
 
-  // 3. Crear guardería
-  const { data: marina, error: marinaErr } = await admin
-    .from('marinas')
-    .upsert({ name: MARINA_NAME, slug: MARINA_SLUG }, { onConflict: 'slug' })
+  // 3. Crear guardería demo
+  const { data: guarderia, error: guarderiaErr } = await admin
+    .from('guarderias')
+    .upsert({ nombre: GUARDERIA_NOMBRE, slug: GUARDERIA_SLUG }, { onConflict: 'slug' })
     .select()
     .single();
-  if (marinaErr) throw marinaErr;
-  console.log(`✓ Guardería "${marina.name}" creada (id: ${marina.id})`);
+  if (guarderiaErr) throw guarderiaErr;
+  console.log(`✓ Guardería "${guarderia.nombre}" creada (id: ${guarderia.id})`);
 
-  // 4. Membership
-  const { error: membershipErr } = await admin
-    .from('memberships')
-    .upsert(
-      { user_id: user.id, marina_id: marina.id, role: 'marina_admin', status: 'active' },
-      { onConflict: 'user_id,marina_id' },
-    );
+  // 4. Membership como administrador_general
+  const { error: membershipErr } = await admin.from('memberships').upsert(
+    {
+      user_id: user.id,
+      guarderia_id: guarderia.id,
+      rol: 'administrador_general',
+      status: 'active',
+    },
+    { onConflict: 'user_id,guarderia_id' },
+  );
   if (membershipErr) throw membershipErr;
-  console.log(`✓ Membership marina_admin creada`);
+  console.log(`✓ Membership administrador_general creada`);
 
   console.log('\nListo. Ingresá a /dashboard.');
 }

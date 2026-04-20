@@ -8,10 +8,10 @@ export default async function DashboardPage() {
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Hola, {ctx.profile.fullName ?? ctx.profile.email}</h1>
+        <h1 className="text-2xl font-bold">Hola, {ctx.profile.nombre ?? ctx.profile.email}</h1>
         <p className="text-muted-foreground">
-          Estás en <strong>{ctx.activeMarina.name}</strong> como{' '}
-          <strong>{ctx.activeMembership.role}</strong>
+          Estás en <strong>{ctx.activeGuarderia.nombre}</strong> como{' '}
+          <strong>{ctx.activeMembership.rol}</strong>
         </p>
       </div>
 
