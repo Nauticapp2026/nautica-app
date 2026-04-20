@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
+import { translateAuthError } from '@/lib/auth/errors';
 
 const loginSchema = z.object({
   email: z.string().email('Email inválido'),
@@ -29,7 +30,7 @@ export async function login(_: ActionResult | null, formData: FormData): Promise
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword(parsed.data);
 
-  if (error) return { error: error.message };
+  if (error) return { error: translateAuthError(error.message) };
 
   revalidatePath('/', 'layout');
   redirect('/dashboard');
@@ -56,7 +57,7 @@ export async function signup(_: ActionResult | null, formData: FormData): Promis
     },
   });
 
-  if (error) return { error: error.message };
+  if (error) return { error: translateAuthError(error.message) };
 
   return { error: undefined };
 }

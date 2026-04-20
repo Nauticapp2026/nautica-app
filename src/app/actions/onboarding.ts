@@ -1,6 +1,7 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
+import { translateAuthError } from '@/lib/auth/errors';
 import { db } from '@/lib/db';
 import { guarderias, memberships, horariosDia } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
@@ -34,7 +35,7 @@ export async function signUpStep(data: {
     },
   });
 
-  if (error) return { error: error.message };
+  if (error) return { error: translateAuthError(error.message) };
   if (!auth.user) return { error: 'No se pudo crear el usuario' };
 
   return { userId: auth.user.id };
