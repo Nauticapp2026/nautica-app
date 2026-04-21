@@ -556,7 +556,6 @@ export const invitados = pgTable(
     motivo: text('motivo'),
     tipo: tipoInvitadoEnum('tipo').default('titular'),
     estado: estadoInvitadoEnum('estado').default('activo'),
-    cantidadAcompanantes: integer('cantidad_acompanantes').default(0),
     validoHasta: timestamp('valido_hasta', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
@@ -571,7 +570,6 @@ export const porteria = pgTable(
       .notNull()
       .references(() => guarderias.id, { onDelete: 'cascade' }),
     socioId: uuid('socio_id').references(() => profiles.id, { onDelete: 'set null' }),
-    invitadoId: uuid('invitado_id').references(() => invitados.id, { onDelete: 'set null' }),
     invitadoUserId: uuid('invitado_user_id').references(() => profiles.id, {
       onDelete: 'set null',
     }),
@@ -587,6 +585,26 @@ export const porteria = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [index('porteria_guarderia_idx').on(t.guarderiaId)],
+);
+
+export const porteriaInvitados = pgTable(
+  'porteria_invitados',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    porteriaId: uuid('porteria_id')
+      .notNull()
+      .references(() => porteria.id, { onDelete: 'cascade' }),
+    invitadoId: uuid('invitado_id')
+      .notNull()
+      .references(() => invitados.id, { onDelete: 'cascade' }),
+    cantidadAcompanantes: integer('cantidad_acompanantes').default(0),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index('porteria_invitados_porteria_idx').on(t.porteriaId),
+    index('porteria_invitados_invitado_idx').on(t.invitadoId),
+    uniqueIndex('porteria_invitados_unique').on(t.porteriaId, t.invitadoId),
+  ],
 );
 
 export const actividadPorteria = pgTable(
