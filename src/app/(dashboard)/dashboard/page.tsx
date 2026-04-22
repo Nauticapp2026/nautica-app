@@ -1,3 +1,4 @@
+import { redirect } from 'next/navigation';
 import { getActiveMarina } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { embarcaciones, memberships, profiles, facturacion, comunicaciones } from '@/lib/db/schema';
@@ -110,6 +111,11 @@ const ROL_LABELS: Record<string, string> = {
 export default async function DashboardPage() {
   const ctx = await getActiveMarina();
   if (!ctx) return null;
+
+  // Operarios no tienen vista de dashboard: van directo a Tareas.
+  if (!ctx.profile.isSuperAdmin && ctx.activeMembership.rol === 'operario') {
+    redirect('/tareas');
+  }
 
   const gId = ctx.activeMembership.guarderiaId;
   const rolLabel = ROL_LABELS[ctx.activeMembership.rol] ?? ctx.activeMembership.rol;

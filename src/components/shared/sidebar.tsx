@@ -31,13 +31,16 @@ const ROL_LABELS: Record<string, string> = {
 const NAV = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/usuarios', label: 'Usuarios', icon: Users },
-  { href: '/dashboard/tareas', label: 'Tareas', icon: ClipboardList },
+  { href: '/tareas', label: 'Tareas', icon: ClipboardList },
   { href: '/dashboard/espacios', label: 'Espacios', icon: Anchor },
   { href: '/dashboard/comunicaciones', label: 'Comunicaciones', icon: MessageSquare },
   { href: '/facturacion', label: 'Facturación', icon: FileText },
   { href: '/dashboard/tarifario', label: 'Tarifario', icon: Tag },
   { href: '/dashboard/configuracion', label: 'Configuración', icon: Settings },
 ];
+
+// El operario solo accede a Tareas desde el admin UI.
+const OPERARIO_ALLOWED = new Set(['/tareas']);
 
 type Props = {
   guarderiaName: string;
@@ -59,24 +62,26 @@ export function Sidebar({ guarderiaName, userName, userInitial, rol }: Props) {
 
       {/* Nav */}
       <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-2">
-        {NAV.map(({ href, label, icon: Icon }) => {
-          const active =
-            href === '/dashboard'
-              ? pathname === '/dashboard'
-              : pathname === href || pathname.startsWith(href + '/');
-          return (
-            <Link
-              key={href}
-              href={href}
-              className={`flex items-center gap-3 rounded-[10px] px-3 py-2.5 text-sm font-medium transition-colors ${
-                active ? 'bg-[#175861] text-white' : 'text-[#364153] hover:bg-gray-100'
-              }`}
-            >
-              <Icon className="h-[18px] w-[18px] shrink-0" />
-              {label}
-            </Link>
-          );
-        })}
+        {NAV.filter(({ href }) => (rol === 'operario' ? OPERARIO_ALLOWED.has(href) : true)).map(
+          ({ href, label, icon: Icon }) => {
+            const active =
+              href === '/dashboard'
+                ? pathname === '/dashboard'
+                : pathname === href || pathname.startsWith(href + '/');
+            return (
+              <Link
+                key={href}
+                href={href}
+                className={`flex items-center gap-3 rounded-[10px] px-3 py-2.5 text-sm font-medium transition-colors ${
+                  active ? 'bg-[#175861] text-white' : 'text-[#364153] hover:bg-gray-100'
+                }`}
+              >
+                <Icon className="h-[18px] w-[18px] shrink-0" />
+                {label}
+              </Link>
+            );
+          },
+        )}
       </nav>
 
       {/* User */}
