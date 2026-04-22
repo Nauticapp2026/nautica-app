@@ -7,6 +7,7 @@ import {
   embarcaciones,
   servicios as serviciosTable,
   movimientosCuentaCorriente,
+  invitados,
 } from '@/lib/db/schema';
 import { eq, and, desc } from 'drizzle-orm';
 import { SocioDetail } from './socio-detail';
@@ -50,7 +51,7 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
 
   const socio = rows[0];
 
-  const [embarcacionesList, movimientosList, serviciosList] = await Promise.all([
+  const [embarcacionesList, movimientosList, serviciosList, invitadosList] = await Promise.all([
     db
       .select({
         id: embarcaciones.id,
@@ -87,6 +88,22 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
       })
       .from(serviciosTable)
       .where(and(eq(serviciosTable.guarderiaId, gId), eq(serviciosTable.estado, 'activo'))),
+
+    db
+      .select({
+        id: invitados.id,
+        nombre: invitados.nombre,
+        apellido: invitados.apellido,
+        email: invitados.email,
+        telefono: invitados.telefono,
+        motivo: invitados.motivo,
+        estado: invitados.estado,
+        validoHasta: invitados.validoHasta,
+        createdAt: invitados.createdAt,
+      })
+      .from(invitados)
+      .where(and(eq(invitados.socioId, id), eq(invitados.guarderiaId, gId)))
+      .orderBy(desc(invitados.createdAt)),
   ]);
 
   return (
@@ -104,6 +121,11 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
         fecha: m.fecha?.toISOString() ?? null,
       }))}
       servicios={serviciosList}
+      invitados={invitadosList.map((i) => ({
+        ...i,
+        validoHasta: i.validoHasta?.toISOString() ?? null,
+        createdAt: i.createdAt.toISOString(),
+      }))}
     />
   );
 }

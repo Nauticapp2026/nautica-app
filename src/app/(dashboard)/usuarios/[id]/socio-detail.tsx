@@ -64,6 +64,18 @@ type Servicio = {
   precio: string | null;
 };
 
+type Invitado = {
+  id: string;
+  nombre: string;
+  apellido: string | null;
+  email: string | null;
+  telefono: string | null;
+  motivo: string | null;
+  estado: string | null;
+  validoHasta: string | null;
+  createdAt: string;
+};
+
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const CONDICION_IVA_OPTS = [
@@ -625,11 +637,13 @@ export function SocioDetail({
   embarcaciones,
   movimientos,
   servicios,
+  invitados,
 }: {
   socio: SocioData;
   embarcaciones: Embarcacion[];
   movimientos: Movimiento[];
   servicios: Servicio[];
+  invitados: Invitado[];
 }) {
   const [activeTab, setActiveTab] = useState<TabId>('generales');
   const [modalServicioOpen, setModalServicioOpen] = useState(false);
@@ -1109,10 +1123,55 @@ export function SocioDetail({
       {/* Navegantes */}
       {activeTab === 'navegantes' && (
         <div className="rounded-2xl border border-gray-200 bg-white p-6">
-          <EmptyTab
-            icon={<Users className="h-7 w-7 opacity-40" />}
-            text="No hay navegantes autorizados."
-          />
+          {invitados.length === 0 ? (
+            <EmptyTab
+              icon={<Users className="h-7 w-7 opacity-40" />}
+              text="No hay navegantes autorizados."
+            />
+          ) : (
+            <div className="space-y-3">
+              {invitados.map((i) => {
+                const nombreCompleto = [i.nombre, i.apellido].filter(Boolean).join(' ') || '—';
+                const inicial = (i.nombre?.[0] ?? '?').toUpperCase();
+                const activo = i.estado === 'activo';
+                return (
+                  <div
+                    key={i.id}
+                    className="flex items-center gap-4 rounded-[10px] border border-gray-100 bg-gray-50 p-4"
+                  >
+                    <div
+                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
+                      style={{ background: '#669E9D' }}
+                    >
+                      {inicial}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold" style={{ color: '#101828' }}>
+                        {nombreCompleto}
+                      </p>
+                      <div className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-gray-500">
+                        {i.email && <span>{i.email}</span>}
+                        {i.telefono && <span>{i.telefono}</span>}
+                        {i.motivo && <span>{i.motivo}</span>}
+                      </div>
+                      {i.validoHasta && (
+                        <p className="mt-0.5 text-xs text-gray-400">
+                          Válido hasta {fmtDate(i.validoHasta)}
+                        </p>
+                      )}
+                    </div>
+                    <span
+                      className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${
+                        activo ? 'bg-teal-50 text-[#175861]' : 'bg-gray-100 text-gray-500'
+                      }`}
+                    >
+                      {activo ? 'Activo' : 'Inactivo'}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
