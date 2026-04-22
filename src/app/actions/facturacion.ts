@@ -9,6 +9,7 @@ import {
   facturacion,
   facturacionItemMovimientos,
   facturacionItems,
+  memberships,
   movimientosCuentaCorriente,
   profiles,
 } from '@/lib/db/schema';
@@ -168,7 +169,7 @@ export async function createInvoiceAction(data: CreateInvoiceData): Promise<{
 
   const gId = ctx.activeMembership.guarderiaId;
 
-  // 1. Traer socio
+  // 1. Traer socio validando que sea miembro de la guardería activa
   const [socio] = await db
     .select({
       id: profiles.id,
@@ -182,9 +183,16 @@ export async function createInvoiceAction(data: CreateInvoiceData): Promise<{
       condicionIva: profiles.condicionIva,
     })
     .from(profiles)
-    .where(eq(profiles.id, data.socioId));
+    .innerJoin(memberships, eq(memberships.userId, profiles.id))
+    .where(
+      and(
+        eq(profiles.id, data.socioId),
+        eq(memberships.guarderiaId, gId),
+        eq(memberships.status, 'active'),
+      ),
+    );
 
-  if (!socio) return { error: 'Socio no encontrado.' };
+  if (!socio) return { error: 'Socio no encontrado en esta guardería.' };
 
   // 2. Construir items desde movimientos (si llegaron) o desde items libres
   let items: { descripcion: string; cantidad: number; importeUnitario: number }[] = [];
@@ -342,9 +350,29 @@ export async function createBatchInvoicesAction(
 
   if (!data.socioIds.length) return { error: 'Seleccioná al menos un socio.' };
 
+  const gId = ctx.activeMembership.guarderiaId;
+
+  // Filtrar socioIds a solo los que son miembros activos de la guardería actual
+  const validos = await db
+    .select({ userId: memberships.userId })
+    .from(memberships)
+    .where(
+      and(
+        inArray(memberships.userId, data.socioIds),
+        eq(memberships.guarderiaId, gId),
+        eq(memberships.status, 'active'),
+      ),
+    );
+  const validSocioIds = new Set(validos.map((v) => v.userId));
+
   const result: BatchResult = { succeeded: [], skipped: [], failed: [] };
 
   for (const socioId of data.socioIds) {
+    if (!validSocioIds.has(socioId)) {
+      result.skipped.push({ socioId, reason: 'Socio fuera de la guardería activa' });
+      continue;
+    }
+
     // Traer movimientos no pagados / no facturados del socio
     const movs = await db
       .select({ id: movimientosCuentaCorriente.id })
@@ -386,6 +414,62 @@ export async function createBatchInvoicesAction(
 
   revalidatePath('/dashboard/facturacion');
   return { result };
+}
+
+// ─── Action: traer movimientos pendientes de un socio (scoped a guardería) ──
+
+export type MovimientoPendiente = {
+  id: string;
+  fecha: string | null;
+  concepto: string | null;
+  debe: string;
+};
+
+export async function getSocioPendientesAction(
+  socioId: string,
+): Promise<{ error?: string; movimientos?: MovimientoPendiente[] }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+
+  const gId = ctx.activeMembership.guarderiaId;
+
+  // Validar que el socio sea miembro activo de la guardería
+  const [m] = await db
+    .select({ id: memberships.id })
+    .from(memberships)
+    .where(
+      and(
+        eq(memberships.userId, socioId),
+        eq(memberships.guarderiaId, gId),
+        eq(memberships.status, 'active'),
+      ),
+    );
+  if (!m) return { error: 'Socio no pertenece a esta guardería.' };
+
+  const rows = await db
+    .select({
+      id: movimientosCuentaCorriente.id,
+      fecha: movimientosCuentaCorriente.fecha,
+      concepto: movimientosCuentaCorriente.concepto,
+      debe: movimientosCuentaCorriente.debe,
+    })
+    .from(movimientosCuentaCorriente)
+    .where(
+      and(
+        eq(movimientosCuentaCorriente.socioId, socioId),
+        eq(movimientosCuentaCorriente.estado, 'no_pagado'),
+      ),
+    )
+    .orderBy(movimientosCuentaCorriente.fecha);
+
+  return {
+    movimientos: rows.map((r) => ({
+      id: r.id,
+      fecha: r.fecha ? r.fecha.toISOString() : null,
+      concepto: r.concepto,
+      debe: r.debe ?? '0',
+    })),
+  };
 }
 
 // ─── Action: marcar factura como pagada ────────────────────────────────────
