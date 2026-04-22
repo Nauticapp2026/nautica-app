@@ -82,6 +82,7 @@ export default async function FacturacionPage() {
         apellido: profiles.apellido,
         email: profiles.email,
         razonSocial: profiles.razonSocial,
+        numeroDocumento: profiles.numeroDocumento,
         pendientes: sql<number>`count(${movimientosCuentaCorriente.id})::int`,
         pendienteTotal: sql<string>`coalesce(sum(${movimientosCuentaCorriente.debe}), '0')::text`,
       })
@@ -125,6 +126,7 @@ export default async function FacturacionPage() {
     id: s.profileId,
     nombre: [s.nombre, s.apellido].filter(Boolean).join(' ') || s.razonSocial || s.email,
     email: s.email,
+    numeroDocumento: s.numeroDocumento ?? '',
     pendientes: s.pendientes,
     pendienteTotal: s.pendienteTotal,
   }));

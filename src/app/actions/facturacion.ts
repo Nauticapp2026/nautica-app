@@ -58,16 +58,20 @@ type MedioPago =
   | 'transferencia'
   | 'cheque';
 
+type EstadoFactura = 'pagada' | 'pendiente' | 'vencida';
+
 export type CreateInvoiceData = {
   socioId: string;
   tipoFactura: TipoFactura;
   condicionVenta: CondicionVenta;
   medioPago: MedioPago;
+  estado?: EstadoFactura;
+  descripcion?: string;
   fecha: string; // ISO yyyy-mm-dd
   vencimiento: string;
   desde: string;
   hasta: string;
-  /** Si se provee, se marcan como facturados y se linkean a items de la factura. */
+  /** Si se provee, se marcan como facturados/pagados y se linkean a items de la factura. */
   movimientoIds?: string[];
   /** Línea libre si no hay movimientos. */
   items?: { descripcion: string; cantidad: number; importeUnitario: number }[];
@@ -265,15 +269,22 @@ export async function createInvoiceAction(data: CreateInvoiceData): Promise<{
 
   // 5. Persistir factura + items + linkear movimientos
   try {
+    const estadoFactura = data.estado ?? 'pendiente';
+    const descripcionFactura =
+      data.descripcion?.trim() ||
+      `Factura ${TIPO_FACTURA_API[data.tipoFactura]} — ${items[0].descripcion}${
+        items.length > 1 ? ` (+${items.length - 1})` : ''
+      }`;
+
     await db.insert(facturacion).values({
       id: facturaId,
       guarderiaId: gId,
       socioId: data.socioId,
       codigo: apiResponse.comprobante_nro ?? null,
       archivo: apiResponse.comprobante_pdf_url ?? null,
-      descripcion: `Factura ${TIPO_FACTURA_API[data.tipoFactura]} — ${items[0].descripcion}${items.length > 1 ? ` (+${items.length - 1})` : ''}`,
+      descripcion: descripcionFactura,
       tipoFactura: data.tipoFactura,
-      estado: 'pendiente',
+      estado: estadoFactura,
       condicionVenta: data.condicionVenta,
       medioPago: data.medioPago,
       importe: total.toFixed(2),
@@ -306,9 +317,11 @@ export async function createInvoiceAction(data: CreateInvoiceData): Promise<{
     }
 
     if (movimientoIds.length > 0) {
+      // Si la factura se crea ya pagada, los movimientos también quedan pagados.
+      const movEstado = estadoFactura === 'pagada' ? 'pagado' : 'facturado';
       await db
         .update(movimientosCuentaCorriente)
-        .set({ estado: 'facturado' })
+        .set({ estado: movEstado })
         .where(inArray(movimientosCuentaCorriente.id, movimientoIds));
     }
 

@@ -35,9 +35,16 @@ type Socio = {
   id: string;
   nombre: string;
   email: string;
+  numeroDocumento: string;
   pendientes: number;
   pendienteTotal: string;
 };
+
+const ESTADO_OPTS = [
+  { value: 'pendiente', label: 'Pendiente' },
+  { value: 'pagada', label: 'Pagada' },
+  { value: 'vencida', label: 'Vencida' },
+];
 
 type Kpis = {
   pendientes: number;
@@ -162,6 +169,8 @@ function NuevaFacturaModal({
     tipoFactura: 'factura_c',
     condicionVenta: 'contado',
     medioPago: 'efectivo',
+    estado: 'pendiente',
+    descripcion: '',
     fecha: todayIso(),
     vencimiento: addDays(todayIso(), 30),
     desde: firstOfMonthIso(),
@@ -205,12 +214,18 @@ function NuevaFacturaModal({
 
   const isValid = Boolean(
     form.socioId &&
+    form.descripcion.trim() &&
     form.fecha &&
     form.vencimiento &&
     form.desde &&
     form.hasta &&
     selectedMovs.size > 0 &&
     totalSeleccionado > 0,
+  );
+
+  const socioSeleccionado = useMemo(
+    () => socios.find((s) => s.id === form.socioId),
+    [socios, form.socioId],
   );
 
   const set =
@@ -253,6 +268,8 @@ function NuevaFacturaModal({
         tipoFactura: form.tipoFactura as never,
         condicionVenta: form.condicionVenta as never,
         medioPago: form.medioPago as never,
+        estado: form.estado as never,
+        descripcion: form.descripcion,
         fecha: form.fecha,
         vencimiento: form.vencimiento,
         desde: form.desde,
@@ -295,21 +312,34 @@ function NuevaFacturaModal({
         <div className="border-t border-gray-200" />
 
         <div className="flex-1 space-y-4 overflow-y-auto p-6">
-          <div>
-            <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
-              Cliente*
-            </label>
-            <select className={inputCls} value={form.socioId} onChange={handleSocioChange}>
-              <option value="">Seleccioná un socio...</option>
-              {socios.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.nombre}
-                  {s.pendientes > 0
-                    ? ` — ${s.pendientes} pendiente${s.pendientes > 1 ? 's' : ''} (${fmtMoney(s.pendienteTotal)})`
-                    : ''}
-                </option>
-              ))}
-            </select>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
+                Cliente / Proveedor*
+              </label>
+              <select className={inputCls} value={form.socioId} onChange={handleSocioChange}>
+                <option value="">Seleccioná un socio...</option>
+                {socios.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.nombre}
+                    {s.pendientes > 0
+                      ? ` — ${s.pendientes} pendiente${s.pendientes > 1 ? 's' : ''} (${fmtMoney(s.pendienteTotal)})`
+                      : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
+                Número documento
+              </label>
+              <input
+                className={`${inputCls} cursor-not-allowed bg-gray-50 text-gray-500`}
+                value={socioSeleccionado?.numeroDocumento ?? ''}
+                placeholder="Se completa al elegir socio"
+                readOnly
+              />
+            </div>
           </div>
 
           {/* Checklist de movimientos pendientes */}
@@ -377,7 +407,7 @@ function NuevaFacturaModal({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
-                Tipo de factura*
+                Tipo de comprobante*
               </label>
               <select className={inputCls} value={form.tipoFactura} onChange={set('tipoFactura')}>
                 {TIPO_FACTURA_OPTS.map((o) => (
@@ -403,6 +433,45 @@ function NuevaFacturaModal({
                 ))}
               </select>
             </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
+                Descripción*
+              </label>
+              <input
+                className={inputCls}
+                placeholder="Detalle de la factura"
+                value={form.descripcion}
+                onChange={set('descripcion')}
+              />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
+                Estado*
+              </label>
+              <select className={inputCls} value={form.estado} onChange={set('estado')}>
+                {ESTADO_OPTS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
+              Forma de pago
+            </label>
+            <select className={inputCls} value={form.medioPago} onChange={set('medioPago')}>
+              {MEDIO_PAGO_OPTS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -438,19 +507,6 @@ function NuevaFacturaModal({
               </label>
               <input type="date" className={inputCls} value={form.hasta} onChange={set('hasta')} />
             </div>
-          </div>
-
-          <div>
-            <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
-              Medio de pago
-            </label>
-            <select className={inputCls} value={form.medioPago} onChange={set('medioPago')}>
-              {MEDIO_PAGO_OPTS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
           </div>
 
           {error && (
