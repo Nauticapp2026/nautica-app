@@ -73,10 +73,15 @@ const textareaCls =
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
+// Formateo con TZ fija (Argentina) para evitar mismatch de hydration
+// entre servidor (UTC) y cliente (TZ del navegador).
+const TZ_AR = 'America/Argentina/Buenos_Aires';
+
 function fmtFechaHora(iso: string | null): string {
   if (!iso) return '—';
   const d = new Date(iso);
   return d.toLocaleString('es-AR', {
+    timeZone: TZ_AR,
     day: '2-digit',
     month: '2-digit',
     hour: '2-digit',
