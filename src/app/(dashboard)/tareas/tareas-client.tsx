@@ -16,11 +16,10 @@ import {
 import {
   createTareaAction,
   deleteTareaAction,
-  ESTADOS_TAREA,
   updateTareaAction,
   updateTareaEstadoAction,
-  type EstadoTarea,
 } from '@/app/actions/tareas';
+import { ESTADOS_TAREA, type EstadoTarea } from './constants';
 
 // ─── Tipos ──────────────────────────────────────────────────────────────────
 

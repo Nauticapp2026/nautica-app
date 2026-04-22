@@ -6,10 +6,7 @@ import { and, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { tareas, memberships, embarcaciones } from '@/lib/db/schema';
 import { getActiveMarina } from '@/lib/auth/session';
-
-export type EstadoTarea = 'preparar' | 'navegando' | 'guardada' | 'lavado';
-
-export const ESTADOS_TAREA: EstadoTarea[] = ['preparar', 'navegando', 'guardada', 'lavado'];
+import { ESTADOS_TAREA, type EstadoTarea } from '@/app/(dashboard)/tareas/constants';
 
 export type CreateTareaData = {
   descripcion: string;
