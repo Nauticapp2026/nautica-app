@@ -325,7 +325,7 @@ export async function createInvoiceAction(data: CreateInvoiceData): Promise<{
         .where(inArray(movimientosCuentaCorriente.id, movimientoIds));
     }
 
-    revalidatePath('/dashboard/facturacion');
+    revalidatePath('/facturacion');
     revalidatePath(`/usuarios/${data.socioId}`);
 
     return {
@@ -425,7 +425,7 @@ export async function createBatchInvoicesAction(
     }
   }
 
-  revalidatePath('/dashboard/facturacion');
+  revalidatePath('/facturacion');
   return { result };
 }
 
@@ -494,15 +494,41 @@ export async function markInvoicePaidAction(
   const ctx = await getActiveMarina();
   if (!ctx) return { error: 'No autenticado' };
 
+  const gId = ctx.activeMembership.guarderiaId;
+
   try {
-    await db
+    const [updated] = await db
       .update(facturacion)
       .set({ estado: 'pagada', medioPago })
-      .where(
-        and(eq(facturacion.id, id), eq(facturacion.guarderiaId, ctx.activeMembership.guarderiaId)),
-      );
+      .where(and(eq(facturacion.id, id), eq(facturacion.guarderiaId, gId)))
+      .returning({ socioId: facturacion.socioId });
 
-    revalidatePath('/dashboard/facturacion');
+    if (!updated) return { error: 'Factura no encontrada.' };
+
+    // Propagar estado 'pagado' a los movimientos vinculados a esta factura
+    const items = await db
+      .select({ id: facturacionItems.id })
+      .from(facturacionItems)
+      .where(eq(facturacionItems.facturacionId, id));
+
+    if (items.length > 0) {
+      const itemIds = items.map((i) => i.id);
+      const links = await db
+        .select({ movimientoId: facturacionItemMovimientos.movimientoId })
+        .from(facturacionItemMovimientos)
+        .where(inArray(facturacionItemMovimientos.facturacionItemId, itemIds));
+
+      const movIds = links.map((l) => l.movimientoId);
+      if (movIds.length > 0) {
+        await db
+          .update(movimientosCuentaCorriente)
+          .set({ estado: 'pagado' })
+          .where(inArray(movimientosCuentaCorriente.id, movIds));
+      }
+    }
+
+    revalidatePath('/facturacion');
+    if (updated.socioId) revalidatePath(`/usuarios/${updated.socioId}`);
     return {};
   } catch {
     return { error: 'Error al actualizar la factura.' };
