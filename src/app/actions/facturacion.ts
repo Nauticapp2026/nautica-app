@@ -1,0 +1,413 @@
+'use server';
+
+import { revalidatePath } from 'next/cache';
+import { and, eq, inArray } from 'drizzle-orm';
+import { randomUUID } from 'node:crypto';
+
+import { db } from '@/lib/db';
+import {
+  facturacion,
+  facturacionItemMovimientos,
+  facturacionItems,
+  movimientosCuentaCorriente,
+  profiles,
+} from '@/lib/db/schema';
+import { getActiveMarina } from '@/lib/auth/session';
+import {
+  crearFactura,
+  toTusFecha,
+  type TusFacturasCliente,
+  type TusFacturasComprobante,
+  type TusFacturasDetalleItem,
+  type TusFacturasFormaPago,
+} from '@/lib/tusfacturas/client';
+import {
+  CONDICION_IVA_API,
+  CONDICION_PAGO_API,
+  FORMA_PAGO_LABEL,
+  TIPO_DOC_API,
+  TIPO_FACTURA_API,
+} from '@/lib/tusfacturas/mappers';
+
+// ─── Tipos ──────────────────────────────────────────────────────────────────
+
+type TipoFactura = 'factura_a' | 'factura_b' | 'factura_c';
+type CondicionVenta =
+  | 'contado'
+  | 'cuenta_corriente'
+  | 'tarjeta_credito'
+  | 'tarjeta_debito'
+  | 'transferencia_bancaria'
+  | 'mercadopago'
+  | 'payway'
+  | 'dias_5'
+  | 'dias_10'
+  | 'dias_15'
+  | 'dias_20'
+  | 'dias_30'
+  | 'dias_45'
+  | 'dias_60'
+  | 'dias_90'
+  | 'otros';
+type MedioPago =
+  | 'efectivo'
+  | 'tarjeta_credito'
+  | 'tarjeta_debito'
+  | 'debito_automatico'
+  | 'transferencia'
+  | 'cheque';
+
+export type CreateInvoiceData = {
+  socioId: string;
+  tipoFactura: TipoFactura;
+  condicionVenta: CondicionVenta;
+  medioPago: MedioPago;
+  fecha: string; // ISO yyyy-mm-dd
+  vencimiento: string;
+  desde: string;
+  hasta: string;
+  /** Si se provee, se marcan como facturados y se linkean a items de la factura. */
+  movimientoIds?: string[];
+  /** Línea libre si no hay movimientos. */
+  items?: { descripcion: string; cantidad: number; importeUnitario: number }[];
+};
+
+export type CreateBatchInvoiceData = {
+  socioIds: string[];
+  tipoFactura: TipoFactura;
+  condicionVenta: CondicionVenta;
+  medioPago: MedioPago;
+  fecha: string;
+  vencimiento: string;
+  desde: string;
+  hasta: string;
+};
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+function alicuotaPara(tipo: TipoFactura): string {
+  // Factura C (Monotributo) → sin IVA discriminado
+  return tipo === 'factura_c' ? '0' : '21';
+}
+
+function precioSinIva(total: number, alicuota: string): number {
+  const a = parseFloat(alicuota);
+  if (!a) return total;
+  return +(total / (1 + a / 100)).toFixed(2);
+}
+
+function buildCliente(p: {
+  email: string;
+  nombre: string | null;
+  apellido: string | null;
+  razonSocial: string | null;
+  tipoDocumento: string | null;
+  numeroDocumento: string | null;
+  direccion: string | null;
+  condicionIva: string | null;
+  condicionVenta: CondicionVenta;
+}): TusFacturasCliente {
+  const razon =
+    p.razonSocial?.trim() || [p.nombre, p.apellido].filter(Boolean).join(' ').trim() || p.email;
+
+  return {
+    documento_tipo: TIPO_DOC_API[p.tipoDocumento ?? ''] ?? 'OTRO',
+    documento_nro: p.numeroDocumento ?? '',
+    razon_social: razon,
+    email: p.email,
+    domicilio: p.direccion ?? '',
+    provincia: '2', // CABA por defecto — TODO: hacer configurable por guardería
+    envia_por_mail: 'N',
+    reclama_deuda: 'N',
+    condicion_pago: CONDICION_PAGO_API[p.condicionVenta] ?? '201',
+    condicion_iva: CONDICION_IVA_API[p.condicionIva ?? ''] ?? 'CF',
+    condicion_iva_operacion: '1',
+  };
+}
+
+function buildDetalle(
+  items: { descripcion: string; cantidad: number; importeUnitario: number }[],
+  tipo: TipoFactura,
+): TusFacturasDetalleItem[] {
+  const alicuota = alicuotaPara(tipo);
+  return items.map((it) => ({
+    cantidad: it.cantidad,
+    producto: {
+      descripcion: it.descripcion,
+      codigo: 'NAUT-001',
+      lista_precios: 'standard',
+      leyenda: '',
+      unidad_bulto: 1,
+      alicuota,
+      precio_unitario_sin_iva: precioSinIva(it.importeUnitario, alicuota),
+    },
+    leyenda: '',
+    tratamiento_descuento: 'A',
+    bonificacion_porcentaje: 0,
+  }));
+}
+
+function totalItems(items: { cantidad: number; importeUnitario: number }[]): number {
+  return items.reduce((s, i) => s + i.cantidad * i.importeUnitario, 0);
+}
+
+function buildPagos(total: number, medio: MedioPago): TusFacturasFormaPago[] {
+  return [{ descripcion: FORMA_PAGO_LABEL[medio] ?? 'Otro', importe: total }];
+}
+
+// ─── Action: factura individual ─────────────────────────────────────────────
+
+export async function createInvoiceAction(data: CreateInvoiceData): Promise<{
+  error?: string;
+  facturaId?: string;
+  comprobanteNro?: string;
+  pdfUrl?: string;
+}> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+
+  const gId = ctx.activeMembership.guarderiaId;
+
+  // 1. Traer socio
+  const [socio] = await db
+    .select({
+      id: profiles.id,
+      email: profiles.email,
+      nombre: profiles.nombre,
+      apellido: profiles.apellido,
+      razonSocial: profiles.razonSocial,
+      tipoDocumento: profiles.tipoDocumento,
+      numeroDocumento: profiles.numeroDocumento,
+      direccion: profiles.direccion,
+      condicionIva: profiles.condicionIva,
+    })
+    .from(profiles)
+    .where(eq(profiles.id, data.socioId));
+
+  if (!socio) return { error: 'Socio no encontrado.' };
+
+  // 2. Construir items desde movimientos (si llegaron) o desde items libres
+  let items: { descripcion: string; cantidad: number; importeUnitario: number }[] = [];
+  let movimientoIds = data.movimientoIds ?? [];
+
+  if (movimientoIds.length > 0) {
+    const movs = await db
+      .select({
+        id: movimientosCuentaCorriente.id,
+        concepto: movimientosCuentaCorriente.concepto,
+        debe: movimientosCuentaCorriente.debe,
+      })
+      .from(movimientosCuentaCorriente)
+      .where(
+        and(
+          inArray(movimientosCuentaCorriente.id, movimientoIds),
+          eq(movimientosCuentaCorriente.socioId, data.socioId),
+        ),
+      );
+
+    items = movs.map((m) => ({
+      descripcion: m.concepto ?? 'Servicio',
+      cantidad: 1,
+      importeUnitario: parseFloat(m.debe ?? '0'),
+    }));
+    movimientoIds = movs.map((m) => m.id);
+  } else if (data.items && data.items.length > 0) {
+    items = data.items;
+  }
+
+  if (items.length === 0) return { error: 'No hay items para facturar.' };
+
+  const total = totalItems(items);
+  if (total <= 0) return { error: 'El total de la factura debe ser mayor a 0.' };
+
+  // 3. Pre-generar ID para usar como external_reference
+  const facturaId = randomUUID();
+
+  // 4. Construir payload y llamar a la API
+  const cliente = buildCliente({ ...socio, condicionVenta: data.condicionVenta });
+  const comprobante: TusFacturasComprobante = {
+    fecha: toTusFecha(data.fecha),
+    vencimiento: toTusFecha(data.vencimiento),
+    tipo: TIPO_FACTURA_API[data.tipoFactura],
+    external_reference: facturaId,
+    operacion: 'V',
+    punto_venta: process.env.TUSFACTURAS_PUNTO_VENTA ?? '00001',
+    moneda: 'PES',
+    cotizacion: 1,
+    periodo_facturado_desde: toTusFecha(data.desde),
+    periodo_facturado_hasta: toTusFecha(data.hasta),
+    rubro: process.env.TUSFACTURAS_RUBRO ?? 'Servicios náuticos',
+    rubro_grupo_contable: process.env.TUSFACTURAS_RUBRO_GRUPO ?? 'Servicios',
+    detalle: buildDetalle(items, data.tipoFactura),
+    total: total.toFixed(2),
+    pagos: {
+      formas_pago: buildPagos(total, data.medioPago),
+      total,
+    },
+  };
+
+  let apiResponse;
+  try {
+    apiResponse = await crearFactura({ cliente, comprobante });
+  } catch (err) {
+    return {
+      error: err instanceof Error ? err.message : 'Error al emitir factura en tusfacturas.app',
+    };
+  }
+
+  // 5. Persistir factura + items + linkear movimientos
+  try {
+    await db.insert(facturacion).values({
+      id: facturaId,
+      guarderiaId: gId,
+      socioId: data.socioId,
+      codigo: apiResponse.comprobante_nro ?? null,
+      archivo: apiResponse.comprobante_pdf_url ?? null,
+      descripcion: `Factura ${TIPO_FACTURA_API[data.tipoFactura]} — ${items[0].descripcion}${items.length > 1 ? ` (+${items.length - 1})` : ''}`,
+      tipoFactura: data.tipoFactura,
+      estado: 'pendiente',
+      condicionVenta: data.condicionVenta,
+      medioPago: data.medioPago,
+      importe: total.toFixed(2),
+      emision: new Date(data.fecha),
+      desde: new Date(data.desde),
+      hasta: new Date(data.hasta),
+      vencimiento: new Date(data.vencimiento),
+      externalReference: facturaId,
+    });
+
+    // Insertar items y linkear movimientos
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i];
+      const [inserted] = await db
+        .insert(facturacionItems)
+        .values({
+          facturacionId: facturaId,
+          socioId: data.socioId,
+          importe: (it.cantidad * it.importeUnitario).toFixed(2),
+          confirmado: true,
+        })
+        .returning({ id: facturacionItems.id });
+
+      if (movimientoIds[i]) {
+        await db.insert(facturacionItemMovimientos).values({
+          facturacionItemId: inserted.id,
+          movimientoId: movimientoIds[i],
+        });
+      }
+    }
+
+    if (movimientoIds.length > 0) {
+      await db
+        .update(movimientosCuentaCorriente)
+        .set({ estado: 'facturado' })
+        .where(inArray(movimientosCuentaCorriente.id, movimientoIds));
+    }
+
+    revalidatePath('/dashboard/facturacion');
+    revalidatePath(`/usuarios/${data.socioId}`);
+
+    return {
+      facturaId,
+      comprobanteNro: apiResponse.comprobante_nro,
+      pdfUrl: apiResponse.comprobante_pdf_url,
+    };
+  } catch (err) {
+    // Factura ya emitida en tusfacturas pero falló nuestra DB → loguear y avisar
+    console.error('Factura emitida en tusfacturas pero falló persistencia local', {
+      comprobanteNro: apiResponse.comprobante_nro,
+      err,
+    });
+    return {
+      error:
+        'La factura se emitió en AFIP pero no se pudo guardar. Contactá al administrador con el número ' +
+        (apiResponse.comprobante_nro ?? facturaId),
+    };
+  }
+}
+
+// ─── Action: factura en lote ────────────────────────────────────────────────
+
+export type BatchResult = {
+  succeeded: { socioId: string; facturaId: string; comprobanteNro?: string }[];
+  skipped: { socioId: string; reason: string }[];
+  failed: { socioId: string; error: string }[];
+};
+
+export async function createBatchInvoicesAction(
+  data: CreateBatchInvoiceData,
+): Promise<{ error?: string; result?: BatchResult }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+
+  if (!data.socioIds.length) return { error: 'Seleccioná al menos un socio.' };
+
+  const result: BatchResult = { succeeded: [], skipped: [], failed: [] };
+
+  for (const socioId of data.socioIds) {
+    // Traer movimientos no pagados / no facturados del socio
+    const movs = await db
+      .select({ id: movimientosCuentaCorriente.id })
+      .from(movimientosCuentaCorriente)
+      .where(
+        and(
+          eq(movimientosCuentaCorriente.socioId, socioId),
+          eq(movimientosCuentaCorriente.estado, 'no_pagado'),
+        ),
+      );
+
+    if (movs.length === 0) {
+      result.skipped.push({ socioId, reason: 'Sin movimientos pendientes' });
+      continue;
+    }
+
+    const res = await createInvoiceAction({
+      socioId,
+      tipoFactura: data.tipoFactura,
+      condicionVenta: data.condicionVenta,
+      medioPago: data.medioPago,
+      fecha: data.fecha,
+      vencimiento: data.vencimiento,
+      desde: data.desde,
+      hasta: data.hasta,
+      movimientoIds: movs.map((m) => m.id),
+    });
+
+    if (res.error) {
+      result.failed.push({ socioId, error: res.error });
+    } else if (res.facturaId) {
+      result.succeeded.push({
+        socioId,
+        facturaId: res.facturaId,
+        comprobanteNro: res.comprobanteNro,
+      });
+    }
+  }
+
+  revalidatePath('/dashboard/facturacion');
+  return { result };
+}
+
+// ─── Action: marcar factura como pagada ────────────────────────────────────
+
+export async function markInvoicePaidAction(
+  id: string,
+  medioPago: MedioPago,
+): Promise<{ error?: string }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+
+  try {
+    await db
+      .update(facturacion)
+      .set({ estado: 'pagada', medioPago })
+      .where(
+        and(eq(facturacion.id, id), eq(facturacion.guarderiaId, ctx.activeMembership.guarderiaId)),
+      );
+
+    revalidatePath('/dashboard/facturacion');
+    return {};
+  } catch {
+    return { error: 'Error al actualizar la factura.' };
+  }
+}
