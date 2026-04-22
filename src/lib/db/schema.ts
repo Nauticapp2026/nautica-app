@@ -148,6 +148,10 @@ export const tipoPorteriaEnum = pgEnum('tipo_porteria', [
   'ingreso_embarcacion',
 ]);
 
+export const tipoAlertaEnum = pgEnum('tipo_alerta', ['retorno_proximo', 'sin_respuesta']);
+
+export const estadoAlertaEnum = pgEnum('estado_alerta', ['pendiente', 'resuelta']);
+
 export const tipoInvitadoEnum = pgEnum('tipo_invitado', ['titular', 'autorizado']);
 
 export const categoriaProveedorEnum = pgEnum('categoria_proveedor', [
@@ -582,6 +586,7 @@ export const porteria = pgTable(
     desde: timestamp('desde', { withTimezone: true }),
     hasta: timestamp('hasta', { withTimezone: true }),
     expiracion: timestamp('expiracion', { withTimezone: true }),
+    arribadaEn: timestamp('arribada_en', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [index('porteria_guarderia_idx').on(t.guarderiaId)],
@@ -925,6 +930,35 @@ export const reservas = pgTable(
 );
 
 // =============================================================================
+// ALERTAS — Monitoreo de retorno (fase 1)
+// =============================================================================
+
+export const alertas = pgTable(
+  'alertas',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    guarderiaId: uuid('guarderia_id')
+      .notNull()
+      .references(() => guarderias.id, { onDelete: 'cascade' }),
+    porteriaId: uuid('porteria_id')
+      .notNull()
+      .references(() => porteria.id, { onDelete: 'cascade' }),
+    socioId: uuid('socio_id').references(() => profiles.id, { onDelete: 'set null' }),
+    tipo: tipoAlertaEnum('tipo').notNull(),
+    estado: estadoAlertaEnum('estado').default('pendiente').notNull(),
+    mensaje: text('mensaje'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+    resolvedBy: uuid('resolved_by').references(() => profiles.id, { onDelete: 'set null' }),
+  },
+  (t) => [
+    uniqueIndex('alertas_porteria_tipo_unique').on(t.porteriaId, t.tipo),
+    index('alertas_guarderia_estado_idx').on(t.guarderiaId, t.estado),
+    index('alertas_socio_estado_idx').on(t.socioId, t.estado),
+  ],
+);
+
+// =============================================================================
 // RELACIONES
 // =============================================================================
 
@@ -1004,6 +1038,13 @@ export const tareasRelations = relations(tareas, ({ one }) => ({
   }),
 }));
 
+export const alertasRelations = relations(alertas, ({ one }) => ({
+  guarderia: one(guarderias, { fields: [alertas.guarderiaId], references: [guarderias.id] }),
+  porteria: one(porteria, { fields: [alertas.porteriaId], references: [porteria.id] }),
+  socio: one(profiles, { fields: [alertas.socioId], references: [profiles.id] }),
+  resolver: one(profiles, { fields: [alertas.resolvedBy], references: [profiles.id] }),
+}));
+
 // =============================================================================
 // TIPOS INFERIDOS
 // =============================================================================
@@ -1020,3 +1061,4 @@ export type Tarea = typeof tareas.$inferSelect;
 export type Comunicacion = typeof comunicaciones.$inferSelect;
 export type Facturacion = typeof facturacion.$inferSelect;
 export type MovimientoCuentaCorriente = typeof movimientosCuentaCorriente.$inferSelect;
+export type Alerta = typeof alertas.$inferSelect;
