@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import Image from 'next/image';
 import QRCodeStyling from 'qr-code-styling';
 import { Logo } from '@/components/shared/logo';
 import { QrCode, Ship, X } from 'lucide-react';
@@ -153,7 +154,7 @@ function QrFullScreen({
                 transform: 'translate(-50%, -50%)',
               }}
             >
-              <Logo size={62} showText={false} />
+              <Image src="/qr-logo.png" alt="Logo" width={74} height={74} />
             </div>
           </div>
         </div>
