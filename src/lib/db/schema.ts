@@ -603,6 +603,8 @@ export const porteriaInvitados = pgTable(
       .notNull()
       .references(() => invitados.id, { onDelete: 'cascade' }),
     cantidadAcompanantes: integer('cantidad_acompanantes').default(0),
+    esTecnico: boolean('es_tecnico').default(false).notNull(),
+    motivoTecnico: text('motivo_tecnico'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [

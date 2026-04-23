@@ -5,7 +5,12 @@ type PorteriaInfo = {
   clubName: string | null;
   socioFullName: string | null;
   socioFirstName: string | null;
-  invitados: { nombre: string; cantidadAcompanantes: number }[];
+  invitados: {
+    nombre: string;
+    cantidadAcompanantes: number;
+    esTecnico: boolean;
+    motivoTecnico: string | null;
+  }[];
   estado: string | null;
 };
 
@@ -15,7 +20,7 @@ async function getPorteriaInfo(id: string): Promise<PorteriaInfo | null> {
     const { data, error } = await admin
       .from('porteria')
       .select(
-        'estado, socio:socio_id(nombre, apellido), guarderia:guarderia_id(nombre), porteria_invitados(cantidad_acompanantes, invitado:invitado_id(nombre, apellido))',
+        'estado, socio:socio_id(nombre, apellido), guarderia:guarderia_id(nombre), porteria_invitados(cantidad_acompanantes, es_tecnico, motivo_tecnico, invitado:invitado_id(nombre, apellido))',
       )
       .eq('id', id)
       .maybeSingle();
@@ -31,7 +36,12 @@ async function getPorteriaInfo(id: string): Promise<PorteriaInfo | null> {
       .map((r) => {
         const inv = Array.isArray(r.invitado) ? r.invitado[0] : r.invitado;
         const nombre = inv ? [inv.nombre, inv.apellido].filter(Boolean).join(' ') : '';
-        return { nombre, cantidadAcompanantes: r.cantidad_acompanantes ?? 0 };
+        return {
+          nombre,
+          cantidadAcompanantes: r.cantidad_acompanantes ?? 0,
+          esTecnico: !!r.es_tecnico,
+          motivoTecnico: (r.motivo_tecnico as string | null) ?? null,
+        };
       })
       .filter((r) => r.nombre);
 

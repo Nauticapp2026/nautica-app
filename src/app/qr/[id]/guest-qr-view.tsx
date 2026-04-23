@@ -3,12 +3,17 @@
 import { useEffect, useRef, useState } from 'react';
 import QRCodeStyling from 'qr-code-styling';
 import { Logo } from '@/components/shared/logo';
-import { QrCode, UserPlus, X } from 'lucide-react';
+import { QrCode, UserPlus, Wrench, X } from 'lucide-react';
 
 const PRIMARY = '#175861';
 const HEADER = '#669999';
 
-type Invitado = { nombre: string; cantidadAcompanantes: number };
+type Invitado = {
+  nombre: string;
+  cantidadAcompanantes: number;
+  esTecnico: boolean;
+  motivoTecnico: string | null;
+};
 
 type Props = {
   id: string;
@@ -76,15 +81,32 @@ export function GuestQrView({
             {invitados.map((inv, idx) => (
               <li
                 key={`${inv.nombre}-${idx}`}
-                className="flex items-center justify-between rounded-[10px] border border-gray-200 bg-white px-4 py-2 text-sm"
+                className="flex flex-col gap-1 rounded-[10px] border border-gray-200 bg-white px-4 py-2 text-sm"
               >
-                <span className="font-medium" style={{ color: '#101828' }}>
-                  {inv.nombre}
-                </span>
-                <span className="text-xs text-gray-500">
-                  + {inv.cantidadAcompanantes}{' '}
-                  {inv.cantidadAcompanantes === 1 ? 'acompañante' : 'acompañantes'}
-                </span>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium" style={{ color: '#101828' }}>
+                      {inv.nombre}
+                    </span>
+                    {inv.esTecnico && (
+                      <span
+                        className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold text-white"
+                        style={{ background: PRIMARY }}
+                      >
+                        <Wrench size={10} /> Técnico
+                      </span>
+                    )}
+                  </div>
+                  {!inv.esTecnico && (
+                    <span className="text-xs whitespace-nowrap text-gray-500">
+                      + {inv.cantidadAcompanantes}{' '}
+                      {inv.cantidadAcompanantes === 1 ? 'acompañante' : 'acompañantes'}
+                    </span>
+                  )}
+                </div>
+                {inv.esTecnico && inv.motivoTecnico && (
+                  <p className="text-xs text-gray-500">Motivo: {inv.motivoTecnico}</p>
+                )}
               </li>
             ))}
           </ul>
