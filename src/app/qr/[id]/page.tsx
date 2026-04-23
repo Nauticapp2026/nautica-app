@@ -5,12 +5,6 @@ type PorteriaInfo = {
   clubName: string | null;
   socioFullName: string | null;
   socioFirstName: string | null;
-  invitados: {
-    nombre: string;
-    cantidadAcompanantes: number;
-    esTecnico: boolean;
-    motivoTecnico: string | null;
-  }[];
   estado: string | null;
   arribadaEn: string | null;
 };
@@ -21,36 +15,26 @@ async function getPorteriaInfo(id: string): Promise<PorteriaInfo | null> {
     const { data, error } = await admin
       .from('porteria')
       .select(
-        'estado, arribada_en, socio:socio_id(nombre, apellido), guarderia:guarderia_id(nombre), porteria_invitados(cantidad_acompanantes, es_tecnico, motivo_tecnico, invitado:invitado_id(nombre, apellido))',
+        'estado, arribada_en, socio:socio_id(nombre, apellido), guarderia:guarderia_id(nombre)',
       )
       .eq('id', id)
       .maybeSingle();
     if (error || !data) return null;
-    const socio = data.socio as any;
-    const guarderia = data.guarderia as any;
-    const rows = (data.porteria_invitados ?? []) as any[];
+    const socio = (Array.isArray(data.socio) ? data.socio[0] : data.socio) as {
+      nombre: string;
+      apellido: string | null;
+    } | null;
+    const guarderia = (Array.isArray(data.guarderia) ? data.guarderia[0] : data.guarderia) as {
+      nombre: string;
+    } | null;
 
     const socioFirstName = socio?.nombre ?? null;
     const socioFullName = socio ? [socio.nombre, socio.apellido].filter(Boolean).join(' ') : null;
-
-    const invitados = rows
-      .map((r) => {
-        const inv = Array.isArray(r.invitado) ? r.invitado[0] : r.invitado;
-        const nombre = inv ? [inv.nombre, inv.apellido].filter(Boolean).join(' ') : '';
-        return {
-          nombre,
-          cantidadAcompanantes: r.cantidad_acompanantes ?? 0,
-          esTecnico: !!r.es_tecnico,
-          motivoTecnico: (r.motivo_tecnico as string | null) ?? null,
-        };
-      })
-      .filter((r) => r.nombre);
 
     return {
       clubName: guarderia?.nombre ?? null,
       socioFirstName,
       socioFullName,
-      invitados,
       estado: data.estado ?? null,
       arribadaEn: (data.arribada_en as string | null) ?? null,
     };
@@ -73,7 +57,6 @@ export default async function GuestQrPage({ params }: { params: Promise<{ id: st
         clubName={info?.clubName ?? null}
         socioFirstName={info?.socioFirstName ?? null}
         socioFullName={info?.socioFullName ?? null}
-        invitados={info?.invitados ?? []}
         estado={info?.estado ?? null}
         arribadaEn={info?.arribadaEn ?? null}
       />

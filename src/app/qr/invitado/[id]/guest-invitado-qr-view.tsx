@@ -3,25 +3,40 @@
 import { useEffect, useRef, useState } from 'react';
 import QRCodeStyling from 'qr-code-styling';
 import { Logo } from '@/components/shared/logo';
-import { QrCode, Ship, X } from 'lucide-react';
+import { QrCode, UserPlus, Wrench, X } from 'lucide-react';
 
 const PRIMARY = '#175861';
 const HEADER = '#669999';
 
 type Props = {
   id: string;
-  clubName: string | null;
-  socioFirstName: string | null;
+  invitadoFullName: string | null;
+  cantidadAcompanantes: number;
+  esTecnico: boolean;
+  motivoTecnico: string | null;
   socioFullName: string | null;
+  clubName: string | null;
   estado: string | null;
   arribadaEn: string | null;
 };
 
-export function GuestQrView({ id, clubName, socioFullName, estado, arribadaEn }: Props) {
+export function GuestInvitadoQrView({
+  id,
+  invitadoFullName,
+  cantidadAcompanantes,
+  esTecnico,
+  motivoTecnico,
+  socioFullName,
+  clubName,
+  estado,
+  arribadaEn,
+}: Props) {
   const [showQr, setShowQr] = useState(false);
 
   const isExpired = estado === 'revocado' || estado === 'usado' || arribadaEn != null;
   const clubLabel = clubName || '—';
+  const invitadoLabel = invitadoFullName || '—';
+  const socioLabel = socioFullName || '—';
 
   if (showQr) {
     return <QrFullScreen id={id} onClose={() => setShowQr(false)} isExpired={isExpired} />;
@@ -40,16 +55,46 @@ export function GuestQrView({ id, clubName, socioFullName, estado, arribadaEn }:
         }}
       >
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/20">
-          <Ship size={18} color="#ffffff" />
+          <UserPlus size={18} color="#ffffff" />
         </div>
         <div className="flex-1">
-          <p className="text-sm font-semibold">QR de acceso del socio</p>
-          <p className="text-xs opacity-90">Presentalo en la guardería para ingresar</p>
+          <p className="text-sm font-semibold">¡Has sido invitado!</p>
+          <p className="text-xs opacity-90">
+            {socioFullName
+              ? `${socioFullName.split(' ')[0]} te ha invitado a ${clubLabel}`
+              : `Un socio te ha invitado a ${clubLabel}`}
+          </p>
         </div>
       </div>
 
-      <Field label="Socio" value={socioFullName || '—'} />
+      <Field label="Invitado" value={invitadoLabel} />
+      {esTecnico && (
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-semibold" style={{ color: '#101828' }}>
+            Tipo de visita
+          </label>
+          <div
+            className="flex items-center gap-2 rounded-[10px] border border-gray-200 bg-white px-4 py-3"
+            style={{ color: '#101828' }}
+          >
+            <span
+              className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold text-white"
+              style={{ background: PRIMARY }}
+            >
+              <Wrench size={10} /> Técnico
+            </span>
+            {motivoTecnico && <span className="text-sm text-gray-700">{motivoTecnico}</span>}
+          </div>
+        </div>
+      )}
       <Field label="Nombre del Marinero/Club" value={clubLabel} />
+      <Field label="Socio que invita" value={socioLabel} />
+      {!esTecnico && cantidadAcompanantes > 0 && (
+        <Field
+          label="Acompañantes"
+          value={`${cantidadAcompanantes} ${cantidadAcompanantes === 1 ? 'persona' : 'personas'}`}
+        />
+      )}
 
       <button
         type="button"
@@ -58,11 +103,13 @@ export function GuestQrView({ id, clubName, socioFullName, estado, arribadaEn }:
         className="flex items-center justify-center gap-2 rounded-[10px] py-3 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
         style={{ background: PRIMARY }}
       >
-        <QrCode size={18} /> Mostrar QR
+        <QrCode size={18} /> Mostrar QR de Invitado
       </button>
 
       {isExpired && (
-        <p className="text-center text-xs text-red-600">Este código ya no está activo.</p>
+        <p className="text-center text-xs text-red-600">
+          Este código ya no está activo. Pedile uno nuevo al socio.
+        </p>
       )}
     </section>
   );
