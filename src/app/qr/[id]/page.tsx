@@ -12,6 +12,7 @@ type PorteriaInfo = {
     motivoTecnico: string | null;
   }[];
   estado: string | null;
+  arribadaEn: string | null;
 };
 
 async function getPorteriaInfo(id: string): Promise<PorteriaInfo | null> {
@@ -20,7 +21,7 @@ async function getPorteriaInfo(id: string): Promise<PorteriaInfo | null> {
     const { data, error } = await admin
       .from('porteria')
       .select(
-        'estado, socio:socio_id(nombre, apellido), guarderia:guarderia_id(nombre), porteria_invitados(cantidad_acompanantes, es_tecnico, motivo_tecnico, invitado:invitado_id(nombre, apellido))',
+        'estado, arribada_en, socio:socio_id(nombre, apellido), guarderia:guarderia_id(nombre), porteria_invitados(cantidad_acompanantes, es_tecnico, motivo_tecnico, invitado:invitado_id(nombre, apellido))',
       )
       .eq('id', id)
       .maybeSingle();
@@ -51,6 +52,7 @@ async function getPorteriaInfo(id: string): Promise<PorteriaInfo | null> {
       socioFullName,
       invitados,
       estado: data.estado ?? null,
+      arribadaEn: (data.arribada_en as string | null) ?? null,
     };
   } catch {
     return null;
@@ -73,6 +75,7 @@ export default async function GuestQrPage({ params }: { params: Promise<{ id: st
         socioFullName={info?.socioFullName ?? null}
         invitados={info?.invitados ?? []}
         estado={info?.estado ?? null}
+        arribadaEn={info?.arribadaEn ?? null}
       />
     </main>
   );

@@ -22,6 +22,7 @@ type Props = {
   socioFullName: string | null;
   invitados: Invitado[];
   estado: string | null;
+  arribadaEn: string | null;
 };
 
 export function GuestQrView({
@@ -31,10 +32,11 @@ export function GuestQrView({
   socioFullName,
   invitados,
   estado,
+  arribadaEn,
 }: Props) {
   const [showQr, setShowQr] = useState(false);
 
-  const isExpired = estado === 'revocado' || estado === 'usado';
+  const isExpired = estado === 'revocado' || estado === 'usado' || arribadaEn != null;
   const clubLabel = clubName || '—';
   const totalPersonas = invitados.reduce((acc, i) => acc + 1 + (i.cantidadAcompanantes ?? 0), 0);
 
