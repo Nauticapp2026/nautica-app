@@ -148,6 +148,8 @@ export const tipoPorteriaEnum = pgEnum('tipo_porteria', [
   'ingreso_embarcacion',
 ]);
 
+export const porteriaTipoEnum = pgEnum('porteria_tipo', ['salida', 'acceso_externo']);
+
 export const tipoAlertaEnum = pgEnum('tipo_alerta', ['retorno_proximo', 'sin_respuesta']);
 
 export const estadoAlertaEnum = pgEnum('estado_alerta', ['pendiente', 'resuelta']);
@@ -582,6 +584,7 @@ export const porteria = pgTable(
     }),
     qr: text('qr').unique(),
     estado: estadoQrEnum('estado').default('activo'),
+    tipo: porteriaTipoEnum('tipo').notNull().default('salida'),
     motivo: text('motivo'),
     desde: timestamp('desde', { withTimezone: true }),
     hasta: timestamp('hasta', { withTimezone: true }),
@@ -589,7 +592,7 @@ export const porteria = pgTable(
     arribadaEn: timestamp('arribada_en', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
-  (t) => [index('porteria_guarderia_idx').on(t.guarderiaId)],
+  (t) => [index('porteria_guarderia_idx').on(t.guarderiaId), index('porteria_tipo_idx').on(t.tipo)],
 );
 
 export const porteriaInvitados = pgTable(

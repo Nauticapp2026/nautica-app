@@ -8,8 +8,7 @@ type InvitadoInfo = {
   motivoTecnico: string | null;
   socioFullName: string | null;
   clubName: string | null;
-  estado: string | null;
-  arribadaEn: string | null;
+  isExpired: boolean;
 };
 
 async function getInvitadoInfo(bridgeId: string): Promise<InvitadoInfo | null> {
@@ -18,7 +17,7 @@ async function getInvitadoInfo(bridgeId: string): Promise<InvitadoInfo | null> {
     const { data, error } = await admin
       .from('porteria_invitados')
       .select(
-        'cantidad_acompanantes, es_tecnico, motivo_tecnico, invitado:invitado_id(nombre, apellido), porteria:porteria_id(estado, arribada_en, socio:socio_id(nombre, apellido), guarderia:guarderia_id(nombre))',
+        'cantidad_acompanantes, es_tecnico, motivo_tecnico, invitado:invitado_id(nombre, apellido), porteria:porteria_id(estado, arribada_en, tipo, hasta, socio:socio_id(nombre, apellido), guarderia:guarderia_id(nombre))',
       )
       .eq('id', bridgeId)
       .maybeSingle();
@@ -33,6 +32,8 @@ async function getInvitadoInfo(bridgeId: string): Promise<InvitadoInfo | null> {
       : data.porteria) as unknown as {
       estado: string | null;
       arribada_en: string | null;
+      tipo: string | null;
+      hasta: string | null;
       socio:
         | { nombre: string; apellido: string | null }
         | { nombre: string; apellido: string | null }[]
@@ -53,6 +54,15 @@ async function getInvitadoInfo(bridgeId: string): Promise<InvitadoInfo | null> {
     ) as { nombre: string } | null | undefined;
     const clubName = guarderia?.nombre ?? null;
 
+    const estado = porteria?.estado ?? null;
+    const arribadaEn = porteria?.arribada_en ?? null;
+    const tipo = porteria?.tipo ?? null;
+    const hasta = porteria?.hasta ?? null;
+    const hastaVencido =
+      tipo === 'acceso_externo' && hasta ? new Date(hasta).getTime() < Date.now() : false;
+    const isExpired =
+      estado === 'revocado' || estado === 'usado' || arribadaEn != null || hastaVencido;
+
     return {
       invitadoFullName,
       cantidadAcompanantes: data.cantidad_acompanantes ?? 0,
@@ -60,8 +70,7 @@ async function getInvitadoInfo(bridgeId: string): Promise<InvitadoInfo | null> {
       motivoTecnico: (data.motivo_tecnico as string | null) ?? null,
       socioFullName,
       clubName,
-      estado: porteria?.estado ?? null,
-      arribadaEn: porteria?.arribada_en ?? null,
+      isExpired,
     };
   } catch {
     return null;
@@ -85,8 +94,7 @@ export default async function GuestInvitadoQrPage({ params }: { params: Promise<
         motivoTecnico={info?.motivoTecnico ?? null}
         socioFullName={info?.socioFullName ?? null}
         clubName={info?.clubName ?? null}
-        estado={info?.estado ?? null}
-        arribadaEn={info?.arribadaEn ?? null}
+        isExpired={info?.isExpired ?? false}
       />
     </main>
   );

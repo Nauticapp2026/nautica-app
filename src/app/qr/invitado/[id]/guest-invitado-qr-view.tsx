@@ -17,8 +17,7 @@ type Props = {
   motivoTecnico: string | null;
   socioFullName: string | null;
   clubName: string | null;
-  estado: string | null;
-  arribadaEn: string | null;
+  isExpired: boolean;
 };
 
 export function GuestInvitadoQrView({
@@ -29,12 +28,9 @@ export function GuestInvitadoQrView({
   motivoTecnico,
   socioFullName,
   clubName,
-  estado,
-  arribadaEn,
+  isExpired,
 }: Props) {
   const [showQr, setShowQr] = useState(false);
-
-  const isExpired = estado === 'revocado' || estado === 'usado' || arribadaEn != null;
   const clubLabel = clubName || '—';
   const invitadoLabel = invitadoFullName || '—';
   const socioLabel = socioFullName || '—';
