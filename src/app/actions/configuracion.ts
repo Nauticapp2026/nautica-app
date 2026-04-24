@@ -7,6 +7,7 @@ import { db } from '@/lib/db';
 import { guarderias, horariosDia, memberships, profiles } from '@/lib/db/schema';
 import { getActiveMarina } from '@/lib/auth/session';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { translateInviteError } from '@/lib/auth/errors';
 import { administrarPuntoVenta, toTusFecha } from '@/lib/tusfacturas/client';
 import { CONDICION_IVA_API } from '@/lib/tusfacturas/mappers';
 
@@ -302,11 +303,8 @@ export async function createMiembroEquipoAction(
   });
 
   if (inviteError) {
-    const msg = inviteError.message.toLowerCase();
-    if (msg.includes('already been registered') || msg.includes('already exists')) {
-      return { error: 'Ya existe una cuenta con ese email.' };
-    }
-    return { error: 'Error al crear la cuenta. Verificá el email e intentá de nuevo.' };
+    console.error('[createMiembroEquipoAction] inviteError', { email, inviteError });
+    return { error: translateInviteError(inviteError.message) };
   }
 
   const profileId = inviteData.user.id;
