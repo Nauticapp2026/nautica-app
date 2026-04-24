@@ -212,23 +212,13 @@ export async function savePuntoVentaAction(data: SavePuntoVentaData): Promise<{ 
       cuit: guarderia.cuit,
       iva_condicion: ivaCode,
       iva_emails: guarderia.email,
-      iibb: guarderia.iibb ?? '',
+      ...(guarderia.iibb ? { iibb: guarderia.iibb } : {}),
       fecha_inicio: toTusFecha(data.fechaInicio),
       factura_afip: 'S',
       es_agente_retencion: 'N',
       esta_activo: 'S',
       es_predeterminado: 'S',
       conceptos_tipo: 'PS',
-      webhook: '',
-      factura: {
-        leyenda_general_predeterminada: '',
-        titulo: '',
-        subtitulo: '',
-        reply_to_email: '',
-        reply_to: '',
-        mensaje: '',
-        copias: '',
-      },
     });
   } catch (err) {
     return {

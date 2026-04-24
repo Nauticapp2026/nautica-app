@@ -138,22 +138,24 @@ export type TusFacturasPuntoVentaInput = {
   cuit: string;
   iva_condicion: string; // 'M' | 'RI' | 'CF' | 'EX' | ...
   iva_emails: string;
-  iibb: string;
+  iibb?: string;
   fecha_inicio: string; // 'DD/MM/YYYY'
   factura_afip: 'S' | 'N';
   es_agente_retencion: 'S' | 'N';
   esta_activo: 'S' | 'N';
   es_predeterminado: 'S' | 'N';
   conceptos_tipo: 'PS' | 'P' | 'S';
-  webhook: string;
-  factura: {
-    leyenda_general_predeterminada: string;
-    titulo: string;
-    subtitulo: string;
-    reply_to_email: string;
-    reply_to: string;
-    mensaje: string;
-    copias: string;
+  // Solo incluir si es una URL válida — tusfacturas valida el formato.
+  webhook?: string;
+  // Todas las propiedades opcionales; si no se pasa `factura`, se usan defaults de tusfacturas.
+  factura?: {
+    leyenda_general_predeterminada?: string;
+    titulo?: string;
+    subtitulo?: string;
+    reply_to_email?: string;
+    reply_to?: string;
+    mensaje?: string;
+    copias?: string;
   };
 };
 
