@@ -2,7 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { translateAuthError } from '@/lib/auth/errors';
+import { translateAuthError, translateInviteError } from '@/lib/auth/errors';
 import { db } from '@/lib/db';
 import { guarderias, memberships, horariosDia, profiles } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
@@ -306,12 +306,7 @@ export async function inviteTeamMembersStep(
 
     if (inviteError) {
       console.error('[inviteTeamMembersStep] inviteError', email, inviteError);
-      const msg = inviteError.message.toLowerCase();
-      if (msg.includes('already been registered') || msg.includes('already exists')) {
-        errores.push(`${email}: ya tiene cuenta`);
-      } else {
-        errores.push(`${email}: ${inviteError.message}`);
-      }
+      errores.push(`${email}: ${translateInviteError(inviteError.message)}`);
       continue;
     }
 

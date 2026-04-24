@@ -11,6 +11,7 @@ import {
 } from '@/lib/db/schema';
 import { getActiveMarina } from '@/lib/auth/session';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { translateInviteError } from '@/lib/auth/errors';
 import { and, eq } from 'drizzle-orm';
 
 export type CreateSocioData = {
@@ -52,13 +53,8 @@ export async function createSocioAction(data: CreateSocioData): Promise<SocioRes
   );
 
   if (inviteError) {
-    if (
-      inviteError.message.toLowerCase().includes('already been registered') ||
-      inviteError.message.toLowerCase().includes('already exists')
-    ) {
-      return { error: 'Ya existe una cuenta con ese email.' };
-    }
-    return { error: 'Error al crear la cuenta del socio. Verificá el email e intentá de nuevo.' };
+    console.error('[createSocioAction] inviteError', { email: emailLower, inviteError });
+    return { error: translateInviteError(inviteError.message) };
   }
 
   const profileId = inviteData.user.id;
