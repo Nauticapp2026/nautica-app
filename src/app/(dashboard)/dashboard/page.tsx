@@ -12,7 +12,7 @@ import {
 } from '@/lib/db/schema';
 import { and, asc, count, desc, eq, gte, lte, sum } from 'drizzle-orm';
 
-import { AlertasOperativasSection, type AlertaOperativa } from './alertas-operativas';
+import { AlertasOperativasList, type AlertaOperativa } from './alertas-operativas';
 import {
   Ship,
   Users,
@@ -139,7 +139,6 @@ export default async function DashboardPage() {
     [{ totalSocios }],
     [{ totalIngresos }],
     [{ totalAlertas }],
-    alertasList,
     operariosList,
     comunicacionesList,
     alertasOperativasRows,
@@ -176,18 +175,6 @@ export default async function DashboardPage() {
       .select({ totalAlertas: count() })
       .from(facturacion)
       .where(and(eq(facturacion.guarderiaId, gId), eq(facturacion.estado, 'vencida'))),
-
-    db
-      .select({
-        id: facturacion.id,
-        descripcion: facturacion.descripcion,
-        importe: facturacion.importe,
-        vencimiento: facturacion.vencimiento,
-      })
-      .from(facturacion)
-      .where(and(eq(facturacion.guarderiaId, gId), eq(facturacion.estado, 'vencida')))
-      .orderBy(desc(facturacion.vencimiento))
-      .limit(8),
 
     db
       .select({
@@ -305,7 +292,7 @@ export default async function DashboardPage() {
 
       {/* Alertas + Operarios */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Alertas */}
+        {/* Alertas operativas — monitoreo de retorno de embarcaciones */}
         <div className="rounded-2xl border border-gray-200 bg-white p-6">
           <div className="mb-4 flex items-center gap-2">
             <Bell className="h-4 w-4" style={{ color: '#175861' }} />
@@ -313,29 +300,7 @@ export default async function DashboardPage() {
               Alertas
             </h2>
           </div>
-          {alertasList.length === 0 ? (
-            <EmptyState
-              icon={<Bell className="h-7 w-7 opacity-40" />}
-              text="No hay alertas pendientes."
-            />
-          ) : (
-            <div className="space-y-3">
-              {alertasList.map((a) => (
-                <div
-                  key={a.id}
-                  className="flex items-center justify-between rounded-[10px] border border-amber-400 bg-amber-50 px-4 py-3"
-                >
-                  <span className="text-sm font-medium text-amber-900">
-                    {a.descripcion ?? 'Pago vencido'}
-                    {a.importe ? ` — $${parseFloat(a.importe).toLocaleString('es-AR')}` : ''}
-                  </span>
-                  <span className="ml-3 shrink-0 text-xs text-amber-700 opacity-80">
-                    {formatShortDate(a.vencimiento)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
+          <AlertasOperativasList alertas={alertasOperativas} />
         </div>
 
         {/* Operarios */}
@@ -389,9 +354,6 @@ export default async function DashboardPage() {
           )}
         </div>
       </div>
-
-      {/* Alertas operativas (retorno de embarcaciones) */}
-      <AlertasOperativasSection alertas={alertasOperativas} />
 
       {/* Comunicaciones recientes */}
       <div className="rounded-2xl border border-gray-200 bg-white p-6">
