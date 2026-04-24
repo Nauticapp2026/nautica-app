@@ -1,18 +1,18 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { CheckCircle } from 'lucide-react';
 
 const inputCls =
   'h-12 w-full rounded-[10px] border border-gray-200 bg-white px-4 text-sm text-[#101828] focus:border-[#175861] focus:outline-none focus:ring-1 focus:ring-[#175861]';
 
 export default function CrearCuentaPage() {
+  const router = useRouter();
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [done, setDone] = useState(false);
 
   const isValid = password.length >= 6 && password === confirm;
 
@@ -29,33 +29,16 @@ export default function CrearCuentaPage() {
     setLoading(true);
     const supabase = createClient();
     const { error: updateError } = await supabase.auth.updateUser({ password });
-    setLoading(false);
     if (updateError) {
+      setLoading(false);
       setError('No se pudo configurar la contraseña. El enlace puede haber expirado.');
-    } else {
-      setDone(true);
+      return;
     }
-  }
-
-  if (done) {
-    return (
-      <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-xl">
-        <div className="flex flex-col items-center gap-4 text-center">
-          <div
-            className="flex h-16 w-16 items-center justify-center rounded-full"
-            style={{ background: '#E6F4F1' }}
-          >
-            <CheckCircle className="h-8 w-8" style={{ color: '#175861' }} />
-          </div>
-          <h1 className="text-xl font-bold" style={{ color: '#101828' }}>
-            ¡Contraseña configurada!
-          </h1>
-          <p className="text-sm text-gray-500">
-            Tu cuenta está lista. Descargá la app NauticApp para ingresar con tu email y contraseña.
-          </p>
-        </div>
-      </div>
-    );
+    // Redirigimos al dashboard: si el usuario tiene rol con acceso web
+    // (admin/operario/super_admin) entra directo; si no, el gate lo manda a
+    // /no-access con el mensaje de "usá la app mobile".
+    router.replace('/dashboard');
+    router.refresh();
   }
 
   return (
