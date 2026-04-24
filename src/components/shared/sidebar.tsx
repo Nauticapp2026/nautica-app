@@ -37,7 +37,7 @@ const NAV = [
   { href: '/dashboard/espacios', label: 'Espacios', icon: Anchor },
   { href: '/dashboard/comunicaciones', label: 'Comunicaciones', icon: MessageSquare },
   { href: '/facturacion', label: 'Facturación', icon: FileText },
-  { href: '/dashboard/tarifario', label: 'Tarifario', icon: Tag },
+  { href: '/tarifario', label: 'Tarifario', icon: Tag },
   { href: '/configuracion', label: 'Configuración', icon: Settings },
 ];
 
