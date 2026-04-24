@@ -284,6 +284,8 @@ export async function inviteTeamMembersStep(
   const errores: string[] = [];
   let creados = 0;
 
+  console.log('[inviteTeamMembersStep] start', { guarderiaId, cantidad: miembros.length });
+
   for (const m of miembros) {
     const email = m.email.trim().toLowerCase();
     const nombre = m.nombre.trim();
@@ -293,7 +295,7 @@ export async function inviteTeamMembersStep(
       continue;
     }
     if (!TEAM_ROLES.includes(m.rol as TeamRol)) {
-      errores.push(`${email}: rol inválido`);
+      errores.push(`${email}: rol inválido (${m.rol || 'vacío'})`);
       continue;
     }
 
@@ -303,6 +305,7 @@ export async function inviteTeamMembersStep(
     );
 
     if (inviteError) {
+      console.error('[inviteTeamMembersStep] inviteError', email, inviteError);
       const msg = inviteError.message.toLowerCase();
       if (msg.includes('already been registered') || msg.includes('already exists')) {
         errores.push(`${email}: ya tiene cuenta`);
@@ -347,11 +350,14 @@ export async function inviteTeamMembersStep(
         .onConflictDoNothing();
 
       creados++;
+      console.log('[inviteTeamMembersStep] creado', email, profileId);
     } catch (err) {
+      console.error('[inviteTeamMembersStep] DB error', email, err);
       errores.push(`${email}: ${err instanceof Error ? err.message : 'Error desconocido'}`);
     }
   }
 
+  console.log('[inviteTeamMembersStep] done', { creados, errores });
   return { creados, errores: errores.length > 0 ? errores : undefined };
 }
 

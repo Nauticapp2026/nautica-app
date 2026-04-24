@@ -665,6 +665,8 @@ function Step4({
   onNext,
   onBack,
   onSkip,
+  error,
+  pending,
 }: {
   data: Data;
   onAddMember: () => void;
@@ -673,6 +675,8 @@ function Step4({
   onNext: () => void;
   onBack: () => void;
   onSkip: () => void;
+  error?: string;
+  pending?: boolean;
 }) {
   return (
     <>
@@ -768,18 +772,26 @@ function Step4({
         <Plus className="h-4 w-4" /> Agregar miembro del equipo
       </button>
 
+      {error && (
+        <p className="mb-3 rounded-[10px] border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          {error}
+        </p>
+      )}
+
       <div className="flex gap-3">
         <button
           type="button"
           onClick={onBack}
-          className="flex-1 rounded-[10px] border border-[#d1d5dc] bg-white py-3 text-sm font-medium text-[#364153] hover:bg-gray-50"
+          disabled={pending}
+          className="flex-1 rounded-[10px] border border-[#d1d5dc] bg-white py-3 text-sm font-medium text-[#364153] hover:bg-gray-50 disabled:opacity-40"
         >
           Atras
         </button>
         <button
           type="button"
           onClick={onSkip}
-          className="flex-1 rounded-[10px] border py-3 text-sm font-medium transition hover:bg-gray-50"
+          disabled={pending}
+          className="flex-1 rounded-[10px] border py-3 text-sm font-medium transition hover:bg-gray-50 disabled:opacity-40"
           style={{ borderColor: '#669E9D', color: '#669E9D' }}
         >
           Lo configuro más tarde
@@ -787,10 +799,11 @@ function Step4({
         <button
           type="button"
           onClick={onNext}
-          className="flex flex-1 items-center justify-center gap-2 rounded-[10px] py-3 text-sm font-semibold text-white hover:opacity-90"
+          disabled={pending}
+          className="flex flex-1 items-center justify-center gap-2 rounded-[10px] py-3 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40"
           style={{ background: '#175861' }}
         >
-          Continuar <ChevronRight className="h-4 w-4" />
+          {pending ? 'Invitando…' : 'Continuar'} <ChevronRight className="h-4 w-4" />
         </button>
       </div>
     </>
@@ -1225,21 +1238,39 @@ export default function OnboardingPage() {
     next();
   }
 
-  async function handleStep4() {
-    // Filtrar miembros vacíos (nombre + email requeridos).
-    const miembros = data.equipo.filter((m) => m.nombre.trim() && m.email.trim());
-    if (data.guarderiaId && miembros.length > 0) {
-      const res = await inviteTeamMembersStep(data.guarderiaId, miembros);
+  function handleStep4() {
+    setError(undefined);
+    // Filtrar miembros incompletos — requerimos nombre, email y rol.
+    const completos = data.equipo.filter((m) => m.nombre.trim() && m.email.trim() && m.rol.trim());
+    const incompletos = data.equipo.length - completos.length;
+
+    if (!data.guarderiaId) {
+      next();
+      return;
+    }
+
+    if (completos.length === 0) {
+      if (incompletos > 0) {
+        setError('Hay miembros con campos vacíos (nombre, email o rol). Completalos o quitalos.');
+        return;
+      }
+      // Sin miembros → avanzamos directo.
+      next();
+      return;
+    }
+
+    startTransition(async () => {
+      const res = await inviteTeamMembersStep(data.guarderiaId, completos);
       if (res.error) {
         setError(res.error);
         return;
       }
       if (res.errores && res.errores.length > 0) {
         setError(`Algunos miembros fallaron: ${res.errores.join(' · ')}`);
-        // Igual avanzamos — los que se crearon ya están y si reintenta va a duplicar
+        return; // NO avanzamos — que el usuario corrija
       }
-    }
-    next();
+      next();
+    });
   }
 
   async function handleStep6() {
@@ -1323,11 +1354,11 @@ export default function OnboardingPage() {
               return { ...prev, equipo };
             })
           }
-          onNext={() => {
-            startTransition(handleStep4);
-          }}
+          onNext={handleStep4}
           onBack={back}
           onSkip={next}
+          error={error}
+          pending={pending}
         />
       )}
       {step === 5 && (
