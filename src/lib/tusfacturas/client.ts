@@ -180,7 +180,12 @@ export async function administrarPuntoVenta(
     throw new Error(`tusfacturas HTTP ${res.status}`);
   }
 
-  const data = (await res.json()) as TusFacturasPuntoVentaResponse;
+  const raw = await res.json();
+  // TEMP LOG — capturar respuesta completa para descubrir qué devuelve tusfacturas
+  // al administrar POS (especialmente si trae keys per-guardería). Remover en
+  // el próximo commit una vez que sepamos el shape del response.
+  console.log('[TUSFACTURAS_POS_RESPONSE]', JSON.stringify(raw));
+  const data = raw as TusFacturasPuntoVentaResponse;
   if (data.error === 'S') {
     const msg = data.errores?.join(' · ') ?? data.rta ?? 'Error al administrar el punto de venta';
     throw new Error(msg);
