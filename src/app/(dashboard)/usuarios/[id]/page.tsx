@@ -122,16 +122,23 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
         .orderBy(desc(documentos.createdAt)),
     ]);
 
-  // Generar signed URLs (el bucket es privado por RLS).
+  // Resolver URL de cada documento. Soportamos dos formatos en
+  // documento_url (histórico y nuevo):
+  //  - URL completa ("https://…/storage/v1/object/…"): se usa tal cual.
+  //  - Path relativo del bucket ("{socioId}/{filename}"): se genera signed URL.
   const admin = createAdminClient();
   const documentosConUrl = await Promise.all(
     documentosList.map(async (d) => {
       let signedUrl: string | null = null;
       if (d.documentoUrl) {
-        const { data } = await admin.storage
-          .from('documentos')
-          .createSignedUrl(d.documentoUrl, 60 * 60); // 1 hora
-        signedUrl = data?.signedUrl ?? null;
+        if (/^https?:\/\//i.test(d.documentoUrl)) {
+          signedUrl = d.documentoUrl;
+        } else {
+          const { data } = await admin.storage
+            .from('documentos')
+            .createSignedUrl(d.documentoUrl, 60 * 60); // 1 hora
+          signedUrl = data?.signedUrl ?? null;
+        }
       }
       return {
         id: d.id,
