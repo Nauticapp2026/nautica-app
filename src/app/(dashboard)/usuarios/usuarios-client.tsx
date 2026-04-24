@@ -372,10 +372,8 @@ export function UsuariosClient({ socios }: { socios: Socio[] }) {
       <div className="p-8">
         {/* Header */}
         <div className="mb-6">
-          <h1 className="text-2xl font-bold" style={{ color: '#101828' }}>
-            Usuarios
-          </h1>
-          <p className="mt-0.5 text-sm text-gray-400">Gestiona socios, invitados y proveedores</p>
+          <h1 className="page-title">Usuarios</h1>
+          <p className="page-subtitle mt-1">Gestiona socios, invitados y proveedores</p>
         </div>
 
         {/* Tabs */}

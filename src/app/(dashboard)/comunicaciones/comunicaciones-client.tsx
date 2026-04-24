@@ -80,12 +80,8 @@ export function ComunicacionesClient({ comunicaciones }: { comunicaciones: Comun
     <div className="p-8">
       <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold" style={{ color: '#101828' }}>
-            Comunicaciones
-          </h1>
-          <p className="mt-1 text-sm" style={{ color: '#669E9D' }}>
-            Gestiona anuncios y comunicados
-          </p>
+          <h1 className="page-title">Comunicaciones</h1>
+          <p className="page-subtitle mt-1">Gestiona anuncios y comunicados</p>
         </div>
         <button
           type="button"

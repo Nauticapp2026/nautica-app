@@ -152,12 +152,8 @@ export function TarifarioClient({ tarifas }: { tarifas: Tarifa[] }) {
     <div className="p-8">
       <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold" style={{ color: '#101828' }}>
-            Tarifario
-          </h1>
-          <p className="mt-1 text-sm" style={{ color: '#669E9D' }}>
-            Gestiona y actualiza las tarifas de servicios
-          </p>
+          <h1 className="page-title">Tarifario</h1>
+          <p className="page-subtitle mt-1">Gestiona y actualiza las tarifas de servicios</p>
         </div>
         <button
           type="button"

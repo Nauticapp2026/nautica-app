@@ -500,12 +500,8 @@ export function TareasClient({
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold" style={{ color: '#101828' }}>
-            Gestión de Embarcaciones
-          </h1>
-          <p className="mt-0.5 text-sm" style={{ color: '#669E9D' }}>
-            Seguimiento del proceso operativo de embarcaciones
-          </p>
+          <h1 className="page-title">Gestión de Embarcaciones</h1>
+          <p className="page-subtitle mt-1">Seguimiento del proceso operativo de embarcaciones</p>
         </div>
         {canCreate && (
           <button

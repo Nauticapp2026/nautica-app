@@ -157,10 +157,8 @@ export function EspaciosClient({
     <div className="p-8">
       <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold" style={{ color: '#101828' }}>
-            Gestión de espacios
-          </h1>
-          <p className="mt-1 text-sm" style={{ color: '#669E9D' }}>
+          <h1 className="page-title">Gestión de espacios</h1>
+          <p className="page-subtitle mt-1">
             Creá áreas con peines y amarras, asigná clientes y embarcaciones
           </p>
         </div>

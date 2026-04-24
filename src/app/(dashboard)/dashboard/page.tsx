@@ -254,12 +254,8 @@ export default async function DashboardPage() {
     <div className="space-y-6 p-8">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold" style={{ color: '#101828' }}>
-          Bienvenido, {rolLabel}
-        </h1>
-        <p className="mt-0.5 text-sm" style={{ color: '#669E9D' }}>
-          {formatDate()}
-        </p>
+        <h1 className="page-title">Bienvenido, {rolLabel}</h1>
+        <p className="page-subtitle mt-1">{formatDate()}</p>
       </div>
 
       {/* Metric cards */}
