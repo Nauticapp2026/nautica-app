@@ -15,6 +15,7 @@ import {
   servicios,
 } from '@/lib/db/schema';
 import { getActiveMarina } from '@/lib/auth/session';
+import { ensureMonthlyMovimiento } from '@/lib/movimientos-mensuales';
 
 export type CreateAreaInput =
   | {
@@ -220,14 +221,18 @@ export async function updateEspacioAction(input: UpdateEspacioInput): Promise<{ 
 
   // Validar que el servicio pertenezca a la guardería.
   let tarifaPrecio: string | null = null;
+  let servicioNombre: string | null = null;
+  let servicioPrecioNum = 0;
   if (input.servicioId) {
     const [s] = await db
-      .select({ id: servicios.id, precio: servicios.precio })
+      .select({ id: servicios.id, nombre: servicios.nombre, precio: servicios.precio })
       .from(servicios)
       .where(and(eq(servicios.id, input.servicioId), eq(servicios.guarderiaId, guarderiaId)))
       .limit(1);
     if (!s) return { error: 'La tarifa seleccionada no existe.' };
     tarifaPrecio = s.precio ?? null;
+    servicioNombre = s.nombre;
+    servicioPrecioNum = s.precio != null ? Number(s.precio) : 0;
   }
 
   await db
@@ -243,6 +248,22 @@ export async function updateEspacioAction(input: UpdateEspacioInput): Promise<{ 
       tarifa: tarifaPrecio,
     })
     .where(eq(espacios.id, input.id));
+
+  // Si hay ocupante + servicio, garantizamos el movimiento mensual del mes
+  // corriente. Los movimientos históricos no se tocan (por decisión del usuario).
+  if (input.ocupanteId && input.servicioId && servicioNombre) {
+    try {
+      await ensureMonthlyMovimiento({
+        socioId: input.ocupanteId,
+        servicioId: input.servicioId,
+        precio: servicioPrecioNum,
+        concepto: servicioNombre,
+      });
+    } catch (err) {
+      // No bloqueamos el save del espacio si falla el movimiento.
+      console.error('[ensureMonthlyMovimiento] error', err);
+    }
+  }
 
   revalidatePath('/espacios');
   return {};
