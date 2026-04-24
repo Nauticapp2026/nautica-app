@@ -24,14 +24,14 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const userInitial = (profile.nombre?.[0] ?? profile.email[0]).toUpperCase();
 
   return (
-    <div className="flex min-h-screen bg-[#F9FAFB]">
+    <div className="flex min-h-screen flex-col bg-[#F9FAFB] md:flex-row">
       <Sidebar
         guarderiaName={activeGuarderia.nombre}
         userName={userName}
         userInitial={userInitial}
         rol={activeMembership.rol}
       />
-      <main className="flex-1 overflow-auto">{children}</main>
+      <main className="min-w-0 flex-1 overflow-auto">{children}</main>
     </div>
   );
 }
