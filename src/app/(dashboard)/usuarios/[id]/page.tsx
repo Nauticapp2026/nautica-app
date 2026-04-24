@@ -2,14 +2,16 @@ import { redirect } from 'next/navigation';
 import { getActiveMarina } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import {
-  profiles,
-  memberships,
+  documentos,
   embarcaciones,
-  servicios as serviciosTable,
-  movimientosCuentaCorriente,
   invitados,
+  memberships,
+  movimientosCuentaCorriente,
+  profiles,
+  servicios as serviciosTable,
 } from '@/lib/db/schema';
 import { eq, and, desc } from 'drizzle-orm';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { SocioDetail } from './socio-detail';
 
 export default async function SocioPage({ params }: { params: Promise<{ id: string }> }) {
@@ -51,60 +53,95 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
 
   const socio = rows[0];
 
-  const [embarcacionesList, movimientosList, serviciosList, invitadosList] = await Promise.all([
-    db
-      .select({
-        id: embarcaciones.id,
-        nombre: embarcaciones.nombre,
-        matricula: embarcaciones.matricula,
-        modelo: embarcaciones.modelo,
-        seguro: embarcaciones.seguro,
-      })
-      .from(embarcaciones)
-      .where(and(eq(embarcaciones.profileId, id), eq(embarcaciones.guarderiaId, gId))),
+  const [embarcacionesList, movimientosList, serviciosList, invitadosList, documentosList] =
+    await Promise.all([
+      db
+        .select({
+          id: embarcaciones.id,
+          nombre: embarcaciones.nombre,
+          matricula: embarcaciones.matricula,
+          modelo: embarcaciones.modelo,
+          seguro: embarcaciones.seguro,
+        })
+        .from(embarcaciones)
+        .where(and(eq(embarcaciones.profileId, id), eq(embarcaciones.guarderiaId, gId))),
 
-    db
-      .select({
-        id: movimientosCuentaCorriente.id,
-        fecha: movimientosCuentaCorriente.fecha,
-        concepto: movimientosCuentaCorriente.concepto,
-        tipo: movimientosCuentaCorriente.tipo,
-        estado: movimientosCuentaCorriente.estado,
-        debe: movimientosCuentaCorriente.debe,
-        haber: movimientosCuentaCorriente.haber,
-        servicioNombre: serviciosTable.nombre,
-        servicioId: movimientosCuentaCorriente.servicioId,
-      })
-      .from(movimientosCuentaCorriente)
-      .leftJoin(serviciosTable, eq(serviciosTable.id, movimientosCuentaCorriente.servicioId))
-      .where(eq(movimientosCuentaCorriente.socioId, id))
-      .orderBy(desc(movimientosCuentaCorriente.fecha)),
+      db
+        .select({
+          id: movimientosCuentaCorriente.id,
+          fecha: movimientosCuentaCorriente.fecha,
+          concepto: movimientosCuentaCorriente.concepto,
+          tipo: movimientosCuentaCorriente.tipo,
+          estado: movimientosCuentaCorriente.estado,
+          debe: movimientosCuentaCorriente.debe,
+          haber: movimientosCuentaCorriente.haber,
+          servicioNombre: serviciosTable.nombre,
+          servicioId: movimientosCuentaCorriente.servicioId,
+        })
+        .from(movimientosCuentaCorriente)
+        .leftJoin(serviciosTable, eq(serviciosTable.id, movimientosCuentaCorriente.servicioId))
+        .where(eq(movimientosCuentaCorriente.socioId, id))
+        .orderBy(desc(movimientosCuentaCorriente.fecha)),
 
-    db
-      .select({
-        id: serviciosTable.id,
-        nombre: serviciosTable.nombre,
-        precio: serviciosTable.precio,
-      })
-      .from(serviciosTable)
-      .where(and(eq(serviciosTable.guarderiaId, gId), eq(serviciosTable.estado, 'activo'))),
+      db
+        .select({
+          id: serviciosTable.id,
+          nombre: serviciosTable.nombre,
+          precio: serviciosTable.precio,
+        })
+        .from(serviciosTable)
+        .where(and(eq(serviciosTable.guarderiaId, gId), eq(serviciosTable.estado, 'activo'))),
 
-    db
-      .select({
-        id: invitados.id,
-        nombre: invitados.nombre,
-        apellido: invitados.apellido,
-        email: invitados.email,
-        telefono: invitados.telefono,
-        motivo: invitados.motivo,
-        estado: invitados.estado,
-        validoHasta: invitados.validoHasta,
-        createdAt: invitados.createdAt,
-      })
-      .from(invitados)
-      .where(and(eq(invitados.socioId, id), eq(invitados.guarderiaId, gId)))
-      .orderBy(desc(invitados.createdAt)),
-  ]);
+      db
+        .select({
+          id: invitados.id,
+          nombre: invitados.nombre,
+          apellido: invitados.apellido,
+          email: invitados.email,
+          telefono: invitados.telefono,
+          motivo: invitados.motivo,
+          estado: invitados.estado,
+          validoHasta: invitados.validoHasta,
+          createdAt: invitados.createdAt,
+        })
+        .from(invitados)
+        .where(and(eq(invitados.socioId, id), eq(invitados.guarderiaId, gId)))
+        .orderBy(desc(invitados.createdAt)),
+
+      db
+        .select({
+          id: documentos.id,
+          nombre: documentos.nombre,
+          tipo: documentos.tipo,
+          documentoUrl: documentos.documentoUrl,
+          vencimiento: documentos.vencimiento,
+          createdAt: documentos.createdAt,
+        })
+        .from(documentos)
+        .where(eq(documentos.profileId, id))
+        .orderBy(desc(documentos.createdAt)),
+    ]);
+
+  // Generar signed URLs (el bucket es privado por RLS).
+  const admin = createAdminClient();
+  const documentosConUrl = await Promise.all(
+    documentosList.map(async (d) => {
+      let signedUrl: string | null = null;
+      if (d.documentoUrl) {
+        const { data } = await admin.storage
+          .from('documentos')
+          .createSignedUrl(d.documentoUrl, 60 * 60); // 1 hora
+        signedUrl = data?.signedUrl ?? null;
+      }
+      return {
+        id: d.id,
+        nombre: d.nombre,
+        tipo: d.tipo ?? null,
+        createdAt: d.createdAt.toISOString(),
+        signedUrl,
+      };
+    }),
+  );
 
   return (
     <SocioDetail
@@ -126,6 +163,7 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
         validoHasta: i.validoHasta?.toISOString() ?? null,
         createdAt: i.createdAt.toISOString(),
       }))}
+      documentos={documentosConUrl}
     />
   );
 }
