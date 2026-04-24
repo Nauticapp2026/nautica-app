@@ -7,6 +7,8 @@ import { db } from '@/lib/db';
 import { guarderias, horariosDia, memberships, profiles } from '@/lib/db/schema';
 import { getActiveMarina } from '@/lib/auth/session';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { administrarPuntoVenta, toTusFecha } from '@/lib/tusfacturas/client';
+import { CONDICION_IVA_API } from '@/lib/tusfacturas/mappers';
 
 const DIAS = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'] as const;
 type Dia = (typeof DIAS)[number];
@@ -135,6 +137,116 @@ export async function updateGuarderiaFeaturesAction(
       updatedAt: new Date(),
     })
     .where(eq(guarderias.id, ctx.activeMembership.guarderiaId));
+
+  revalidatePath('/configuracion');
+  return {};
+}
+
+// =============================================================================
+// PUNTO DE VENTA / TUSFACTURAS
+// =============================================================================
+
+const CONDICIONES_IVA = [
+  'consumidor_final',
+  'responsable_inscripto',
+  'monotributo',
+  'exento',
+  'cliente_exterior',
+  'iva_no_alcanzado',
+] as const;
+type CondicionIva = (typeof CONDICIONES_IVA)[number];
+
+export type SavePuntoVentaData = {
+  puntoDeVenta: number;
+  razonSocial: string;
+  condicionIva: CondicionIva;
+  rubro: string;
+  fechaInicio: string; // 'YYYY-MM-DD' (del input date)
+};
+
+export async function savePuntoVentaAction(data: SavePuntoVentaData): Promise<{ error?: string }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+  if (!isAdmin(ctx)) return { error: 'Solo administradores pueden editar la configuración.' };
+
+  if (!Number.isInteger(data.puntoDeVenta) || data.puntoDeVenta <= 0) {
+    return { error: 'El punto de venta debe ser un número entero positivo.' };
+  }
+  if (!data.razonSocial.trim()) return { error: 'La razón social es obligatoria.' };
+  if (!CONDICIONES_IVA.includes(data.condicionIva)) return { error: 'Condición IVA inválida.' };
+  if (!data.rubro.trim()) return { error: 'El rubro es obligatorio.' };
+  if (!data.fechaInicio) return { error: 'La fecha de inicio es obligatoria.' };
+
+  const guarderiaId = ctx.activeMembership.guarderiaId;
+
+  const [guarderia] = await db
+    .select({
+      direccion: guarderias.direccion,
+      cuit: guarderias.cuit,
+      email: guarderias.email,
+      iibb: guarderias.iibb,
+      puntoDeVentaActual: guarderias.puntoDeVenta,
+    })
+    .from(guarderias)
+    .where(eq(guarderias.id, guarderiaId))
+    .limit(1);
+
+  if (!guarderia) return { error: 'Guardería no encontrada.' };
+  if (!guarderia.direccion || !guarderia.cuit || !guarderia.email) {
+    return {
+      error: 'Completá dirección, CUIT y email en Información general antes de configurar el POS.',
+    };
+  }
+
+  const ivaCode = CONDICION_IVA_API[data.condicionIva];
+  if (!ivaCode) return { error: 'No se pudo mapear la condición IVA.' };
+
+  const operacion: 'A' | 'M' = guarderia.puntoDeVentaActual == null ? 'A' : 'M';
+
+  try {
+    await administrarPuntoVenta({
+      operacion,
+      punto_venta: String(data.puntoDeVenta),
+      direccion: guarderia.direccion,
+      razon_social: data.razonSocial.trim(),
+      cuit: guarderia.cuit,
+      iva_condicion: ivaCode,
+      iva_emails: guarderia.email,
+      iibb: guarderia.iibb ?? '',
+      fecha_inicio: toTusFecha(data.fechaInicio),
+      factura_afip: 'S',
+      es_agente_retencion: 'N',
+      esta_activo: 'S',
+      es_predeterminado: 'S',
+      conceptos_tipo: 'PS',
+      webhook: '',
+      factura: {
+        leyenda_general_predeterminada: '',
+        titulo: '',
+        subtitulo: '',
+        reply_to_email: '',
+        reply_to: '',
+        mensaje: '',
+        copias: '',
+      },
+    });
+  } catch (err) {
+    return {
+      error: err instanceof Error ? err.message : 'Error al sincronizar con tusfacturas.app',
+    };
+  }
+
+  await db
+    .update(guarderias)
+    .set({
+      puntoDeVenta: data.puntoDeVenta,
+      razonSocial: data.razonSocial.trim(),
+      condicionIva: data.condicionIva,
+      rubro: data.rubro.trim(),
+      fechaInicio: new Date(data.fechaInicio),
+      updatedAt: new Date(),
+    })
+    .where(eq(guarderias.id, guarderiaId));
 
   revalidatePath('/configuracion');
   return {};

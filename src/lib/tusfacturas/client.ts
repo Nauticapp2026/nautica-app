@@ -128,6 +128,64 @@ export async function crearFactura(
   return data;
 }
 
+// ─── Punto de venta (administrar) ───────────────────────────────────────────
+
+export type TusFacturasPuntoVentaInput = {
+  operacion: 'A' | 'M'; // alta | modificación
+  punto_venta: string;
+  direccion: string;
+  razon_social: string;
+  cuit: string;
+  iva_condicion: string; // 'M' | 'RI' | 'CF' | 'EX' | ...
+  iva_emails: string;
+  iibb: string;
+  fecha_inicio: string; // 'DD/MM/YYYY'
+  factura_afip: 'S' | 'N';
+  es_agente_retencion: 'S' | 'N';
+  esta_activo: 'S' | 'N';
+  es_predeterminado: 'S' | 'N';
+  conceptos_tipo: 'PS' | 'P' | 'S';
+  webhook: string;
+  factura: {
+    leyenda_general_predeterminada: string;
+    titulo: string;
+    subtitulo: string;
+    reply_to_email: string;
+    reply_to: string;
+    mensaje: string;
+    copias: string;
+  };
+};
+
+export type TusFacturasPuntoVentaResponse = {
+  error: 'S' | 'N';
+  errores?: string[];
+  rta?: string;
+};
+
+export async function administrarPuntoVenta(
+  input: TusFacturasPuntoVentaInput,
+  creds: TusFacturasCredentials = getCredentialsFromEnv(),
+): Promise<TusFacturasPuntoVentaResponse> {
+  const res = await fetch(`${TUSFACTURAS_BASE}/puntos_venta/administrar`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...creds, ...input }),
+    cache: 'no-store',
+  });
+
+  if (!res.ok) {
+    throw new Error(`tusfacturas HTTP ${res.status}`);
+  }
+
+  const data = (await res.json()) as TusFacturasPuntoVentaResponse;
+  if (data.error === 'S') {
+    const msg = data.errores?.join(' · ') ?? data.rta ?? 'Error al administrar el punto de venta';
+    throw new Error(msg);
+  }
+  return data;
+}
+
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 /** Formatea Date | ISO a 'DD/MM/YYYY' que requiere tusfacturas. */

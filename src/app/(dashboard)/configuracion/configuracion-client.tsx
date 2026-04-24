@@ -6,11 +6,13 @@ import { Bell, Building2, FilterX, Minus, Plus, Receipt, Users, X } from 'lucide
 
 import {
   createMiembroEquipoAction,
+  savePuntoVentaAction,
   updateGuarderiaFeaturesAction,
   updateGuarderiaGeneralAction,
   type CreateMiembroEquipoData,
   type GuarderiaFeatures,
   type HorarioInput,
+  type SavePuntoVentaData,
   type UpdateGuarderiaGeneralData,
 } from '@/app/actions/configuracion';
 
@@ -42,6 +44,23 @@ const DIAS_LABELS: Record<HorarioInput['dia'], string> = {
 };
 
 export type InfoGeneralData = UpdateGuarderiaGeneralData;
+
+export type PuntoVentaData = {
+  puntoDeVenta: number | null;
+  razonSocial: string;
+  condicionIva: SavePuntoVentaData['condicionIva'];
+  rubro: string;
+  fechaInicio: string; // 'YYYY-MM-DD' o ''
+};
+
+const CONDICION_IVA_OPTS: { value: SavePuntoVentaData['condicionIva']; label: string }[] = [
+  { value: 'monotributo', label: 'Monotributo' },
+  { value: 'responsable_inscripto', label: 'Responsable Inscripto' },
+  { value: 'consumidor_final', label: 'Consumidor Final' },
+  { value: 'exento', label: 'Exento' },
+  { value: 'cliente_exterior', label: 'Cliente Exterior' },
+  { value: 'iva_no_alcanzado', label: 'IVA No Alcanzado' },
+];
 
 export type Rol = CreateMiembroEquipoData['rol'];
 
@@ -80,10 +99,12 @@ export function ConfiguracionClient({
   infoGeneral,
   miembros,
   features,
+  puntoVenta,
 }: {
   infoGeneral: InfoGeneralData;
   miembros: MiembroEquipo[];
   features: GuarderiaFeatures;
+  puntoVenta: PuntoVentaData;
 }) {
   const [activeTab, setActiveTab] = useState<TabKey>('info');
 
@@ -121,11 +142,7 @@ export function ConfiguracionClient({
 
       {activeTab === 'info' && <InfoGeneralForm initial={infoGeneral} />}
       {activeTab === 'equipo' && <EquipoTab miembros={miembros} />}
-      {activeTab === 'punto_venta' && (
-        <section className="rounded-2xl border border-gray-200 bg-white p-8">
-          <TabPlaceholder title="Punto de venta" />
-        </section>
-      )}
+      {activeTab === 'punto_venta' && <PuntoVentaTab initial={puntoVenta} />}
       {activeTab === 'notificaciones' && <NotificacionesTab initial={features} />}
     </div>
   );
@@ -737,6 +754,123 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: () => void 
         }`}
       />
     </button>
+  );
+}
+
+function PuntoVentaTab({ initial }: { initial: PuntoVentaData }) {
+  const [data, setData] = useState<PuntoVentaData>(initial);
+  const [feedback, setFeedback] = useState<{ type: 'error' | 'success'; msg: string } | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  const onField = <K extends keyof PuntoVentaData>(key: K, value: PuntoVentaData[K]) => {
+    setData((prev) => ({ ...prev, [key]: value }));
+    setFeedback(null);
+  };
+
+  const onSubmit = () => {
+    setFeedback(null);
+    if (!data.puntoDeVenta || data.puntoDeVenta <= 0) {
+      setFeedback({ type: 'error', msg: 'Ingresá un número de punto de venta válido.' });
+      return;
+    }
+    if (!data.fechaInicio) {
+      setFeedback({ type: 'error', msg: 'Elegí la fecha de inicio.' });
+      return;
+    }
+    startTransition(async () => {
+      const res = await savePuntoVentaAction({
+        puntoDeVenta: data.puntoDeVenta!,
+        razonSocial: data.razonSocial,
+        condicionIva: data.condicionIva,
+        rubro: data.rubro,
+        fechaInicio: data.fechaInicio,
+      });
+      if (res.error) setFeedback({ type: 'error', msg: res.error });
+      else setFeedback({ type: 'success', msg: 'Punto de venta sincronizado con tusfacturas.' });
+    });
+  };
+
+  return (
+    <section className="rounded-2xl border border-gray-200 bg-white p-8">
+      <h2 className="mb-6 text-base font-bold" style={{ color: '#101828' }}>
+        Configure su punto de venta
+      </h2>
+
+      <div className="space-y-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <Field label="Punto de venta" required>
+            <input
+              className={inputCls}
+              type="number"
+              min={1}
+              placeholder="1"
+              value={data.puntoDeVenta ?? ''}
+              onChange={(e) =>
+                onField('puntoDeVenta', e.target.value ? Number(e.target.value) : null)
+              }
+            />
+          </Field>
+          <Field label="Condición frente IVA" required>
+            <select
+              className={inputCls}
+              value={data.condicionIva}
+              onChange={(e) =>
+                onField('condicionIva', e.target.value as PuntoVentaData['condicionIva'])
+              }
+            >
+              {CONDICION_IVA_OPTS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <Field label="Rubro" required>
+            <input
+              className={inputCls}
+              value={data.rubro}
+              onChange={(e) => onField('rubro', e.target.value)}
+            />
+          </Field>
+          <Field label="Razón social" required>
+            <input
+              className={inputCls}
+              value={data.razonSocial}
+              onChange={(e) => onField('razonSocial', e.target.value)}
+            />
+          </Field>
+        </div>
+
+        <Field label="Fecha inicio" required>
+          <input
+            className={inputCls}
+            type="date"
+            value={data.fechaInicio}
+            onChange={(e) => onField('fechaInicio', e.target.value)}
+          />
+        </Field>
+
+        {feedback && (
+          <p className={`text-sm ${feedback.type === 'error' ? 'text-red-600' : 'text-green-700'}`}>
+            {feedback.msg}
+          </p>
+        )}
+
+        <div className="pt-2">
+          <button
+            type="button"
+            onClick={onSubmit}
+            disabled={pending}
+            className="rounded-[10px] bg-[#175861] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#0f4249] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {pending ? 'Sincronizando…' : 'Guardar cambios'}
+          </button>
+        </div>
+      </div>
+    </section>
   );
 }
 

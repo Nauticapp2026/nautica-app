@@ -11,6 +11,7 @@ import {
   ConfiguracionClient,
   type InfoGeneralData,
   type MiembroEquipo,
+  type PuntoVentaData,
 } from './configuracion-client';
 
 const DIAS = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'] as const;
@@ -40,6 +41,11 @@ export default async function ConfiguracionPage() {
       activarReservasOnline: guarderias.activarReservasOnline,
       activarPagosOnline: guarderias.activarPagosOnline,
       activarMenuGastronomico: guarderias.activarMenuGastronomico,
+      puntoDeVenta: guarderias.puntoDeVenta,
+      razonSocial: guarderias.razonSocial,
+      condicionIva: guarderias.condicionIva,
+      rubro: guarderias.rubro,
+      fechaInicio: guarderias.fechaInicio,
     })
     .from(guarderias)
     .where(eq(guarderias.id, guarderiaId))
@@ -108,5 +114,20 @@ export default async function ConfiguracionPage() {
     activarMenuGastronomico: guarderia?.activarMenuGastronomico ?? false,
   };
 
-  return <ConfiguracionClient infoGeneral={infoGeneral} miembros={miembros} features={features} />;
+  const puntoVenta: PuntoVentaData = {
+    puntoDeVenta: guarderia?.puntoDeVenta ?? null,
+    razonSocial: guarderia?.razonSocial ?? '',
+    condicionIva: (guarderia?.condicionIva ?? 'monotributo') as PuntoVentaData['condicionIva'],
+    rubro: guarderia?.rubro ?? '',
+    fechaInicio: guarderia?.fechaInicio ? guarderia.fechaInicio.toISOString().slice(0, 10) : '',
+  };
+
+  return (
+    <ConfiguracionClient
+      infoGeneral={infoGeneral}
+      miembros={miembros}
+      features={features}
+      puntoVenta={puntoVenta}
+    />
+  );
 }
