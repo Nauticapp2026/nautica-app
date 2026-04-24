@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Logo } from './logo';
@@ -14,6 +15,8 @@ import {
   Tag,
   Settings,
   LogOut,
+  Menu,
+  X,
 } from 'lucide-react';
 
 const ROL_LABELS: Record<string, string> = {
@@ -51,19 +54,61 @@ type Props = {
 
 export function Sidebar({ guarderiaName, userName, userInitial, rol }: Props) {
   const pathname = usePathname();
+  const [open, setOpen] = useState(false);
+
+  const items = NAV.filter(({ href }) => (rol === 'operario' ? OPERARIO_ALLOWED.has(href) : true));
 
   return (
-    <aside className="sticky top-0 flex h-screen w-56 shrink-0 flex-col border-r border-gray-200 bg-white">
-      {/* Logo + guardería */}
-      <div className="px-4 pt-5 pb-3">
-        <Logo size={36} />
-        <p className="mt-1.5 truncate text-xs text-gray-400">{guarderiaName}</p>
+    <>
+      {/* Top bar mobile: solo visible <md. Es lo que toma el espacio del
+          sidebar en el flex-col del layout (el aside abajo es fixed en mobile). */}
+      <div className="sticky top-0 z-30 flex items-center justify-between border-b border-gray-200 bg-white px-4 py-2.5 md:hidden">
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="-ml-1 rounded-md p-2 text-gray-600 hover:bg-gray-100"
+          aria-label="Abrir menú"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+        <Logo size={28} />
+        <div className="w-9" aria-hidden />
       </div>
 
-      {/* Nav */}
-      <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-2">
-        {NAV.filter(({ href }) => (rol === 'operario' ? OPERARIO_ALLOWED.has(href) : true)).map(
-          ({ href, label, icon: Icon }) => {
+      {/* Backdrop mobile */}
+      {open && (
+        <div
+          onClick={() => setOpen(false)}
+          className="fixed inset-0 z-40 bg-black/40 md:hidden"
+          aria-hidden
+        />
+      )}
+
+      {/* Aside: drawer fijo deslizable en mobile, sticky en desktop. */}
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-gray-200 bg-white transition-transform duration-200 md:sticky md:top-0 md:h-screen md:w-56 md:translate-x-0 ${
+          open ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+        }`}
+      >
+        {/* Botón cerrar en mobile */}
+        <button
+          type="button"
+          onClick={() => setOpen(false)}
+          className="absolute top-3 right-3 rounded-md p-1.5 text-gray-500 hover:bg-gray-100 md:hidden"
+          aria-label="Cerrar menú"
+        >
+          <X className="h-5 w-5" />
+        </button>
+
+        {/* Logo + guardería */}
+        <div className="px-4 pt-5 pb-3">
+          <Logo size={36} />
+          <p className="mt-1.5 truncate text-xs text-gray-400">{guarderiaName}</p>
+        </div>
+
+        {/* Nav */}
+        <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-2">
+          {items.map(({ href, label, icon: Icon }) => {
             const active =
               href === '/dashboard'
                 ? pathname === '/dashboard'
@@ -72,6 +117,7 @@ export function Sidebar({ guarderiaName, userName, userInitial, rol }: Props) {
               <Link
                 key={href}
                 href={href}
+                onClick={() => setOpen(false)}
                 className={`flex items-center gap-3 rounded-[10px] px-3 py-2.5 text-sm font-medium transition-colors ${
                   active ? 'bg-[#175861] text-white' : 'text-[#364153] hover:bg-gray-100'
                 }`}
@@ -80,36 +126,36 @@ export function Sidebar({ guarderiaName, userName, userInitial, rol }: Props) {
                 {label}
               </Link>
             );
-          },
-        )}
-      </nav>
+          })}
+        </nav>
 
-      {/* User */}
-      <div className="border-t border-gray-100 px-4 py-4">
-        <div className="flex items-center gap-3">
-          <div
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
-            style={{ background: '#E87040' }}
-          >
-            {userInitial}
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold" style={{ color: '#101828' }}>
-              {userName}
-            </p>
-            <p className="truncate text-xs text-gray-400">{ROL_LABELS[rol] ?? rol}</p>
-          </div>
-          <form action={logout}>
-            <button
-              type="submit"
-              className="rounded-[6px] p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
-              title="Cerrar sesión"
+        {/* User */}
+        <div className="border-t border-gray-100 px-4 py-4">
+          <div className="flex items-center gap-3">
+            <div
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
+              style={{ background: '#E87040' }}
             >
-              <LogOut className="h-3.5 w-3.5" />
-            </button>
-          </form>
+              {userInitial}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold" style={{ color: '#101828' }}>
+                {userName}
+              </p>
+              <p className="truncate text-xs text-gray-400">{ROL_LABELS[rol] ?? rol}</p>
+            </div>
+            <form action={logout}>
+              <button
+                type="submit"
+                className="rounded-[6px] p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+                title="Cerrar sesión"
+              >
+                <LogOut className="h-3.5 w-3.5" />
+              </button>
+            </form>
+          </div>
         </div>
-      </div>
-    </aside>
+      </aside>
+    </>
   );
 }
