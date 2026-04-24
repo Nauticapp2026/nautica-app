@@ -1,6 +1,7 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { translateAuthError } from '@/lib/auth/errors';
 import { db } from '@/lib/db';
 import { guarderias, memberships, horariosDia } from '@/lib/db/schema';
@@ -18,6 +19,11 @@ function toSlug(name: string) {
 export type ActionResult = { error?: string };
 
 // Step 1 — crear cuenta
+// Usamos admin.createUser con email_confirm:true para saltearnos el mail de
+// verificación (el admin que se da de alta debe poder completar TODO el
+// onboarding en una sesión, sin trabarse esperando a confirmar por mail).
+// Después iniciamos sesión con la misma password para que los pasos
+// siguientes del onboarding tengan contexto autenticado.
 export async function signUpStep(data: {
   nombre: string;
   apellido: string;
@@ -25,20 +31,26 @@ export async function signUpStep(data: {
   telefono: string;
   password: string;
 }): Promise<ActionResult & { userId?: string }> {
-  const supabase = await createClient();
+  const admin = createAdminClient();
 
-  const { data: auth, error } = await supabase.auth.signUp({
+  const { data: created, error: createErr } = await admin.auth.admin.createUser({
     email: data.email,
     password: data.password,
-    options: {
-      data: { nombre: data.nombre, apellido: data.apellido },
-    },
+    email_confirm: true,
+    user_metadata: { nombre: data.nombre, apellido: data.apellido },
   });
 
-  if (error) return { error: translateAuthError(error.message) };
-  if (!auth.user) return { error: 'No se pudo crear el usuario' };
+  if (createErr) return { error: translateAuthError(createErr.message) };
+  if (!created.user) return { error: 'No se pudo crear el usuario' };
 
-  return { userId: auth.user.id };
+  const supabase = await createClient();
+  const { error: signInErr } = await supabase.auth.signInWithPassword({
+    email: data.email,
+    password: data.password,
+  });
+  if (signInErr) return { error: translateAuthError(signInErr.message) };
+
+  return { userId: created.user.id };
 }
 
 // Step 2 — crear guardería + membership
