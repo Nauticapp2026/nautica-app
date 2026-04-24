@@ -109,31 +109,33 @@ export function ConfiguracionClient({
   const [activeTab, setActiveTab] = useState<TabKey>('info');
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       <header className="mb-6">
         <h1 className="page-title">Configuración</h1>
         <p className="page-subtitle mt-1">Administra la configuración de tu guardería náutica</p>
       </header>
 
-      <div className="mb-6 flex items-center gap-2 border-b border-gray-200">
-        {TABS.map(({ key, label, icon: Icon }) => {
-          const isActive = activeTab === key;
-          return (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setActiveTab(key)}
-              className={`flex items-center gap-2 border-b-2 px-4 py-3 text-sm transition-colors ${
-                isActive
-                  ? 'border-[#175861] font-semibold text-[#175861]'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              <Icon className="h-4 w-4" />
-              {label}
-            </button>
-          );
-        })}
+      <div className="mb-6 overflow-x-auto border-b border-gray-200">
+        <div className="flex min-w-max items-center gap-2 whitespace-nowrap">
+          {TABS.map(({ key, label, icon: Icon }) => {
+            const isActive = activeTab === key;
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setActiveTab(key)}
+                className={`flex items-center gap-2 border-b-2 px-4 py-3 text-sm transition-colors ${
+                  isActive
+                    ? 'border-[#175861] font-semibold text-[#175861]'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <Icon className="h-4 w-4" />
+                {label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {activeTab === 'info' && <InfoGeneralForm initial={infoGeneral} />}
@@ -175,7 +177,7 @@ function InfoGeneralForm({ initial }: { initial: InfoGeneralData }) {
   };
 
   return (
-    <section className="rounded-2xl border border-gray-200 bg-white p-8">
+    <section className="rounded-2xl border border-gray-200 bg-white p-4 md:p-8">
       <h2 className="mb-6 text-base font-bold" style={{ color: '#101828' }}>
         Datos de la Guardería
       </h2>
@@ -339,8 +341,8 @@ function EquipoTab({ miembros }: { miembros: MiembroEquipo[] }) {
   };
 
   return (
-    <section className="rounded-2xl border border-gray-200 bg-white p-8">
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+    <section className="rounded-2xl border border-gray-200 bg-white p-4 md:p-8">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="text-base font-bold" style={{ color: '#101828' }}>
             Gestión de Equipo
@@ -352,7 +354,7 @@ function EquipoTab({ miembros }: { miembros: MiembroEquipo[] }) {
         <button
           type="button"
           onClick={() => setModalOpen(true)}
-          className="flex items-center gap-2 rounded-[10px] bg-[#175861] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#0f4249]"
+          className="flex shrink-0 items-center justify-center gap-2 rounded-[10px] bg-[#175861] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#0f4249]"
         >
           <Plus className="h-4 w-4" />
           Agregar miembro
@@ -532,7 +534,7 @@ function AltaEquipoModal({ open, onClose }: { open: boolean; onClose: () => void
             Datos Personales
           </p>
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label="Nombre" required>
                 <input
                   className={inputCls}
@@ -550,7 +552,7 @@ function AltaEquipoModal({ open, onClose }: { open: boolean; onClose: () => void
                 />
               </Field>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label="Email" required>
                 <input
                   className={inputCls}
@@ -574,7 +576,7 @@ function AltaEquipoModal({ open, onClose }: { open: boolean; onClose: () => void
                 </select>
               </Field>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label="DNI">
                 <input
                   className={inputCls}
@@ -793,7 +795,7 @@ function PuntoVentaTab({ initial }: { initial: PuntoVentaData }) {
   const readOnlyCls = readOnly ? 'bg-gray-50 text-gray-500' : '';
 
   return (
-    <section className="rounded-2xl border border-gray-200 bg-white p-8">
+    <section className="rounded-2xl border border-gray-200 bg-white p-4 md:p-8">
       <h2 className="mb-2 text-base font-bold" style={{ color: '#101828' }}>
         Configure su punto de venta
       </h2>

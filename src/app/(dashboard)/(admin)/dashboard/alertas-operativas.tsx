@@ -115,7 +115,7 @@ function AlertaCard({
 
   return (
     <div className={`rounded-[12px] border ${cardBorder} ${cardBg} px-4 py-4`}>
-      <div className="flex items-start gap-3">
+      <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-start">
         <div
           className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
             isCritica ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
@@ -132,7 +132,7 @@ function AlertaCard({
             )}
           </div>
 
-          <div className="mt-1 grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-600">
+          <div className="mt-1 grid grid-cols-1 gap-x-4 gap-y-1 text-xs text-gray-600 sm:grid-cols-2">
             <Field label="Hora prometida" value={fmtNaive(alerta.hasta)} />
             <Field label="Alerta creada" value={fmtRelative(alerta.createdAt)} />
             {isCritica && alerta.hasta && (
@@ -144,7 +144,7 @@ function AlertaCard({
           {alerta.mensaje && <p className="mt-2 text-xs text-gray-500">{alerta.mensaje}</p>}
         </div>
 
-        <div className="flex shrink-0 flex-col gap-2">
+        <div className="flex shrink-0 flex-row flex-wrap gap-2 sm:flex-col">
           {isCritica && alerta.socioTelefono && (
             <a
               href={`tel:${alerta.socioTelefono}`}

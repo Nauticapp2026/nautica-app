@@ -251,7 +251,7 @@ export default async function DashboardPage() {
   }));
 
   return (
-    <div className="space-y-6 p-8">
+    <div className="space-y-6 p-4 md:p-8">
       {/* Header */}
       <div>
         <h1 className="page-title">Bienvenido, {rolLabel}</h1>
@@ -289,7 +289,7 @@ export default async function DashboardPage() {
       {/* Alertas + Operarios */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Alertas operativas — monitoreo de retorno de embarcaciones */}
-        <div className="rounded-2xl border border-gray-200 bg-white p-6">
+        <div className="rounded-2xl border border-gray-200 bg-white p-4 md:p-6">
           <div className="mb-4 flex items-center gap-2">
             <Bell className="h-4 w-4" style={{ color: '#175861' }} />
             <h2 className="text-base font-semibold" style={{ color: '#101828' }}>
@@ -300,7 +300,7 @@ export default async function DashboardPage() {
         </div>
 
         {/* Operarios */}
-        <div className="rounded-2xl border border-gray-200 bg-white p-6">
+        <div className="rounded-2xl border border-gray-200 bg-white p-4 md:p-6">
           <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Anchor className="h-4 w-4" style={{ color: '#175861' }} />
@@ -352,7 +352,7 @@ export default async function DashboardPage() {
       </div>
 
       {/* Comunicaciones recientes */}
-      <div className="rounded-2xl border border-gray-200 bg-white p-6">
+      <div className="rounded-2xl border border-gray-200 bg-white p-4 md:p-6">
         <div className="mb-4 flex items-center gap-2">
           <MessageSquare className="h-4 w-4" style={{ color: '#175861' }} />
           <h2 className="text-base font-semibold" style={{ color: '#101828' }}>

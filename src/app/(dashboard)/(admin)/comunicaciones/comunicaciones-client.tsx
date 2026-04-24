@@ -77,8 +77,8 @@ export function ComunicacionesClient({ comunicaciones }: { comunicaciones: Comun
   }, [comunicaciones, query]);
 
   return (
-    <div className="p-8">
-      <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
+    <div className="p-4 md:p-8">
+      <header className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="page-title">Comunicaciones</h1>
           <p className="page-subtitle mt-1">Gestiona anuncios y comunicados</p>
@@ -86,7 +86,7 @@ export function ComunicacionesClient({ comunicaciones }: { comunicaciones: Comun
         <button
           type="button"
           onClick={() => setModal({ mode: 'create' })}
-          className="flex items-center gap-2 rounded-[10px] bg-[#175861] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#0f4249]"
+          className="flex shrink-0 items-center justify-center gap-2 rounded-[10px] bg-[#175861] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#0f4249]"
         >
           <Plus className="h-4 w-4" />
           Nueva comunicación

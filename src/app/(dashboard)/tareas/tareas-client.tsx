@@ -133,6 +133,7 @@ function TareaCard({
   canEditAll,
   operarios,
   onEdit,
+  onMoveEstado,
   busy,
   onDragStart,
   onDragEnd,
@@ -141,6 +142,7 @@ function TareaCard({
   canEditAll: boolean;
   operarios: OperarioOpt[];
   onEdit: (t: Tarea) => void;
+  onMoveEstado: (t: Tarea, destino: EstadoTarea) => void;
   busy: boolean;
   onDragStart: (t: Tarea) => void;
   onDragEnd: () => void;
@@ -180,7 +182,7 @@ function TareaCard({
         </div>
       )}
 
-      <div className="mt-3" onClick={(e) => e.stopPropagation()}>
+      <div className="mt-3 space-y-2" onClick={(e) => e.stopPropagation()}>
         <select
           className="h-8 w-full rounded-[8px] border border-gray-200 bg-white px-2 text-xs text-[#101828] focus:border-[#175861] focus:outline-none"
           value={tarea.operarioId ?? ''}
@@ -191,6 +193,24 @@ function TareaCard({
           {operarios.map((o) => (
             <option key={o.id} value={o.id}>
               {o.nombre}
+            </option>
+          ))}
+        </select>
+        {/* Selector "Mover a" — alternativa al drag & drop para touch/mobile.
+            El valor siempre se resetea a "" después de disparar el move. */}
+        <select
+          className="h-8 w-full rounded-[8px] border border-gray-200 bg-white px-2 text-xs text-[#175861] focus:border-[#175861] focus:outline-none"
+          value=""
+          onChange={(e) => {
+            const dest = e.target.value as EstadoTarea;
+            if (dest) onMoveEstado(tarea, dest);
+          }}
+          disabled={!canEditAll || pending}
+        >
+          <option value="">Mover a…</option>
+          {ESTADOS_TAREA.filter((e) => e !== tarea.estado).map((e) => (
+            <option key={e} value={e}>
+              {ESTADO_LABEL[e]}
             </option>
           ))}
         </select>
@@ -299,7 +319,7 @@ function TareaModal({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
                 Operario
@@ -332,7 +352,7 @@ function TareaModal({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
                 Estado
@@ -463,11 +483,8 @@ export function TareasClient({
     setFilterEmbarcacion('');
   };
 
-  const onDropOnColumn = (destino: EstadoTarea) => {
-    const tarea = tareas.find((t) => t.id === draggingId);
-    setDraggingId(null);
-    setDragOverState(null);
-    if (!tarea || tarea.estado === destino) return;
+  const moverTarea = (tarea: Tarea, destino: EstadoTarea) => {
+    if (tarea.estado === destino) return;
     if (!canEditAll) return;
 
     setGlobalError(null);
@@ -478,6 +495,14 @@ export function TareasClient({
       else router.refresh();
       setBusyId(null);
     });
+  };
+
+  const onDropOnColumn = (destino: EstadoTarea) => {
+    const tarea = tareas.find((t) => t.id === draggingId);
+    setDraggingId(null);
+    setDragOverState(null);
+    if (!tarea) return;
+    moverTarea(tarea, destino);
   };
 
   const borrarTarea = (t: Tarea) => {
@@ -496,9 +521,9 @@ export function TareasClient({
   };
 
   return (
-    <div className="space-y-6 p-8">
+    <div className="space-y-6 p-4 md:p-8">
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="page-title">Gestión de Embarcaciones</h1>
           <p className="page-subtitle mt-1">Seguimiento del proceso operativo de embarcaciones</p>
@@ -507,7 +532,7 @@ export function TareasClient({
           <button
             type="button"
             onClick={() => setModal({ mode: 'create' })}
-            className="flex items-center gap-1.5 rounded-[10px] px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90"
+            className="flex shrink-0 items-center justify-center gap-1.5 rounded-[10px] px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90"
             style={{ background: '#175861' }}
           >
             <Plus className="h-4 w-4" />
@@ -631,6 +656,7 @@ export function TareasClient({
                       canEditAll={canEditAll}
                       operarios={operarios}
                       onEdit={(x) => setModal({ mode: 'edit', tarea: x })}
+                      onMoveEstado={moverTarea}
                       busy={isPending && busyId === t.id}
                       onDragStart={() => setDraggingId(t.id)}
                       onDragEnd={() => {
