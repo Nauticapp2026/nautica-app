@@ -243,7 +243,7 @@ function Field({
 }
 
 const inputCls =
-  'h-12 rounded-[10px] border border-gray-200 bg-white px-4 text-sm focus:border-[#175861] focus:ring-1 focus:ring-[#175861] focus:outline-none';
+  '!h-12 w-full rounded-[10px] border border-gray-200 bg-white px-4 text-sm focus:border-[#175861] focus:ring-1 focus:ring-[#175861] focus:outline-none';
 
 // ─── Steps ──────────────────────────────────────────────────────────────────
 
