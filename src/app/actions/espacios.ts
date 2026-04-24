@@ -169,6 +169,25 @@ export async function createAreaAction(
   return { id: area.id };
 }
 
+export async function deleteEspacioAction(id: string): Promise<{ error?: string }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+  if (!isAdmin(ctx)) return { error: 'Solo administradores pueden eliminar espacios.' };
+
+  const guarderiaId = ctx.activeMembership.guarderiaId;
+
+  const [current] = await db
+    .select({ id: espacios.id })
+    .from(espacios)
+    .where(and(eq(espacios.id, id), eq(espacios.guarderiaId, guarderiaId)))
+    .limit(1);
+  if (!current) return { error: 'Espacio no encontrado.' };
+
+  await db.delete(espacios).where(eq(espacios.id, id));
+  revalidatePath('/espacios');
+  return {};
+}
+
 export async function deleteAreaAction(id: string): Promise<{ error?: string }> {
   const ctx = await getActiveMarina();
   if (!ctx) return { error: 'No autenticado' };

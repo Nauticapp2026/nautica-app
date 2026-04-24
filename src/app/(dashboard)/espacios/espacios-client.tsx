@@ -4,7 +4,12 @@ import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Anchor, Building2, Check, Plus, Trash2, X } from 'lucide-react';
 
-import { createAreaAction, deleteAreaAction, type CreateAreaInput } from '@/app/actions/espacios';
+import {
+  createAreaAction,
+  deleteAreaAction,
+  deleteEspacioAction,
+  type CreateAreaInput,
+} from '@/app/actions/espacios';
 
 export type EstadoEspacio = 'ocupado' | 'reservado' | 'disponible';
 
@@ -63,6 +68,10 @@ export function EspaciosClient({ areas }: { areas: AreaView[] }) {
   const [deleting, startDelete] = useTransition();
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
+  const [confirmDeleteEspacio, setConfirmDeleteEspacio] = useState<EspacioCell | null>(null);
+  const [deletingEspacio, startDeleteEspacio] = useTransition();
+  const [deleteEspacioError, setDeleteEspacioError] = useState<string | null>(null);
+
   const onDelete = () => {
     if (!confirmDelete) return;
     setDeleteError(null);
@@ -71,6 +80,19 @@ export function EspaciosClient({ areas }: { areas: AreaView[] }) {
       if (res.error) setDeleteError(res.error);
       else {
         setConfirmDelete(null);
+        router.refresh();
+      }
+    });
+  };
+
+  const onDeleteEspacio = () => {
+    if (!confirmDeleteEspacio) return;
+    setDeleteEspacioError(null);
+    startDeleteEspacio(async () => {
+      const res = await deleteEspacioAction(confirmDeleteEspacio.id);
+      if (res.error) setDeleteEspacioError(res.error);
+      else {
+        setConfirmDeleteEspacio(null);
         router.refresh();
       }
     });
@@ -195,9 +217,23 @@ export function EspaciosClient({ areas }: { areas: AreaView[] }) {
         <div className="space-y-4">
           {areasFiltradas.map((a) =>
             a.tipo === 'marina' ? (
-              <MarinaSection key={a.id} area={a} />
+              <MarinaSection
+                key={a.id}
+                area={a}
+                onDeleteEspacio={(cell) => {
+                  setDeleteEspacioError(null);
+                  setConfirmDeleteEspacio(cell);
+                }}
+              />
             ) : (
-              <NaveSection key={a.id} area={a} />
+              <NaveSection
+                key={a.id}
+                area={a}
+                onDeleteEspacio={(cell) => {
+                  setDeleteEspacioError(null);
+                  setConfirmDeleteEspacio(cell);
+                }}
+              />
             ),
           )}
         </div>
@@ -220,6 +256,16 @@ export function EspaciosClient({ areas }: { areas: AreaView[] }) {
           error={deleteError}
           onCancel={() => setConfirmDelete(null)}
           onConfirm={onDelete}
+        />
+      )}
+
+      {confirmDeleteEspacio && (
+        <ConfirmDeleteEspacioModal
+          espacio={confirmDeleteEspacio}
+          pending={deletingEspacio}
+          error={deleteEspacioError}
+          onCancel={() => setConfirmDeleteEspacio(null)}
+          onConfirm={onDeleteEspacio}
         />
       )}
     </div>
@@ -320,7 +366,13 @@ function LeyendaItem({ color, label }: { color: string; label: string }) {
   );
 }
 
-function MarinaSection({ area }: { area: AreaView }) {
+function MarinaSection({
+  area,
+  onDeleteEspacio,
+}: {
+  area: AreaView;
+  onDeleteEspacio: (cell: EspacioCell) => void;
+}) {
   return (
     <section className="rounded-2xl border border-gray-200 bg-white">
       <header className="flex items-center gap-2 rounded-t-2xl bg-[#175861] px-5 py-3 text-sm font-semibold text-white">
@@ -337,7 +389,7 @@ function MarinaSection({ area }: { area: AreaView }) {
                 <Anchor className="h-3.5 w-3.5" />
                 {p.nombre}
               </div>
-              <EspaciosRow espacios={p.espacios} />
+              <EspaciosRow espacios={p.espacios} onDeleteEspacio={onDeleteEspacio} />
             </div>
           ))
         )}
@@ -346,7 +398,13 @@ function MarinaSection({ area }: { area: AreaView }) {
   );
 }
 
-function NaveSection({ area }: { area: AreaView }) {
+function NaveSection({
+  area,
+  onDeleteEspacio,
+}: {
+  area: AreaView;
+  onDeleteEspacio: (cell: EspacioCell) => void;
+}) {
   return (
     <section className="rounded-2xl border border-gray-200 bg-white">
       <header className="flex items-center gap-2 rounded-t-2xl bg-[#175861] px-5 py-3 text-sm font-semibold text-white">
@@ -367,7 +425,7 @@ function NaveSection({ area }: { area: AreaView }) {
                 {l.pisos.map((pi) => (
                   <div key={pi.pisoId} className="mb-3">
                     <p className="mb-1 text-[11px] text-gray-400">{pi.nombre}</p>
-                    <EspaciosRow espacios={pi.espacios} />
+                    <EspaciosRow espacios={pi.espacios} onDeleteEspacio={onDeleteEspacio} />
                   </div>
                 ))}
               </div>
@@ -379,20 +437,36 @@ function NaveSection({ area }: { area: AreaView }) {
   );
 }
 
-function EspaciosRow({ espacios }: { espacios: EspacioCell[] }) {
+function EspaciosRow({
+  espacios,
+  onDeleteEspacio,
+}: {
+  espacios: EspacioCell[];
+  onDeleteEspacio: (cell: EspacioCell) => void;
+}) {
   if (espacios.length === 0) {
     return <p className="text-[11px] text-gray-400">Sin espacios.</p>;
   }
   return (
     <div className="flex flex-wrap gap-2">
       {espacios.map((e) => (
-        <span
-          key={e.id}
-          className={`inline-flex h-7 min-w-[2.25rem] items-center justify-center rounded-[8px] border px-2 text-xs font-semibold ${ESTADO_CLS[e.estado]}`}
-          title={`${e.nomenclatura} · ${e.estado}`}
-        >
-          {e.nomenclatura}
-        </span>
+        <div key={e.id} className="group relative">
+          <span
+            className={`inline-flex h-7 min-w-[2.25rem] items-center justify-center rounded-[8px] border px-2 text-xs font-semibold ${ESTADO_CLS[e.estado]}`}
+            title={`${e.nomenclatura} · ${e.estado}`}
+          >
+            {e.nomenclatura}
+          </span>
+          <button
+            type="button"
+            onClick={() => onDeleteEspacio(e)}
+            title={`Eliminar espacio ${e.nomenclatura}`}
+            aria-label={`Eliminar espacio ${e.nomenclatura}`}
+            className="absolute -top-1.5 -right-1.5 hidden h-4 w-4 items-center justify-center rounded-full bg-red-500 text-white shadow transition-colors group-hover:flex hover:bg-red-600"
+          >
+            <X className="h-3 w-3" strokeWidth={3} />
+          </button>
+        </div>
       ))}
     </div>
   );
@@ -692,6 +766,55 @@ function ConfirmDeleteModal({
           <p className="mt-2 text-sm text-gray-600">
             ¿Seguro querés eliminar <strong>{area.nombre}</strong>? Se borran también todos los
             peines, lados, pisos y espacios asociados. Esta acción no se puede deshacer.
+          </p>
+          {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+        </div>
+        <div className="flex justify-end gap-3 border-t border-gray-200 p-6">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={pending}
+            className="rounded-[10px] border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-[#101828] hover:bg-gray-50 disabled:opacity-60"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={pending}
+            className="rounded-[10px] bg-red-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+          >
+            {pending ? 'Eliminando…' : 'Eliminar'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ConfirmDeleteEspacioModal({
+  espacio,
+  pending,
+  error,
+  onCancel,
+  onConfirm,
+}: {
+  espacio: EspacioCell;
+  pending: boolean;
+  error: string | null;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="flex w-full max-w-md flex-col rounded-2xl bg-white shadow-2xl">
+        <div className="p-6">
+          <h2 className="text-lg font-bold" style={{ color: '#101828' }}>
+            Eliminar espacio
+          </h2>
+          <p className="mt-2 text-sm text-gray-600">
+            ¿Seguro querés eliminar el espacio <strong>{espacio.nomenclatura}</strong>? Esta acción
+            no se puede deshacer.
           </p>
           {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
         </div>
