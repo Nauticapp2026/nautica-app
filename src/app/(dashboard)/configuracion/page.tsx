@@ -1,11 +1,15 @@
 import { redirect } from 'next/navigation';
-import { eq, asc } from 'drizzle-orm';
+import { eq, and, asc, desc } from 'drizzle-orm';
 
 import { getActiveMarina } from '@/lib/auth/session';
 import { db } from '@/lib/db';
-import { guarderias, horariosDia } from '@/lib/db/schema';
+import { guarderias, horariosDia, memberships, profiles } from '@/lib/db/schema';
 
-import { ConfiguracionClient, type InfoGeneralData } from './configuracion-client';
+import {
+  ConfiguracionClient,
+  type InfoGeneralData,
+  type MiembroEquipo,
+} from './configuracion-client';
 
 const DIAS = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'] as const;
 
@@ -64,5 +68,30 @@ export default async function ConfiguracionPage() {
     horarios,
   };
 
-  return <ConfiguracionClient infoGeneral={infoGeneral} />;
+  const miembrosRows = await db
+    .select({
+      profileId: profiles.id,
+      nombre: profiles.nombre,
+      apellido: profiles.apellido,
+      email: profiles.email,
+      telefono: profiles.telefono,
+      rol: memberships.rol,
+      estadoMiembro: profiles.estadoMiembro,
+    })
+    .from(memberships)
+    .innerJoin(profiles, eq(profiles.id, memberships.userId))
+    .where(and(eq(memberships.guarderiaId, guarderiaId), eq(memberships.status, 'active')))
+    .orderBy(desc(memberships.createdAt));
+
+  const miembros: MiembroEquipo[] = miembrosRows.map((m) => ({
+    profileId: m.profileId,
+    nombre: m.nombre,
+    apellido: m.apellido,
+    email: m.email,
+    telefono: m.telefono,
+    rol: m.rol,
+    estadoMiembro: m.estadoMiembro,
+  }));
+
+  return <ConfiguracionClient infoGeneral={infoGeneral} miembros={miembros} />;
 }

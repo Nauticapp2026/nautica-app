@@ -4,8 +4,9 @@ import { revalidatePath } from 'next/cache';
 import { and, eq } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
-import { guarderias, horariosDia } from '@/lib/db/schema';
+import { guarderias, horariosDia, memberships, profiles } from '@/lib/db/schema';
 import { getActiveMarina } from '@/lib/auth/session';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 const DIAS = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'] as const;
 type Dia = (typeof DIAS)[number];
@@ -102,4 +103,109 @@ export async function updateGuarderiaGeneralAction(
 
   revalidatePath('/configuracion');
   return {};
+}
+
+// =============================================================================
+// EQUIPO
+// =============================================================================
+
+const ROLES = [
+  'super_admin',
+  'administrador_general',
+  'operario',
+  'contable',
+  'mantenimiento',
+  'comunicaciones',
+  'restaurantes',
+  'socio',
+  'invitado',
+  'proveedor',
+] as const;
+type Rol = (typeof ROLES)[number];
+
+export type CreateMiembroEquipoData = {
+  nombre: string;
+  apellido: string;
+  email: string;
+  rol: Rol;
+  dni: string;
+  telefono: string;
+  sede: string;
+};
+
+export async function createMiembroEquipoAction(
+  data: CreateMiembroEquipoData,
+): Promise<{ error?: string; profileId?: string }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+  if (!isAdmin(ctx)) return { error: 'Solo administradores pueden agregar miembros.' };
+
+  const nombre = data.nombre.trim();
+  const apellido = data.apellido.trim();
+  const email = data.email.toLowerCase().trim();
+  if (!nombre || !apellido || !email) {
+    return { error: 'Nombre, apellido y email son obligatorios.' };
+  }
+  if (!ROLES.includes(data.rol)) return { error: 'Rol inválido.' };
+
+  const guarderiaId = ctx.activeMembership.guarderiaId;
+  const admin = createAdminClient();
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
+
+  const { data: inviteData, error: inviteError } = await admin.auth.admin.inviteUserByEmail(email, {
+    redirectTo: `${appUrl}/auth/callback?next=/crear-cuenta`,
+  });
+
+  if (inviteError) {
+    const msg = inviteError.message.toLowerCase();
+    if (msg.includes('already been registered') || msg.includes('already exists')) {
+      return { error: 'Ya existe una cuenta con ese email.' };
+    }
+    return { error: 'Error al crear la cuenta. Verificá el email e intentá de nuevo.' };
+  }
+
+  const profileId = inviteData.user.id;
+
+  try {
+    await db
+      .insert(profiles)
+      .values({
+        id: profileId,
+        email,
+        nombre,
+        apellido,
+        telefono: data.telefono.trim() || null,
+        numeroDocumento: data.dni.trim() || null,
+        tipoDocumento: data.dni.trim() ? 'dni' : null,
+        sede: data.sede.trim() || null,
+      })
+      .onConflictDoUpdate({
+        target: profiles.id,
+        set: {
+          email,
+          nombre,
+          apellido,
+          telefono: data.telefono.trim() || null,
+          numeroDocumento: data.dni.trim() || null,
+          tipoDocumento: data.dni.trim() ? 'dni' : null,
+          sede: data.sede.trim() || null,
+        },
+      });
+
+    await db
+      .insert(memberships)
+      .values({
+        userId: profileId,
+        guarderiaId,
+        rol: data.rol,
+        status: 'active',
+      })
+      .onConflictDoNothing();
+
+    revalidatePath('/configuracion');
+    return { profileId };
+  } catch {
+    await admin.auth.admin.deleteUser(profileId).catch(() => null);
+    return { error: 'Error al registrar el miembro. Intentá de nuevo.' };
+  }
 }
