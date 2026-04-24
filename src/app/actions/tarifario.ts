@@ -103,6 +103,43 @@ export async function updateTarifaAction(data: UpdateTarifaData): Promise<{ erro
   return {};
 }
 
+export async function ajusteMasivoTarifasAction(
+  data: AjusteMasivoData,
+): Promise<{ error?: string; afectadas?: number }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+  if (!isAdmin(ctx)) return { error: 'Solo administradores pueden ajustar tarifas.' };
+
+  if (!Number.isFinite(data.valor) || data.valor < 0) {
+    return { error: 'El valor debe ser un número mayor o igual a 0.' };
+  }
+
+  const guarderiaId = ctx.activeMembership.guarderiaId;
+
+  const rows = await db
+    .select({ id: servicios.id, precio: servicios.precio })
+    .from(servicios)
+    .where(eq(servicios.guarderiaId, guarderiaId));
+
+  let afectadas = 0;
+  const now = new Date();
+
+  for (const row of rows) {
+    const actual = row.precio != null ? Number(row.precio) : 0;
+    const nuevo =
+      data.tipo === 'porcentaje' ? actual * (1 + data.valor / 100) : actual + data.valor;
+
+    await db
+      .update(servicios)
+      .set({ precio: nuevo.toFixed(2), updatedAt: now })
+      .where(eq(servicios.id, row.id));
+    afectadas++;
+  }
+
+  revalidatePath('/tarifario');
+  return { afectadas };
+}
+
 export async function deleteTarifaAction(id: string): Promise<{ error?: string }> {
   const ctx = await getActiveMarina();
   if (!ctx) return { error: 'No autenticado' };

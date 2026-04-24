@@ -5,9 +5,11 @@ import { useRouter } from 'next/navigation';
 import { Edit3, Plus, Tag, Trash2, X } from 'lucide-react';
 
 import {
+  ajusteMasivoTarifasAction,
   createTarifaAction,
   deleteTarifaAction,
   updateTarifaAction,
+  type AjusteMasivoData,
 } from '@/app/actions/tarifario';
 
 export type TipoTarifa = 'cuota_mensual' | 'servicios' | 'espacios';
@@ -106,12 +108,7 @@ export function TarifarioClient({ tarifas }: { tarifas: Tarifa[] }) {
         </button>
       </header>
 
-      <section className="mb-6 rounded-2xl border border-gray-200 bg-[#F3F6F6] p-5">
-        <h2 className="mb-3 text-sm font-bold" style={{ color: '#101828' }}>
-          Ajuste Masivo de Tarifas
-        </h2>
-        <p className="text-sm text-gray-500">Disponible en la próxima entrega.</p>
-      </section>
+      <AjusteMasivoSection totalTarifas={tarifas.length} onApplied={() => router.refresh()} />
 
       <section className="mb-6">
         <div
@@ -411,6 +408,151 @@ function TarifaModal({
         </div>
       </div>
     </div>
+  );
+}
+
+function AjusteMasivoSection({
+  totalTarifas,
+  onApplied,
+}: {
+  totalTarifas: number;
+  onApplied: () => void;
+}) {
+  const [tipo, setTipo] = useState<'' | AjusteMasivoData['tipo']>('');
+  const [valor, setValor] = useState<string>('');
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [feedback, setFeedback] = useState<{ type: 'error' | 'success'; msg: string } | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  const valorNum = Number(valor);
+  const valido = Boolean(tipo) && Number.isFinite(valorNum) && valorNum >= 0 && valor !== '';
+  const sinTarifas = totalTarifas === 0;
+
+  const handleAplicar = () => {
+    setFeedback(null);
+    if (!valido) {
+      setFeedback({ type: 'error', msg: 'Elegí tipo de ajuste y un valor ≥ 0.' });
+      return;
+    }
+    setConfirmOpen(true);
+  };
+
+  const handleConfirm = () => {
+    if (!tipo || !Number.isFinite(valorNum)) return;
+    setFeedback(null);
+    startTransition(async () => {
+      const res = await ajusteMasivoTarifasAction({ tipo, valor: valorNum });
+      if (res.error) {
+        setFeedback({ type: 'error', msg: res.error });
+        setConfirmOpen(false);
+      } else {
+        setConfirmOpen(false);
+        setValor('');
+        setTipo('');
+        setFeedback({
+          type: 'success',
+          msg: `Ajuste aplicado a ${res.afectadas ?? 0} tarifa(s).`,
+        });
+        onApplied();
+      }
+    });
+  };
+
+  const previewTexto = tipo === 'porcentaje' ? `+${valor}%` : tipo === 'monto' ? `+$${valor}` : '';
+
+  return (
+    <>
+      <section className="mb-6 rounded-2xl border border-gray-200 bg-[#F3F6F6] p-5">
+        <h2 className="mb-1 text-sm font-bold" style={{ color: '#101828' }}>
+          Ajuste Masivo de Tarifas
+        </h2>
+        <p className="mb-4 text-xs text-gray-500">
+          Se aplicará a todas las tarifas ({totalTarifas}) sin importar el filtro.
+        </p>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <select
+            className={`${inputCls} max-w-[220px]`}
+            value={tipo}
+            onChange={(e) => {
+              setTipo(e.target.value as '' | AjusteMasivoData['tipo']);
+              setFeedback(null);
+            }}
+          >
+            <option value="">Seleccione una opción…</option>
+            <option value="porcentaje">Porcentaje</option>
+            <option value="monto">Monto</option>
+          </select>
+
+          {tipo && (
+            <input
+              className={`${inputCls} max-w-[180px]`}
+              type="number"
+              min={0}
+              step={tipo === 'porcentaje' ? '0.1' : '0.01'}
+              placeholder={tipo === 'porcentaje' ? 'Ej: 10' : 'Ej: 500'}
+              value={valor}
+              onChange={(e) => {
+                setValor(e.target.value);
+                setFeedback(null);
+              }}
+            />
+          )}
+
+          <button
+            type="button"
+            onClick={handleAplicar}
+            disabled={!valido || sinTarifas || pending}
+            className="rounded-[10px] bg-[#175861] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#0f4249] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Aplicar a todas
+          </button>
+        </div>
+
+        {feedback && (
+          <p
+            className={`mt-3 text-sm ${feedback.type === 'error' ? 'text-red-600' : 'text-green-700'}`}
+          >
+            {feedback.msg}
+          </p>
+        )}
+      </section>
+
+      {confirmOpen && tipo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="flex w-full max-w-md flex-col rounded-2xl bg-white shadow-2xl">
+            <div className="p-6">
+              <h2 className="text-lg font-bold" style={{ color: '#101828' }}>
+                Confirmar ajuste masivo
+              </h2>
+              <p className="mt-2 text-sm text-gray-600">
+                Se va a aplicar <strong>{previewTexto}</strong> a las{' '}
+                <strong>{totalTarifas}</strong> tarifa(s) de tu guardería. Esta acción no se puede
+                deshacer con un solo clic.
+              </p>
+            </div>
+            <div className="flex justify-end gap-3 border-t border-gray-200 p-6">
+              <button
+                type="button"
+                onClick={() => setConfirmOpen(false)}
+                disabled={pending}
+                className="rounded-[10px] border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-[#101828] hover:bg-gray-50 disabled:opacity-60"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirm}
+                disabled={pending}
+                className="rounded-[10px] bg-[#175861] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#0f4249] disabled:opacity-60"
+              >
+                {pending ? 'Aplicando…' : 'Confirmar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
