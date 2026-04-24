@@ -194,12 +194,24 @@ function EmptyState() {
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
+const TZ_AR = 'America/Argentina/Buenos_Aires';
+
 function fmtNaive(iso: string | null): string {
   if (!iso) return '—';
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '—';
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${pad(d.getUTCDate())}/${pad(d.getUTCMonth() + 1)} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
+  const date = d.toLocaleDateString('es-AR', {
+    timeZone: TZ_AR,
+    day: '2-digit',
+    month: '2-digit',
+  });
+  const time = d.toLocaleTimeString('es-AR', {
+    timeZone: TZ_AR,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+  return `${date} ${time}`;
 }
 
 function fmtRelative(iso: string): string {
