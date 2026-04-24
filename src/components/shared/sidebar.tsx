@@ -38,7 +38,7 @@ const NAV = [
   { href: '/dashboard/comunicaciones', label: 'Comunicaciones', icon: MessageSquare },
   { href: '/facturacion', label: 'Facturación', icon: FileText },
   { href: '/dashboard/tarifario', label: 'Tarifario', icon: Tag },
-  { href: '/dashboard/configuracion', label: 'Configuración', icon: Settings },
+  { href: '/configuracion', label: 'Configuración', icon: Settings },
 ];
 
 // El operario solo accede a Tareas desde el admin UI.
