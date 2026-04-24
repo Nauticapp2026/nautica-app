@@ -1,8 +1,18 @@
 import { redirect } from 'next/navigation';
 import { getActiveMarina } from '@/lib/auth/session';
 import { db } from '@/lib/db';
-import { embarcaciones, memberships, profiles, facturacion, comunicaciones } from '@/lib/db/schema';
-import { count, sum, eq, and, gte, lte, desc } from 'drizzle-orm';
+import {
+  alertas,
+  comunicaciones,
+  embarcaciones,
+  facturacion,
+  memberships,
+  porteria,
+  profiles,
+} from '@/lib/db/schema';
+import { and, asc, count, desc, eq, gte, lte, sum } from 'drizzle-orm';
+
+import { AlertasOperativasSection, type AlertaOperativa } from './alertas-operativas';
 import {
   Ship,
   Users,
@@ -132,6 +142,7 @@ export default async function DashboardPage() {
     alertasList,
     operariosList,
     comunicacionesList,
+    alertasOperativasRows,
   ] = await Promise.all([
     db
       .select({ totalEmbarcaciones: count() })
@@ -206,7 +217,51 @@ export default async function DashboardPage() {
       .where(and(eq(comunicaciones.guarderiaId, gId), eq(comunicaciones.publicar, true)))
       .orderBy(desc(comunicaciones.createdAt))
       .limit(3),
+
+    db
+      .select({
+        id: alertas.id,
+        tipo: alertas.tipo,
+        estado: alertas.estado,
+        mensaje: alertas.mensaje,
+        createdAt: alertas.createdAt,
+        porteriaId: alertas.porteriaId,
+        socioId: alertas.socioId,
+        socioNombre: profiles.nombre,
+        socioApellido: profiles.apellido,
+        socioEmail: profiles.email,
+        socioTelefono: profiles.telefono,
+        desde: porteria.desde,
+        hasta: porteria.hasta,
+        arribadaEn: porteria.arribadaEn,
+        embarcacionNombre: embarcaciones.nombre,
+        embarcacionMatricula: embarcaciones.matricula,
+      })
+      .from(alertas)
+      .leftJoin(porteria, eq(porteria.id, alertas.porteriaId))
+      .leftJoin(profiles, eq(profiles.id, alertas.socioId))
+      .leftJoin(embarcaciones, eq(embarcaciones.id, porteria.embarcacionId))
+      .where(and(eq(alertas.guarderiaId, gId), eq(alertas.estado, 'pendiente')))
+      .orderBy(asc(alertas.tipo), desc(alertas.createdAt))
+      .limit(500),
   ]);
+
+  const alertasOperativas: AlertaOperativa[] = alertasOperativasRows.map((r) => ({
+    id: r.id,
+    tipo: r.tipo as 'retorno_proximo' | 'sin_respuesta',
+    mensaje: r.mensaje,
+    createdAt: r.createdAt.toISOString(),
+    porteriaId: r.porteriaId,
+    socioNombre:
+      [r.socioNombre, r.socioApellido].filter(Boolean).join(' ') || r.socioEmail || 'Sin socio',
+    socioTelefono: r.socioTelefono,
+    desde: r.desde ? r.desde.toISOString() : null,
+    hasta: r.hasta ? r.hasta.toISOString() : null,
+    arribadaEn: r.arribadaEn ? r.arribadaEn.toISOString() : null,
+    embarcacion: r.embarcacionMatricula
+      ? `${r.embarcacionNombre ?? ''} (${r.embarcacionMatricula})`.trim()
+      : r.embarcacionNombre,
+  }));
 
   return (
     <div className="space-y-6 p-8">
@@ -334,6 +389,9 @@ export default async function DashboardPage() {
           )}
         </div>
       </div>
+
+      {/* Alertas operativas (retorno de embarcaciones) */}
+      <AlertasOperativasSection alertas={alertasOperativas} />
 
       {/* Comunicaciones recientes */}
       <div className="rounded-2xl border border-gray-200 bg-white p-6">
