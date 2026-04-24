@@ -126,8 +126,9 @@ export async function ajusteMasivoTarifasAction(
 
   for (const row of rows) {
     const actual = row.precio != null ? Number(row.precio) : 0;
-    const nuevo =
-      data.tipo === 'porcentaje' ? actual * (1 + data.valor / 100) : actual + data.valor;
+    // porcentaje: incrementa el precio actual en X%.
+    // monto: reemplaza el precio por el valor indicado.
+    const nuevo = data.tipo === 'porcentaje' ? actual * (1 + data.valor / 100) : data.valor;
 
     await db
       .update(servicios)

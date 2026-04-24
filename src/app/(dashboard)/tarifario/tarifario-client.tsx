@@ -458,7 +458,12 @@ function AjusteMasivoSection({
     });
   };
 
-  const previewTexto = tipo === 'porcentaje' ? `+${valor}%` : tipo === 'monto' ? `+$${valor}` : '';
+  const previewTexto =
+    tipo === 'porcentaje'
+      ? `un aumento de ${valor}%`
+      : tipo === 'monto'
+        ? `el monto fijo $${valor} (se reemplaza el precio actual)`
+        : '';
 
   return (
     <>
