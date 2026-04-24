@@ -234,6 +234,13 @@ export const guarderias = pgTable(
     activarNotificaciones: boolean('activar_notificaciones').default(false),
     activarPagosOnline: boolean('activar_pagos_online').default(false),
     activarReservasOnline: boolean('activar_reservas_online').default(false),
+    // Punto de venta / facturación electrónica (tusfacturas.app)
+    puntoDeVenta: integer('punto_de_venta'),
+    razonSocial: text('razon_social'),
+    condicionIva: condicionFrenteIvaEnum('condicion_iva'),
+    rubro: text('rubro'),
+    iibb: text('iibb'),
+    fechaInicio: timestamp('fecha_inicio', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
