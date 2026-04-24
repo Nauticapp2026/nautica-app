@@ -15,13 +15,74 @@ import {
 export type TipoTarifa = 'cuota_mensual' | 'servicios' | 'espacios';
 export type EstadoTarifa = 'activo' | 'inactivo';
 
+export type MedidaTarifa =
+  | 'hasta_16'
+  | 'hasta_18'
+  | 'hasta_19'
+  | 'hasta_21'
+  | 'hasta_23'
+  | 'hasta_25'
+  | 'hasta_29'
+  | 'hasta_32'
+  | 'hasta_35'
+  | 'hasta_40'
+  | 'hasta_42'
+  | 'hasta_44'
+  | 'hasta_46'
+  | 'hasta_50'
+  | 'hasta_55'
+  | 'hasta_60'
+  | 'hasta_65'
+  | 'hasta_70'
+  | 'hasta_74'
+  | 'hasta_86'
+  | 'hasta_105';
+
+export type LocacionTarifa = 'camas' | 'amarra';
+export type UnidadMetraje = 'metros' | 'pies';
+
 export type Tarifa = {
   id: string;
   nombre: string;
   tipo: TipoTarifa;
   precio: number;
   estado: EstadoTarifa;
+  medida: MedidaTarifa | null;
+  locacion: LocacionTarifa | null;
+  unidadMetraje: UnidadMetraje | null;
+  eslora: number | null;
+  manga: number | null;
+  puntual: number | null;
+  clases: string | null;
 };
+
+const MEDIDAS: MedidaTarifa[] = [
+  'hasta_16',
+  'hasta_18',
+  'hasta_19',
+  'hasta_21',
+  'hasta_23',
+  'hasta_25',
+  'hasta_29',
+  'hasta_32',
+  'hasta_35',
+  'hasta_40',
+  'hasta_42',
+  'hasta_44',
+  'hasta_46',
+  'hasta_50',
+  'hasta_55',
+  'hasta_60',
+  'hasta_65',
+  'hasta_70',
+  'hasta_74',
+  'hasta_86',
+  'hasta_105',
+];
+
+function medidaLabel(m: MedidaTarifa): string {
+  return `Hasta ${m.replace('hasta_', '')}`;
+}
 
 type FiltroCategoria = 'todas' | TipoTarifa;
 
@@ -278,8 +339,36 @@ function TarifaModal({
   const [nombre, setNombre] = useState(initial?.nombre ?? '');
   const [precio, setPrecio] = useState<string>(initial ? String(initial.precio) : '');
   const [estado, setEstado] = useState<EstadoTarifa>(initial?.estado ?? 'activo');
+
+  // Cuota mensual
+  const [medida, setMedida] = useState<MedidaTarifa | ''>(initial?.medida ?? '');
+
+  // Espacios
+  const [locacion, setLocacion] = useState<LocacionTarifa>(initial?.locacion ?? 'camas');
+  const [unidadMetraje, setUnidadMetraje] = useState<UnidadMetraje>(
+    initial?.unidadMetraje ?? 'metros',
+  );
+  const [eslora, setEslora] = useState<string>(
+    initial?.eslora != null ? String(initial.eslora) : '',
+  );
+  const [manga, setManga] = useState<string>(initial?.manga != null ? String(initial.manga) : '');
+  const [puntual, setPuntual] = useState<string>(
+    initial?.puntual != null ? String(initial.puntual) : '',
+  );
+  const [clases, setClases] = useState<string>(initial?.clases ?? '');
+
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  const esloraNum = Number(eslora);
+  const conversion =
+    Number.isFinite(esloraNum) && eslora !== ''
+      ? unidadMetraje === 'metros'
+        ? `${(esloraNum * 3.28084).toFixed(2)} pies`
+        : `${(esloraNum / 3.28084).toFixed(2)} metros`
+      : unidadMetraje === 'metros'
+        ? '0 pies'
+        : '0 metros';
 
   const handleSubmit = () => {
     setError(null);
@@ -296,16 +385,45 @@ function TarifaModal({
       setError('El precio debe ser un número mayor o igual a 0.');
       return;
     }
+
+    const toNumOrNull = (s: string): number | null => {
+      if (s.trim() === '') return null;
+      const n = Number(s);
+      return Number.isFinite(n) ? n : null;
+    };
+
+    let payload;
+    if (tipo === 'cuota_mensual') {
+      payload = {
+        tipo: 'cuota_mensual' as const,
+        nombre: nombre.trim(),
+        precio: precioNum,
+        medida: medida === '' ? null : medida,
+      };
+    } else if (tipo === 'espacios') {
+      payload = {
+        tipo: 'espacios' as const,
+        nombre: nombre.trim(),
+        precio: precioNum,
+        locacion,
+        unidadMetraje,
+        eslora: toNumOrNull(eslora),
+        manga: toNumOrNull(manga),
+        puntual: toNumOrNull(puntual),
+        clases,
+      };
+    } else {
+      payload = {
+        tipo: 'servicios' as const,
+        nombre: nombre.trim(),
+        precio: precioNum,
+      };
+    }
+
     startTransition(async () => {
       const res = isEdit
-        ? await updateTarifaAction({
-            id: state.tarifa.id,
-            nombre: nombre.trim(),
-            tipo,
-            precio: precioNum,
-            estado,
-          })
-        : await createTarifaAction({ nombre: nombre.trim(), tipo, precio: precioNum });
+        ? await updateTarifaAction({ ...payload, id: state.tarifa.id, estado })
+        : await createTarifaAction(payload);
       if (res.error) setError(res.error);
       else onSaved();
     });
@@ -313,7 +431,7 @@ function TarifaModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="flex w-full max-w-md flex-col rounded-2xl bg-white shadow-2xl">
+      <div className="flex max-h-[92vh] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
         <div className="flex items-start justify-between p-6 pb-4">
           <div>
             <h2 className="text-lg font-bold" style={{ color: '#101828' }}>
@@ -333,7 +451,7 @@ function TarifaModal({
 
         <div className="border-t border-gray-200" />
 
-        <div className="space-y-4 p-6">
+        <div className="flex-1 space-y-4 overflow-y-auto p-6">
           <div>
             <label className="mb-1 block text-sm font-semibold text-gray-700">Categoría</label>
             <select
@@ -348,15 +466,146 @@ function TarifaModal({
             </select>
           </div>
 
-          <div>
-            <label className="mb-1 block text-sm font-semibold text-gray-700">Concepto</label>
-            <input
-              className={inputCls}
-              placeholder="Ej: Mantenimiento mensual"
-              value={nombre}
-              onChange={(e) => setNombre(e.target.value)}
-            />
-          </div>
+          {tipo === 'espacios' && (
+            <>
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-gray-700">Locación</label>
+                <div className="flex gap-5">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="radio"
+                      checked={locacion === 'camas'}
+                      onChange={() => setLocacion('camas')}
+                    />
+                    Camas
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="radio"
+                      checked={locacion === 'amarra'}
+                      onChange={() => setLocacion('amarra')}
+                    />
+                    Amarra
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-gray-700">
+                  ¿Cómo desea cargar el metraje?
+                </label>
+                <div className="flex gap-5">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="radio"
+                      checked={unidadMetraje === 'metros'}
+                      onChange={() => setUnidadMetraje('metros')}
+                    />
+                    Metros
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="radio"
+                      checked={unidadMetraje === 'pies'}
+                      onChange={() => setUnidadMetraje('pies')}
+                    />
+                    Pies
+                  </label>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-gray-700">
+                    Eslora ({unidadMetraje})
+                  </label>
+                  <input
+                    className={inputCls}
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={eslora}
+                    onChange={(e) => setEslora(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-gray-700">Manga</label>
+                  <input
+                    className={inputCls}
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={manga}
+                    onChange={(e) => setManga(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-gray-700">Puntual</label>
+                  <input
+                    className={inputCls}
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={puntual}
+                    onChange={(e) => setPuntual(e.target.value)}
+                  />
+                </div>
+              </div>
+              <p className="-mt-2 text-xs text-gray-500">{conversion}</p>
+
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-gray-700">Clases</label>
+                <input
+                  className={inputCls}
+                  placeholder="Clases"
+                  value={clases}
+                  onChange={(e) => setClases(e.target.value)}
+                />
+              </div>
+            </>
+          )}
+
+          {tipo !== 'espacios' && (
+            <div>
+              <label className="mb-1 block text-sm font-semibold text-gray-700">Concepto</label>
+              <input
+                className={inputCls}
+                placeholder="Ej: Mantenimiento mensual"
+                value={nombre}
+                onChange={(e) => setNombre(e.target.value)}
+              />
+            </div>
+          )}
+
+          {tipo === 'espacios' && (
+            <div>
+              <label className="mb-1 block text-sm font-semibold text-gray-700">Concepto</label>
+              <input
+                className={inputCls}
+                placeholder="Ej: Amarra 10m"
+                value={nombre}
+                onChange={(e) => setNombre(e.target.value)}
+              />
+            </div>
+          )}
+
+          {tipo === 'cuota_mensual' && (
+            <div>
+              <label className="mb-1 block text-sm font-semibold text-gray-700">Medida</label>
+              <select
+                className={inputCls}
+                value={medida}
+                onChange={(e) => setMedida(e.target.value as MedidaTarifa | '')}
+              >
+                <option value="">Seleccione una opción…</option>
+                {MEDIDAS.map((m) => (
+                  <option key={m} value={m}>
+                    {medidaLabel(m)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div>
             <label className="mb-1 block text-sm font-semibold text-gray-700">Precio</label>

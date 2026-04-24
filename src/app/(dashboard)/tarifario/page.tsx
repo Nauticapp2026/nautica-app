@@ -23,10 +23,19 @@ export default async function TarifarioPage() {
       tipo: servicios.tipo,
       precio: servicios.precio,
       estado: servicios.estado,
+      medida: servicios.medida,
+      locacion: servicios.locacion,
+      unidadMetraje: servicios.unidadMetraje,
+      eslora: servicios.eslora,
+      manga: servicios.manga,
+      puntual: servicios.puntual,
+      clases: servicios.clases,
     })
     .from(servicios)
     .where(eq(servicios.guarderiaId, guarderiaId))
     .orderBy(asc(servicios.tipo), asc(servicios.nombre));
+
+  const toNum = (v: string | null) => (v != null ? Number(v) : null);
 
   const tarifas: Tarifa[] = rows.map((r) => ({
     id: r.id,
@@ -34,6 +43,13 @@ export default async function TarifarioPage() {
     tipo: r.tipo,
     precio: r.precio != null ? Number(r.precio) : 0,
     estado: r.estado ?? 'activo',
+    medida: r.medida,
+    locacion: r.locacion,
+    unidadMetraje: r.unidadMetraje,
+    eslora: toNum(r.eslora),
+    manga: toNum(r.manga),
+    puntual: toNum(r.puntual),
+    clases: r.clases,
   }));
 
   return <TarifarioClient tarifas={tarifas} />;
