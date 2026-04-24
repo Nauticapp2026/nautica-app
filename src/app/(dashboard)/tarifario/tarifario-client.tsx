@@ -1,7 +1,14 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { Edit3, Plus, Tag, Trash2 } from 'lucide-react';
+import { useMemo, useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
+import { Edit3, Plus, Tag, Trash2, X } from 'lucide-react';
+
+import {
+  createTarifaAction,
+  deleteTarifaAction,
+  updateTarifaAction,
+} from '@/app/actions/tarifario';
 
 export type TipoTarifa = 'cuota_mensual' | 'servicios' | 'espacios';
 export type EstadoTarifa = 'activo' | 'inactivo';
@@ -31,6 +38,9 @@ const TIPO_LABELS: Record<TipoTarifa, string> = {
 
 const GRUPO_ORDER: TipoTarifa[] = ['cuota_mensual', 'servicios', 'espacios'];
 
+const inputCls =
+  'h-11 w-full rounded-[10px] border border-gray-200 bg-white px-4 text-sm text-[#101828] focus:border-[#175861] focus:outline-none focus:ring-1 focus:ring-[#175861]';
+
 function formatARS(n: number): string {
   return n.toLocaleString('es-AR', {
     style: 'currency',
@@ -39,8 +49,15 @@ function formatARS(n: number): string {
   });
 }
 
+type ModalState = { mode: 'create' } | { mode: 'edit'; tarifa: Tarifa } | null;
+
 export function TarifarioClient({ tarifas }: { tarifas: Tarifa[] }) {
+  const router = useRouter();
   const [filtro, setFiltro] = useState<FiltroCategoria>('todas');
+  const [modal, setModal] = useState<ModalState>(null);
+  const [confirmDelete, setConfirmDelete] = useState<Tarifa | null>(null);
+  const [deleting, startDelete] = useTransition();
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const grupos = useMemo(() => {
     const filtered = filtro === 'todas' ? tarifas : tarifas.filter((t) => t.tipo === filtro);
@@ -55,6 +72,19 @@ export function TarifarioClient({ tarifas }: { tarifas: Tarifa[] }) {
     }));
   }, [tarifas, filtro]);
 
+  const handleDelete = () => {
+    if (!confirmDelete) return;
+    setDeleteError(null);
+    startDelete(async () => {
+      const res = await deleteTarifaAction(confirmDelete.id);
+      if (res.error) setDeleteError(res.error);
+      else {
+        setConfirmDelete(null);
+        router.refresh();
+      }
+    });
+  };
+
   return (
     <div className="p-8">
       <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
@@ -68,9 +98,8 @@ export function TarifarioClient({ tarifas }: { tarifas: Tarifa[] }) {
         </div>
         <button
           type="button"
-          className="flex items-center gap-2 rounded-[10px] bg-[#175861] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#0f4249] disabled:opacity-60"
-          disabled
-          title="Disponible en la próxima entrega"
+          onClick={() => setModal({ mode: 'create' })}
+          className="flex items-center gap-2 rounded-[10px] bg-[#175861] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#0f4249]"
         >
           <Plus className="h-4 w-4" />
           Nueva tarifa
@@ -131,15 +160,51 @@ export function TarifarioClient({ tarifas }: { tarifas: Tarifa[] }) {
               <Tag className="h-4 w-4" style={{ color: '#669E9D' }} />
               {TIPO_LABELS[tipo]}
             </h3>
-            <TablaTarifas items={list} />
+            <TablaTarifas
+              items={list}
+              onEdit={(t) => setModal({ mode: 'edit', tarifa: t })}
+              onDelete={(t) => {
+                setDeleteError(null);
+                setConfirmDelete(t);
+              }}
+            />
           </section>
         ))
+      )}
+
+      {modal && (
+        <TarifaModal
+          state={modal}
+          onClose={() => setModal(null)}
+          onSaved={() => {
+            setModal(null);
+            router.refresh();
+          }}
+        />
+      )}
+
+      {confirmDelete && (
+        <ConfirmDeleteModal
+          tarifa={confirmDelete}
+          pending={deleting}
+          error={deleteError}
+          onCancel={() => setConfirmDelete(null)}
+          onConfirm={handleDelete}
+        />
       )}
     </div>
   );
 }
 
-function TablaTarifas({ items }: { items: Tarifa[] }) {
+function TablaTarifas({
+  items,
+  onEdit,
+  onDelete,
+}: {
+  items: Tarifa[];
+  onEdit: (t: Tarifa) => void;
+  onDelete: (t: Tarifa) => void;
+}) {
   return (
     <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
       <table className="w-full text-sm">
@@ -167,17 +232,17 @@ function TablaTarifas({ items }: { items: Tarifa[] }) {
                 <div className="flex justify-end gap-2">
                   <button
                     type="button"
-                    className="rounded-[8px] p-1.5 text-[#669E9D] hover:bg-gray-100 disabled:opacity-40"
-                    disabled
-                    title="Disponible en la próxima entrega"
+                    onClick={() => onEdit(t)}
+                    title="Editar tarifa"
+                    className="rounded-[8px] p-1.5 text-[#669E9D] hover:bg-gray-100"
                   >
                     <Edit3 className="h-4 w-4" />
                   </button>
                   <button
                     type="button"
-                    className="rounded-[8px] p-1.5 text-red-500 hover:bg-red-50 disabled:opacity-40"
-                    disabled
-                    title="Disponible en la próxima entrega"
+                    onClick={() => onDelete(t)}
+                    title="Eliminar tarifa"
+                    className="rounded-[8px] p-1.5 text-red-500 hover:bg-red-50"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
@@ -197,5 +262,203 @@ function EstadoBadge({ estado }: { estado: EstadoTarifa }) {
     <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${cls}`}>
       {estado === 'activo' ? 'Activo' : 'Inactivo'}
     </span>
+  );
+}
+
+function TarifaModal({
+  state,
+  onClose,
+  onSaved,
+}: {
+  state: NonNullable<ModalState>;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const isEdit = state.mode === 'edit';
+  const initial = isEdit ? state.tarifa : null;
+
+  const [tipo, setTipo] = useState<TipoTarifa | ''>(initial?.tipo ?? '');
+  const [nombre, setNombre] = useState(initial?.nombre ?? '');
+  const [precio, setPrecio] = useState<string>(initial ? String(initial.precio) : '');
+  const [estado, setEstado] = useState<EstadoTarifa>(initial?.estado ?? 'activo');
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  const handleSubmit = () => {
+    setError(null);
+    if (!tipo) {
+      setError('Elegí una categoría.');
+      return;
+    }
+    if (!nombre.trim()) {
+      setError('El concepto es obligatorio.');
+      return;
+    }
+    const precioNum = Number(precio);
+    if (!Number.isFinite(precioNum) || precioNum < 0) {
+      setError('El precio debe ser un número mayor o igual a 0.');
+      return;
+    }
+    startTransition(async () => {
+      const res = isEdit
+        ? await updateTarifaAction({
+            id: state.tarifa.id,
+            nombre: nombre.trim(),
+            tipo,
+            precio: precioNum,
+            estado,
+          })
+        : await createTarifaAction({ nombre: nombre.trim(), tipo, precio: precioNum });
+      if (res.error) setError(res.error);
+      else onSaved();
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="flex w-full max-w-md flex-col rounded-2xl bg-white shadow-2xl">
+        <div className="flex items-start justify-between p-6 pb-4">
+          <div>
+            <h2 className="text-lg font-bold" style={{ color: '#101828' }}>
+              {isEdit ? 'Editar tarifa' : 'Nueva tarifa'}
+            </h2>
+            <p className="mt-0.5 text-sm" style={{ color: '#669E9D' }}>
+              {isEdit ? 'Modificá los datos de la tarifa' : 'Completá los datos de la nueva tarifa'}
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="rounded-[8px] p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="border-t border-gray-200" />
+
+        <div className="space-y-4 p-6">
+          <div>
+            <label className="mb-1 block text-sm font-semibold text-gray-700">Categoría</label>
+            <select
+              className={inputCls}
+              value={tipo}
+              onChange={(e) => setTipo(e.target.value as TipoTarifa)}
+            >
+              <option value="">Seleccione una opción…</option>
+              <option value="cuota_mensual">Cuota mensual</option>
+              <option value="servicios">Servicios</option>
+              <option value="espacios">Espacios</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-semibold text-gray-700">Concepto</label>
+            <input
+              className={inputCls}
+              placeholder="Ej: Mantenimiento mensual"
+              value={nombre}
+              onChange={(e) => setNombre(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-semibold text-gray-700">Precio</label>
+            <input
+              className={inputCls}
+              type="number"
+              min={0}
+              step="0.01"
+              placeholder="Precio"
+              value={precio}
+              onChange={(e) => setPrecio(e.target.value)}
+            />
+          </div>
+
+          {isEdit && (
+            <div>
+              <label className="mb-1 block text-sm font-semibold text-gray-700">Estado</label>
+              <select
+                className={inputCls}
+                value={estado}
+                onChange={(e) => setEstado(e.target.value as EstadoTarifa)}
+              >
+                <option value="activo">Activo</option>
+                <option value="inactivo">Inactivo</option>
+              </select>
+            </div>
+          )}
+
+          {error && <p className="text-sm text-red-600">{error}</p>}
+        </div>
+
+        <div className="flex justify-end gap-3 border-t border-gray-200 p-6">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={pending}
+            className="rounded-[10px] border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-[#101828] hover:bg-gray-50 disabled:opacity-60"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={pending}
+            className="rounded-[10px] bg-[#175861] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#0f4249] disabled:opacity-60"
+          >
+            {pending ? 'Guardando…' : 'Guardar tarifa'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ConfirmDeleteModal({
+  tarifa,
+  pending,
+  error,
+  onCancel,
+  onConfirm,
+}: {
+  tarifa: Tarifa;
+  pending: boolean;
+  error: string | null;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="flex w-full max-w-md flex-col rounded-2xl bg-white shadow-2xl">
+        <div className="p-6">
+          <h2 className="text-lg font-bold" style={{ color: '#101828' }}>
+            Eliminar tarifa
+          </h2>
+          <p className="mt-2 text-sm text-gray-600">
+            ¿Seguro querés eliminar <strong>{tarifa.nombre}</strong>? Esta acción no se puede
+            deshacer.
+          </p>
+          {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+        </div>
+        <div className="flex justify-end gap-3 border-t border-gray-200 p-6">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={pending}
+            className="rounded-[10px] border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-[#101828] hover:bg-gray-50 disabled:opacity-60"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={pending}
+            className="rounded-[10px] bg-red-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+          >
+            {pending ? 'Eliminando…' : 'Eliminar'}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
