@@ -9,8 +9,10 @@ import {
   espacios,
   lados as ladosTable,
   marinas,
+  memberships,
   naves,
   pisos as pisosTable,
+  servicios,
 } from '@/lib/db/schema';
 import { getActiveMarina } from '@/lib/auth/session';
 
@@ -167,6 +169,83 @@ export async function createAreaAction(
 
   revalidatePath('/espacios');
   return { id: area.id };
+}
+
+const ESTADOS_ESPACIO = ['disponible', 'ocupado', 'reservado'] as const;
+type EstadoEspacio = (typeof ESTADOS_ESPACIO)[number];
+
+export type UpdateEspacioInput = {
+  id: string;
+  ocupanteId: string | null;
+  nomenclatura: string;
+  estado: EstadoEspacio;
+  servicioId: string | null;
+  eslora: number | null;
+  manga: number | null;
+  puntual: number | null;
+};
+
+export async function updateEspacioAction(input: UpdateEspacioInput): Promise<{ error?: string }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+  if (!isAdmin(ctx)) return { error: 'Solo administradores pueden editar espacios.' };
+
+  if (!input.nomenclatura.trim()) return { error: 'La nomenclatura es obligatoria.' };
+  if (!ESTADOS_ESPACIO.includes(input.estado)) return { error: 'Estado inválido.' };
+
+  const guarderiaId = ctx.activeMembership.guarderiaId;
+
+  const [current] = await db
+    .select({ id: espacios.id })
+    .from(espacios)
+    .where(and(eq(espacios.id, input.id), eq(espacios.guarderiaId, guarderiaId)))
+    .limit(1);
+  if (!current) return { error: 'Espacio no encontrado.' };
+
+  // Validar que el ocupante (si se asocia) sea miembro de la guardería.
+  if (input.ocupanteId) {
+    const [m] = await db
+      .select({ id: memberships.id })
+      .from(memberships)
+      .where(
+        and(
+          eq(memberships.userId, input.ocupanteId),
+          eq(memberships.guarderiaId, guarderiaId),
+          eq(memberships.status, 'active'),
+        ),
+      )
+      .limit(1);
+    if (!m) return { error: 'El cliente seleccionado no es miembro de esta guardería.' };
+  }
+
+  // Validar que el servicio pertenezca a la guardería.
+  let tarifaPrecio: string | null = null;
+  if (input.servicioId) {
+    const [s] = await db
+      .select({ id: servicios.id, precio: servicios.precio })
+      .from(servicios)
+      .where(and(eq(servicios.id, input.servicioId), eq(servicios.guarderiaId, guarderiaId)))
+      .limit(1);
+    if (!s) return { error: 'La tarifa seleccionada no existe.' };
+    tarifaPrecio = s.precio ?? null;
+  }
+
+  await db
+    .update(espacios)
+    .set({
+      ocupanteId: input.ocupanteId,
+      servicioId: input.servicioId,
+      nomenclatura: input.nomenclatura.trim(),
+      estado: input.estado,
+      eslora: input.eslora != null ? input.eslora.toFixed(2) : null,
+      manga: input.manga != null ? input.manga.toFixed(2) : null,
+      puntual: input.puntual != null ? input.puntual.toFixed(2) : null,
+      tarifa: tarifaPrecio,
+    })
+    .where(eq(espacios.id, input.id));
+
+  revalidatePath('/espacios');
+  return {};
 }
 
 export async function deleteEspacioAction(id: string): Promise<{ error?: string }> {

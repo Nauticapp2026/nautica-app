@@ -1,11 +1,27 @@
 import { redirect } from 'next/navigation';
-import { asc, eq } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 
 import { getActiveMarina } from '@/lib/auth/session';
 import { db } from '@/lib/db';
-import { areas, espacios, lados, marinas, naves, pisos } from '@/lib/db/schema';
+import {
+  areas,
+  espacios,
+  lados,
+  marinas,
+  memberships,
+  naves,
+  pisos,
+  profiles,
+  servicios,
+} from '@/lib/db/schema';
 
-import { EspaciosClient, type AreaView, type EspacioCell } from './espacios-client';
+import {
+  EspaciosClient,
+  type AreaView,
+  type EspacioCell,
+  type ServicioEspacio,
+  type SocioOpt,
+} from './espacios-client';
 
 export default async function EspaciosPage() {
   const ctx = await getActiveMarina();
@@ -16,60 +32,111 @@ export default async function EspaciosPage() {
 
   const guarderiaId = ctx.activeMembership.guarderiaId;
 
-  const [areasRows, marinasRows, navesRows, ladosRows, pisosRows, espaciosRows] = await Promise.all(
-    [
-      db
-        .select({ id: areas.id, nombre: areas.nombre })
-        .from(areas)
-        .where(eq(areas.guarderiaId, guarderiaId))
-        .orderBy(asc(areas.createdAt)),
+  const [
+    areasRows,
+    marinasRows,
+    navesRows,
+    ladosRows,
+    pisosRows,
+    espaciosRows,
+    sociosRows,
+    serviciosRows,
+  ] = await Promise.all([
+    db
+      .select({ id: areas.id, nombre: areas.nombre })
+      .from(areas)
+      .where(eq(areas.guarderiaId, guarderiaId))
+      .orderBy(asc(areas.createdAt)),
 
-      db
-        .select({
-          id: marinas.id,
-          areaId: marinas.areaId,
-          nombre: marinas.nombre,
-          orden: marinas.orden,
-        })
-        .from(marinas)
-        .where(eq(marinas.guarderiaId, guarderiaId))
-        .orderBy(asc(marinas.orden)),
+    db
+      .select({
+        id: marinas.id,
+        areaId: marinas.areaId,
+        nombre: marinas.nombre,
+        orden: marinas.orden,
+      })
+      .from(marinas)
+      .where(eq(marinas.guarderiaId, guarderiaId))
+      .orderBy(asc(marinas.orden)),
 
-      db
-        .select({ id: naves.id, areaId: naves.areaId, nombre: naves.nombre })
-        .from(naves)
-        .where(eq(naves.guarderiaId, guarderiaId))
-        .orderBy(asc(naves.orden)),
+    db
+      .select({ id: naves.id, areaId: naves.areaId, nombre: naves.nombre })
+      .from(naves)
+      .where(eq(naves.guarderiaId, guarderiaId))
+      .orderBy(asc(naves.orden)),
 
-      db
-        .select({
-          id: lados.id,
-          naveId: lados.naveId,
-          nombre: lados.nombre,
-          cantidadPisos: lados.cantidadPisos,
-        })
-        .from(lados)
-        .where(eq(lados.guarderiaId, guarderiaId)),
+    db
+      .select({
+        id: lados.id,
+        naveId: lados.naveId,
+        nombre: lados.nombre,
+        cantidadPisos: lados.cantidadPisos,
+      })
+      .from(lados)
+      .where(eq(lados.guarderiaId, guarderiaId)),
 
-      db
-        .select({ id: pisos.id, ladoId: pisos.ladoId, nombre: pisos.nombre, orden: pisos.orden })
-        .from(pisos),
+    db
+      .select({ id: pisos.id, ladoId: pisos.ladoId, nombre: pisos.nombre, orden: pisos.orden })
+      .from(pisos),
 
-      db
-        .select({
-          id: espacios.id,
-          areaId: espacios.areaId,
-          naveId: espacios.naveId,
-          ladoId: espacios.ladoId,
-          pisoId: espacios.pisoId,
-          marinaId: espacios.marinaId,
-          nomenclatura: espacios.nomenclatura,
-          estado: espacios.estado,
-        })
-        .from(espacios)
-        .where(eq(espacios.guarderiaId, guarderiaId)),
-    ],
-  );
+    db
+      .select({
+        id: espacios.id,
+        areaId: espacios.areaId,
+        naveId: espacios.naveId,
+        ladoId: espacios.ladoId,
+        pisoId: espacios.pisoId,
+        marinaId: espacios.marinaId,
+        nomenclatura: espacios.nomenclatura,
+        estado: espacios.estado,
+        ocupanteId: espacios.ocupanteId,
+        servicioId: espacios.servicioId,
+        eslora: espacios.eslora,
+        manga: espacios.manga,
+        puntual: espacios.puntual,
+      })
+      .from(espacios)
+      .where(eq(espacios.guarderiaId, guarderiaId)),
+
+    db
+      .select({
+        id: profiles.id,
+        nombre: profiles.nombre,
+        apellido: profiles.apellido,
+        email: profiles.email,
+      })
+      .from(memberships)
+      .innerJoin(profiles, eq(profiles.id, memberships.userId))
+      .where(
+        and(
+          eq(memberships.guarderiaId, guarderiaId),
+          eq(memberships.rol, 'socio'),
+          eq(memberships.status, 'active'),
+        ),
+      )
+      .orderBy(asc(profiles.apellido), asc(profiles.nombre)),
+
+    db
+      .select({
+        id: servicios.id,
+        nombre: servicios.nombre,
+        precio: servicios.precio,
+        eslora: servicios.eslora,
+        manga: servicios.manga,
+        puntual: servicios.puntual,
+      })
+      .from(servicios)
+      .where(
+        and(
+          eq(servicios.guarderiaId, guarderiaId),
+          eq(servicios.tipo, 'espacios'),
+          eq(servicios.estado, 'activo'),
+        ),
+      )
+      .orderBy(asc(servicios.nombre)),
+  ]);
+
+  const toNum = (v: string | null) => (v != null ? Number(v) : null);
 
   // Mapa auxiliar: marinaId -> espacios ordenados por nomenclatura numérica
   const espaciosPorMarina = new Map<string, EspacioCell[]>();
@@ -80,6 +147,11 @@ export default async function EspaciosPage() {
       id: e.id,
       nomenclatura: e.nomenclatura ?? '',
       estado: (e.estado ?? 'disponible') as EspacioCell['estado'],
+      ocupanteId: e.ocupanteId,
+      servicioId: e.servicioId,
+      eslora: toNum(e.eslora),
+      manga: toNum(e.manga),
+      puntual: toNum(e.puntual),
     };
     if (e.marinaId) {
       const arr = espaciosPorMarina.get(e.marinaId) ?? [];
@@ -153,5 +225,19 @@ export default async function EspaciosPage() {
     return { id: a.id, nombre: a.nombre, tipo: 'marina' as const, peines: [], lados: [] };
   });
 
-  return <EspaciosClient areas={areasView} />;
+  const socios: SocioOpt[] = sociosRows.map((s) => ({
+    id: s.id,
+    nombre: [s.nombre, s.apellido].filter(Boolean).join(' ').trim() || s.email,
+  }));
+
+  const serviciosEspacios: ServicioEspacio[] = serviciosRows.map((s) => ({
+    id: s.id,
+    nombre: s.nombre,
+    precio: s.precio != null ? Number(s.precio) : 0,
+    eslora: toNum(s.eslora),
+    manga: toNum(s.manga),
+    puntual: toNum(s.puntual),
+  }));
+
+  return <EspaciosClient areas={areasView} socios={socios} serviciosEspacios={serviciosEspacios} />;
 }

@@ -8,6 +8,7 @@ import {
   createAreaAction,
   deleteAreaAction,
   deleteEspacioAction,
+  updateEspacioAction,
   type CreateAreaInput,
 } from '@/app/actions/espacios';
 
@@ -17,6 +18,11 @@ export type EspacioCell = {
   id: string;
   nomenclatura: string;
   estado: EstadoEspacio;
+  ocupanteId: string | null;
+  servicioId: string | null;
+  eslora: number | null;
+  manga: number | null;
+  puntual: number | null;
 };
 
 export type AreaView = {
@@ -29,6 +35,17 @@ export type AreaView = {
     nombre: string;
     pisos: { pisoId: string; nombre: string; espacios: EspacioCell[] }[];
   }[];
+};
+
+export type SocioOpt = { id: string; nombre: string };
+
+export type ServicioEspacio = {
+  id: string;
+  nombre: string;
+  precio: number;
+  eslora: number | null;
+  manga: number | null;
+  puntual: number | null;
 };
 
 type Filtro = 'marina' | 'nave';
@@ -60,7 +77,15 @@ function countEspacios(a: AreaView): {
 const inputCls =
   'h-11 w-full rounded-[10px] border border-gray-200 bg-white px-4 text-sm text-[#101828] focus:border-[#175861] focus:outline-none focus:ring-1 focus:ring-[#175861]';
 
-export function EspaciosClient({ areas }: { areas: AreaView[] }) {
+export function EspaciosClient({
+  areas,
+  socios,
+  serviciosEspacios,
+}: {
+  areas: AreaView[];
+  socios: SocioOpt[];
+  serviciosEspacios: ServicioEspacio[];
+}) {
   const router = useRouter();
   const [filtro, setFiltro] = useState<Filtro>('marina');
   const [modalOpen, setModalOpen] = useState(false);
@@ -71,6 +96,10 @@ export function EspaciosClient({ areas }: { areas: AreaView[] }) {
   const [confirmDeleteEspacio, setConfirmDeleteEspacio] = useState<EspacioCell | null>(null);
   const [deletingEspacio, startDeleteEspacio] = useTransition();
   const [deleteEspacioError, setDeleteEspacioError] = useState<string | null>(null);
+
+  const [editEspacio, setEditEspacio] = useState<{ cell: EspacioCell; areaNombre: string } | null>(
+    null,
+  );
 
   const onDelete = () => {
     if (!confirmDelete) return;
@@ -220,6 +249,7 @@ export function EspaciosClient({ areas }: { areas: AreaView[] }) {
               <MarinaSection
                 key={a.id}
                 area={a}
+                onEditEspacio={(cell) => setEditEspacio({ cell, areaNombre: a.nombre })}
                 onDeleteEspacio={(cell) => {
                   setDeleteEspacioError(null);
                   setConfirmDeleteEspacio(cell);
@@ -229,6 +259,7 @@ export function EspaciosClient({ areas }: { areas: AreaView[] }) {
               <NaveSection
                 key={a.id}
                 area={a}
+                onEditEspacio={(cell) => setEditEspacio({ cell, areaNombre: a.nombre })}
                 onDeleteEspacio={(cell) => {
                   setDeleteEspacioError(null);
                   setConfirmDeleteEspacio(cell);
@@ -266,6 +297,25 @@ export function EspaciosClient({ areas }: { areas: AreaView[] }) {
           error={deleteEspacioError}
           onCancel={() => setConfirmDeleteEspacio(null)}
           onConfirm={onDeleteEspacio}
+        />
+      )}
+
+      {editEspacio && (
+        <EditarEspacioModal
+          cell={editEspacio.cell}
+          areaNombre={editEspacio.areaNombre}
+          socios={socios}
+          serviciosEspacios={serviciosEspacios}
+          onClose={() => setEditEspacio(null)}
+          onSaved={() => {
+            setEditEspacio(null);
+            router.refresh();
+          }}
+          onDelete={() => {
+            setDeleteEspacioError(null);
+            setConfirmDeleteEspacio(editEspacio.cell);
+            setEditEspacio(null);
+          }}
         />
       )}
     </div>
@@ -368,9 +418,11 @@ function LeyendaItem({ color, label }: { color: string; label: string }) {
 
 function MarinaSection({
   area,
+  onEditEspacio,
   onDeleteEspacio,
 }: {
   area: AreaView;
+  onEditEspacio: (cell: EspacioCell) => void;
   onDeleteEspacio: (cell: EspacioCell) => void;
 }) {
   return (
@@ -389,7 +441,11 @@ function MarinaSection({
                 <Anchor className="h-3.5 w-3.5" />
                 {p.nombre}
               </div>
-              <EspaciosRow espacios={p.espacios} onDeleteEspacio={onDeleteEspacio} />
+              <EspaciosRow
+                espacios={p.espacios}
+                onEditEspacio={onEditEspacio}
+                onDeleteEspacio={onDeleteEspacio}
+              />
             </div>
           ))
         )}
@@ -400,9 +456,11 @@ function MarinaSection({
 
 function NaveSection({
   area,
+  onEditEspacio,
   onDeleteEspacio,
 }: {
   area: AreaView;
+  onEditEspacio: (cell: EspacioCell) => void;
   onDeleteEspacio: (cell: EspacioCell) => void;
 }) {
   return (
@@ -425,7 +483,11 @@ function NaveSection({
                 {l.pisos.map((pi) => (
                   <div key={pi.pisoId} className="mb-3">
                     <p className="mb-1 text-[11px] text-gray-400">{pi.nombre}</p>
-                    <EspaciosRow espacios={pi.espacios} onDeleteEspacio={onDeleteEspacio} />
+                    <EspaciosRow
+                      espacios={pi.espacios}
+                      onEditEspacio={onEditEspacio}
+                      onDeleteEspacio={onDeleteEspacio}
+                    />
                   </div>
                 ))}
               </div>
@@ -439,9 +501,11 @@ function NaveSection({
 
 function EspaciosRow({
   espacios,
+  onEditEspacio,
   onDeleteEspacio,
 }: {
   espacios: EspacioCell[];
+  onEditEspacio: (cell: EspacioCell) => void;
   onDeleteEspacio: (cell: EspacioCell) => void;
 }) {
   if (espacios.length === 0) {
@@ -451,15 +515,20 @@ function EspaciosRow({
     <div className="flex flex-wrap gap-2">
       {espacios.map((e) => (
         <div key={e.id} className="group relative">
-          <span
-            className={`inline-flex h-7 min-w-[2.25rem] items-center justify-center rounded-[8px] border px-2 text-xs font-semibold ${ESTADO_CLS[e.estado]}`}
-            title={`${e.nomenclatura} · ${e.estado}`}
-          >
-            {e.nomenclatura}
-          </span>
           <button
             type="button"
-            onClick={() => onDeleteEspacio(e)}
+            onClick={() => onEditEspacio(e)}
+            title={`Editar espacio ${e.nomenclatura}`}
+            className={`inline-flex h-7 min-w-[2.25rem] items-center justify-center rounded-[8px] border px-2 text-xs font-semibold transition-colors hover:brightness-95 ${ESTADO_CLS[e.estado]}`}
+          >
+            {e.nomenclatura}
+          </button>
+          <button
+            type="button"
+            onClick={(ev) => {
+              ev.stopPropagation();
+              onDeleteEspacio(e);
+            }}
             title={`Eliminar espacio ${e.nomenclatura}`}
             aria-label={`Eliminar espacio ${e.nomenclatura}`}
             className="absolute -top-1.5 -right-1.5 hidden h-4 w-4 items-center justify-center rounded-full bg-red-500 text-white shadow transition-colors group-hover:flex hover:bg-red-600"
@@ -834,6 +903,240 @@ function ConfirmDeleteEspacioModal({
             className="rounded-[10px] bg-red-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
           >
             {pending ? 'Eliminando…' : 'Eliminar'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const ESTADO_LABEL: Record<EstadoEspacio, string> = {
+  disponible: 'Disponible',
+  ocupado: 'Ocupado',
+  reservado: 'Reservado',
+};
+
+function EditarEspacioModal({
+  cell,
+  areaNombre,
+  socios,
+  serviciosEspacios,
+  onClose,
+  onSaved,
+  onDelete,
+}: {
+  cell: EspacioCell;
+  areaNombre: string;
+  socios: SocioOpt[];
+  serviciosEspacios: ServicioEspacio[];
+  onClose: () => void;
+  onSaved: () => void;
+  onDelete: () => void;
+}) {
+  const [ocupanteId, setOcupanteId] = useState<string>(cell.ocupanteId ?? '');
+  const [nomenclatura, setNomenclatura] = useState<string>(cell.nomenclatura);
+  const [estado, setEstado] = useState<EstadoEspacio>(cell.estado);
+  const [servicioId, setServicioId] = useState<string>(cell.servicioId ?? '');
+  const [eslora, setEslora] = useState<string>(cell.eslora != null ? String(cell.eslora) : '');
+  const [manga, setManga] = useState<string>(cell.manga != null ? String(cell.manga) : '');
+  const [puntual, setPuntual] = useState<string>(cell.puntual != null ? String(cell.puntual) : '');
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  const onTarifaChange = (id: string) => {
+    setServicioId(id);
+    if (!id) return;
+    const s = serviciosEspacios.find((x) => x.id === id);
+    if (!s) return;
+    if (eslora === '' && s.eslora != null) setEslora(String(s.eslora));
+    if (manga === '' && s.manga != null) setManga(String(s.manga));
+    if (puntual === '' && s.puntual != null) setPuntual(String(s.puntual));
+  };
+
+  const submit = () => {
+    setError(null);
+    if (!nomenclatura.trim()) {
+      setError('La nomenclatura es obligatoria.');
+      return;
+    }
+    const toNum = (s: string): number | null => {
+      if (s.trim() === '') return null;
+      const n = Number(s);
+      return Number.isFinite(n) ? n : null;
+    };
+
+    startTransition(async () => {
+      const res = await updateEspacioAction({
+        id: cell.id,
+        ocupanteId: ocupanteId || null,
+        nomenclatura: nomenclatura.trim(),
+        estado,
+        servicioId: servicioId || null,
+        eslora: toNum(eslora),
+        manga: toNum(manga),
+        puntual: toNum(puntual),
+      });
+      if (res.error) setError(res.error);
+      else onSaved();
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="flex max-h-[92vh] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+        <div className="flex items-start justify-between p-6 pb-4">
+          <div>
+            <h2 className="text-lg font-bold" style={{ color: '#101828' }}>
+              Editar espacio
+            </h2>
+            <p className="mt-0.5 text-sm" style={{ color: '#669E9D' }}>
+              {areaNombre}
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="rounded-[8px] p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="border-t border-gray-200" />
+
+        <div className="flex-1 space-y-4 overflow-y-auto p-6">
+          <div>
+            <label className="mb-1 block text-sm font-semibold text-gray-700">
+              Cliente (socio)
+            </label>
+            <select
+              className={inputCls}
+              value={ocupanteId}
+              onChange={(e) => setOcupanteId(e.target.value)}
+            >
+              <option value="">Seleccione una opción…</option>
+              {socios.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-semibold text-gray-700">Nomenclatura</label>
+            <input
+              className={inputCls}
+              value={nomenclatura}
+              onChange={(e) => setNomenclatura(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-semibold text-gray-700">Estado</label>
+            <div className="flex flex-wrap gap-2">
+              {(['disponible', 'ocupado', 'reservado'] as const).map((st) => (
+                <button
+                  key={st}
+                  type="button"
+                  onClick={() => setEstado(st)}
+                  className={`rounded-[10px] px-4 py-2 text-sm font-semibold transition-colors ${
+                    estado === st
+                      ? 'bg-[#175861] text-white'
+                      : 'border border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  {ESTADO_LABEL[st]}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-semibold text-gray-700">Tarifa</label>
+            <select
+              className={inputCls}
+              value={servicioId}
+              onChange={(e) => onTarifaChange(e.target.value)}
+            >
+              <option value="">Tarifa</option>
+              {serviciosEspacios.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.nombre} —{' '}
+                  {s.precio.toLocaleString('es-AR', {
+                    style: 'currency',
+                    currency: 'ARS',
+                    maximumFractionDigits: 0,
+                  })}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-gray-700">Eslora</label>
+              <input
+                className={inputCls}
+                type="number"
+                min={0}
+                step="0.01"
+                value={eslora}
+                onChange={(e) => setEslora(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-gray-700">Manga</label>
+              <input
+                className={inputCls}
+                type="number"
+                min={0}
+                step="0.01"
+                value={manga}
+                onChange={(e) => setManga(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-gray-700">Puntual</label>
+              <input
+                className={inputCls}
+                type="number"
+                min={0}
+                step="0.01"
+                value={puntual}
+                onChange={(e) => setPuntual(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="text-center">
+            <button
+              type="button"
+              onClick={onDelete}
+              className="text-sm font-semibold text-red-600 underline hover:text-red-700"
+            >
+              Eliminar
+            </button>
+          </div>
+
+          {error && <p className="text-sm text-red-600">{error}</p>}
+        </div>
+
+        <div className="flex justify-end gap-3 border-t border-gray-200 p-6">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={pending}
+            className="rounded-[10px] border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-[#101828] hover:bg-gray-50 disabled:opacity-60"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={submit}
+            disabled={pending}
+            className="rounded-[10px] bg-[#175861] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#0f4249] disabled:opacity-60"
+          >
+            {pending ? 'Guardando…' : 'Guardar'}
           </button>
         </div>
       </div>
