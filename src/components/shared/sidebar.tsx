@@ -32,7 +32,7 @@ const NAV = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/usuarios', label: 'Usuarios', icon: Users },
   { href: '/tareas', label: 'Tareas', icon: ClipboardList },
-  { href: '/dashboard/espacios', label: 'Espacios', icon: Anchor },
+  { href: '/espacios', label: 'Espacios', icon: Anchor },
   { href: '/comunicaciones', label: 'Comunicaciones', icon: MessageSquare },
   { href: '/facturacion', label: 'Facturación', icon: FileText },
   { href: '/tarifario', label: 'Tarifario', icon: Tag },
