@@ -27,6 +27,6 @@ export async function marcarAlertaResueltaAction(alertaId: string) {
     return { ok: false, error: 'Alerta no encontrada.' };
   }
 
-  revalidatePath('/alertas');
+  revalidatePath('/dashboard');
   return { ok: true };
 }

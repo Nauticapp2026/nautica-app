@@ -14,7 +14,6 @@ import {
   Tag,
   Settings,
   LogOut,
-  AlertTriangle,
 } from 'lucide-react';
 
 const ROL_LABELS: Record<string, string> = {
@@ -31,7 +30,6 @@ const ROL_LABELS: Record<string, string> = {
 
 const NAV = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/alertas', label: 'Alertas', icon: AlertTriangle },
   { href: '/usuarios', label: 'Usuarios', icon: Users },
   { href: '/tareas', label: 'Tareas', icon: ClipboardList },
   { href: '/dashboard/espacios', label: 'Espacios', icon: Anchor },

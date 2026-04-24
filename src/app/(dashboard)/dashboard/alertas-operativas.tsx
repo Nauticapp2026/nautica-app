@@ -6,7 +6,7 @@ import { AlertTriangle, Check, Clock, Phone, Ship } from 'lucide-react';
 
 import { marcarAlertaResueltaAction } from '@/app/actions/alertas';
 
-export type AlertaRow = {
+export type AlertaOperativa = {
   id: string;
   tipo: 'retorno_proximo' | 'sin_respuesta';
   mensaje: string | null;
@@ -20,16 +20,14 @@ export type AlertaRow = {
   embarcacion: string | null;
 };
 
-type Props = { alertas: AlertaRow[] };
-
-export function AlertasClient({ alertas }: Props) {
+export function AlertasOperativasSection({ alertas }: { alertas: AlertaOperativa[] }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [resolvingId, setResolvingId] = useState<string | null>(null);
 
   const { criticas, proximas } = useMemo(() => {
-    const criticas: AlertaRow[] = [];
-    const proximas: AlertaRow[] = [];
+    const criticas: AlertaOperativa[] = [];
+    const proximas: AlertaOperativa[] = [];
     for (const a of alertas) {
       if (a.tipo === 'sin_respuesta') criticas.push(a);
       else proximas.push(a);
@@ -51,16 +49,20 @@ export function AlertasClient({ alertas }: Props) {
   };
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-6 py-8">
-      <header className="mb-6">
-        <h1 className="text-2xl font-semibold text-[#101828]">Alertas</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Monitoreo de retorno de embarcaciones. El sistema revisa cada minuto las salidas activas y
-          crea una alerta cuando se acerca la hora de arribo o cuando pasó sin respuesta.
-        </p>
-      </header>
+    <section className="rounded-2xl border border-gray-200 bg-white p-6">
+      <div className="mb-4 flex items-center gap-2">
+        <AlertTriangle className="h-4 w-4" style={{ color: '#175861' }} />
+        <h2 className="text-base font-semibold" style={{ color: '#101828' }}>
+          Alertas operativas
+        </h2>
+      </div>
 
-      <div className="mb-6 grid grid-cols-2 gap-3">
+      <p className="mb-4 text-xs text-gray-500">
+        Monitoreo de retorno de embarcaciones. El sistema revisa cada minuto las salidas activas y
+        crea una alerta cuando se acerca la hora de arribo o pasó sin respuesta.
+      </p>
+
+      <div className="mb-5 grid grid-cols-2 gap-3">
         <StatCard
           label="Sin respuesta"
           value={criticas.length}
@@ -78,9 +80,9 @@ export function AlertasClient({ alertas }: Props) {
       {alertas.length === 0 ? (
         <EmptyState />
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-5">
           {criticas.length > 0 && (
-            <section>
+            <div>
               <SectionTitle label="Críticas — Sin respuesta del socio" count={criticas.length} />
               <div className="space-y-3">
                 {criticas.map((a) => (
@@ -92,11 +94,11 @@ export function AlertasClient({ alertas }: Props) {
                   />
                 ))}
               </div>
-            </section>
+            </div>
           )}
 
           {proximas.length > 0 && (
-            <section>
+            <div>
               <SectionTitle label="Retorno próximo — Esperando respuesta" count={proximas.length} />
               <div className="space-y-3">
                 {proximas.map((a) => (
@@ -108,15 +110,13 @@ export function AlertasClient({ alertas }: Props) {
                   />
                 ))}
               </div>
-            </section>
+            </div>
           )}
         </div>
       )}
-    </div>
+    </section>
   );
 }
-
-// ─── Subcomponents ─────────────────────────────────────────────────────────
 
 function StatCard({
   label,
@@ -144,9 +144,9 @@ function StatCard({
 
 function SectionTitle({ label, count }: { label: string; count: number }) {
   return (
-    <h2 className="mb-3 text-sm font-semibold text-[#364153]">
+    <h3 className="mb-3 text-sm font-semibold text-[#364153]">
       {label} <span className="ml-1 text-gray-400">({count})</span>
-    </h2>
+    </h3>
   );
 }
 
@@ -155,7 +155,7 @@ function AlertaCard({
   onResolver,
   loading,
 }: {
-  alerta: AlertaRow;
+  alerta: AlertaOperativa;
   onResolver: (id: string) => void;
   loading: boolean;
 }) {
@@ -230,7 +230,7 @@ function Field({ label, value }: { label: string; value: string }) {
 
 function EmptyState() {
   return (
-    <div className="rounded-[12px] border border-dashed border-gray-200 bg-white px-6 py-12 text-center">
+    <div className="rounded-[12px] border border-dashed border-gray-200 bg-white px-6 py-8 text-center">
       <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-green-50 text-green-600">
         <Check className="h-5 w-5" />
       </div>
@@ -244,8 +244,6 @@ function EmptyState() {
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
-// Los timestamps desde/hasta se guardan como naive UTC (wall-clock local del socio).
-// Los leemos con getUTC* para mostrar los dígitos literales que el socio escribió.
 function fmtNaive(iso: string | null): string {
   if (!iso) return '—';
   const d = new Date(iso);
@@ -266,7 +264,6 @@ function fmtRelative(iso: string): string {
   return `hace ${days} d`;
 }
 
-// "hasta" es naive UTC con hora literal local. "Now naive" = reloj local → UTC digits.
 function fmtDelayFromHasta(hastaIso: string): string {
   const hastaMs = new Date(hastaIso).getTime();
   const now = new Date();
