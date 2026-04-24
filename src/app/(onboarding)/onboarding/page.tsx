@@ -155,7 +155,9 @@ function Shell({ step, children }: { step: number; children: React.ReactNode }) 
           background: 'linear-gradient(180deg, #175861 0%, #669E9D 60%, #ABC2B3 100%)',
         }}
       >
-        <div className="w-full max-w-3xl rounded-2xl bg-white px-8 py-8 shadow-2xl">{children}</div>
+        <div className="w-full max-w-3xl rounded-2xl bg-white px-4 py-6 shadow-2xl md:px-8 md:py-8">
+          {children}
+        </div>
       </div>
     </div>
   );
@@ -423,7 +425,7 @@ function Step2({
             onChange={(e) => onChange('direccion', e.target.value)}
           />
         </Field>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <Field label="Ciudad" required>
             <Input
               className={inputCls}
@@ -710,11 +712,11 @@ function Step4({
           <p className="text-sm">Aún no has agregado miembros al equipo</p>
         </div>
       ) : (
-        <div className="mb-4 space-y-2">
+        <div className="-mx-4 mb-4 space-y-2 overflow-x-auto px-4 md:mx-0 md:px-0">
           {data.equipo.map((m, i) => (
             <div
               key={i}
-              className="flex items-center gap-1.5 rounded-[10px] border border-gray-200 p-2"
+              className="flex min-w-[640px] items-center gap-1.5 rounded-[10px] border border-gray-200 p-2 md:min-w-0"
             >
               <Input
                 className="h-8 flex-1 rounded-[10px] border-gray-200 px-2 text-xs"
@@ -778,7 +780,7 @@ function Step4({
         </p>
       )}
 
-      <div className="flex gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row">
         <button
           type="button"
           onClick={onBack}
@@ -980,7 +982,7 @@ function Step7({
           </>
         }
       />
-      <div className="mb-4 grid grid-cols-3 gap-3">
+      <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-3">
         {plans.map((p) => {
           const info = PLAN_INFO[p];
           const selected = data.plan === p;
