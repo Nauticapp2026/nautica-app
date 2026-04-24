@@ -312,7 +312,7 @@ function NuevaFacturaModal({
         <div className="border-t border-gray-200" />
 
         <div className="flex-1 space-y-4 overflow-y-auto p-6">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
                 Cliente / Proveedor*
@@ -404,7 +404,7 @@ function NuevaFacturaModal({
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
                 Tipo de comprobante*
@@ -435,7 +435,7 @@ function NuevaFacturaModal({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
                 Descripción*
@@ -474,7 +474,7 @@ function NuevaFacturaModal({
             </select>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
                 Fecha*
@@ -494,7 +494,7 @@ function NuevaFacturaModal({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
                 Período desde*
@@ -669,7 +669,7 @@ function LoteModal({
         <div className="flex-1 space-y-4 overflow-y-auto p-6">
           {!result ? (
             <>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <label
                     className="mb-1.5 block text-xs font-semibold"
@@ -710,7 +710,7 @@ function LoteModal({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <label
                     className="mb-1.5 block text-xs font-semibold"
@@ -741,7 +741,7 @@ function LoteModal({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <label
                     className="mb-1.5 block text-xs font-semibold"
@@ -1015,7 +1015,7 @@ export function FacturacionClient({
   }, [facturas, search]);
 
   return (
-    <div className="space-y-6 p-8">
+    <div className="space-y-6 p-4 md:p-8">
       <NuevaFacturaModal open={nuevaOpen} onClose={() => setNuevaOpen(false)} socios={socios} />
       <LoteModal open={loteOpen} onClose={() => setLoteOpen(false)} socios={socios} />
       <MarcarPagadaModal
@@ -1025,22 +1025,22 @@ export function FacturacionClient({
       />
 
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="page-title">Facturación</h1>
           <p className="page-subtitle mt-1">Gestión de facturas y cobros</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex shrink-0 flex-wrap gap-2">
           <button
             onClick={() => setLoteOpen(true)}
-            className="flex items-center gap-2 rounded-[10px] border border-[#d1d5dc] bg-white px-4 py-2.5 text-sm font-semibold text-[#364153] transition hover:bg-gray-50"
+            className="flex items-center justify-center gap-2 rounded-[10px] border border-[#d1d5dc] bg-white px-4 py-2.5 text-sm font-semibold text-[#364153] transition hover:bg-gray-50"
           >
             <Plus className="h-4 w-4" />
             Factura en lote
           </button>
           <button
             onClick={() => setNuevaOpen(true)}
-            className="flex items-center gap-2 rounded-[10px] px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90"
+            className="flex items-center justify-center gap-2 rounded-[10px] px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90"
             style={{ background: '#175861' }}
           >
             <Plus className="h-4 w-4" />
@@ -1080,111 +1080,116 @@ export function FacturacionClient({
             </p>
           </div>
         ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gray-50 text-left text-xs font-semibold text-gray-500">
-                <th className="px-4 py-3">Número</th>
-                <th className="px-4 py-3">Tipo</th>
-                <th className="px-4 py-3">Cliente</th>
-                <th className="px-4 py-3">Fecha</th>
-                <th className="px-4 py-3">Vencimiento</th>
-                <th className="px-4 py-3">Período</th>
-                <th className="px-4 py-3 text-right">Total</th>
-                <th className="px-4 py-3 text-center">Estado</th>
-                <th className="px-4 py-3 text-right">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtradas.map((f) => (
-                <tr key={f.id} className="border-t border-gray-100 transition hover:bg-gray-50/50">
-                  <td className="px-4 py-3 font-medium" style={{ color: '#101828' }}>
-                    {f.codigo ?? '—'}
-                  </td>
-                  <td className="px-4 py-3 text-gray-500">
-                    {TIPO_FACTURA_LABEL[f.tipoFactura ?? ''] ?? '—'}
-                  </td>
-                  <td className="px-4 py-3 font-medium" style={{ color: '#175861' }}>
-                    {f.socioNombre}
-                  </td>
-                  <td className="px-4 py-3 text-gray-500">{fmtDate(f.emision)}</td>
-                  <td className="px-4 py-3 text-gray-500">{fmtDate(f.vencimiento)}</td>
-                  <td className="px-4 py-3 text-xs text-gray-500">
-                    {f.desde ? (
-                      <div>
-                        <div>Desde {fmtDate(f.desde)}</div>
-                        <div>Hasta {fmtDate(f.hasta)}</div>
-                      </div>
-                    ) : (
-                      '—'
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-right font-medium" style={{ color: '#101828' }}>
-                    {fmtMoney(f.importe)}
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <span
-                      className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${
-                        ESTADO_BADGE[f.estado ?? 'pendiente'] ?? 'bg-gray-100 text-gray-600'
-                      }`}
-                    >
-                      {ESTADO_LABEL[f.estado ?? 'pendiente'] ?? f.estado}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center justify-end gap-2">
-                      <button
-                        onClick={() => setPagarFactura(f)}
-                        disabled={f.estado === 'pagada'}
-                        title="Marcar como pagada"
-                        className="rounded-[6px] p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-[#175861] disabled:opacity-30 disabled:hover:bg-transparent"
-                      >
-                        <Edit3 className="h-4 w-4" />
-                      </button>
-                      {f.archivo ? (
-                        <a
-                          href={f.archivo}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          title="Ver PDF"
-                          className="rounded-[6px] p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-[#175861]"
-                        >
-                          <Send className="h-4 w-4" />
-                        </a>
-                      ) : (
-                        <button
-                          disabled
-                          title="PDF no disponible"
-                          className="rounded-[6px] p-1.5 text-gray-400 opacity-30"
-                        >
-                          <Send className="h-4 w-4" />
-                        </button>
-                      )}
-                      {f.archivo ? (
-                        <a
-                          href={f.archivo}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          download
-                          title="Descargar"
-                          className="rounded-[6px] p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-[#175861]"
-                        >
-                          <Download className="h-4 w-4" />
-                        </a>
-                      ) : (
-                        <button
-                          disabled
-                          title="PDF no disponible"
-                          className="rounded-[6px] p-1.5 text-gray-400 opacity-30"
-                        >
-                          <Download className="h-4 w-4" />
-                        </button>
-                      )}
-                    </div>
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[900px] text-sm">
+              <thead>
+                <tr className="bg-gray-50 text-left text-xs font-semibold text-gray-500">
+                  <th className="px-4 py-3">Número</th>
+                  <th className="px-4 py-3">Tipo</th>
+                  <th className="px-4 py-3">Cliente</th>
+                  <th className="px-4 py-3">Fecha</th>
+                  <th className="px-4 py-3">Vencimiento</th>
+                  <th className="px-4 py-3">Período</th>
+                  <th className="px-4 py-3 text-right">Total</th>
+                  <th className="px-4 py-3 text-center">Estado</th>
+                  <th className="px-4 py-3 text-right">Acciones</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {filtradas.map((f) => (
+                  <tr
+                    key={f.id}
+                    className="border-t border-gray-100 transition hover:bg-gray-50/50"
+                  >
+                    <td className="px-4 py-3 font-medium" style={{ color: '#101828' }}>
+                      {f.codigo ?? '—'}
+                    </td>
+                    <td className="px-4 py-3 text-gray-500">
+                      {TIPO_FACTURA_LABEL[f.tipoFactura ?? ''] ?? '—'}
+                    </td>
+                    <td className="px-4 py-3 font-medium" style={{ color: '#175861' }}>
+                      {f.socioNombre}
+                    </td>
+                    <td className="px-4 py-3 text-gray-500">{fmtDate(f.emision)}</td>
+                    <td className="px-4 py-3 text-gray-500">{fmtDate(f.vencimiento)}</td>
+                    <td className="px-4 py-3 text-xs text-gray-500">
+                      {f.desde ? (
+                        <div>
+                          <div>Desde {fmtDate(f.desde)}</div>
+                          <div>Hasta {fmtDate(f.hasta)}</div>
+                        </div>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-right font-medium" style={{ color: '#101828' }}>
+                      {fmtMoney(f.importe)}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <span
+                        className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${
+                          ESTADO_BADGE[f.estado ?? 'pendiente'] ?? 'bg-gray-100 text-gray-600'
+                        }`}
+                      >
+                        {ESTADO_LABEL[f.estado ?? 'pendiente'] ?? f.estado}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => setPagarFactura(f)}
+                          disabled={f.estado === 'pagada'}
+                          title="Marcar como pagada"
+                          className="rounded-[6px] p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-[#175861] disabled:opacity-30 disabled:hover:bg-transparent"
+                        >
+                          <Edit3 className="h-4 w-4" />
+                        </button>
+                        {f.archivo ? (
+                          <a
+                            href={f.archivo}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title="Ver PDF"
+                            className="rounded-[6px] p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-[#175861]"
+                          >
+                            <Send className="h-4 w-4" />
+                          </a>
+                        ) : (
+                          <button
+                            disabled
+                            title="PDF no disponible"
+                            className="rounded-[6px] p-1.5 text-gray-400 opacity-30"
+                          >
+                            <Send className="h-4 w-4" />
+                          </button>
+                        )}
+                        {f.archivo ? (
+                          <a
+                            href={f.archivo}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            download
+                            title="Descargar"
+                            className="rounded-[6px] p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-[#175861]"
+                          >
+                            <Download className="h-4 w-4" />
+                          </a>
+                        ) : (
+                          <button
+                            disabled
+                            title="PDF no disponible"
+                            className="rounded-[6px] p-1.5 text-gray-400 opacity-30"
+                          >
+                            <Download className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </div>

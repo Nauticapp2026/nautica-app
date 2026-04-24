@@ -149,8 +149,8 @@ export function TarifarioClient({ tarifas }: { tarifas: Tarifa[] }) {
   };
 
   return (
-    <div className="p-8">
-      <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
+    <div className="p-4 md:p-8">
+      <header className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="page-title">Tarifario</h1>
           <p className="page-subtitle mt-1">Gestiona y actualiza las tarifas de servicios</p>
@@ -158,7 +158,7 @@ export function TarifarioClient({ tarifas }: { tarifas: Tarifa[] }) {
         <button
           type="button"
           onClick={() => setModal({ mode: 'create' })}
-          className="flex items-center gap-2 rounded-[10px] bg-[#175861] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#0f4249]"
+          className="flex shrink-0 items-center justify-center gap-2 rounded-[10px] bg-[#175861] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#0f4249]"
         >
           <Plus className="h-4 w-4" />
           Nueva tarifa
@@ -261,51 +261,53 @@ function TablaTarifas({
 }) {
   return (
     <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-gray-200 text-left text-xs text-gray-500">
-            <th className="px-5 py-3 font-semibold">Concepto</th>
-            <th className="px-5 py-3 font-semibold">Precio actual</th>
-            <th className="px-5 py-3 font-semibold">Estado</th>
-            <th className="px-5 py-3 text-right font-semibold">Acciones</th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((t) => (
-            <tr key={t.id} className="border-b border-gray-100 last:border-b-0">
-              <td className="px-5 py-3" style={{ color: '#101828' }}>
-                {t.nombre}
-              </td>
-              <td className="px-5 py-3" style={{ color: '#101828' }}>
-                {formatARS(t.precio)}
-              </td>
-              <td className="px-5 py-3">
-                <EstadoBadge estado={t.estado} />
-              </td>
-              <td className="px-5 py-3">
-                <div className="flex justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => onEdit(t)}
-                    title="Editar tarifa"
-                    className="rounded-[8px] p-1.5 text-[#669E9D] hover:bg-gray-100"
-                  >
-                    <Edit3 className="h-4 w-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onDelete(t)}
-                    title="Eliminar tarifa"
-                    className="rounded-[8px] p-1.5 text-red-500 hover:bg-red-50"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              </td>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[560px] text-sm">
+          <thead>
+            <tr className="border-b border-gray-200 text-left text-xs text-gray-500">
+              <th className="px-5 py-3 font-semibold">Concepto</th>
+              <th className="px-5 py-3 font-semibold">Precio actual</th>
+              <th className="px-5 py-3 font-semibold">Estado</th>
+              <th className="px-5 py-3 text-right font-semibold">Acciones</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {items.map((t) => (
+              <tr key={t.id} className="border-b border-gray-100 last:border-b-0">
+                <td className="px-5 py-3" style={{ color: '#101828' }}>
+                  {t.nombre}
+                </td>
+                <td className="px-5 py-3" style={{ color: '#101828' }}>
+                  {formatARS(t.precio)}
+                </td>
+                <td className="px-5 py-3">
+                  <EstadoBadge estado={t.estado} />
+                </td>
+                <td className="px-5 py-3">
+                  <div className="flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => onEdit(t)}
+                      title="Editar tarifa"
+                      className="rounded-[8px] p-1.5 text-[#669E9D] hover:bg-gray-100"
+                    >
+                      <Edit3 className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onDelete(t)}
+                      title="Eliminar tarifa"
+                      className="rounded-[8px] p-1.5 text-red-500 hover:bg-red-50"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -510,7 +512,7 @@ function TarifaModal({
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <div>
                   <label className="mb-1 block text-xs font-semibold text-gray-700">
                     Eslora ({unidadMetraje})

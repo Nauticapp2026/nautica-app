@@ -154,8 +154,8 @@ export function EspaciosClient({
   }, [areasFiltradas]);
 
   return (
-    <div className="p-8">
-      <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
+    <div className="p-4 md:p-8">
+      <header className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="page-title">Gestión de espacios</h1>
           <p className="page-subtitle mt-1">
@@ -165,7 +165,7 @@ export function EspaciosClient({
         <button
           type="button"
           onClick={() => setModalOpen(true)}
-          className="flex items-center gap-2 rounded-[10px] bg-[#175861] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#0f4249]"
+          className="flex shrink-0 items-center justify-center gap-2 rounded-[10px] bg-[#175861] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#0f4249]"
         >
           <Plus className="h-4 w-4" />
           Nueva área
@@ -678,7 +678,7 @@ function NuevaAreaModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
           </div>
 
           {tipo === 'marina' ? (
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <label className="mb-1 block text-sm font-semibold text-gray-700">
                   Cantidad de peines
@@ -721,7 +721,10 @@ function NuevaAreaModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
 
               <div className="space-y-3">
                 {lados.map((l, idx) => (
-                  <div key={idx} className="grid grid-cols-[1fr_1fr_1fr_auto_auto] items-end gap-2">
+                  <div
+                    key={idx}
+                    className="grid grid-cols-[1fr_1fr_auto_auto] items-end gap-2 sm:grid-cols-[1fr_1fr_1fr_auto_auto]"
+                  >
                     <div>
                       <label className="mb-1 block text-xs font-semibold text-gray-600">
                         Cantidad de pisos
@@ -1070,7 +1073,7 @@ function EditarEspacioModal({
             </select>
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div>
               <label className="mb-1 block text-xs font-semibold text-gray-700">Eslora</label>
               <input

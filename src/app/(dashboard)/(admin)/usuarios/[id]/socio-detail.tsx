@@ -284,7 +284,7 @@ function FormaPagoModal({
           {/* Transferencia fields */}
           {esTransferencia && (
             <>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Field label="Banco origen">
                   <input
                     className={inputCls}
@@ -302,7 +302,7 @@ function FormaPagoModal({
                   />
                 </Field>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Field label="CBU / Alias">
                   <input
                     className={inputCls}
@@ -320,7 +320,7 @@ function FormaPagoModal({
                   />
                 </Field>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Field label="Fecha de transferencia">
                   <input
                     type="date"
@@ -352,7 +352,7 @@ function FormaPagoModal({
           {/* Cheque fields */}
           {esCheque && (
             <>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Field label="Número de cheque">
                   <input
                     className={inputCls}
@@ -370,7 +370,7 @@ function FormaPagoModal({
                   />
                 </Field>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Field label="Sucursal">
                   <input
                     className={inputCls}
@@ -388,7 +388,7 @@ function FormaPagoModal({
                   />
                 </Field>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Field label="Nombre del titular del cheque">
                   <input
                     className={inputCls}
@@ -406,7 +406,7 @@ function FormaPagoModal({
                   />
                 </Field>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Field label="Tipo de cheque">
                   <select className={inputCls} value={form.tipoCheque} onChange={set('tipoCheque')}>
                     <option value="">Seleccione una opción...</option>
@@ -426,7 +426,7 @@ function FormaPagoModal({
                   </select>
                 </Field>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Field label="Cuenta donde se deposita">
                   <input
                     className={inputCls}
@@ -579,7 +579,7 @@ function AgregarServicioModal({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
                 Monto
@@ -762,7 +762,7 @@ export function SocioDetail({
   }
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       <AgregarServicioModal
         open={modalServicioOpen}
         onClose={() => setModalServicioOpen(false)}
@@ -805,50 +805,52 @@ export function SocioDetail({
       </div>
 
       {/* Tabs */}
-      <div className="mb-6 flex flex-wrap gap-0 border-b border-gray-200">
-        {TABS.map(({ id, label, icon: Icon }) => (
-          <button
-            key={id}
-            onClick={() => setActiveTab(id)}
-            className={`flex items-center gap-2 px-4 pb-3 text-sm font-medium transition ${
-              activeTab === id
-                ? 'border-b-2 border-[#175861] text-[#175861]'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            <Icon className="h-3.5 w-3.5" />
-            {label}
-          </button>
-        ))}
+      <div className="-mx-4 mb-6 overflow-x-auto border-b border-gray-200 md:mx-0">
+        <div className="flex min-w-max gap-0 px-4 whitespace-nowrap md:px-0">
+          {TABS.map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              onClick={() => setActiveTab(id)}
+              className={`flex shrink-0 items-center gap-2 px-4 pb-3 text-sm font-medium transition ${
+                activeTab === id
+                  ? 'border-b-2 border-[#175861] text-[#175861]'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Generales */}
       {activeTab === 'generales' && (
-        <div className="rounded-2xl border border-gray-200 bg-white p-6">
-          <div className="mb-4 flex items-center justify-between">
+        <div className="rounded-2xl border border-gray-200 bg-white p-4 md:p-6">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-[18px] font-bold" style={{ color: '#101828' }}>
               Datos Personales
             </p>
             {!editando ? (
               <button
                 onClick={() => setEditando(true)}
-                className="rounded-[10px] border border-[#d1d5dc] px-4 py-2 text-sm font-medium text-[#364153] transition hover:bg-gray-50"
+                className="shrink-0 justify-center rounded-[10px] border border-[#d1d5dc] px-4 py-2 text-sm font-medium text-[#364153] transition hover:bg-gray-50"
               >
                 Editar
               </button>
             ) : (
-              <div className="flex gap-2">
+              <div className="flex shrink-0 gap-2">
                 <button
                   onClick={handleCancelar}
                   disabled={isSaving}
-                  className="rounded-[10px] border border-[#d1d5dc] px-4 py-2 text-sm font-medium text-[#364153] transition hover:bg-gray-50 disabled:opacity-40"
+                  className="flex-1 justify-center rounded-[10px] border border-[#d1d5dc] px-4 py-2 text-sm font-medium text-[#364153] transition hover:bg-gray-50 disabled:opacity-40 sm:flex-none"
                 >
                   Cancelar
                 </button>
                 <button
                   onClick={handleGuardar}
                   disabled={isSaving}
-                  className="rounded-[10px] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-40"
+                  className="flex-1 justify-center rounded-[10px] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-40 sm:flex-none"
                   style={{ background: '#175861' }}
                 >
                   {isSaving ? 'Guardando...' : 'Guardar'}
@@ -858,7 +860,7 @@ export function SocioDetail({
           </div>
 
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <label className="mb-1.5 block text-xs font-semibold text-gray-500">Nombre</label>
                 <input
@@ -878,7 +880,7 @@ export function SocioDetail({
                 />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <label className="mb-1.5 block text-xs font-semibold text-gray-500">Email</label>
                 <input
@@ -897,7 +899,7 @@ export function SocioDetail({
                 />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <label className="mb-1.5 block text-xs font-semibold text-gray-500">
                   Tipo Documento
@@ -935,7 +937,7 @@ export function SocioDetail({
                 readOnly={!editando}
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <label className="mb-1.5 block text-xs font-semibold text-gray-500">
                   Razón social
@@ -974,7 +976,7 @@ export function SocioDetail({
 
       {/* Embarcación */}
       {activeTab === 'embarcacion' && (
-        <div className="rounded-2xl border border-gray-200 bg-white p-6">
+        <div className="rounded-2xl border border-gray-200 bg-white p-4 md:p-6">
           {embarcaciones.length === 0 ? (
             <EmptyTab
               icon={<Ship className="h-7 w-7 opacity-40" />}
@@ -984,7 +986,7 @@ export function SocioDetail({
             <div className="space-y-4">
               {embarcaciones.map((e) => (
                 <div key={e.id} className="rounded-[10px] border border-gray-100 bg-gray-50 p-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div>
                       <label className="mb-1 block text-xs font-semibold text-gray-500">
                         Nombre
@@ -1027,22 +1029,22 @@ export function SocioDetail({
 
       {/* Cuenta Corriente */}
       {activeTab === 'cuenta-corriente' && (
-        <div className="rounded-2xl border border-gray-200 bg-white p-6">
+        <div className="rounded-2xl border border-gray-200 bg-white p-4 md:p-6">
           {/* Header */}
-          <div className="mb-5 flex items-center justify-between">
+          <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <p className="text-[18px] font-bold" style={{ color: '#101828' }}>
               Movimientos de cuenta
             </p>
             <button
               onClick={() => setModalServicioOpen(true)}
-              className="rounded-[10px] border border-[#d1d5dc] px-4 py-2 text-sm font-medium text-[#364153] transition hover:bg-gray-50"
+              className="shrink-0 justify-center rounded-[10px] border border-[#d1d5dc] px-4 py-2 text-sm font-medium text-[#364153] transition hover:bg-gray-50"
             >
               Agregar servicio
             </button>
           </div>
 
           {/* Metric cards */}
-          <div className="mb-6 grid grid-cols-2 gap-4">
+          <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="flex items-center gap-4 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
               <div
                 className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl"
@@ -1098,54 +1100,59 @@ export function SocioDetail({
                 </div>
               )}
 
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-gray-50 text-left text-xs font-semibold text-gray-500">
-                    <th className="w-10 px-4 py-3"></th>
-                    <th className="px-4 py-3">Fecha</th>
-                    <th className="px-4 py-3">Servicio</th>
-                    <th className="px-4 py-3">Concepto</th>
-                    <th className="px-4 py-3 text-right">Total</th>
-                    <th className="px-4 py-3 text-right">Estado</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {movimientos.map((m) => (
-                    <tr
-                      key={m.id}
-                      className={`border-t border-gray-100 transition hover:bg-gray-50/50 ${
-                        selectedIds.has(m.id) ? 'bg-teal-50/40' : ''
-                      }`}
-                    >
-                      <td className="px-4 py-3">
-                        <input
-                          type="checkbox"
-                          className="h-4 w-4 cursor-pointer rounded accent-[#175861]"
-                          checked={selectedIds.has(m.id)}
-                          onChange={() => toggleId(m.id)}
-                        />
-                      </td>
-                      <td className="px-4 py-3 text-gray-500">{fmtDate(m.fecha)}</td>
-                      <td className="px-4 py-3 font-medium" style={{ color: '#175861' }}>
-                        {m.servicioNombre ?? '—'}
-                      </td>
-                      <td className="px-4 py-3 text-gray-500">{m.concepto ?? '—'}</td>
-                      <td className="px-4 py-3 text-right font-medium" style={{ color: '#101828' }}>
-                        {fmt(parseFloat(m.debe ?? '0'))}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <span
-                          className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${
-                            ESTADO_BADGE[m.estado ?? ''] ?? 'bg-gray-100 text-gray-500'
-                          }`}
-                        >
-                          {ESTADO_LABEL[m.estado ?? ''] ?? m.estado ?? '—'}
-                        </span>
-                      </td>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[640px] text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 text-left text-xs font-semibold text-gray-500">
+                      <th className="w-10 px-4 py-3"></th>
+                      <th className="px-4 py-3">Fecha</th>
+                      <th className="px-4 py-3">Servicio</th>
+                      <th className="px-4 py-3">Concepto</th>
+                      <th className="px-4 py-3 text-right">Total</th>
+                      <th className="px-4 py-3 text-right">Estado</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {movimientos.map((m) => (
+                      <tr
+                        key={m.id}
+                        className={`border-t border-gray-100 transition hover:bg-gray-50/50 ${
+                          selectedIds.has(m.id) ? 'bg-teal-50/40' : ''
+                        }`}
+                      >
+                        <td className="px-4 py-3">
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 cursor-pointer rounded accent-[#175861]"
+                            checked={selectedIds.has(m.id)}
+                            onChange={() => toggleId(m.id)}
+                          />
+                        </td>
+                        <td className="px-4 py-3 text-gray-500">{fmtDate(m.fecha)}</td>
+                        <td className="px-4 py-3 font-medium" style={{ color: '#175861' }}>
+                          {m.servicioNombre ?? '—'}
+                        </td>
+                        <td className="px-4 py-3 text-gray-500">{m.concepto ?? '—'}</td>
+                        <td
+                          className="px-4 py-3 text-right font-medium"
+                          style={{ color: '#101828' }}
+                        >
+                          {fmt(parseFloat(m.debe ?? '0'))}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <span
+                            className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${
+                              ESTADO_BADGE[m.estado ?? ''] ?? 'bg-gray-100 text-gray-500'
+                            }`}
+                          >
+                            {ESTADO_LABEL[m.estado ?? ''] ?? m.estado ?? '—'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </>
           )}
         </div>
@@ -1153,7 +1160,7 @@ export function SocioDetail({
 
       {/* Facturación */}
       {activeTab === 'facturacion' && (
-        <div className="rounded-2xl border border-gray-200 bg-white p-6">
+        <div className="rounded-2xl border border-gray-200 bg-white p-4 md:p-6">
           <EmptyTab
             icon={<DollarSign className="h-7 w-7 opacity-40" />}
             text="No hay facturas registradas."
@@ -1163,7 +1170,7 @@ export function SocioDetail({
 
       {/* Navegantes */}
       {activeTab === 'navegantes' && (
-        <div className="rounded-2xl border border-gray-200 bg-white p-6">
+        <div className="rounded-2xl border border-gray-200 bg-white p-4 md:p-6">
           {invitados.length === 0 ? (
             <EmptyTab
               icon={<Users className="h-7 w-7 opacity-40" />}
@@ -1218,7 +1225,7 @@ export function SocioDetail({
 
       {/* Salidas */}
       {activeTab === 'salidas' && (
-        <div className="rounded-2xl border border-gray-200 bg-white p-6">
+        <div className="rounded-2xl border border-gray-200 bg-white p-4 md:p-6">
           {salidas.length === 0 ? (
             <EmptyTab
               icon={<Clock className="h-7 w-7 opacity-40" />}
@@ -1260,7 +1267,7 @@ export function SocioDetail({
 
       {/* Documentación */}
       {activeTab === 'documentacion' && (
-        <div className="rounded-2xl border border-gray-200 bg-white p-6">
+        <div className="rounded-2xl border border-gray-200 bg-white p-4 md:p-6">
           {documentos.length === 0 ? (
             <EmptyTab
               icon={<FileText className="h-7 w-7 opacity-40" />}
