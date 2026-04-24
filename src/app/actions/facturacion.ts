@@ -162,6 +162,43 @@ function buildPagos(total: number, medio: MedioPago): TusFacturasFormaPago[] {
   return [{ descripcion: FORMA_PAGO_LABEL[medio] ?? 'Otro', importe: total }];
 }
 
+/**
+ * Valida que el socio tenga documento compatible con su condición ante el IVA.
+ * Devuelve mensaje de error si hay inconsistencia, o null si está OK.
+ *
+ * Reglas de tusfacturas.app / AFIP:
+ *  - Si condición IVA = Responsable Inscripto o Monotributo → requiere CUIT válido (11 dígitos).
+ *  - Si tipo documento = CUIT/CUIL → número debe tener 11 dígitos.
+ *  - Si tipo documento = DNI → número debe ser numérico (7-8 dígitos).
+ *  - Consumidor Final sin documento es válido (se factura al consumidor anónimo).
+ */
+function validarDocumentoSocio(p: {
+  tipoDocumento: string | null;
+  numeroDocumento: string | null;
+  condicionIva: string | null;
+}): string | null {
+  const tipo = p.tipoDocumento ?? '';
+  const nro = (p.numeroDocumento ?? '').replace(/[\s-]/g, '');
+  const iva = p.condicionIva ?? '';
+
+  const requiereCuit = iva === 'responsable_inscripto' || iva === 'monotributo';
+  if (requiereCuit && tipo !== 'cuit' && tipo !== 'cuil') {
+    return 'La condición IVA del socio requiere tipo de documento CUIT/CUIL. Actualizá los datos del socio.';
+  }
+
+  if ((tipo === 'cuit' || tipo === 'cuil') && !/^\d{11}$/.test(nro)) {
+    return 'El CUIT/CUIL del socio debe tener 11 dígitos. Actualizá los datos del socio.';
+  }
+  if (tipo === 'dni' && !/^\d{7,8}$/.test(nro)) {
+    return 'El DNI del socio debe tener 7 u 8 dígitos. Actualizá los datos del socio.';
+  }
+  if (requiereCuit && !nro) {
+    return 'Falta el número de CUIT/CUIL del socio. Actualizá los datos antes de facturar.';
+  }
+
+  return null;
+}
+
 // ─── Action: factura individual ─────────────────────────────────────────────
 
 export async function createInvoiceAction(data: CreateInvoiceData): Promise<{
@@ -200,6 +237,15 @@ export async function createInvoiceAction(data: CreateInvoiceData): Promise<{
 
   if (!socio) return { error: 'Socio no encontrado en esta guardería.' };
 
+  // 1.a Validar documento del socio antes de llamar a tusfacturas (evita
+  // errores crípticos tipo "Error al crear al cliente").
+  const validacionSocio = validarDocumentoSocio({
+    tipoDocumento: socio.tipoDocumento,
+    numeroDocumento: socio.numeroDocumento,
+    condicionIva: socio.condicionIva,
+  });
+  if (validacionSocio) return { error: validacionSocio };
+
   // 1.b Traer POS + creds de la guardería (con fallback a env vars).
   const [guarderia] = await db
     .select({
@@ -213,9 +259,11 @@ export async function createInvoiceAction(data: CreateInvoiceData): Promise<{
     .where(eq(guarderias.id, gId))
     .limit(1);
 
+  // Mandamos el número sin padding — así es como lo registramos en tusfacturas
+  // al crear el POS (administrarPuntoVenta usa String(puntoDeVenta) directo).
   const puntoVenta =
     guarderia?.puntoDeVenta != null
-      ? String(guarderia.puntoDeVenta).padStart(5, '0')
+      ? String(guarderia.puntoDeVenta)
       : (process.env.TUSFACTURAS_PUNTO_VENTA ?? '00001');
 
   const rubroGuarderia = guarderia?.rubro ?? process.env.TUSFACTURAS_RUBRO ?? 'Servicios náuticos';
