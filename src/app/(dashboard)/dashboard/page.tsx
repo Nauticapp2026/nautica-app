@@ -203,7 +203,7 @@ export default async function DashboardPage() {
         fecha: comunicaciones.fecha,
       })
       .from(comunicaciones)
-      .where(eq(comunicaciones.guarderiaId, gId))
+      .where(and(eq(comunicaciones.guarderiaId, gId), eq(comunicaciones.publicar, true)))
       .orderBy(desc(comunicaciones.createdAt))
       .limit(3),
   ]);
