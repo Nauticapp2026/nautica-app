@@ -172,6 +172,39 @@ export async function updateTareaEstadoAction(
   return {};
 }
 
+// ─── Cambiar operario asignado (admin) ──────────────────────────────────────
+
+export async function updateTareaOperarioAction(
+  tareaId: string,
+  operarioId: string | null,
+): Promise<{ error?: string }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+  if (!isAdmin(ctx)) return { error: 'Solo administradores pueden reasignar tareas.' };
+
+  const gId = ctx.activeMembership.guarderiaId;
+
+  const [current] = await db
+    .select({ id: tareas.id })
+    .from(tareas)
+    .where(and(eq(tareas.id, tareaId), eq(tareas.guarderiaId, gId)))
+    .limit(1);
+  if (!current) return { error: 'Tarea no encontrada.' };
+
+  if (operarioId) {
+    const ok = await validateOperarioBelongsToGuarderia(operarioId, gId);
+    if (!ok) return { error: 'El operario no pertenece a esta guardería.' };
+  }
+
+  await db
+    .update(tareas)
+    .set({ operarioId })
+    .where(and(eq(tareas.id, tareaId), eq(tareas.guarderiaId, gId)));
+
+  revalidatePath('/tareas');
+  return {};
+}
+
 // ─── Eliminar (admin) ───────────────────────────────────────────────────────
 
 export async function deleteTareaAction(tareaId: string): Promise<{ error?: string }> {
