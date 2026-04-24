@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { AlertTriangle, Check, Clock, Phone, Ship } from 'lucide-react';
+import { AlertTriangle, Check, Phone, Ship } from 'lucide-react';
 
 import { marcarAlertaResueltaAction } from '@/app/actions/alertas';
 
@@ -20,7 +20,12 @@ export type AlertaOperativa = {
   embarcacion: string | null;
 };
 
-export function AlertasOperativasSection({ alertas }: { alertas: AlertaOperativa[] }) {
+/**
+ * Lista de alertas operativas sin wrapper propio — se renderiza dentro de un
+ * card existente del dashboard. Separa críticas (sin respuesta) y próximas
+ * (retorno próximo) con un subtítulo cada una.
+ */
+export function AlertasOperativasList({ alertas }: { alertas: AlertaOperativa[] }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [resolvingId, setResolvingId] = useState<string | null>(null);
@@ -48,96 +53,41 @@ export function AlertasOperativasSection({ alertas }: { alertas: AlertaOperativa
     });
   };
 
+  if (alertas.length === 0) return <EmptyState />;
+
   return (
-    <section className="rounded-2xl border border-gray-200 bg-white p-6">
-      <div className="mb-4 flex items-center gap-2">
-        <AlertTriangle className="h-4 w-4" style={{ color: '#175861' }} />
-        <h2 className="text-base font-semibold" style={{ color: '#101828' }}>
-          Alertas operativas
-        </h2>
-      </div>
-
-      <p className="mb-4 text-xs text-gray-500">
-        Monitoreo de retorno de embarcaciones. El sistema revisa cada minuto las salidas activas y
-        crea una alerta cuando se acerca la hora de arribo o pasó sin respuesta.
-      </p>
-
-      <div className="mb-5 grid grid-cols-2 gap-3">
-        <StatCard
-          label="Sin respuesta"
-          value={criticas.length}
-          tone="critical"
-          icon={<AlertTriangle className="h-4 w-4" />}
-        />
-        <StatCard
-          label="Retorno próximo"
-          value={proximas.length}
-          tone="warn"
-          icon={<Clock className="h-4 w-4" />}
-        />
-      </div>
-
-      {alertas.length === 0 ? (
-        <EmptyState />
-      ) : (
-        <div className="space-y-5">
-          {criticas.length > 0 && (
-            <div>
-              <SectionTitle label="Críticas — Sin respuesta del socio" count={criticas.length} />
-              <div className="space-y-3">
-                {criticas.map((a) => (
-                  <AlertaCard
-                    key={a.id}
-                    alerta={a}
-                    onResolver={onResolver}
-                    loading={pending && resolvingId === a.id}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {proximas.length > 0 && (
-            <div>
-              <SectionTitle label="Retorno próximo — Esperando respuesta" count={proximas.length} />
-              <div className="space-y-3">
-                {proximas.map((a) => (
-                  <AlertaCard
-                    key={a.id}
-                    alerta={a}
-                    onResolver={onResolver}
-                    loading={pending && resolvingId === a.id}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
+    <div className="space-y-5">
+      {criticas.length > 0 && (
+        <div>
+          <SectionTitle label="Críticas — Sin respuesta del socio" count={criticas.length} />
+          <div className="space-y-3">
+            {criticas.map((a) => (
+              <AlertaCard
+                key={a.id}
+                alerta={a}
+                onResolver={onResolver}
+                loading={pending && resolvingId === a.id}
+              />
+            ))}
+          </div>
         </div>
       )}
-    </section>
-  );
-}
 
-function StatCard({
-  label,
-  value,
-  tone,
-  icon,
-}: {
-  label: string;
-  value: number;
-  tone: 'critical' | 'warn';
-  icon: React.ReactNode;
-}) {
-  const bg = tone === 'critical' ? 'bg-red-50' : 'bg-amber-50';
-  const fg = tone === 'critical' ? 'text-red-700' : 'text-amber-700';
-  return (
-    <div className={`rounded-[12px] border border-gray-200 ${bg} px-4 py-3`}>
-      <div className={`flex items-center gap-2 text-xs font-medium ${fg}`}>
-        {icon}
-        {label}
-      </div>
-      <p className={`mt-1 text-2xl font-semibold ${fg}`}>{value}</p>
+      {proximas.length > 0 && (
+        <div>
+          <SectionTitle label="Retorno próximo — Esperando respuesta" count={proximas.length} />
+          <div className="space-y-3">
+            {proximas.map((a) => (
+              <AlertaCard
+                key={a.id}
+                alerta={a}
+                onResolver={onResolver}
+                loading={pending && resolvingId === a.id}
+              />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
