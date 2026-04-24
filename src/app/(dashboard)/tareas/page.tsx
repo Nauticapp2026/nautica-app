@@ -1,4 +1,5 @@
 import { and, asc, desc, eq } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 
 import { getActiveMarina } from '@/lib/auth/session';
 import { db } from '@/lib/db';
@@ -13,6 +14,10 @@ export default async function TareasPage() {
   const gId = ctx.activeMembership.guarderiaId;
   const isAdmin = ctx.profile.isSuperAdmin || ctx.activeMembership.rol === 'administrador_general';
   const isOperario = ctx.activeMembership.rol === 'operario';
+
+  // Alias para traer al socio dueño de la embarcación (profiles se usa dos veces:
+  // una para el operario y otra para el socio).
+  const socioProfile = alias(profiles, 'socio_profile');
 
   const [listado, operariosList, embarcacionesList] = await Promise.all([
     db
@@ -29,10 +34,14 @@ export default async function TareasPage() {
         operarioEmail: profiles.email,
         embarcacionId: tareas.embarcacionId,
         embarcacionNombre: embarcaciones.nombre,
+        socioNombre: socioProfile.nombre,
+        socioApellido: socioProfile.apellido,
+        socioEmail: socioProfile.email,
       })
       .from(tareas)
       .leftJoin(profiles, eq(profiles.id, tareas.operarioId))
       .leftJoin(embarcaciones, eq(embarcaciones.id, tareas.embarcacionId))
+      .leftJoin(socioProfile, eq(socioProfile.id, embarcaciones.profileId))
       .where(eq(tareas.guarderiaId, gId))
       .orderBy(desc(tareas.createdAt))
       .limit(500),
@@ -78,6 +87,7 @@ export default async function TareasPage() {
       [t.operarioNombre, t.operarioApellido].filter(Boolean).join(' ') || t.operarioEmail || null,
     embarcacionId: t.embarcacionId,
     embarcacionNombre: t.embarcacionNombre,
+    socioNombre: [t.socioNombre, t.socioApellido].filter(Boolean).join(' ') || t.socioEmail || null,
   }));
 
   const operarios = operariosList.map((o) => ({

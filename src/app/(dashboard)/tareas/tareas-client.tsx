@@ -4,12 +4,13 @@ import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   AlertCircle,
-  ChevronLeft,
-  ChevronRight,
+  Anchor,
   ClipboardList,
-  Edit3,
+  Droplet,
+  FilterX,
   Plus,
-  Trash2,
+  Settings,
+  Ship,
   X,
 } from 'lucide-react';
 
@@ -18,6 +19,7 @@ import {
   deleteTareaAction,
   updateTareaAction,
   updateTareaEstadoAction,
+  updateTareaOperarioAction,
 } from '@/app/actions/tareas';
 import { ESTADOS_TAREA, type EstadoTarea } from './constants';
 
@@ -34,6 +36,7 @@ export type Tarea = {
   operarioNombre: string | null;
   embarcacionId: string | null;
   embarcacionNombre: string | null;
+  socioNombre: string | null;
 };
 
 type OperarioOpt = { id: string; nombre: string };
@@ -51,11 +54,43 @@ type Props = {
 
 // ─── Constantes UI ──────────────────────────────────────────────────────────
 
-const COLUMNAS: { estado: EstadoTarea; label: string; accent: string }[] = [
-  { estado: 'preparar', label: 'Preparar', accent: 'bg-amber-50 text-amber-700' },
-  { estado: 'navegando', label: 'Navegando', accent: 'bg-blue-50 text-blue-700' },
-  { estado: 'guardada', label: 'Guardada', accent: 'bg-gray-100 text-gray-700' },
-  { estado: 'lavado', label: 'Lavado', accent: 'bg-teal-50 text-[#175861]' },
+type ColumnDef = {
+  estado: EstadoTarea;
+  label: string;
+  icon: typeof Anchor;
+  header: string; // bg class for header
+  body: string; // bg class for body area
+};
+
+const COLUMNAS: ColumnDef[] = [
+  {
+    estado: 'preparar',
+    label: 'Preparar',
+    icon: Settings,
+    header: 'bg-[#175861]',
+    body: 'bg-[#F6F8F8]',
+  },
+  {
+    estado: 'navegando',
+    label: 'Navegando',
+    icon: Ship,
+    header: 'bg-purple-700',
+    body: 'bg-purple-50/40',
+  },
+  {
+    estado: 'guardada',
+    label: 'Guardada',
+    icon: Anchor,
+    header: 'bg-[#0f4249]',
+    body: 'bg-[#F2F6F6]',
+  },
+  {
+    estado: 'lavado',
+    label: 'Lavado',
+    icon: Droplet,
+    header: 'bg-blue-600',
+    body: 'bg-blue-50/40',
+  },
 ];
 
 const ESTADO_LABEL: Record<EstadoTarea, string> = {
@@ -71,21 +106,16 @@ const inputCls =
 const textareaCls =
   'w-full rounded-[10px] border border-gray-200 bg-white px-4 py-2.5 text-sm text-[#101828] focus:border-[#175861] focus:outline-none focus:ring-1 focus:ring-[#175861]';
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
-
-// Formateo con TZ fija (Argentina) para evitar mismatch de hydration
-// entre servidor (UTC) y cliente (TZ del navegador).
 const TZ_AR = 'America/Argentina/Buenos_Aires';
 
-function fmtFechaHora(iso: string | null): string {
-  if (!iso) return '—';
+function fmtHora(iso: string | null): string {
+  if (!iso) return '';
   const d = new Date(iso);
-  return d.toLocaleString('es-AR', {
+  return d.toLocaleTimeString('es-AR', {
     timeZone: TZ_AR,
-    day: '2-digit',
-    month: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
+    hour12: false,
   });
 }
 
@@ -96,107 +126,74 @@ function toDatetimeLocal(iso: string | null): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-function adyacente(estado: EstadoTarea, dir: -1 | 1): EstadoTarea | null {
-  const idx = ESTADOS_TAREA.indexOf(estado);
-  const next = idx + dir;
-  if (next < 0 || next >= ESTADOS_TAREA.length) return null;
-  return ESTADOS_TAREA[next];
-}
-
 // ─── Card ───────────────────────────────────────────────────────────────────
 
 function TareaCard({
   tarea,
   canEditAll,
-  isOperario,
-  currentUserId,
+  operarios,
   onEdit,
-  onMove,
-  onDelete,
   busy,
+  onDragStart,
+  onDragEnd,
 }: {
   tarea: Tarea;
   canEditAll: boolean;
-  isOperario: boolean;
-  currentUserId: string;
+  operarios: OperarioOpt[];
   onEdit: (t: Tarea) => void;
-  onMove: (t: Tarea, dir: -1 | 1) => void;
-  onDelete: (t: Tarea) => void;
   busy: boolean;
+  onDragStart: (t: Tarea) => void;
+  onDragEnd: () => void;
 }) {
-  const puedeMover = canEditAll || (isOperario && tarea.operarioId === currentUserId);
-  const prev = adyacente(tarea.estado, -1);
-  const next = adyacente(tarea.estado, 1);
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+
+  const changeOperario = (opId: string) => {
+    startTransition(async () => {
+      const res = await updateTareaOperarioAction(tarea.id, opId || null);
+      if (res.error) alert(res.error);
+      else router.refresh();
+    });
+  };
 
   return (
-    <div className="rounded-[10px] border border-gray-200 bg-white p-3 shadow-sm">
-      <p className="text-sm leading-snug font-semibold" style={{ color: '#101828' }}>
-        {tarea.descripcion}
-      </p>
-      <div className="mt-2 space-y-0.5 text-xs text-gray-500">
-        {tarea.embarcacionNombre && (
-          <p>
-            <span className="font-medium text-gray-600">Embarcación:</span>{' '}
-            {tarea.embarcacionNombre}
-          </p>
-        )}
-        <p>
-          <span className="font-medium text-gray-600">Operario:</span>{' '}
-          {tarea.operarioNombre ?? 'Sin asignar'}
-        </p>
-        <p>
-          <span className="font-medium text-gray-600">Fecha:</span> {fmtFechaHora(tarea.fechaHora)}
-        </p>
+    <div
+      draggable={canEditAll}
+      onDragStart={() => onDragStart(tarea)}
+      onDragEnd={onDragEnd}
+      onClick={() => onEdit(tarea)}
+      className={`cursor-pointer rounded-[12px] border border-gray-200 bg-white p-3 shadow-sm transition-opacity hover:shadow-md ${busy ? 'opacity-60' : ''}`}
+    >
+      <div className="mb-1 flex items-start justify-between gap-2">
+        <p className="truncate text-xs font-medium text-gray-600">{tarea.socioNombre ?? '—'}</p>
+        <span className="shrink-0 text-xs text-gray-500">{fmtHora(tarea.fechaHora)}</span>
       </div>
-      {tarea.nota && (
-        <p className="mt-2 rounded-[6px] bg-gray-50 px-2 py-1.5 text-xs text-gray-600">
-          {tarea.nota}
-        </p>
+
+      <p className="text-base font-bold" style={{ color: '#101828' }}>
+        {tarea.embarcacionNombre ?? 'Sin embarcación'}
+      </p>
+
+      {(tarea.descripcion || tarea.nota) && (
+        <div className="mt-2 flex items-start gap-1.5 text-xs text-gray-600">
+          <ClipboardList className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-400" />
+          <span className="line-clamp-2">{tarea.descripcion || tarea.nota}</span>
+        </div>
       )}
 
-      <div className="mt-3 flex items-center justify-between border-t border-gray-100 pt-2">
-        <div className="flex gap-1">
-          <button
-            type="button"
-            onClick={() => prev && onMove(tarea, -1)}
-            disabled={!puedeMover || !prev || busy}
-            title={prev ? `Mover a ${ESTADO_LABEL[prev]}` : 'Sin estado previo'}
-            className="rounded-[6px] p-1.5 text-gray-500 transition hover:bg-gray-100 hover:text-[#175861] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => next && onMove(tarea, 1)}
-            disabled={!puedeMover || !next || busy}
-            title={next ? `Mover a ${ESTADO_LABEL[next]}` : 'Sin estado siguiente'}
-            className="rounded-[6px] p-1.5 text-gray-500 transition hover:bg-gray-100 hover:text-[#175861] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </button>
-        </div>
-        {canEditAll && (
-          <div className="flex gap-1">
-            <button
-              type="button"
-              onClick={() => onEdit(tarea)}
-              disabled={busy}
-              title="Editar"
-              className="rounded-[6px] p-1.5 text-gray-500 transition hover:bg-gray-100 hover:text-[#175861]"
-            >
-              <Edit3 className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => onDelete(tarea)}
-              disabled={busy}
-              title="Eliminar"
-              className="rounded-[6px] p-1.5 text-gray-500 transition hover:bg-red-50 hover:text-red-600"
-            >
-              <Trash2 className="h-4 w-4" />
-            </button>
-          </div>
-        )}
+      <div className="mt-3" onClick={(e) => e.stopPropagation()}>
+        <select
+          className="h-8 w-full rounded-[8px] border border-gray-200 bg-white px-2 text-xs text-[#101828] focus:border-[#175861] focus:outline-none"
+          value={tarea.operarioId ?? ''}
+          onChange={(e) => changeOperario(e.target.value)}
+          disabled={!canEditAll || pending}
+        >
+          <option value="">Sin asignar</option>
+          {operarios.map((o) => (
+            <option key={o.id} value={o.id}>
+              {o.nombre}
+            </option>
+          ))}
+        </select>
       </div>
     </div>
   );
@@ -211,13 +208,17 @@ function TareaModal({
   mode,
   operarios,
   embarcaciones,
+  canEditAll,
   onClose,
+  onDelete,
 }: {
   open: boolean;
   mode: ModalMode | null;
   operarios: OperarioOpt[];
   embarcaciones: EmbarcacionOpt[];
+  canEditAll: boolean;
   onClose: () => void;
+  onDelete: (t: Tarea) => void;
 }) {
   const router = useRouter();
   const editing = mode?.mode === 'edit' ? mode.tarea : null;
@@ -378,24 +379,37 @@ function TareaModal({
           )}
         </div>
 
-        <div className="flex items-center justify-end gap-2 border-t border-gray-200 p-4">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={isPending}
-            className="rounded-[10px] px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-100"
-          >
-            Cancelar
-          </button>
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={!isValid || isPending}
-            className="rounded-[10px] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-            style={{ background: '#175861' }}
-          >
-            {isPending ? 'Guardando…' : editing ? 'Guardar cambios' : 'Crear tarea'}
-          </button>
+        <div className="flex items-center justify-between gap-2 border-t border-gray-200 p-4">
+          <div>
+            {editing && canEditAll && (
+              <button
+                type="button"
+                onClick={() => onDelete(editing)}
+                className="text-sm font-semibold text-red-600 underline hover:text-red-700"
+              >
+                Eliminar
+              </button>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isPending}
+              className="rounded-[10px] px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-100"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={!isValid || isPending}
+              className="rounded-[10px] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+              style={{ background: '#175861' }}
+            >
+              {isPending ? 'Guardando…' : editing ? 'Guardar cambios' : 'Crear tarea'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -410,14 +424,28 @@ export function TareasClient({
   embarcaciones,
   canCreate,
   canEditAll,
-  currentUserId,
-  isOperario,
+  currentUserId: _currentUserId,
+  isOperario: _isOperario,
 }: Props) {
   const router = useRouter();
   const [modal, setModal] = useState<ModalMode | null>(null);
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  const [filterOperario, setFilterOperario] = useState<string>('');
+  const [filterEmbarcacion, setFilterEmbarcacion] = useState<string>('');
+
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dragOverState, setDragOverState] = useState<EstadoTarea | null>(null);
+
+  const filtradas = useMemo(() => {
+    return tareas.filter((t) => {
+      if (filterOperario && t.operarioId !== filterOperario) return false;
+      if (filterEmbarcacion && t.embarcacionId !== filterEmbarcacion) return false;
+      return true;
+    });
+  }, [tareas, filterOperario, filterEmbarcacion]);
 
   const agrupadas = useMemo(() => {
     const acc: Record<EstadoTarea, Tarea[]> = {
@@ -426,34 +454,46 @@ export function TareasClient({
       guardada: [],
       lavado: [],
     };
-    for (const t of tareas) acc[t.estado].push(t);
+    for (const t of filtradas) acc[t.estado].push(t);
     return acc;
-  }, [tareas]);
+  }, [filtradas]);
 
-  function moverTarea(t: Tarea, dir: -1 | 1) {
-    const destino = adyacente(t.estado, dir);
-    if (!destino) return;
+  const limpiarFiltros = () => {
+    setFilterOperario('');
+    setFilterEmbarcacion('');
+  };
+
+  const onDropOnColumn = (destino: EstadoTarea) => {
+    const tarea = tareas.find((t) => t.id === draggingId);
+    setDraggingId(null);
+    setDragOverState(null);
+    if (!tarea || tarea.estado === destino) return;
+    if (!canEditAll) return;
+
     setGlobalError(null);
-    setBusyId(t.id);
+    setBusyId(tarea.id);
     startTransition(async () => {
-      const res = await updateTareaEstadoAction(t.id, destino);
+      const res = await updateTareaEstadoAction(tarea.id, destino);
       if (res.error) setGlobalError(res.error);
       else router.refresh();
       setBusyId(null);
     });
-  }
+  };
 
-  function borrarTarea(t: Tarea) {
+  const borrarTarea = (t: Tarea) => {
     if (!confirm(`¿Eliminar la tarea "${t.descripcion}"?`)) return;
     setGlobalError(null);
     setBusyId(t.id);
     startTransition(async () => {
       const res = await deleteTareaAction(t.id);
       if (res.error) setGlobalError(res.error);
-      else router.refresh();
+      else {
+        setModal(null);
+        router.refresh();
+      }
       setBusyId(null);
     });
-  }
+  };
 
   return (
     <div className="space-y-6 p-8">
@@ -461,12 +501,10 @@ export function TareasClient({
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold" style={{ color: '#101828' }}>
-            Tareas
+            Gestión de Embarcaciones
           </h1>
           <p className="mt-0.5 text-sm" style={{ color: '#669E9D' }}>
-            {canCreate
-              ? 'Cargá y asigná tareas a los operarios de la guardería.'
-              : 'Tareas asignadas a la guardería. Movelas según su avance.'}
+            Seguimiento del proceso operativo de embarcaciones
           </p>
         </div>
         {canCreate && (
@@ -482,6 +520,63 @@ export function TareasClient({
         )}
       </div>
 
+      {/* Stat cards */}
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        {COLUMNAS.map((col) => {
+          const Icon = col.icon;
+          const count = agrupadas[col.estado].length;
+          return (
+            <div key={col.estado} className="rounded-2xl border border-gray-200 bg-white p-5">
+              <div className="flex items-center justify-between">
+                <p className="text-sm" style={{ color: '#669E9D' }}>
+                  {col.label}
+                </p>
+                <Icon className="h-4 w-4" style={{ color: '#669E9D' }} />
+              </div>
+              <p className="mt-2 text-3xl font-bold" style={{ color: '#175861' }}>
+                {count}
+              </p>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Filtros */}
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_auto]">
+        <select
+          className={inputCls}
+          value={filterOperario}
+          onChange={(e) => setFilterOperario(e.target.value)}
+        >
+          <option value="">Operario</option>
+          {operarios.map((o) => (
+            <option key={o.id} value={o.id}>
+              {o.nombre}
+            </option>
+          ))}
+        </select>
+        <select
+          className={inputCls}
+          value={filterEmbarcacion}
+          onChange={(e) => setFilterEmbarcacion(e.target.value)}
+        >
+          <option value="">Embarcación</option>
+          {embarcaciones.map((e) => (
+            <option key={e.id} value={e.id}>
+              {e.nombre}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          onClick={limpiarFiltros}
+          title="Limpiar filtros"
+          className="flex h-11 w-11 items-center justify-center rounded-[10px] border border-gray-200 text-gray-500 hover:bg-gray-50"
+        >
+          <FilterX className="h-4 w-4" />
+        </button>
+      </div>
+
       {globalError && (
         <div className="flex items-center gap-2 rounded-[10px] border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
           <AlertCircle className="h-4 w-4 shrink-0" />
@@ -493,44 +588,63 @@ export function TareasClient({
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         {COLUMNAS.map((col) => {
           const lista = agrupadas[col.estado];
+          const Icon = col.icon;
+          const isOver = dragOverState === col.estado;
           return (
             <div
               key={col.estado}
-              className="flex min-h-[240px] flex-col rounded-2xl border border-gray-200 bg-[#F9FAFB] p-3"
+              onDragOver={(e) => {
+                if (!canEditAll) return;
+                e.preventDefault();
+                if (dragOverState !== col.estado) setDragOverState(col.estado);
+              }}
+              onDragLeave={() => {
+                if (dragOverState === col.estado) setDragOverState(null);
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                onDropOnColumn(col.estado);
+              }}
+              className={`flex min-h-[280px] flex-col overflow-hidden rounded-2xl border ${
+                isOver ? 'border-[#175861] ring-2 ring-[#175861]/30' : 'border-gray-200'
+              } ${col.body}`}
             >
-              <div className="mb-3 flex items-center justify-between px-1">
+              <div
+                className={`flex items-center justify-between ${col.header} px-4 py-3 text-white`}
+              >
                 <div className="flex items-center gap-2">
-                  <span
-                    className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${col.accent}`}
-                  >
-                    {col.label}
-                  </span>
-                  <span className="text-xs text-gray-500">{lista.length}</span>
+                  <Icon className="h-4 w-4" />
+                  <span className="text-sm font-semibold">{col.label}</span>
                 </div>
+                <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-xs font-bold text-white">
+                  {lista.length}
+                </span>
               </div>
 
-              {lista.length === 0 ? (
-                <div className="flex flex-1 flex-col items-center justify-center gap-2 py-6 text-gray-400">
-                  <ClipboardList className="h-6 w-6 opacity-40" />
-                  <p className="text-xs">Sin tareas</p>
-                </div>
-              ) : (
-                <div className="space-y-2.5">
-                  {lista.map((t) => (
+              <div className="flex-1 space-y-2.5 p-3">
+                {lista.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center gap-2 py-10 text-gray-400">
+                    <ClipboardList className="h-6 w-6 opacity-40" />
+                    <p className="text-xs">Sin tareas</p>
+                  </div>
+                ) : (
+                  lista.map((t) => (
                     <TareaCard
                       key={t.id}
                       tarea={t}
                       canEditAll={canEditAll}
-                      isOperario={isOperario}
-                      currentUserId={currentUserId}
+                      operarios={operarios}
                       onEdit={(x) => setModal({ mode: 'edit', tarea: x })}
-                      onMove={moverTarea}
-                      onDelete={borrarTarea}
                       busy={isPending && busyId === t.id}
+                      onDragStart={() => setDraggingId(t.id)}
+                      onDragEnd={() => {
+                        setDraggingId(null);
+                        setDragOverState(null);
+                      }}
                     />
-                  ))}
-                </div>
-              )}
+                  ))
+                )}
+              </div>
             </div>
           );
         })}
@@ -542,7 +656,9 @@ export function TareasClient({
         mode={modal}
         operarios={operarios}
         embarcaciones={embarcaciones}
+        canEditAll={canEditAll}
         onClose={() => setModal(null)}
+        onDelete={borrarTarea}
       />
     </div>
   );
