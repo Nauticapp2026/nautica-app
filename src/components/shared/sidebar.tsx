@@ -35,7 +35,7 @@ const NAV = [
   { href: '/usuarios', label: 'Usuarios', icon: Users },
   { href: '/tareas', label: 'Tareas', icon: ClipboardList },
   { href: '/dashboard/espacios', label: 'Espacios', icon: Anchor },
-  { href: '/dashboard/comunicaciones', label: 'Comunicaciones', icon: MessageSquare },
+  { href: '/comunicaciones', label: 'Comunicaciones', icon: MessageSquare },
   { href: '/facturacion', label: 'Facturación', icon: FileText },
   { href: '/dashboard/tarifario', label: 'Tarifario', icon: Tag },
   { href: '/configuracion', label: 'Configuración', icon: Settings },
