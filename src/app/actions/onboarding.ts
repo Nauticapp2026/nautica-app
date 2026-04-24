@@ -284,8 +284,6 @@ export async function inviteTeamMembersStep(
   const errores: string[] = [];
   let creados = 0;
 
-  console.log('[inviteTeamMembersStep] start', { guarderiaId, cantidad: miembros.length });
-
   for (const m of miembros) {
     const email = m.email.trim().toLowerCase();
     const nombre = m.nombre.trim();
@@ -345,14 +343,12 @@ export async function inviteTeamMembersStep(
         .onConflictDoNothing();
 
       creados++;
-      console.log('[inviteTeamMembersStep] creado', email, profileId);
     } catch (err) {
       console.error('[inviteTeamMembersStep] DB error', email, err);
       errores.push(`${email}: ${err instanceof Error ? err.message : 'Error desconocido'}`);
     }
   }
 
-  console.log('[inviteTeamMembersStep] done', { creados, errores });
   return { creados, errores: errores.length > 0 ? errores : undefined };
 }
 
