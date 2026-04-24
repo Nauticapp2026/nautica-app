@@ -5,6 +5,8 @@ import { getActiveMarina } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { guarderias, horariosDia, memberships, profiles } from '@/lib/db/schema';
 
+import type { GuarderiaFeatures } from '@/app/actions/configuracion';
+
 import {
   ConfiguracionClient,
   type InfoGeneralData,
@@ -33,6 +35,11 @@ export default async function ConfiguracionPage() {
       codigoPostal: guarderias.codigoPostal,
       telefono: guarderias.telefono,
       email: guarderias.email,
+      activarNotificaciones: guarderias.activarNotificaciones,
+      activarClimaYMareas: guarderias.activarClimaYMareas,
+      activarReservasOnline: guarderias.activarReservasOnline,
+      activarPagosOnline: guarderias.activarPagosOnline,
+      activarMenuGastronomico: guarderias.activarMenuGastronomico,
     })
     .from(guarderias)
     .where(eq(guarderias.id, guarderiaId))
@@ -93,5 +100,13 @@ export default async function ConfiguracionPage() {
     estadoMiembro: m.estadoMiembro,
   }));
 
-  return <ConfiguracionClient infoGeneral={infoGeneral} miembros={miembros} />;
+  const features: GuarderiaFeatures = {
+    activarNotificaciones: guarderia?.activarNotificaciones ?? false,
+    activarClimaYMareas: guarderia?.activarClimaYMareas ?? false,
+    activarReservasOnline: guarderia?.activarReservasOnline ?? false,
+    activarPagosOnline: guarderia?.activarPagosOnline ?? false,
+    activarMenuGastronomico: guarderia?.activarMenuGastronomico ?? false,
+  };
+
+  return <ConfiguracionClient infoGeneral={infoGeneral} miembros={miembros} features={features} />;
 }

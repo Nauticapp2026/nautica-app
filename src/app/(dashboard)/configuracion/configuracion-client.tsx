@@ -6,8 +6,10 @@ import { Bell, Building2, FilterX, Minus, Plus, Receipt, Users, X } from 'lucide
 
 import {
   createMiembroEquipoAction,
+  updateGuarderiaFeaturesAction,
   updateGuarderiaGeneralAction,
   type CreateMiembroEquipoData,
+  type GuarderiaFeatures,
   type HorarioInput,
   type UpdateGuarderiaGeneralData,
 } from '@/app/actions/configuracion';
@@ -77,9 +79,11 @@ const inputCls =
 export function ConfiguracionClient({
   infoGeneral,
   miembros,
+  features,
 }: {
   infoGeneral: InfoGeneralData;
   miembros: MiembroEquipo[];
+  features: GuarderiaFeatures;
 }) {
   const [activeTab, setActiveTab] = useState<TabKey>('info');
 
@@ -122,11 +126,7 @@ export function ConfiguracionClient({
           <TabPlaceholder title="Punto de venta" />
         </section>
       )}
-      {activeTab === 'notificaciones' && (
-        <section className="rounded-2xl border border-gray-200 bg-white p-8">
-          <TabPlaceholder title="Notificaciones" />
-        </section>
-      )}
+      {activeTab === 'notificaciones' && <NotificacionesTab initial={features} />}
     </div>
   );
 }
@@ -631,6 +631,112 @@ function Field({
       </label>
       {children}
     </div>
+  );
+}
+
+const FEATURES_META: {
+  key: keyof GuarderiaFeatures;
+  title: string;
+  desc: string;
+}[] = [
+  {
+    key: 'activarNotificaciones',
+    title: 'Activar notificaciones a socios',
+    desc: 'Enviá alertas automáticas por email y SMS',
+  },
+  {
+    key: 'activarClimaYMareas',
+    title: 'Activar clima y mareas',
+    desc: 'Mostrá información meteorológica en tiempo real',
+  },
+  {
+    key: 'activarReservasOnline',
+    title: 'Activar reservas online',
+    desc: 'Permitir que socios reserven espacios y servicios',
+  },
+  {
+    key: 'activarPagosOnline',
+    title: 'Activar pagos online',
+    desc: 'Integrá con Mercado Pago y otros medios de pago',
+  },
+  {
+    key: 'activarMenuGastronomico',
+    title: 'Activar menú gastronómico',
+    desc: 'Gestioná pedidos del buffet o restaurante',
+  },
+];
+
+function NotificacionesTab({ initial }: { initial: GuarderiaFeatures }) {
+  const [state, setState] = useState<GuarderiaFeatures>(initial);
+  const [error, setError] = useState<string | null>(null);
+  const [, startTransition] = useTransition();
+
+  const toggle = (key: keyof GuarderiaFeatures) => {
+    const prev = state;
+    const next = { ...state, [key]: !state[key] };
+    setState(next);
+    setError(null);
+    startTransition(async () => {
+      const res = await updateGuarderiaFeaturesAction(next);
+      if (res.error) {
+        setState(prev);
+        setError(res.error);
+      }
+    });
+  };
+
+  return (
+    <section>
+      <div className="mb-4">
+        <h2 className="text-base font-bold" style={{ color: '#101828' }}>
+          Configuraciones Generales
+        </h2>
+        <p className="mt-1 text-sm" style={{ color: '#669E9D' }}>
+          Activa o desactiva funcionalidades de tu guardería
+        </p>
+      </div>
+
+      <div className="space-y-3">
+        {FEATURES_META.map((f) => (
+          <div
+            key={f.key}
+            className="flex items-start justify-between gap-4 rounded-2xl border border-gray-200 bg-white p-5"
+          >
+            <div className="min-w-0">
+              <p className="text-sm font-bold" style={{ color: '#101828' }}>
+                {f.title}
+              </p>
+              <p className="mt-0.5 text-sm" style={{ color: '#669E9D' }}>
+                {f.desc}
+              </p>
+            </div>
+            <Toggle checked={state[f.key]} onChange={() => toggle(f.key)} />
+          </div>
+        ))}
+      </div>
+
+      {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+    </section>
+  );
+}
+
+function Toggle({ checked, onChange }: { checked: boolean; onChange: () => void }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={onChange}
+      className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
+        checked ? 'bg-[#175861]' : 'bg-gray-200'
+      }`}
+    >
+      <span
+        className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+          checked ? 'translate-x-[22px]' : 'translate-x-0.5'
+        }`}
+      />
+    </button>
   );
 }
 

@@ -106,6 +106,41 @@ export async function updateGuarderiaGeneralAction(
 }
 
 // =============================================================================
+// FEATURE FLAGS / NOTIFICACIONES
+// =============================================================================
+
+export type GuarderiaFeatures = {
+  activarNotificaciones: boolean;
+  activarClimaYMareas: boolean;
+  activarReservasOnline: boolean;
+  activarPagosOnline: boolean;
+  activarMenuGastronomico: boolean;
+};
+
+export async function updateGuarderiaFeaturesAction(
+  features: GuarderiaFeatures,
+): Promise<{ error?: string }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+  if (!isAdmin(ctx)) return { error: 'Solo administradores pueden editar la configuración.' };
+
+  await db
+    .update(guarderias)
+    .set({
+      activarNotificaciones: features.activarNotificaciones,
+      activarClimaYMareas: features.activarClimaYMareas,
+      activarReservasOnline: features.activarReservasOnline,
+      activarPagosOnline: features.activarPagosOnline,
+      activarMenuGastronomico: features.activarMenuGastronomico,
+      updatedAt: new Date(),
+    })
+    .where(eq(guarderias.id, ctx.activeMembership.guarderiaId));
+
+  revalidatePath('/configuracion');
+  return {};
+}
+
+// =============================================================================
 // EQUIPO
 // =============================================================================
 
