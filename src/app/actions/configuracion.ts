@@ -198,14 +198,19 @@ export async function savePuntoVentaAction(data: SavePuntoVentaData): Promise<{ 
     };
   }
 
+  if (guarderia.puntoDeVentaActual != null) {
+    return {
+      error: 'Ya tenés un punto de venta configurado. No se puede volver a agregar.',
+    };
+  }
+
   const ivaCode = CONDICION_IVA_API[data.condicionIva];
   if (!ivaCode) return { error: 'No se pudo mapear la condición IVA.' };
 
-  const operacion: 'A' | 'M' = guarderia.puntoDeVentaActual == null ? 'A' : 'M';
-
+  let tusResponse;
   try {
-    await administrarPuntoVenta({
-      operacion,
+    tusResponse = await administrarPuntoVenta({
+      operacion: 'A',
       punto_venta: String(data.puntoDeVenta),
       direccion: guarderia.direccion,
       razon_social: data.razonSocial.trim(),
@@ -234,6 +239,9 @@ export async function savePuntoVentaAction(data: SavePuntoVentaData): Promise<{ 
       condicionIva: data.condicionIva,
       rubro: data.rubro.trim(),
       fechaInicio: new Date(data.fechaInicio),
+      tusfacturasApikey: tusResponse.apikey != null ? String(tusResponse.apikey) : null,
+      tusfacturasApitoken: tusResponse.apitoken ?? null,
+      tusfacturasUsertoken: tusResponse.usertoken ?? null,
       updatedAt: new Date(),
     })
     .where(eq(guarderias.id, guarderiaId));

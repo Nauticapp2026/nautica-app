@@ -9,6 +9,7 @@ import {
   facturacion,
   facturacionItemMovimientos,
   facturacionItems,
+  guarderias,
   memberships,
   movimientosCuentaCorriente,
   profiles,
@@ -19,6 +20,7 @@ import {
   toTusFecha,
   type TusFacturasCliente,
   type TusFacturasComprobante,
+  type TusFacturasCredentials,
   type TusFacturasDetalleItem,
   type TusFacturasFormaPago,
 } from '@/lib/tusfacturas/client';
@@ -198,6 +200,35 @@ export async function createInvoiceAction(data: CreateInvoiceData): Promise<{
 
   if (!socio) return { error: 'Socio no encontrado en esta guardería.' };
 
+  // 1.b Traer POS + creds de la guardería (con fallback a env vars).
+  const [guarderia] = await db
+    .select({
+      puntoDeVenta: guarderias.puntoDeVenta,
+      rubro: guarderias.rubro,
+      tusfacturasApikey: guarderias.tusfacturasApikey,
+      tusfacturasApitoken: guarderias.tusfacturasApitoken,
+      tusfacturasUsertoken: guarderias.tusfacturasUsertoken,
+    })
+    .from(guarderias)
+    .where(eq(guarderias.id, gId))
+    .limit(1);
+
+  const puntoVenta =
+    guarderia?.puntoDeVenta != null
+      ? String(guarderia.puntoDeVenta).padStart(5, '0')
+      : (process.env.TUSFACTURAS_PUNTO_VENTA ?? '00001');
+
+  const rubroGuarderia = guarderia?.rubro ?? process.env.TUSFACTURAS_RUBRO ?? 'Servicios náuticos';
+
+  const credsOverride: TusFacturasCredentials | undefined =
+    guarderia?.tusfacturasApikey && guarderia.tusfacturasApitoken && guarderia.tusfacturasUsertoken
+      ? {
+          apikey: guarderia.tusfacturasApikey,
+          apitoken: guarderia.tusfacturasApitoken,
+          usertoken: guarderia.tusfacturasUsertoken,
+        }
+      : undefined;
+
   // 2. Construir items desde movimientos (si llegaron) o desde items libres
   let items: { descripcion: string; cantidad: number; importeUnitario: number }[] = [];
   let movimientoIds = data.movimientoIds ?? [];
@@ -243,12 +274,12 @@ export async function createInvoiceAction(data: CreateInvoiceData): Promise<{
     tipo: TIPO_FACTURA_API[data.tipoFactura],
     external_reference: facturaId,
     operacion: 'V',
-    punto_venta: process.env.TUSFACTURAS_PUNTO_VENTA ?? '00001',
+    punto_venta: puntoVenta,
     moneda: 'PES',
     cotizacion: 1,
     periodo_facturado_desde: toTusFecha(data.desde),
     periodo_facturado_hasta: toTusFecha(data.hasta),
-    rubro: process.env.TUSFACTURAS_RUBRO ?? 'Servicios náuticos',
+    rubro: rubroGuarderia,
     rubro_grupo_contable: process.env.TUSFACTURAS_RUBRO_GRUPO ?? 'Servicios',
     detalle: buildDetalle(items, data.tipoFactura),
     total: total.toFixed(2),
@@ -260,7 +291,7 @@ export async function createInvoiceAction(data: CreateInvoiceData): Promise<{
 
   let apiResponse;
   try {
-    apiResponse = await crearFactura({ cliente, comprobante });
+    apiResponse = await crearFactura({ cliente, comprobante }, credsOverride);
   } catch (err) {
     return {
       error: err instanceof Error ? err.message : 'Error al emitir factura en tusfacturas.app',

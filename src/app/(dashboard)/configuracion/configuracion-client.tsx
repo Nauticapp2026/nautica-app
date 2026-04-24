@@ -762,7 +762,11 @@ function PuntoVentaTab({ initial }: { initial: PuntoVentaData }) {
   const [feedback, setFeedback] = useState<{ type: 'error' | 'success'; msg: string } | null>(null);
   const [pending, startTransition] = useTransition();
 
+  const yaConfigurado = initial.puntoDeVenta != null;
+  const readOnly = yaConfigurado;
+
   const onField = <K extends keyof PuntoVentaData>(key: K, value: PuntoVentaData[K]) => {
+    if (readOnly) return;
     setData((prev) => ({ ...prev, [key]: value }));
     setFeedback(null);
   };
@@ -790,21 +794,31 @@ function PuntoVentaTab({ initial }: { initial: PuntoVentaData }) {
     });
   };
 
+  const readOnlyCls = readOnly ? 'bg-gray-50 text-gray-500' : '';
+
   return (
     <section className="rounded-2xl border border-gray-200 bg-white p-8">
-      <h2 className="mb-6 text-base font-bold" style={{ color: '#101828' }}>
+      <h2 className="mb-2 text-base font-bold" style={{ color: '#101828' }}>
         Configure su punto de venta
       </h2>
+
+      {yaConfigurado && (
+        <div className="mb-6 rounded-[10px] border border-[#CAE6E4] bg-[#ECFDF3] px-4 py-3 text-sm text-[#175861]">
+          Este punto de venta ya fue creado en tusfacturas. Los datos no se pueden modificar desde
+          acá.
+        </div>
+      )}
 
       <div className="space-y-4">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <Field label="Punto de venta" required>
             <input
-              className={inputCls}
+              className={`${inputCls} ${readOnlyCls}`}
               type="number"
               min={1}
               placeholder="1"
               value={data.puntoDeVenta ?? ''}
+              disabled={readOnly}
               onChange={(e) =>
                 onField('puntoDeVenta', e.target.value ? Number(e.target.value) : null)
               }
@@ -812,8 +826,9 @@ function PuntoVentaTab({ initial }: { initial: PuntoVentaData }) {
           </Field>
           <Field label="Condición frente IVA" required>
             <select
-              className={inputCls}
+              className={`${inputCls} ${readOnlyCls}`}
               value={data.condicionIva}
+              disabled={readOnly}
               onChange={(e) =>
                 onField('condicionIva', e.target.value as PuntoVentaData['condicionIva'])
               }
@@ -830,15 +845,17 @@ function PuntoVentaTab({ initial }: { initial: PuntoVentaData }) {
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <Field label="Rubro" required>
             <input
-              className={inputCls}
+              className={`${inputCls} ${readOnlyCls}`}
               value={data.rubro}
+              disabled={readOnly}
               onChange={(e) => onField('rubro', e.target.value)}
             />
           </Field>
           <Field label="Razón social" required>
             <input
-              className={inputCls}
+              className={`${inputCls} ${readOnlyCls}`}
               value={data.razonSocial}
+              disabled={readOnly}
               onChange={(e) => onField('razonSocial', e.target.value)}
             />
           </Field>
@@ -846,9 +863,10 @@ function PuntoVentaTab({ initial }: { initial: PuntoVentaData }) {
 
         <Field label="Fecha inicio" required>
           <input
-            className={inputCls}
+            className={`${inputCls} ${readOnlyCls}`}
             type="date"
             value={data.fechaInicio}
+            disabled={readOnly}
             onChange={(e) => onField('fechaInicio', e.target.value)}
           />
         </Field>
@@ -859,16 +877,18 @@ function PuntoVentaTab({ initial }: { initial: PuntoVentaData }) {
           </p>
         )}
 
-        <div className="pt-2">
-          <button
-            type="button"
-            onClick={onSubmit}
-            disabled={pending}
-            className="rounded-[10px] bg-[#175861] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#0f4249] disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {pending ? 'Sincronizando…' : 'Guardar cambios'}
-          </button>
-        </div>
+        {!readOnly && (
+          <div className="pt-2">
+            <button
+              type="button"
+              onClick={onSubmit}
+              disabled={pending}
+              className="rounded-[10px] bg-[#175861] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#0f4249] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {pending ? 'Sincronizando…' : 'Guardar cambios'}
+            </button>
+          </div>
+        )}
       </div>
     </section>
   );

@@ -241,6 +241,10 @@ export const guarderias = pgTable(
     rubro: text('rubro'),
     iibb: text('iibb'),
     fechaInicio: timestamp('fecha_inicio', { withTimezone: true }),
+    // Credenciales devueltas por tusfacturas al crear el POS de esta guardería.
+    tusfacturasApikey: text('tusfacturas_apikey'),
+    tusfacturasApitoken: text('tusfacturas_apitoken'),
+    tusfacturasUsertoken: text('tusfacturas_usertoken'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
