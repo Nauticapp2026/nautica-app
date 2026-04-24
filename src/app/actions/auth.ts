@@ -32,8 +32,14 @@ export async function login(_: ActionResult | null, formData: FormData): Promise
 
   if (error) return { error: translateAuthError(error.message) };
 
+  // El operario no tiene acceso al dashboard ni al resto del panel; su única
+  // sección es /tareas. El resto de roles web van al dashboard.
+  const { getActiveMarina } = await import('@/lib/auth/session');
+  const ctx = await getActiveMarina();
+  const isOperario = !!ctx && !ctx.profile.isSuperAdmin && ctx.activeMembership.rol === 'operario';
+
   revalidatePath('/', 'layout');
-  redirect('/dashboard');
+  redirect(isOperario ? '/tareas' : '/dashboard');
 }
 
 export async function signup(_: ActionResult | null, formData: FormData): Promise<ActionResult> {
@@ -72,13 +78,17 @@ export async function logout() {
 /**
  * Devuelve el contexto de acceso del usuario actual para decidir a dónde
  * mandarlo después de setear su contraseña.
- * - 'web': rol con acceso al dashboard (admin_general / operario / super_admin)
- * - 'mobile': rol que opera desde la app mobile (socio, invitado, etc)
- * - 'no_membership': cuenta sin membership activa
- * - 'no_session': no hay usuario autenticado
+ * - 'web': rol con acceso al dashboard. `redirectTo` indica a dónde ir
+ *   (normalmente /dashboard; operario va a /tareas).
+ * - 'mobile': rol que opera desde la app mobile (socio, invitado, etc).
+ * - 'no_membership': cuenta sin membership activa.
+ * - 'no_session': no hay usuario autenticado.
  */
 export async function getPostSignupAccess(): Promise<
-  { kind: 'web' } | { kind: 'mobile' } | { kind: 'no_membership' } | { kind: 'no_session' }
+  | { kind: 'web'; redirectTo: string }
+  | { kind: 'mobile' }
+  | { kind: 'no_membership' }
+  | { kind: 'no_session' }
 > {
   const { getActiveMarina, getCurrentUser } = await import('@/lib/auth/session');
   const user = await getCurrentUser();
@@ -87,9 +97,11 @@ export async function getPostSignupAccess(): Promise<
   const active = await getActiveMarina();
   if (!active) return { kind: 'no_membership' };
 
-  const webRoles = new Set(['administrador_general', 'operario']);
-  if (active.profile.isSuperAdmin || webRoles.has(active.activeMembership.rol)) {
-    return { kind: 'web' };
+  if (active.profile.isSuperAdmin || active.activeMembership.rol === 'administrador_general') {
+    return { kind: 'web', redirectTo: '/dashboard' };
+  }
+  if (active.activeMembership.rol === 'operario') {
+    return { kind: 'web', redirectTo: '/tareas' };
   }
   return { kind: 'mobile' };
 }
