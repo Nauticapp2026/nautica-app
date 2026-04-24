@@ -1231,11 +1231,18 @@ export default function OnboardingPage() {
   }
 
   async function handleStep3() {
-    if (data.guarderiaId) {
-      await updateDetallesStep(data.guarderiaId, {
-        descripcion: data.descripcion,
-        horarios: data.horarios,
-      });
+    if (!data.guarderiaId) {
+      next();
+      return;
+    }
+    setError(undefined);
+    const res = await updateDetallesStep(data.guarderiaId, {
+      descripcion: data.descripcion,
+      horarios: data.horarios,
+    });
+    if (res?.error) {
+      setError(res.error);
+      return;
     }
     next();
   }
