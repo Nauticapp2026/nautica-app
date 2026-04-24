@@ -646,6 +646,41 @@ const TIPO_DOC_LABEL: Record<'carnet_nautico' | 'matricula' | 'seguro', string> 
   seguro: 'Seguro',
 };
 
+export type SalidaItem = {
+  id: string;
+  desde: string | null;
+  hasta: string | null;
+  arribadaEn: string | null;
+  estado: 'activo' | 'usado' | 'revocado' | null;
+  motivo: string | null;
+  embarcacion: string | null;
+  createdAt: string;
+};
+
+const SALIDA_ESTADO_LABEL: Record<'activo' | 'usado' | 'revocado', string> = {
+  activo: 'Pendiente',
+  usado: 'Completada',
+  revocado: 'Revocada',
+};
+
+const SALIDA_ESTADO_CLS: Record<'activo' | 'usado' | 'revocado', string> = {
+  activo: 'bg-amber-100 text-amber-700',
+  usado: 'bg-green-100 text-green-700',
+  revocado: 'bg-gray-100 text-gray-600',
+};
+
+function fmtFechaHoraSalida(iso: string | null): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleString('es-AR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 export function SocioDetail({
   socio,
   embarcaciones,
@@ -653,6 +688,7 @@ export function SocioDetail({
   servicios,
   invitados,
   documentos = [],
+  salidas = [],
 }: {
   socio: SocioData;
   embarcaciones: Embarcacion[];
@@ -660,6 +696,7 @@ export function SocioDetail({
   servicios: Servicio[];
   invitados: Invitado[];
   documentos?: DocumentoItem[];
+  salidas?: SalidaItem[];
 }) {
   const [activeTab, setActiveTab] = useState<TabId>('generales');
   const [modalServicioOpen, setModalServicioOpen] = useState(false);
@@ -1194,10 +1231,52 @@ export function SocioDetail({
       {/* Salidas */}
       {activeTab === 'salidas' && (
         <div className="rounded-2xl border border-gray-200 bg-white p-6">
-          <EmptyTab
-            icon={<Clock className="h-7 w-7 opacity-40" />}
-            text="No hay salidas registradas."
-          />
+          {salidas.length === 0 ? (
+            <EmptyTab
+              icon={<Clock className="h-7 w-7 opacity-40" />}
+              text="No hay salidas registradas."
+            />
+          ) : (
+            <div className="space-y-3">
+              {salidas.map((s) => {
+                const estadoKey = (s.estado ?? 'activo') as 'activo' | 'usado' | 'revocado';
+                return (
+                  <div
+                    key={s.id}
+                    className="flex items-start justify-between gap-4 rounded-[10px] border border-gray-200 bg-white px-4 py-3"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="truncate text-sm font-semibold text-[#101828]">
+                          {s.embarcacion ?? 'Sin embarcación'}
+                        </p>
+                        <span
+                          className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${SALIDA_ESTADO_CLS[estadoKey]}`}
+                        >
+                          {SALIDA_ESTADO_LABEL[estadoKey]}
+                        </span>
+                      </div>
+                      <div className="mt-1 grid grid-cols-1 gap-x-4 gap-y-0.5 text-xs text-gray-500 sm:grid-cols-3">
+                        <span>
+                          <strong className="text-gray-400">Salida: </strong>
+                          {fmtFechaHoraSalida(s.desde)}
+                        </span>
+                        <span>
+                          <strong className="text-gray-400">Regreso: </strong>
+                          {fmtFechaHoraSalida(s.hasta)}
+                        </span>
+                        <span>
+                          <strong className="text-gray-400">Arribó: </strong>
+                          {fmtFechaHoraSalida(s.arribadaEn)}
+                        </span>
+                      </div>
+                      {s.motivo && <p className="mt-1 text-xs text-gray-500">{s.motivo}</p>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
