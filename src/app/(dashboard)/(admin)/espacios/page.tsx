@@ -75,9 +75,13 @@ export default async function EspaciosPage() {
       .from(lados)
       .where(eq(lados.guarderiaId, guarderiaId)),
 
+    // pisos no tiene guarderia_id directo — lo derivamos por lados.
+    // Join + filter para que el server solo traiga pisos de esta guardería.
     db
       .select({ id: pisos.id, ladoId: pisos.ladoId, nombre: pisos.nombre, orden: pisos.orden })
-      .from(pisos),
+      .from(pisos)
+      .innerJoin(lados, eq(lados.id, pisos.ladoId))
+      .where(eq(lados.guarderiaId, guarderiaId)),
 
     db
       .select({
