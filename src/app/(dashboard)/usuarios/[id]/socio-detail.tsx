@@ -632,18 +632,34 @@ function AgregarServicioModal({
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
+export type DocumentoItem = {
+  id: string;
+  nombre: string;
+  tipo: 'carnet_nautico' | 'matricula' | 'seguro' | null;
+  createdAt: string;
+  signedUrl: string | null;
+};
+
+const TIPO_DOC_LABEL: Record<'carnet_nautico' | 'matricula' | 'seguro', string> = {
+  carnet_nautico: 'Carnet náutico',
+  matricula: 'Matrícula',
+  seguro: 'Seguro',
+};
+
 export function SocioDetail({
   socio,
   embarcaciones,
   movimientos,
   servicios,
   invitados,
+  documentos = [],
 }: {
   socio: SocioData;
   embarcaciones: Embarcacion[];
   movimientos: Movimiento[];
   servicios: Servicio[];
   invitados: Invitado[];
+  documentos?: DocumentoItem[];
 }) {
   const [activeTab, setActiveTab] = useState<TabId>('generales');
   const [modalServicioOpen, setModalServicioOpen] = useState(false);
@@ -1188,10 +1204,42 @@ export function SocioDetail({
       {/* Documentación */}
       {activeTab === 'documentacion' && (
         <div className="rounded-2xl border border-gray-200 bg-white p-6">
-          <EmptyTab
-            icon={<FileText className="h-7 w-7 opacity-40" />}
-            text="No hay documentos adjuntos."
-          />
+          {documentos.length === 0 ? (
+            <EmptyTab
+              icon={<FileText className="h-7 w-7 opacity-40" />}
+              text="No hay documentos adjuntos."
+            />
+          ) : (
+            <div className="space-y-2">
+              {documentos.map((d) => (
+                <div
+                  key={d.id}
+                  className="flex items-center gap-3 rounded-[10px] border border-gray-200 bg-white px-4 py-3 hover:bg-gray-50"
+                >
+                  <FileText className="h-5 w-5 shrink-0 text-[#669E9D]" />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-[#101828]">{d.nombre}</p>
+                    <p className="text-xs text-gray-500">
+                      {d.tipo ? TIPO_DOC_LABEL[d.tipo] : 'Sin categoría'} ·{' '}
+                      {new Date(d.createdAt).toLocaleDateString('es-AR')}
+                    </p>
+                  </div>
+                  {d.signedUrl ? (
+                    <a
+                      href={d.signedUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="shrink-0 rounded-[8px] border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-[#175861] hover:bg-gray-50"
+                    >
+                      Ver
+                    </a>
+                  ) : (
+                    <span className="shrink-0 text-xs text-gray-400">Sin archivo</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

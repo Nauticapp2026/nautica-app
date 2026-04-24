@@ -3,8 +3,8 @@
 import { useState, useTransition, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Users, UserPlus, Package, Plus, Eye, Search, X } from 'lucide-react';
-import { createSocioAction } from '@/app/actions/socios';
+import { Eye, FileText, Package, Paperclip, Plus, Search, UserPlus, Users, X } from 'lucide-react';
+import { createSocioAction, uploadSocioDocumentoAction } from '@/app/actions/socios';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -92,9 +92,21 @@ function SectionHeader({ title }: { title: string }) {
 
 // ─── Modal ───────────────────────────────────────────────────────────────────
 
+type TipoDocAdjunto = 'carnet_nautico' | 'matricula' | 'seguro';
+
+const TIPO_DOC_ADJUNTO_OPTS: { value: TipoDocAdjunto; label: string }[] = [
+  { value: 'carnet_nautico', label: 'Carnet náutico' },
+  { value: 'matricula', label: 'Matrícula' },
+  { value: 'seguro', label: 'Seguro' },
+];
+
+type AdjuntoInput = { file: File; tipo: TipoDocAdjunto };
+
 function CrearSocioModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const router = useRouter();
   const [form, setForm] = useState(EMPTY_FORM);
+  const [adjuntos, setAdjuntos] = useState<AdjuntoInput[]>([]);
+  const [uploadProgress, setUploadProgress] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -112,8 +124,27 @@ function CrearSocioModal({ open, onClose }: { open: boolean; onClose: () => void
 
   function handleClose() {
     setForm(EMPTY_FORM);
+    setAdjuntos([]);
+    setUploadProgress(null);
     setError(null);
     onClose();
+  }
+
+  function addFiles(files: FileList | null) {
+    if (!files) return;
+    const next: AdjuntoInput[] = [];
+    for (const f of Array.from(files)) {
+      next.push({ file: f, tipo: 'carnet_nautico' });
+    }
+    setAdjuntos((prev) => [...prev, ...next]);
+  }
+
+  function updateAdjunto(idx: number, patch: Partial<AdjuntoInput>) {
+    setAdjuntos((prev) => prev.map((a, i) => (i === idx ? { ...a, ...patch } : a)));
+  }
+
+  function removeAdjunto(idx: number) {
+    setAdjuntos((prev) => prev.filter((_, i) => i !== idx));
   }
 
   function handleSubmit() {
@@ -126,10 +157,31 @@ function CrearSocioModal({ open, onClose }: { open: boolean; onClose: () => void
       const res = await createSocioAction(form);
       if (res.error) {
         setError(res.error);
-      } else {
-        handleClose();
-        router.refresh();
+        return;
       }
+      const socioId = res.socioId!;
+
+      // Subir adjuntos (si hay). Si alguno falla, mostramos error pero el
+      // socio ya quedó creado — el admin puede reintentar.
+      for (let i = 0; i < adjuntos.length; i++) {
+        const a = adjuntos[i];
+        setUploadProgress(`Subiendo ${i + 1}/${adjuntos.length}: ${a.file.name}`);
+        const fd = new FormData();
+        fd.append('socioId', socioId);
+        fd.append('tipo', a.tipo);
+        fd.append('file', a.file);
+        const up = await uploadSocioDocumentoAction(fd);
+        if (up.error) {
+          setError(`Socio creado, pero falló "${a.file.name}": ${up.error}`);
+          setUploadProgress(null);
+          router.refresh();
+          return;
+        }
+      }
+
+      setUploadProgress(null);
+      handleClose();
+      router.refresh();
     });
   }
 
@@ -308,11 +360,63 @@ function CrearSocioModal({ open, onClose }: { open: boolean; onClose: () => void
             {/* Adjuntos */}
             <div className="space-y-4">
               <SectionHeader title="Adjuntos" />
-              <div className="flex min-h-16 cursor-pointer items-center justify-center rounded-[10px] border-2 border-dashed border-gray-300 text-sm text-gray-400 hover:border-gray-400">
-                Agregue aquí los documentos
-              </div>
+
+              <label className="flex min-h-16 cursor-pointer flex-col items-center justify-center gap-1 rounded-[10px] border-2 border-dashed border-gray-300 px-4 py-3 text-sm text-gray-500 hover:border-[#175861] hover:text-[#175861]">
+                <div className="flex items-center gap-2">
+                  <Paperclip className="h-4 w-4" />
+                  <span>Seleccionar documentos</span>
+                </div>
+                <span className="text-xs text-gray-400">PDF, imágenes — varios archivos</span>
+                <input
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => {
+                    addFiles(e.target.files);
+                    e.target.value = '';
+                  }}
+                />
+              </label>
+
+              {adjuntos.length > 0 && (
+                <div className="space-y-2">
+                  {adjuntos.map((a, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center gap-2 rounded-[8px] border border-gray-200 bg-gray-50 px-3 py-2"
+                    >
+                      <FileText className="h-4 w-4 shrink-0 text-[#669E9D]" />
+                      <span className="min-w-0 flex-1 truncate text-xs text-gray-700">
+                        {a.file.name}
+                      </span>
+                      <select
+                        className="h-8 rounded-[6px] border border-gray-200 bg-white px-2 text-xs text-[#101828] focus:border-[#175861] focus:outline-none"
+                        value={a.tipo}
+                        onChange={(e) =>
+                          updateAdjunto(idx, { tipo: e.target.value as TipoDocAdjunto })
+                        }
+                      >
+                        {TIPO_DOC_ADJUNTO_OPTS.map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => removeAdjunto(idx)}
+                        title="Quitar"
+                        className="rounded-[6px] p-1 text-gray-400 hover:bg-red-50 hover:text-red-600"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
+            {uploadProgress && <p className="text-sm text-[#669E9D]">{uploadProgress}</p>}
             {error && <p className="text-sm text-red-600">{error}</p>}
           </div>
         </div>
