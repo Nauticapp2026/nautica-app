@@ -68,3 +68,28 @@ export async function logout() {
   revalidatePath('/', 'layout');
   redirect('/login');
 }
+
+/**
+ * Devuelve el contexto de acceso del usuario actual para decidir a dónde
+ * mandarlo después de setear su contraseña.
+ * - 'web': rol con acceso al dashboard (admin_general / operario / super_admin)
+ * - 'mobile': rol que opera desde la app mobile (socio, invitado, etc)
+ * - 'no_membership': cuenta sin membership activa
+ * - 'no_session': no hay usuario autenticado
+ */
+export async function getPostSignupAccess(): Promise<
+  { kind: 'web' } | { kind: 'mobile' } | { kind: 'no_membership' } | { kind: 'no_session' }
+> {
+  const { getActiveMarina, getCurrentUser } = await import('@/lib/auth/session');
+  const user = await getCurrentUser();
+  if (!user) return { kind: 'no_session' };
+
+  const active = await getActiveMarina();
+  if (!active) return { kind: 'no_membership' };
+
+  const webRoles = new Set(['administrador_general', 'operario']);
+  if (active.profile.isSuperAdmin || webRoles.has(active.activeMembership.rol)) {
+    return { kind: 'web' };
+  }
+  return { kind: 'mobile' };
+}
