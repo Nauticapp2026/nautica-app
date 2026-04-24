@@ -111,12 +111,8 @@ export function ConfiguracionClient({
   return (
     <div className="p-8">
       <header className="mb-6">
-        <h1 className="text-2xl font-bold" style={{ color: '#101828' }}>
-          Configuración
-        </h1>
-        <p className="mt-1 text-sm" style={{ color: '#669E9D' }}>
-          Administra la configuración de tu guardería náutica
-        </p>
+        <h1 className="page-title">Configuración</h1>
+        <p className="page-subtitle mt-1">Administra la configuración de tu guardería náutica</p>
       </header>
 
       <div className="mb-6 flex items-center gap-2 border-b border-gray-200">

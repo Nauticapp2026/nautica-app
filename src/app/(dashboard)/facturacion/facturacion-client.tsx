@@ -1027,12 +1027,8 @@ export function FacturacionClient({
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold" style={{ color: '#101828' }}>
-            Facturación
-          </h1>
-          <p className="mt-0.5 text-sm" style={{ color: '#669E9D' }}>
-            Gestión de facturas y cobros
-          </p>
+          <h1 className="page-title">Facturación</h1>
+          <p className="page-subtitle mt-1">Gestión de facturas y cobros</p>
         </div>
         <div className="flex gap-2">
           <button
