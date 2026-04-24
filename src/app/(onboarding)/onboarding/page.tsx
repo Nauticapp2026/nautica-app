@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import Script from 'next/script';
 import { Logo } from '@/components/shared/logo';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,6 +23,8 @@ import {
   updateDetallesStep,
   updateFeaturesStep,
   selectPlanStep,
+  inviteTeamMembersStep,
+  uploadGuarderiaFotoStep,
 } from '@/app/actions/onboarding';
 import { Check, Trash2, Plus, ChevronRight } from 'lucide-react';
 
@@ -152,7 +155,7 @@ function Shell({ step, children }: { step: number; children: React.ReactNode }) 
           background: 'linear-gradient(180deg, #175861 0%, #669E9D 60%, #ABC2B3 100%)',
         }}
       >
-        <div className="w-full max-w-xl rounded-2xl bg-white px-8 py-8 shadow-2xl">{children}</div>
+        <div className="w-full max-w-3xl rounded-2xl bg-white px-8 py-8 shadow-2xl">{children}</div>
       </div>
     </div>
   );
@@ -507,7 +510,33 @@ function Step3({
   onNext: () => void;
   onBack: () => void;
 }) {
-  const setAllTimes = (apertura: string, cierre: string) => {
+  const [fotos, setFotos] = useState<string[]>([]);
+  const [subiendo, setSubiendo] = useState<string | null>(null);
+  const [fotosError, setFotosError] = useState<string | null>(null);
+
+  const handleFiles = async (files: FileList | null) => {
+    if (!files || !data.guarderiaId) return;
+    setFotosError(null);
+    for (const f of Array.from(files)) {
+      setSubiendo(f.name);
+      const fd = new FormData();
+      fd.append('guarderiaId', data.guarderiaId);
+      fd.append('file', f);
+      const res = await uploadGuarderiaFotoStep(fd);
+      if (res.error) {
+        setFotosError(`${f.name}: ${res.error}`);
+      } else if (res.url) {
+        setFotos((prev) => [...prev, res.url!]);
+      }
+    }
+    setSubiendo(null);
+  };
+  const setAllTimes = () => {
+    // Pedimos apertura y cierre en un prompt mínimo. Simple y sin dependencias.
+    const apertura = window.prompt('Hora de apertura para todos los días (HH:MM)', '09:00');
+    if (!apertura) return;
+    const cierre = window.prompt('Hora de cierre para todos los días (HH:MM)', '18:00');
+    if (!cierre) return;
     DIAS.forEach((d) => {
       onChangeHorario(d, 'apertura', apertura);
       onChangeHorario(d, 'cierre', cierre);
@@ -530,12 +559,12 @@ function Step3({
               type="button"
               className="text-xs underline"
               style={{ color: '#669E9D' }}
-              onClick={() => setAllTimes('09:00', '18:00')}
+              onClick={setAllTimes}
             >
               Cambiar todos los horarios juntos
             </button>
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
             {DIAS.map((dia) => {
               const h = data.horarios[dia];
               return (
@@ -543,28 +572,34 @@ function Step3({
                   key={dia}
                   className="flex items-center gap-2 rounded-[10px] border border-gray-200 p-2"
                 >
-                  <span className="w-20 text-xs font-semibold" style={{ color: '#175861' }}>
+                  <span
+                    className="w-20 shrink-0 text-xs font-semibold"
+                    style={{ color: '#175861' }}
+                  >
                     {DIAS_LABELS[dia]}
                   </span>
                   <input
                     type="time"
                     value={h.apertura}
+                    disabled={!h.activo}
                     onChange={(e) => onChangeHorario(dia, 'apertura', e.target.value)}
-                    className="w-20 rounded border border-gray-200 px-1 py-0.5 text-xs"
+                    className="min-w-0 flex-1 rounded border border-gray-200 px-2 py-1 text-xs disabled:bg-gray-50 disabled:text-gray-400"
                   />
                   <span className="text-xs text-gray-400">-</span>
                   <input
                     type="time"
                     value={h.cierre}
+                    disabled={!h.activo}
                     onChange={(e) => onChangeHorario(dia, 'cierre', e.target.value)}
-                    className="w-20 rounded border border-gray-200 px-1 py-0.5 text-xs"
+                    className="min-w-0 flex-1 rounded border border-gray-200 px-2 py-1 text-xs disabled:bg-gray-50 disabled:text-gray-400"
                   />
                   <button
                     type="button"
                     onClick={() => onChangeHorario(dia, 'activo', !h.activo)}
-                    className={`ml-auto rounded-full p-1 transition ${h.activo ? 'bg-gray-200 text-gray-500' : 'bg-red-100 text-red-400'}`}
+                    title={h.activo ? 'Marcar cerrado' : 'Marcar abierto'}
+                    className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold transition ${h.activo ? 'bg-gray-200 text-gray-600 hover:bg-gray-300' : 'bg-red-100 text-red-600 hover:bg-red-200'}`}
                   >
-                    <span className="text-xs">{h.activo ? '−' : '+'}</span>
+                    {h.activo ? 'Abierto' : 'Cerrado'}
                   </button>
                 </div>
               );
@@ -576,9 +611,35 @@ function Step3({
           <p className="mb-2 font-semibold" style={{ color: '#175861' }}>
             Fotos de tu guardería
           </p>
-          <div className="flex min-h-24 cursor-pointer items-center justify-center rounded-[10px] border-2 border-dashed border-gray-300 text-sm text-gray-400 transition hover:border-gray-400">
-            Click para subir fotos
-          </div>
+          <label className="flex min-h-24 cursor-pointer flex-col items-center justify-center gap-1 rounded-[10px] border-2 border-dashed border-gray-300 text-sm text-gray-500 transition hover:border-[#175861] hover:text-[#175861]">
+            <span>Click para subir fotos</span>
+            <span className="text-xs text-gray-400">JPG, PNG — podés elegir varias</span>
+            <input
+              type="file"
+              multiple
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                handleFiles(e.target.files);
+                e.target.value = '';
+              }}
+            />
+          </label>
+          {subiendo && <p className="mt-1 text-xs text-[#669E9D]">Subiendo {subiendo}…</p>}
+          {fotosError && <p className="mt-1 text-xs text-red-600">{fotosError}</p>}
+          {fotos.length > 0 && (
+            <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-4">
+              {fotos.map((url, idx) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  key={idx}
+                  src={url}
+                  alt={`Foto ${idx + 1}`}
+                  className="h-20 w-full rounded-[8px] border border-gray-200 object-cover"
+                />
+              ))}
+            </div>
+          )}
         </div>
 
         <Field label="Descripción de tu guardería">
@@ -1005,9 +1066,15 @@ function Step9({ onNext, onBack }: { onNext: () => void; onBack: () => void }) {
         title="Agendar llamada de demo"
         subtitle="Coordiná una videollamada con nuestro equipo"
       />
-      <div className="mb-6 flex min-h-40 items-center justify-center rounded-2xl border-2 border-dashed border-gray-300 text-sm text-gray-400">
-        Widget de Calendly — configurá la URL en ajustes
-      </div>
+      <div
+        className="calendly-inline-widget mb-6 rounded-2xl border border-gray-200"
+        data-url="https://calendly.com/marcosienragarre/nauticapp"
+        style={{ minWidth: '320px', height: '700px' }}
+      />
+      <Script
+        src="https://assets.calendly.com/assets/external/widget.js"
+        strategy="afterInteractive"
+      />
       <NavButtons onBack={onBack} onNext={onNext} />
     </>
   );
@@ -1158,6 +1225,23 @@ export default function OnboardingPage() {
     next();
   }
 
+  async function handleStep4() {
+    // Filtrar miembros vacíos (nombre + email requeridos).
+    const miembros = data.equipo.filter((m) => m.nombre.trim() && m.email.trim());
+    if (data.guarderiaId && miembros.length > 0) {
+      const res = await inviteTeamMembersStep(data.guarderiaId, miembros);
+      if (res.error) {
+        setError(res.error);
+        return;
+      }
+      if (res.errores && res.errores.length > 0) {
+        setError(`Algunos miembros fallaron: ${res.errores.join(' · ')}`);
+        // Igual avanzamos — los que se crearon ya están y si reintenta va a duplicar
+      }
+    }
+    next();
+  }
+
   async function handleStep6() {
     if (data.guarderiaId) {
       await updateFeaturesStep(data.guarderiaId, {
@@ -1239,7 +1323,9 @@ export default function OnboardingPage() {
               return { ...prev, equipo };
             })
           }
-          onNext={next}
+          onNext={() => {
+            startTransition(handleStep4);
+          }}
           onBack={back}
           onSkip={next}
         />
