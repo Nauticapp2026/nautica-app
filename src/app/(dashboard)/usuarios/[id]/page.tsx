@@ -105,7 +105,13 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
           createdAt: invitados.createdAt,
         })
         .from(invitados)
-        .where(and(eq(invitados.socioId, id), eq(invitados.guarderiaId, gId)))
+        .where(
+          and(
+            eq(invitados.socioId, id),
+            eq(invitados.guarderiaId, gId),
+            eq(invitados.estado, 'activo'),
+          ),
+        )
         .orderBy(desc(invitados.createdAt)),
 
       db
