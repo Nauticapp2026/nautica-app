@@ -7,6 +7,7 @@ import {
   invitados,
   memberships,
   movimientosCuentaCorriente,
+  porteria,
   profiles,
   servicios as serviciosTable,
 } from '@/lib/db/schema';
@@ -53,80 +54,105 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
 
   const socio = rows[0];
 
-  const [embarcacionesList, movimientosList, serviciosList, invitadosList, documentosList] =
-    await Promise.all([
-      db
-        .select({
-          id: embarcaciones.id,
-          nombre: embarcaciones.nombre,
-          matricula: embarcaciones.matricula,
-          modelo: embarcaciones.modelo,
-          seguro: embarcaciones.seguro,
-        })
-        .from(embarcaciones)
-        .where(and(eq(embarcaciones.profileId, id), eq(embarcaciones.guarderiaId, gId))),
+  const [
+    embarcacionesList,
+    movimientosList,
+    serviciosList,
+    invitadosList,
+    documentosList,
+    salidasList,
+  ] = await Promise.all([
+    db
+      .select({
+        id: embarcaciones.id,
+        nombre: embarcaciones.nombre,
+        matricula: embarcaciones.matricula,
+        modelo: embarcaciones.modelo,
+        seguro: embarcaciones.seguro,
+      })
+      .from(embarcaciones)
+      .where(and(eq(embarcaciones.profileId, id), eq(embarcaciones.guarderiaId, gId))),
 
-      db
-        .select({
-          id: movimientosCuentaCorriente.id,
-          fecha: movimientosCuentaCorriente.fecha,
-          concepto: movimientosCuentaCorriente.concepto,
-          tipo: movimientosCuentaCorriente.tipo,
-          estado: movimientosCuentaCorriente.estado,
-          debe: movimientosCuentaCorriente.debe,
-          haber: movimientosCuentaCorriente.haber,
-          servicioNombre: serviciosTable.nombre,
-          servicioId: movimientosCuentaCorriente.servicioId,
-        })
-        .from(movimientosCuentaCorriente)
-        .leftJoin(serviciosTable, eq(serviciosTable.id, movimientosCuentaCorriente.servicioId))
-        .where(eq(movimientosCuentaCorriente.socioId, id))
-        .orderBy(desc(movimientosCuentaCorriente.fecha)),
+    db
+      .select({
+        id: movimientosCuentaCorriente.id,
+        fecha: movimientosCuentaCorriente.fecha,
+        concepto: movimientosCuentaCorriente.concepto,
+        tipo: movimientosCuentaCorriente.tipo,
+        estado: movimientosCuentaCorriente.estado,
+        debe: movimientosCuentaCorriente.debe,
+        haber: movimientosCuentaCorriente.haber,
+        servicioNombre: serviciosTable.nombre,
+        servicioId: movimientosCuentaCorriente.servicioId,
+      })
+      .from(movimientosCuentaCorriente)
+      .leftJoin(serviciosTable, eq(serviciosTable.id, movimientosCuentaCorriente.servicioId))
+      .where(eq(movimientosCuentaCorriente.socioId, id))
+      .orderBy(desc(movimientosCuentaCorriente.fecha)),
 
-      db
-        .select({
-          id: serviciosTable.id,
-          nombre: serviciosTable.nombre,
-          precio: serviciosTable.precio,
-        })
-        .from(serviciosTable)
-        .where(and(eq(serviciosTable.guarderiaId, gId), eq(serviciosTable.estado, 'activo'))),
+    db
+      .select({
+        id: serviciosTable.id,
+        nombre: serviciosTable.nombre,
+        precio: serviciosTable.precio,
+      })
+      .from(serviciosTable)
+      .where(and(eq(serviciosTable.guarderiaId, gId), eq(serviciosTable.estado, 'activo'))),
 
-      db
-        .select({
-          id: invitados.id,
-          nombre: invitados.nombre,
-          apellido: invitados.apellido,
-          email: invitados.email,
-          telefono: invitados.telefono,
-          motivo: invitados.motivo,
-          estado: invitados.estado,
-          validoHasta: invitados.validoHasta,
-          createdAt: invitados.createdAt,
-        })
-        .from(invitados)
-        .where(
-          and(
-            eq(invitados.socioId, id),
-            eq(invitados.guarderiaId, gId),
-            eq(invitados.estado, 'activo'),
-          ),
-        )
-        .orderBy(desc(invitados.createdAt)),
+    db
+      .select({
+        id: invitados.id,
+        nombre: invitados.nombre,
+        apellido: invitados.apellido,
+        email: invitados.email,
+        telefono: invitados.telefono,
+        motivo: invitados.motivo,
+        estado: invitados.estado,
+        validoHasta: invitados.validoHasta,
+        createdAt: invitados.createdAt,
+      })
+      .from(invitados)
+      .where(
+        and(
+          eq(invitados.socioId, id),
+          eq(invitados.guarderiaId, gId),
+          eq(invitados.estado, 'activo'),
+        ),
+      )
+      .orderBy(desc(invitados.createdAt)),
 
-      db
-        .select({
-          id: documentos.id,
-          nombre: documentos.nombre,
-          tipo: documentos.tipo,
-          documentoUrl: documentos.documentoUrl,
-          vencimiento: documentos.vencimiento,
-          createdAt: documentos.createdAt,
-        })
-        .from(documentos)
-        .where(eq(documentos.profileId, id))
-        .orderBy(desc(documentos.createdAt)),
-    ]);
+    db
+      .select({
+        id: documentos.id,
+        nombre: documentos.nombre,
+        tipo: documentos.tipo,
+        documentoUrl: documentos.documentoUrl,
+        vencimiento: documentos.vencimiento,
+        createdAt: documentos.createdAt,
+      })
+      .from(documentos)
+      .where(eq(documentos.profileId, id))
+      .orderBy(desc(documentos.createdAt)),
+
+    db
+      .select({
+        id: porteria.id,
+        desde: porteria.desde,
+        hasta: porteria.hasta,
+        arribadaEn: porteria.arribadaEn,
+        estado: porteria.estado,
+        motivo: porteria.motivo,
+        embarcacionNombre: embarcaciones.nombre,
+        embarcacionMatricula: embarcaciones.matricula,
+        createdAt: porteria.createdAt,
+      })
+      .from(porteria)
+      .leftJoin(embarcaciones, eq(embarcaciones.id, porteria.embarcacionId))
+      .where(
+        and(eq(porteria.socioId, id), eq(porteria.guarderiaId, gId), eq(porteria.tipo, 'salida')),
+      )
+      .orderBy(desc(porteria.createdAt)),
+  ]);
 
   // Resolver URL de cada documento. Soportamos dos formatos en
   // documento_url (histórico y nuevo):
@@ -177,6 +203,18 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
         createdAt: i.createdAt.toISOString(),
       }))}
       documentos={documentosConUrl}
+      salidas={salidasList.map((s) => ({
+        id: s.id,
+        desde: s.desde?.toISOString() ?? null,
+        hasta: s.hasta?.toISOString() ?? null,
+        arribadaEn: s.arribadaEn?.toISOString() ?? null,
+        estado: s.estado ?? null,
+        motivo: s.motivo ?? null,
+        embarcacion: s.embarcacionMatricula
+          ? `${s.embarcacionNombre ?? ''} (${s.embarcacionMatricula})`.trim()
+          : (s.embarcacionNombre ?? null),
+        createdAt: s.createdAt.toISOString(),
+      }))}
     />
   );
 }
