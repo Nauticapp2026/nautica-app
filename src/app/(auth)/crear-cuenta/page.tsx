@@ -44,7 +44,7 @@ export default function CrearCuentaPage() {
     const access = await getPostSignupAccess();
     setLoading(false);
     if (access.kind === 'web') {
-      router.replace('/dashboard');
+      router.replace(access.redirectTo);
       router.refresh();
       return;
     }
