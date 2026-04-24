@@ -179,6 +179,11 @@ export const diaSemanaEnum = pgEnum('dia_semana', [
   'domingo',
 ]);
 
+// Servicios de categoría "espacios": locación (dónde se aplica) y unidad de metraje.
+export const locacionServicioEnum = pgEnum('locacion_servicio', ['camas', 'amarra']);
+
+export const unidadMetrajeEnum = pgEnum('unidad_metraje', ['metros', 'pies']);
+
 // Rangos de eslora/manga para tarifas (Medidas en Bubble)
 export const medidaEnum = pgEnum('medida', [
   'hasta_16',
@@ -453,6 +458,10 @@ export const servicios = pgTable(
     medida: medidaEnum('medida'),
     puntual: numeric('puntual', { precision: 12, scale: 2 }),
     medidaPuntual: medidaEnum('medida_puntual'),
+    // Campos específicos de servicios tipo "espacios"
+    locacion: locacionServicioEnum('locacion'),
+    unidadMetraje: unidadMetrajeEnum('unidad_metraje'),
+    clases: text('clases'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
