@@ -2,10 +2,14 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { CheckCircle, Smartphone } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { getPostSignupAccess, logout } from '@/app/actions/auth';
 
 const inputCls =
   'h-12 w-full rounded-[10px] border border-gray-200 bg-white px-4 text-sm text-[#101828] focus:border-[#175861] focus:outline-none focus:ring-1 focus:ring-[#175861]';
+
+type DoneState = null | 'mobile' | 'no_membership';
 
 export default function CrearCuentaPage() {
   const router = useRouter();
@@ -13,6 +17,7 @@ export default function CrearCuentaPage() {
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [done, setDone] = useState<DoneState>(null);
 
   const isValid = password.length >= 6 && password === confirm;
 
@@ -34,11 +39,90 @@ export default function CrearCuentaPage() {
       setError('No se pudo configurar la contraseña. El enlace puede haber expirado.');
       return;
     }
-    // Redirigimos al dashboard: si el usuario tiene rol con acceso web
-    // (admin/operario/super_admin) entra directo; si no, el gate lo manda a
-    // /no-access con el mensaje de "usá la app mobile".
-    router.replace('/dashboard');
-    router.refresh();
+
+    // Decidimos a dónde mandarlo según su rol/membership.
+    const access = await getPostSignupAccess();
+    setLoading(false);
+    if (access.kind === 'web') {
+      router.replace('/dashboard');
+      router.refresh();
+      return;
+    }
+    if (access.kind === 'mobile') {
+      setDone('mobile');
+      return;
+    }
+    if (access.kind === 'no_membership') {
+      setDone('no_membership');
+      return;
+    }
+    // no_session: algo raro, redirigimos a login
+    router.replace('/login');
+  }
+
+  async function handleLogout() {
+    await logout();
+  }
+
+  if (done === 'mobile') {
+    return (
+      <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-xl">
+        <div className="flex flex-col items-center gap-4 text-center">
+          <div
+            className="flex h-16 w-16 items-center justify-center rounded-full"
+            style={{ background: '#E6F4F1' }}
+          >
+            <Smartphone className="h-8 w-8" style={{ color: '#175861' }} />
+          </div>
+          <h1 className="text-xl font-bold" style={{ color: '#101828' }}>
+            ¡Listo!
+          </h1>
+          <p className="text-sm text-gray-600">
+            Descargá la app <strong>NauticApp</strong> en tu celular y entrá con tu email y la
+            contraseña que acabás de crear.
+          </p>
+          <p className="text-xs text-gray-400">
+            Esta versión web está reservada para el equipo administrativo de la guardería.
+          </p>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="mt-2 text-sm font-semibold text-[#175861] underline hover:opacity-80"
+          >
+            Cerrar sesión
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (done === 'no_membership') {
+    return (
+      <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-xl">
+        <div className="flex flex-col items-center gap-4 text-center">
+          <div
+            className="flex h-16 w-16 items-center justify-center rounded-full"
+            style={{ background: '#E6F4F1' }}
+          >
+            <CheckCircle className="h-8 w-8" style={{ color: '#175861' }} />
+          </div>
+          <h1 className="text-xl font-bold" style={{ color: '#101828' }}>
+            ¡Contraseña configurada!
+          </h1>
+          <p className="text-sm text-gray-600">
+            Tu cuenta está lista. En cuanto un administrador te agregue a su guardería vas a poder
+            ingresar.
+          </p>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="mt-2 text-sm font-semibold text-[#175861] underline hover:opacity-80"
+          >
+            Cerrar sesión
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
