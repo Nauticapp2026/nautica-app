@@ -4,7 +4,7 @@ import Image from 'next/image';
 export function Hero() {
   return (
     <section className="relative overflow-hidden bg-[#0e3d44] text-white">
-      <Image src="/landing/1.png" alt="" fill priority className="-z-10 object-cover" />
+      <Image src="/landing/hero-bg.png" alt="" fill priority className="-z-10 object-cover" />
       <div className="absolute inset-0 -z-10 bg-[#0e3d44]/45" />
 
       <div className="mx-auto flex max-w-5xl flex-col items-center px-4 py-24 text-center md:py-32 lg:py-40">
