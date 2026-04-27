@@ -35,7 +35,7 @@ export function Header() {
 
         <div className="flex items-center gap-2">
           <Link
-            href="/signup"
+            href="/onboarding"
             className="hidden rounded-lg bg-[#ABC2B3] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#9bb5a3] sm:inline-flex"
           >
             Registrá tu club
