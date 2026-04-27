@@ -24,7 +24,7 @@ export function Hero() {
         </p>
         <div className="mt-10 flex flex-col gap-3 sm:flex-row">
           <Link
-            href="/signup"
+            href="/onboarding"
             className="rounded-lg bg-[#ABC2B3] px-6 py-3 text-sm font-bold text-white transition hover:bg-[#9bb5a3]"
           >
             Registrá tu club

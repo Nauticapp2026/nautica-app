@@ -150,7 +150,7 @@ function PlanCard({ plan }: { plan: Plan }) {
         </ul>
 
         <Link
-          href="/signup"
+          href="/onboarding"
           className="block rounded-[10px] px-4 py-3 text-center text-base font-semibold text-white transition hover:opacity-90"
           style={{ backgroundColor: plan.buttonColor }}
         >
