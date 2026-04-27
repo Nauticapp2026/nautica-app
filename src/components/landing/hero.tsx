@@ -4,8 +4,8 @@ import Image from 'next/image';
 export function Hero() {
   return (
     <section className="relative overflow-hidden bg-[#0e3d44] text-white">
-      <Image src="/landing/1.png" alt="" fill priority className="-z-10 object-cover opacity-60" />
-      <div className="absolute inset-0 -z-10 bg-gradient-to-b from-[#0e3d44]/70 via-[#175861]/60 to-[#0e3d44]/80" />
+      <Image src="/landing/1.png" alt="" fill priority className="-z-10 object-cover" />
+      <div className="absolute inset-0 -z-10 bg-[#0e3d44]/45" />
 
       <div className="mx-auto flex max-w-5xl flex-col items-center px-4 py-24 text-center md:py-32 lg:py-40">
         <h1 className="text-4xl leading-[1.05] font-bold md:text-5xl lg:text-7xl">

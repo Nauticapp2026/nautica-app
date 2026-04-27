@@ -44,7 +44,7 @@ export function Ecosistema() {
 
       {/* CTA banner */}
       <div className="relative mt-20 overflow-hidden py-16">
-        <Image src="/landing/7.png" alt="" fill className="-z-10 object-cover" sizes="100vw" />
+        <Image src="/landing/8.png" alt="" fill className="-z-10 object-cover" sizes="100vw" />
         <div className="absolute inset-0 -z-10 bg-[#175861]/80" />
         <div className="mx-auto max-w-4xl px-4 text-center text-white md:px-8">
           <h3 className="text-3xl leading-tight font-bold md:text-[33px]">
