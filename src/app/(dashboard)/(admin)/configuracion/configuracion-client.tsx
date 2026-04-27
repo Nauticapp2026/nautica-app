@@ -85,6 +85,7 @@ const ROL_LABELS: Record<Rol, string> = {
   socio: 'Socio',
   invitado: 'Invitado',
   proveedor: 'Proveedor',
+  seguridad: 'Seguridad',
 };
 
 const ROL_OPTS = Object.entries(ROL_LABELS).map(([value, label]) => ({

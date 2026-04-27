@@ -6,6 +6,7 @@ export const ROLES = {
   MANTENIMIENTO: 'mantenimiento',
   COMUNICACIONES: 'comunicaciones',
   RESTAURANTES: 'restaurantes',
+  SEGURIDAD: 'seguridad',
   SOCIO: 'socio',
   INVITADO: 'invitado',
   PROVEEDOR: 'proveedor',
@@ -24,4 +25,5 @@ export const STAFF_ROLES: Rol[] = [
   ROLES.MANTENIMIENTO,
   ROLES.COMUNICACIONES,
   ROLES.RESTAURANTES,
+  ROLES.SEGURIDAD,
 ];

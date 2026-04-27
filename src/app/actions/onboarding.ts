@@ -263,6 +263,7 @@ const TEAM_ROLES = [
   'socio',
   'invitado',
   'proveedor',
+  'seguridad',
 ] as const;
 type TeamRol = (typeof TEAM_ROLES)[number];
 

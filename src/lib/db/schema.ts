@@ -28,6 +28,7 @@ export const rolEnum = pgEnum('rol', [
   'socio',
   'invitado',
   'proveedor',
+  'seguridad',
 ]);
 
 export const planEnum = pgEnum('plan', ['classic', 'plus', 'platinum']);
