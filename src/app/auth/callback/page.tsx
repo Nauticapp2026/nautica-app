@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import type { EmailOtpType } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
@@ -10,7 +10,8 @@ import { createClient } from '@/lib/supabase/client';
 // - OTP: ?token_hash=...&type=... (custom template con {{ .TokenHash }})
 // - PKCE: ?code=...
 // Es client-side porque el fragment NO llega al server.
-export default function AuthCallbackPage() {
+
+function CallbackHandler() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -73,17 +74,25 @@ export default function AuthCallbackPage() {
   }, [router, searchParams]);
 
   return (
+    <div className="text-center">
+      {errorMsg ? (
+        <>
+          <p className="text-sm font-semibold text-red-600">No se pudo completar el ingreso</p>
+          <p className="mt-2 text-xs text-gray-500">{errorMsg}</p>
+        </>
+      ) : (
+        <p className="text-sm text-gray-500">Procesando autenticación…</p>
+      )}
+    </div>
+  );
+}
+
+export default function AuthCallbackPage() {
+  return (
     <div className="flex min-h-screen items-center justify-center px-4">
-      <div className="text-center">
-        {errorMsg ? (
-          <>
-            <p className="text-sm font-semibold text-red-600">No se pudo completar el ingreso</p>
-            <p className="mt-2 text-xs text-gray-500">{errorMsg}</p>
-          </>
-        ) : (
-          <p className="text-sm text-gray-500">Procesando autenticación…</p>
-        )}
-      </div>
+      <Suspense fallback={<p className="text-sm text-gray-500">Procesando autenticación…</p>}>
+        <CallbackHandler />
+      </Suspense>
     </div>
   );
 }
