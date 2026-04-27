@@ -1,152 +1,144 @@
 # Náutica App
 
-Plataforma multi-tenant para guarderías náuticas.
+SaaS multi-tenant para guarderías náuticas: gestión de espacios y embarcaciones, socios, tareas operativas, tarifario, facturación electrónica (AFIP vía tusfacturas.app), comunicaciones y QR para invitados.
 
-**Stack:** Next.js 15 (App Router) · TypeScript · Supabase · Tailwind · shadcn/ui · Drizzle ORM · Vercel
+**Stack:** Next.js 16 (App Router) · React 19 · TypeScript · Supabase (Auth + Postgres + RLS) · Drizzle ORM · Tailwind 4 · shadcn/ui · Vercel
 
 ---
 
-## Fase 0 — Setup inicial
+## Features
 
-### 1. Prerrequisitos
+- **Multi-tenant** — cada usuario opera dentro de una guardería. Toda la data está scopeada por `guarderia_id` con RLS en Supabase.
+- **Onboarding guiado** — alta de la guardería, configuración de espacios/lados/pisos y carga inicial de equipo.
+- **Dashboard** — alertas operativas (movimientos, vencimientos, etc.) con horas en zona Argentina.
+- **Espacios y embarcaciones** — espacios organizados por lado/piso, asignación a embarcaciones de socios.
+- **Socios y usuarios** — alta de socios, invitaciones por email, roles admin/operario.
+- **Tareas** — admin crea, asigna y supervisa; operario ve y resuelve las propias. Vinculadas a salidas/entradas.
+- **Tarifario y facturación** — definición de tarifas, generación de movimientos mensuales (cron) y emisión de facturas A/B/C contra AFIP vía tusfacturas.app.
+- **Comunicaciones** — envío masivo a socios.
+- **QR público** — vistas de embarcación e invitado para escaneo en la guardería, sin login.
+- **Responsive** — sidebar con drawer en mobile; pantallas pensadas para uso desde celular en muelle.
 
-- Node.js 20+ (`node -v`)
-- pnpm 9+ (`npm i -g pnpm`)
-- Cuenta en [GitHub](https://github.com), [Vercel](https://vercel.com), [Supabase](https://supabase.com)
-- VS Code con extensiones recomendadas (ver `.vscode/extensions.json`)
+---
 
-### 2. Crear el proyecto Next.js
+## Roles
+
+- **Admin** — acceso total dentro de su guardería: dashboard, configuración, usuarios, espacios, tarifario, facturación, comunicaciones, tareas.
+- **Operario** — acceso a tareas asignadas y operativa básica de salidas/entradas.
+
+Definidos en `src/config/roles.ts` y enforced en server actions + RLS.
+
+---
+
+## Estructura
+
+```
+src/
+├── app/
+│   ├── (auth)/                 # login, signup, crear-cuenta, accept-invite
+│   ├── (onboarding)/           # flujo de alta de guardería
+│   ├── (dashboard)/
+│   │   ├── (admin)/            # dashboard, espacios, usuarios, tarifario,
+│   │   │                       # facturación, comunicaciones, configuración
+│   │   └── tareas/             # accesible por admin y operario
+│   ├── qr/                     # vistas QR públicas (embarcación / invitado)
+│   ├── api/cron/               # jobs (ej. movimientos mensuales)
+│   ├── auth/callback/          # callback de Supabase Auth
+│   └── actions/                # server actions (auth, espacios, tareas,
+│                               # facturación, onboarding, etc.)
+├── components/
+│   ├── ui/                     # shadcn/ui
+│   └── shared/                 # sidebar, marina-switcher, user-menu, logo
+├── lib/
+│   ├── supabase/               # clients server / browser / admin
+│   ├── db/                     # drizzle schema y conexión
+│   ├── auth/                   # session helpers y errores tipados
+│   ├── tusfacturas/            # client + mappers para AFIP
+│   └── movimientos-mensuales.ts
+├── config/                     # roles y constantes
+└── middleware.ts               # auth + redirección por rol
+```
+
+---
+
+## Setup local
+
+### Prerrequisitos
+
+- Node.js 20+
+- pnpm 9+
+- Acceso al proyecto de Supabase de dev y a las credenciales de tusfacturas.app
+
+### Pasos
 
 ```bash
-pnpm create next-app@latest nautica-app \
-  --typescript \
-  --tailwind \
-  --eslint \
-  --app \
-  --src-dir \
-  --import-alias "@/*" \
-  --use-pnpm
-
+git clone git@github.com:<owner>/nautica-app.git
 cd nautica-app
+pnpm install
+
+cp .env.example .env.local
+# completar .env.local con valores de dev (ver sección Variables de entorno)
+
+pnpm dev
 ```
 
-### 3. Instalar dependencias base
+App en `http://localhost:3000`.
+
+### Variables de entorno
+
+Ver `.env.example` para la lista completa. Bloques principales:
+
+- **Supabase** — `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`.
+- **Drizzle** — `DATABASE_URL` (pooler 6543), `DIRECT_URL` (5432, para migraciones).
+- **App** — `NEXT_PUBLIC_APP_URL`.
+- **tusfacturas.app (AFIP)** — `TUSFACTURAS_USERTOKEN`, `TUSFACTURAS_APIKEY`, `TUSFACTURAS_APITOKEN`, `TUSFACTURAS_PUNTO_VENTA`, `TUSFACTURAS_RUBRO`, `TUSFACTURAS_RUBRO_GRUPO`.
+
+---
+
+## Scripts
 
 ```bash
-# Supabase
-pnpm add @supabase/supabase-js @supabase/ssr
+pnpm dev            # desarrollo local
+pnpm build          # build de prod
+pnpm start          # servir build
+pnpm lint           # eslint
+pnpm typecheck      # tsc --noEmit
+pnpm format         # prettier --write
+pnpm format:check   # prettier --check
 
-# ORM y validación
-pnpm add drizzle-orm postgres zod
+pnpm db:generate    # generar migración desde schema (drizzle-kit)
+pnpm db:migrate     # aplicar migraciones
+pnpm db:push        # push directo del schema (solo dev)
+pnpm db:studio      # UI de Drizzle
 
-# UI y formularios
-pnpm add react-hook-form @hookform/resolvers
-pnpm add lucide-react class-variance-authority clsx tailwind-merge
-
-# Dev
-pnpm add -D drizzle-kit @types/node
-pnpm add -D prettier prettier-plugin-tailwindcss
-pnpm add -D husky lint-staged
-```
-
-### 4. Inicializar shadcn/ui
-
-```bash
-pnpm dlx shadcn@latest init
-pnpm dlx shadcn@latest add button input label card form toast
-```
-
-### 5. Crear los proyectos en Supabase
-
-Creá dos proyectos en Supabase (dashboard → New project):
-
-- `nautica-dev`
-- `nautica-prod`
-
-De cada uno, anotá:
-
-- Project URL
-- `anon` public key
-- `service_role` key (¡nunca la expongas al cliente!)
-- Connection string de Postgres (Settings → Database → Connection string → URI)
-
-### 6. Variables de entorno
-
-Copiá `.env.example` a `.env.local` y completá con los valores del proyecto de dev.
-
-### 7. Subir a GitHub
-
-```bash
-git init
-git add .
-git commit -m "chore: initial setup (phase 0)"
-git branch -M main
-git remote add origin git@github.com:TU_USUARIO/nautica-app.git
-git push -u origin main
-```
-
-### 8. Conectar a Vercel
-
-1. Vercel → Add New Project → Import from GitHub → seleccionar `nautica-app`.
-2. Framework: Next.js (autodetectado).
-3. Environment Variables: pegar las mismas del `.env.local` pero con valores de **prod**.
-4. Deploy.
-
-Cada push a `main` deploya a producción. Cada PR genera una preview automática.
-
-### 9. Activar Husky
-
-```bash
-pnpm exec husky init
-echo "pnpm lint-staged" > .husky/pre-commit
+pnpm seed           # script de seed (scripts/seed.ts)
 ```
 
 ---
 
-## Estructura de carpetas
+## Deploy
 
-```
-nautica-app/
-├── src/
-│   ├── app/                    # App Router (rutas)
-│   │   ├── (auth)/             # login, signup, invitaciones
-│   │   ├── (dashboard)/        # app autenticada
-│   │   ├── (marketing)/        # landing pública
-│   │   └── api/                # route handlers
-│   ├── components/
-│   │   ├── ui/                 # shadcn/ui
-│   │   └── shared/             # componentes propios reusables
-│   ├── lib/
-│   │   ├── supabase/           # clients (server, browser, admin)
-│   │   ├── db/                 # drizzle schema y queries
-│   │   ├── auth/               # helpers de sesión y roles
-│   │   └── utils.ts
-│   ├── types/                  # tipos compartidos
-│   └── config/                 # constantes (roles, etc.)
-├── drizzle/                    # migraciones generadas
-├── public/
-└── ...
-```
+Deploy automático en Vercel:
+
+- **Push a `main`** → producción.
+- **PR** → preview con URL única.
+
+Flujo recomendado: trabajar en una rama (`feat/...`, `fix/...`, `docs/...`), abrir PR, revisar la preview, mergear a `main`.
 
 ---
 
-## Scripts útiles
+## Integraciones
 
-```bash
-pnpm dev              # desarrollo local
-pnpm build            # build de prod
-pnpm lint             # eslint
-pnpm format           # prettier
-pnpm db:generate      # generar migración desde schema
-pnpm db:migrate       # aplicar migraciones
-pnpm db:studio        # UI para la DB
-```
+- **Supabase** — Auth, Postgres y RLS.
+- **tusfacturas.app** — emisión de facturas electrónicas contra AFIP. Cliente y mappers en `src/lib/tusfacturas/`.
+- **Vercel Cron** — `src/app/api/cron/mensuales` genera los movimientos mensuales.
 
 ---
 
-## Próximas fases
+## Convenciones
 
-- **Fase 1:** Auth, roles y multi-tenancy con RLS.
-- **Fase 2:** Espacios y embarcaciones.
-- **Fase 3:** Tarifas y facturación.
-- ...
+- Server Actions en `src/app/actions/` para todas las mutaciones.
+- Tipos compartidos en `src/types/`, schema de DB en `src/lib/db/schema.ts`.
+- Validación con Zod en los bordes (server actions, route handlers).
+- Auth y permisos resueltos en `middleware.ts` + helpers de `src/lib/auth/`.
+- Husky + lint-staged corren lint/format en cada commit.
