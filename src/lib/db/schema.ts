@@ -637,6 +637,7 @@ export const porteriaInvitados = pgTable(
     cantidadAcompanantes: integer('cantidad_acompanantes').default(0),
     esTecnico: boolean('es_tecnico').default(false).notNull(),
     motivoTecnico: text('motivo_tecnico'),
+    ingresoEn: timestamp('ingreso_en', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [
