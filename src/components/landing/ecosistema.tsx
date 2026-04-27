@@ -43,10 +43,10 @@ export function Ecosistema() {
       </div>
 
       {/* CTA banner */}
-      <div className="relative mt-20 overflow-hidden py-16">
-        <Image src="/landing/7.png" alt="" fill className="-z-10 object-cover" sizes="100vw" />
-        <div className="absolute inset-0 -z-10 bg-[#175861]/80" />
-        <div className="mx-auto max-w-4xl px-4 text-center text-white md:px-8">
+      <div className="relative isolate mt-20 overflow-hidden py-16">
+        <Image src="/landing/7.png" alt="" fill className="object-cover" sizes="100vw" />
+        <div className="absolute inset-0 bg-[#175861]/80" />
+        <div className="relative z-10 mx-auto max-w-4xl px-4 text-center text-white md:px-8">
           <h3 className="text-3xl leading-tight font-bold md:text-[33px]">
             Sumá tu negocio al mundo Náutico
           </h3>
