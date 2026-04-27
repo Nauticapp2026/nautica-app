@@ -29,6 +29,7 @@ const ROL_LABELS: Record<string, string> = {
   socio: 'Socio',
   invitado: 'Invitado',
   proveedor: 'Proveedor',
+  seguridad: 'Seguridad',
 };
 
 const NAV = [

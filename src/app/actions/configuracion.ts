@@ -266,6 +266,7 @@ const ROLES = [
   'socio',
   'invitado',
   'proveedor',
+  'seguridad',
 ] as const;
 type Rol = (typeof ROLES)[number];
 
