@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { CheckCircle, Smartphone } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
-import { getPostSignupAccess, logout } from '@/app/actions/auth';
+import { getPostSignupAccess } from '@/app/actions/auth';
 
 const inputCls =
   'h-12 w-full rounded-[10px] border border-gray-200 bg-white px-4 text-sm text-[#101828] focus:border-[#175861] focus:outline-none focus:ring-1 focus:ring-[#175861]';
@@ -18,6 +18,17 @@ export default function CrearCuentaPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState<DoneState>(null);
+
+  // Para roles que no usan la web (mobile / sin membership), cerramos la sesión
+  // web en cuanto llegamos a la pantalla final. Así no queda una sesión colgada
+  // que les permita navegar a /dashboard u otras rutas. El gate server-side
+  // (DashboardLayout → /no-access) sigue siendo la línea de defensa real.
+  useEffect(() => {
+    if (done === 'mobile' || done === 'no_membership') {
+      const supabase = createClient();
+      supabase.auth.signOut().catch(() => null);
+    }
+  }, [done]);
 
   const isValid = password.length >= 6 && password === confirm;
 
@@ -60,10 +71,6 @@ export default function CrearCuentaPage() {
     router.replace('/login');
   }
 
-  async function handleLogout() {
-    await logout();
-  }
-
   if (done === 'mobile') {
     return (
       <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-xl">
@@ -84,13 +91,6 @@ export default function CrearCuentaPage() {
           <p className="text-xs text-gray-400">
             Esta versión web está reservada para el equipo administrativo de la guardería.
           </p>
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="mt-2 text-sm font-semibold text-[#175861] underline hover:opacity-80"
-          >
-            Cerrar sesión
-          </button>
         </div>
       </div>
     );
@@ -113,13 +113,6 @@ export default function CrearCuentaPage() {
             Tu cuenta está lista. En cuanto un administrador te agregue a su guardería vas a poder
             ingresar.
           </p>
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="mt-2 text-sm font-semibold text-[#175861] underline hover:opacity-80"
-          >
-            Cerrar sesión
-          </button>
         </div>
       </div>
     );
