@@ -3,11 +3,11 @@ import Image from 'next/image';
 
 export function Hero() {
   return (
-    <section className="relative overflow-hidden bg-[#0e3d44] text-white">
-      <Image src="/landing/hero-bg.png" alt="" fill priority className="-z-10 object-cover" />
-      <div className="absolute inset-0 -z-10 bg-[#0e3d44]/45" />
+    <section className="relative isolate overflow-hidden bg-[#0e3d44] text-white">
+      <Image src="/landing/hero-bg.png" alt="" fill priority className="object-cover" />
+      <div className="absolute inset-0 bg-[#0e3d44]/45" />
 
-      <div className="mx-auto flex max-w-5xl flex-col items-center px-4 py-24 text-center md:py-32 lg:py-40">
+      <div className="relative z-10 mx-auto flex max-w-5xl flex-col items-center px-4 py-24 text-center md:py-32 lg:py-40">
         <h1 className="text-4xl leading-[1.05] font-bold md:text-5xl lg:text-7xl">
           Digitalizamos la
           <br />
