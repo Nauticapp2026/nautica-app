@@ -7,6 +7,7 @@ import {
   integer,
   numeric,
   timestamp,
+  date,
   uniqueIndex,
   index,
 } from 'drizzle-orm/pg-core';
@@ -153,6 +154,13 @@ export const porteriaTipoEnum = pgEnum('porteria_tipo', ['salida', 'acceso_exter
 export const tipoAlertaEnum = pgEnum('tipo_alerta', ['retorno_proximo', 'sin_respuesta']);
 
 export const estadoAlertaEnum = pgEnum('estado_alerta', ['pendiente', 'resuelta']);
+
+export const estadoSolicitudLavadoEnum = pgEnum('estado_solicitud_lavado', [
+  'pendiente',
+  'en_proceso',
+  'lista',
+  'cancelada',
+]);
 
 export const tipoInvitadoEnum = pgEnum('tipo_invitado', ['titular', 'autorizado']);
 
@@ -983,6 +991,32 @@ export const alertas = pgTable(
   ],
 );
 
+export const solicitudesLavado = pgTable(
+  'solicitudes_lavado',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    guarderiaId: uuid('guarderia_id')
+      .notNull()
+      .references(() => guarderias.id, { onDelete: 'cascade' }),
+    socioId: uuid('socio_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    diaUso: date('dia_uso').notNull(),
+    estado: estadoSolicitudLavadoEnum('estado').default('pendiente').notNull(),
+    tareaId: uuid('tarea_id').references(() => tareas.id, { onDelete: 'set null' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index('solicitudes_lavado_socio_idx').on(t.socioId, t.estado),
+    index('solicitudes_lavado_guarderia_idx').on(t.guarderiaId, t.estado),
+    index('solicitudes_lavado_tarea_idx').on(t.tareaId),
+    uniqueIndex('solicitudes_lavado_socio_activa_unique')
+      .on(t.socioId)
+      .where(sql`${t.estado} in ('pendiente', 'en_proceso')`),
+  ],
+);
+
 // =============================================================================
 // RELACIONES
 // =============================================================================
@@ -1006,6 +1040,7 @@ export const guarderiaRelations = relations(guarderias, ({ many }) => ({
   facturacion: many(facturacion),
   proveedores: many(proveedores),
   restaurantes: many(restaurantes),
+  solicitudesLavado: many(solicitudesLavado),
 }));
 
 export const profileRelations = relations(profiles, ({ many, one }) => ({
@@ -1018,6 +1053,7 @@ export const profileRelations = relations(profiles, ({ many, one }) => ({
     references: [datosFacturacion.profileId],
   }),
   movimientos: many(movimientosCuentaCorriente),
+  solicitudesLavado: many(solicitudesLavado),
 }));
 
 export const membershipsRelations = relations(memberships, ({ one }) => ({
@@ -1070,6 +1106,21 @@ export const alertasRelations = relations(alertas, ({ one }) => ({
   resolver: one(profiles, { fields: [alertas.resolvedBy], references: [profiles.id] }),
 }));
 
+export const solicitudesLavadoRelations = relations(solicitudesLavado, ({ one }) => ({
+  guarderia: one(guarderias, {
+    fields: [solicitudesLavado.guarderiaId],
+    references: [guarderias.id],
+  }),
+  socio: one(profiles, {
+    fields: [solicitudesLavado.socioId],
+    references: [profiles.id],
+  }),
+  tarea: one(tareas, {
+    fields: [solicitudesLavado.tareaId],
+    references: [tareas.id],
+  }),
+}));
+
 // =============================================================================
 // TIPOS INFERIDOS
 // =============================================================================
@@ -1087,3 +1138,5 @@ export type Comunicacion = typeof comunicaciones.$inferSelect;
 export type Facturacion = typeof facturacion.$inferSelect;
 export type MovimientoCuentaCorriente = typeof movimientosCuentaCorriente.$inferSelect;
 export type Alerta = typeof alertas.$inferSelect;
+export type SolicitudLavado = typeof solicitudesLavado.$inferSelect;
+export type NewSolicitudLavado = typeof solicitudesLavado.$inferInsert;
