@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Anchor } from 'lucide-react';
+import Image from 'next/image';
 
 const columns = [
   {
@@ -35,15 +35,13 @@ export function Footer() {
       <div className="mx-auto max-w-6xl px-4 md:px-8">
         <div className="grid gap-10 md:grid-cols-4">
           <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <div className="flex size-10 items-center justify-center rounded-full bg-white/10 ring-2 ring-white/20">
-                <Anchor className="size-5" />
-              </div>
-              <span className="text-base">
-                <span className="font-black">NAUTIC</span>
-                <span className="font-bold">APP</span>
-              </span>
-            </div>
+            <Image
+              src="/landing/logoFooter.png"
+              alt="NauticApp"
+              width={200}
+              height={50}
+              className="h-10 w-auto"
+            />
             <p className="max-w-[14rem] text-sm font-bold opacity-80">
               Digitalizamos la experiencia náutica
             </p>

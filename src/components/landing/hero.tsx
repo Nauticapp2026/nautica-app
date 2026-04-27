@@ -1,16 +1,11 @@
 import Link from 'next/link';
+import Image from 'next/image';
 
 export function Hero() {
   return (
     <section className="relative overflow-hidden bg-[#0e3d44] text-white">
-      <div
-        className="absolute inset-0 -z-10 bg-cover bg-center opacity-40"
-        style={{
-          backgroundImage: 'linear-gradient(135deg, #0e3d44 0%, #175861 50%, #2a6f78 100%)',
-        }}
-        aria-hidden
-      />
-      <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_30%_20%,rgba(102,158,157,0.4),transparent_60%)]" />
+      <Image src="/landing/1.png" alt="" fill priority className="-z-10 object-cover opacity-60" />
+      <div className="absolute inset-0 -z-10 bg-gradient-to-b from-[#0e3d44]/70 via-[#175861]/60 to-[#0e3d44]/80" />
 
       <div className="mx-auto flex max-w-5xl flex-col items-center px-4 py-24 text-center md:py-32 lg:py-40">
         <h1 className="text-4xl leading-[1.05] font-bold md:text-5xl lg:text-7xl">

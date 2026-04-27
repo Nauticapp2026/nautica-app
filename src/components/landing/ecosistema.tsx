@@ -1,10 +1,11 @@
 import Link from 'next/link';
+import Image from 'next/image';
 
 const items = [
-  { label: 'Restaurantes' },
-  { label: 'Compra y venta de embarcaciones' },
-  { label: 'Propiedades' },
-  { label: 'Amarras y camas libres' },
+  { label: 'Restaurantes', src: '/landing/3.png' },
+  { label: 'Compra y venta de embarcaciones', src: '/landing/4.png' },
+  { label: 'Propiedades', src: '/landing/5.png' },
+  { label: 'Amarras y camas libres', src: '/landing/6.png' },
 ];
 
 export function Ecosistema() {
@@ -24,9 +25,14 @@ export function Ecosistema() {
               key={item.label}
               className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm"
             >
-              <div className="flex aspect-[3/4] items-center justify-center bg-gradient-to-br from-[#175861]/15 to-[#669E9D]/40 text-xs text-[#175861]/60">
-                {/* TODO: reemplazar con imagen real */}
-                Imagen
+              <div className="relative aspect-[3/4] w-full">
+                <Image
+                  src={item.src}
+                  alt={item.label}
+                  fill
+                  className="object-cover"
+                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                />
               </div>
               <p className="px-3 py-4 text-center text-base font-semibold text-[#175861]">
                 {item.label}
@@ -37,7 +43,9 @@ export function Ecosistema() {
       </div>
 
       {/* CTA banner */}
-      <div className="mt-20 bg-[#175861]/95 py-16">
+      <div className="relative mt-20 overflow-hidden py-16">
+        <Image src="/landing/7.png" alt="" fill className="-z-10 object-cover" sizes="100vw" />
+        <div className="absolute inset-0 -z-10 bg-[#175861]/80" />
         <div className="mx-auto max-w-4xl px-4 text-center text-white md:px-8">
           <h3 className="text-3xl leading-tight font-bold md:text-[33px]">
             Sumá tu negocio al mundo Náutico

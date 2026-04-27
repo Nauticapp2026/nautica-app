@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import { Check } from 'lucide-react';
 
 const features = [
@@ -16,9 +17,14 @@ export function GestionFeatures() {
   return (
     <section className="bg-white py-20">
       <div className="mx-auto grid max-w-6xl gap-10 px-4 md:grid-cols-2 md:px-8 lg:gap-16">
-        <div className="flex aspect-[5/6] w-full items-center justify-center rounded-2xl bg-gradient-to-br from-[#175861]/10 to-[#175861]/30 text-sm text-[#175861]/60">
-          {/* TODO: reemplazar con captura del panel admin */}
-          Imagen panel admin
+        <div className="relative aspect-[5/6] w-full overflow-hidden rounded-2xl">
+          <Image
+            src="/landing/2.png"
+            alt="Panel de gestión administrativa"
+            fill
+            className="object-cover"
+            sizes="(max-width: 768px) 100vw, 50vw"
+          />
         </div>
 
         <div className="flex flex-col justify-center">

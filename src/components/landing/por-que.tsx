@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 
 const benefits = [
   'Solución 100% integrada y escalable.',
@@ -30,9 +31,14 @@ export function PorQue() {
           </Link>
         </div>
 
-        <div className="flex aspect-[5/6] items-center justify-center rounded-2xl bg-gradient-to-br from-[#175861]/15 to-[#669E9D]/40 text-sm text-[#175861]/60 md:order-last">
-          {/* TODO: reemplazar con imagen real */}
-          Imagen mockup app
+        <div className="relative aspect-[5/6] w-full overflow-hidden rounded-2xl md:order-last">
+          <Image
+            src="/landing/8.png"
+            alt="App NauticApp en uso"
+            fill
+            className="object-cover"
+            sizes="(max-width: 768px) 100vw, 50vw"
+          />
         </div>
       </div>
     </section>
