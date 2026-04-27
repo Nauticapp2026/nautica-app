@@ -33,7 +33,7 @@ export function PorQue() {
 
         <div className="relative aspect-[5/6] w-full overflow-hidden rounded-2xl md:order-last">
           <Image
-            src="/landing/7.png"
+            src="/landing/8.png"
             alt="App NauticApp en uso"
             fill
             className="object-cover"
