@@ -1,9 +1,9 @@
-import { Building2, Users, Ship, Anchor, ShieldCheck, DollarSign } from 'lucide-react';
-import { count, eq, sql } from 'drizzle-orm';
+import { Building2, Users, Ship, Anchor, ShieldCheck } from 'lucide-react';
+import { count, eq } from 'drizzle-orm';
 
 import { requireSuperAdmin } from '@/lib/auth/session';
 import { db } from '@/lib/db';
-import { guarderias, profiles, embarcaciones, espacios, pricingPlans } from '@/lib/db/schema';
+import { guarderias, profiles, embarcaciones, espacios } from '@/lib/db/schema';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,10 +11,6 @@ const TZ_AR = 'America/Argentina/Buenos_Aires';
 
 function formatNumber(n: number): string {
   return n.toLocaleString('es-AR');
-}
-
-function formatCurrency(n: number): string {
-  return `$${formatNumber(Math.round(n))}`;
 }
 
 function formatDate(): string {
@@ -33,37 +29,13 @@ async function loadMetrics() {
     [{ value: superAdminsCount }],
     [{ value: embarcacionesCount }],
     [{ value: espaciosCount }],
-    plans,
-    espaciosByGuarderia,
-    guarderiasPlans,
   ] = await Promise.all([
     db.select({ value: count() }).from(guarderias),
     db.select({ value: count() }).from(profiles),
     db.select({ value: count() }).from(profiles).where(eq(profiles.isSuperAdmin, true)),
     db.select({ value: count() }).from(embarcaciones),
     db.select({ value: count() }).from(espacios),
-    db.select({ slug: pricingPlans.slug, rate: pricingPlans.rate }).from(pricingPlans),
-    db
-      .select({
-        guarderiaId: espacios.guarderiaId,
-        total: sql<number>`count(*)::int`,
-      })
-      .from(espacios)
-      .groupBy(espacios.guarderiaId),
-    db.select({ id: guarderias.id, plan: guarderias.plan }).from(guarderias),
   ]);
-
-  const rateBySlug = new Map<string, number>(plans.map((p) => [p.slug, p.rate]));
-  const espaciosById = new Map<string, number>(
-    espaciosByGuarderia.map((e) => [e.guarderiaId, e.total]),
-  );
-
-  let mrr = 0;
-  for (const g of guarderiasPlans) {
-    const rate = g.plan ? (rateBySlug.get(g.plan) ?? 0) : 0;
-    const cantidad = espaciosById.get(g.id) ?? 0;
-    mrr += rate * cantidad;
-  }
 
   return {
     guarderiasCount,
@@ -71,7 +43,6 @@ async function loadMetrics() {
     superAdminsCount,
     embarcacionesCount,
     espaciosCount,
-    mrr,
   };
 }
 
@@ -110,12 +81,6 @@ export default async function SuperAdminHomePage() {
       value: formatNumber(metrics.embarcacionesCount),
       label: 'Embarcaciones',
     },
-    {
-      icon: <DollarSign className="h-5 w-5 text-white" />,
-      iconBg: '#E87040',
-      value: formatCurrency(metrics.mrr),
-      label: 'MRR estimado',
-    },
   ];
 
   return (
@@ -130,12 +95,6 @@ export default async function SuperAdminHomePage() {
           <MetricCard key={c.label} {...c} />
         ))}
       </div>
-
-      <p className="text-muted-foreground text-xs">
-        El MRR estimado se calcula como{' '}
-        <code className="rounded bg-gray-100 px-1 font-mono">rate × espacios</code> por cada
-        guardería, según el plan que tiene asignado y los espacios cargados en su jerarquía.
-      </p>
     </div>
   );
 }

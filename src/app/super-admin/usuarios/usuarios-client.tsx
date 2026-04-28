@@ -3,6 +3,9 @@
 import { useState, useTransition, useMemo } from 'react';
 import { Trash2, X, ShieldCheck, Shield } from 'lucide-react';
 
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card } from '@/components/ui/card';
 import { MEMBERSHIP_ROLES, ROL_LABELS, type Rol } from '@/config/roles';
 import {
   deleteUserAction,
@@ -33,6 +36,12 @@ type Props = {
   actorId: string;
 };
 
+// Mismo estilo que un Input shadcn pero para <select> nativo. Mantiene los
+// tokens del design system (border-input, focus-visible:border-ring) y evita
+// los wrappers de radix dentro de filas de tabla.
+const selectCls =
+  'border-input focus-visible:border-ring focus-visible:ring-ring/50 dark:bg-input/30 h-8 rounded-md border bg-transparent px-2 py-1 text-xs shadow-xs transition-[color,box-shadow] outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50';
+
 export function UsuariosClient({ usuarios, actorId }: Props) {
   const [query, setQuery] = useState('');
   const [globalError, setGlobalError] = useState<string | null>(null);
@@ -49,54 +58,56 @@ export function UsuariosClient({ usuarios, actorId }: Props) {
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <input
+        <Input
           type="search"
           placeholder="Buscar por email o nombre..."
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-[#669E9D] focus:outline-none sm:max-w-xs"
+          className="sm:max-w-xs"
         />
-        <p className="text-xs text-[#677B85]">
+        <p className="text-muted-foreground text-xs">
           {filtered.length} de {usuarios.length} usuarios
         </p>
       </div>
 
       {globalError && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+        <div className="border-destructive/30 bg-destructive/5 text-destructive rounded-md border px-3 py-2 text-sm">
           {globalError}
         </div>
       )}
 
-      <div className="overflow-x-auto rounded-2xl border border-gray-200 bg-white shadow-sm">
-        <table className="min-w-full divide-y divide-gray-200 text-sm">
-          <thead className="bg-gray-50 text-left text-xs font-semibold tracking-wider text-[#677B85] uppercase">
-            <tr>
-              <th className="px-4 py-3">Usuario</th>
-              <th className="px-4 py-3">Memberships</th>
-              <th className="px-4 py-3">Super admin</th>
-              <th className="px-4 py-3 text-right">Acciones</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {filtered.length === 0 ? (
+      <Card className="overflow-hidden p-0">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200 text-sm">
+            <thead className="text-muted-foreground bg-gray-50 text-left text-xs font-semibold tracking-wider uppercase">
               <tr>
-                <td colSpan={4} className="px-4 py-6 text-center text-sm text-[#677B85]">
-                  Sin resultados.
-                </td>
+                <th className="px-4 py-3">Usuario</th>
+                <th className="px-4 py-3">Memberships</th>
+                <th className="px-4 py-3">Super admin</th>
+                <th className="px-4 py-3 text-right">Acciones</th>
               </tr>
-            ) : (
-              filtered.map((u) => (
-                <UsuarioFila
-                  key={u.id}
-                  usuario={u}
-                  isSelf={u.id === actorId}
-                  onError={setGlobalError}
-                />
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="text-muted-foreground px-4 py-6 text-center text-sm">
+                    Sin resultados.
+                  </td>
+                </tr>
+              ) : (
+                filtered.map((u) => (
+                  <UsuarioFila
+                    key={u.id}
+                    usuario={u}
+                    isSelf={u.id === actorId}
+                    onError={setGlobalError}
+                  />
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Card>
     </div>
   );
 }
@@ -149,12 +160,12 @@ function UsuarioFila({
   return (
     <tr className={pending ? 'opacity-50' : ''}>
       <td className="px-4 py-3 align-top">
-        <div className="font-semibold text-[#175861]">{usuario.email}</div>
-        {fullName && <div className="text-xs text-[#677B85]">{fullName}</div>}
+        <div className="font-semibold text-[#101828]">{usuario.email}</div>
+        {fullName && <div className="text-muted-foreground text-xs">{fullName}</div>}
       </td>
       <td className="px-4 py-3 align-top">
         {usuario.memberships.length === 0 ? (
-          <span className="text-xs text-gray-400">Sin memberships</span>
+          <span className="text-muted-foreground text-xs">Sin memberships</span>
         ) : (
           <ul className="space-y-1.5">
             {usuario.memberships.map((m) => (
@@ -164,8 +175,10 @@ function UsuarioFila({
         )}
       </td>
       <td className="px-4 py-3 align-top">
-        <button
+        <Button
           type="button"
+          variant={usuario.isSuperAdmin ? 'default' : 'outline'}
+          size="xs"
           onClick={handleToggleSuperAdmin}
           disabled={pending || (isSelf && usuario.isSuperAdmin)}
           title={
@@ -175,34 +188,24 @@ function UsuarioFila({
                 ? 'Quitar flag'
                 : 'Marcar como super admin'
           }
-          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
-            usuario.isSuperAdmin
-              ? 'bg-[#175861] text-white hover:bg-[#669E9D]'
-              : 'bg-gray-100 text-[#677B85] hover:bg-gray-200'
-          }`}
         >
-          {usuario.isSuperAdmin ? (
-            <>
-              <ShieldCheck className="size-3.5" /> Sí
-            </>
-          ) : (
-            <>
-              <Shield className="size-3.5" /> No
-            </>
-          )}
-        </button>
+          {usuario.isSuperAdmin ? <ShieldCheck /> : <Shield />}
+          {usuario.isSuperAdmin ? 'Sí' : 'No'}
+        </Button>
       </td>
       <td className="px-4 py-3 text-right align-top">
-        <button
+        <Button
           type="button"
+          variant="outline"
+          size="xs"
           onClick={handleDelete}
           disabled={pending || isSelf}
           title={isSelf ? 'No podés eliminar tu propia cuenta' : 'Eliminar cuenta'}
-          className="inline-flex items-center gap-1.5 rounded-md border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+          className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
         >
-          <Trash2 className="size-3.5" />
+          <Trash2 />
           Eliminar
-        </button>
+        </Button>
       </td>
     </tr>
   );
@@ -246,20 +249,20 @@ function MembershipFila({
   }
 
   // Si la rol actual no está en MEMBERSHIP_ROLES (ej. super_admin viejo), igual
-  // la mostramos en el select para no perderla, pero el resto son las normales.
+  // la mostramos en el select para no perderla.
   const rolOptions = MEMBERSHIP_ROLES.includes(membership.rol as (typeof MEMBERSHIP_ROLES)[number])
     ? MEMBERSHIP_ROLES
     : [membership.rol, ...MEMBERSHIP_ROLES];
 
   return (
     <li className={`flex flex-wrap items-center gap-2 ${pending ? 'opacity-50' : ''}`}>
-      <span className="font-medium text-[#175861]">{membership.guarderia.nombre}</span>
-      <span className="text-gray-300">—</span>
+      <span className="font-medium text-[#101828]">{membership.guarderia.nombre}</span>
+      <span className="text-muted-foreground">—</span>
       <select
         value={membership.rol}
         onChange={handleRolChange}
         disabled={pending}
-        className="rounded-md border border-gray-300 px-2 py-1 text-xs focus:border-[#669E9D] focus:outline-none disabled:opacity-50"
+        className={selectCls}
       >
         {rolOptions.map((r) => (
           <option key={r} value={r}>
@@ -267,15 +270,17 @@ function MembershipFila({
           </option>
         ))}
       </select>
-      <button
+      <Button
         type="button"
+        variant="ghost"
+        size="icon-xs"
         onClick={handleRemove}
         disabled={pending}
         title="Quitar de esta guardería"
-        className="inline-flex items-center rounded p-1 text-gray-400 transition hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+        className="text-muted-foreground hover:bg-red-50 hover:text-red-600"
       >
-        <X className="size-3.5" />
-      </button>
+        <X />
+      </Button>
     </li>
   );
 }
