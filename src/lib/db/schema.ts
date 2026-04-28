@@ -619,6 +619,7 @@ export const porteria = pgTable(
     hasta: timestamp('hasta', { withTimezone: true }),
     expiracion: timestamp('expiracion', { withTimezone: true }),
     arribadaEn: timestamp('arribada_en', { withTimezone: true }),
+    socioIngresoEn: timestamp('socio_ingreso_en', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [index('porteria_guarderia_idx').on(t.guarderiaId), index('porteria_tipo_idx').on(t.tipo)],
