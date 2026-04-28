@@ -1,11 +1,15 @@
+'use client';
+
 import Link from 'next/link';
 import { Check } from 'lucide-react';
+import { useState } from 'react';
 
-const capacities = ['200', '500', '700', '1.000', '1.500', '2.000', '3.000', '4.000'];
+const capacities = [200, 500, 700, 1000, 1500, 2000, 3000, 4000] as const;
+const DEFAULT_INDEX = 1;
 
 type Plan = {
   name: string;
-  price: string;
+  rate: number;
   headerColor: string;
   buttonColor: string;
   iconColor: string;
@@ -17,7 +21,7 @@ type Plan = {
 const plans: Plan[] = [
   {
     name: 'CLASSIC',
-    price: '$450.000',
+    rate: 900,
     headerColor: '#677B85',
     buttonColor: '#677B85',
     iconColor: '#677B85',
@@ -30,7 +34,7 @@ const plans: Plan[] = [
   },
   {
     name: 'PLUS',
-    price: '$600.000',
+    rate: 1200,
     headerColor: '#669E9D',
     buttonColor: '#669E9D',
     iconColor: '#669E9D',
@@ -46,7 +50,7 @@ const plans: Plan[] = [
   },
   {
     name: 'PLATINIUM',
-    price: '$750.000',
+    rate: 1500,
     headerColor: '#ABC2B3',
     buttonColor: '#ABC2B3',
     iconColor: '#ABC2B3',
@@ -64,7 +68,15 @@ const plans: Plan[] = [
   },
 ];
 
+function formatNumber(value: number) {
+  return value.toLocaleString('es-AR');
+}
+
 export function Pricing() {
+  const [index, setIndex] = useState<number>(DEFAULT_INDEX);
+  const capacity = capacities[index];
+  const handlePercent = (index / (capacities.length - 1)) * 100;
+
   return (
     <section id="planes" className="bg-[#F3F4F6] py-20">
       <div className="mx-auto max-w-6xl px-4 md:px-8">
@@ -77,17 +89,31 @@ export function Pricing() {
           </p>
         </div>
 
-        {/* Slider visual estático */}
+        {/* Slider interactivo */}
         <div className="mx-auto mt-12 max-w-4xl">
           <div className="relative h-3.5 rounded-full bg-gradient-to-r from-white via-[#669E9D]/40 to-[#175861] ring-2 ring-gray-200">
-            {/* tramo activo (hasta "500") */}
-            <div className="absolute inset-y-0 left-0 w-[15%] rounded-l-full bg-gradient-to-r from-[#175861] to-[#669E9D]" />
-            {/* handle en "500" */}
-            <div className="absolute -top-1 left-[15%] size-6 -translate-x-1/2 rounded-full border-2 border-white bg-[#175861] shadow-md" />
+            <div
+              className="absolute inset-y-0 left-0 rounded-l-full bg-gradient-to-r from-[#175861] to-[#669E9D] transition-[width] duration-200"
+              style={{ width: `${handlePercent}%` }}
+            />
+            <div
+              className="absolute -top-1 size-6 -translate-x-1/2 rounded-full border-2 border-white bg-[#175861] shadow-md transition-[left] duration-200"
+              style={{ left: `${handlePercent}%` }}
+            />
           </div>
-          <div className="mt-3 flex justify-between text-sm font-bold text-[#175861]">
-            {capacities.map((c) => (
-              <span key={c}>{c}</span>
+          <div className="mt-3 flex justify-between text-sm font-bold">
+            {capacities.map((c, i) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => setIndex(i)}
+                aria-pressed={i === index}
+                className={`cursor-pointer transition ${
+                  i === index ? 'text-[#175861]' : 'text-[#677B85] hover:text-[#175861]'
+                }`}
+              >
+                {formatNumber(c)}
+              </button>
             ))}
           </div>
         </div>
@@ -95,7 +121,7 @@ export function Pricing() {
         {/* Planes */}
         <div className="mt-16 grid gap-6 md:grid-cols-3 md:items-stretch">
           {plans.map((plan) => (
-            <PlanCard key={plan.name} plan={plan} />
+            <PlanCard key={plan.name} plan={plan} capacity={capacity} />
           ))}
         </div>
 
@@ -114,7 +140,10 @@ export function Pricing() {
   );
 }
 
-function PlanCard({ plan }: { plan: Plan }) {
+function PlanCard({ plan, capacity }: { plan: Plan; capacity: number }) {
+  const price = `$${formatNumber(plan.rate * capacity)}`;
+  const capacityLabel = formatNumber(capacity);
+
   return (
     <div
       className={`flex flex-col overflow-hidden rounded-2xl bg-white shadow-md ${
@@ -126,11 +155,10 @@ function PlanCard({ plan }: { plan: Plan }) {
         style={{ backgroundColor: plan.headerColor }}
       >
         <p className="text-2xl font-semibold tracking-wider md:text-3xl">
-          {plan.name} <span className="font-bold">500</span>
+          {plan.name} <span className="font-bold">{capacityLabel}</span>
         </p>
         <p className="mt-2 text-base">
-          <span className="font-semibold">{plan.price}</span>{' '}
-          <span className="font-bold">/MES</span>
+          <span className="font-semibold">{price}</span> <span className="font-bold">/MES</span>
         </p>
       </div>
 
