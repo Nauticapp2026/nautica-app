@@ -17,6 +17,7 @@ import {
   LogOut,
   Menu,
   X,
+  Building2,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -56,6 +57,7 @@ const NAV_BY_VARIANT: Record<SidebarVariant, SidebarItem[]> = {
   ],
   'super-admin': [
     { href: '/super-admin', label: 'Inicio', icon: LayoutDashboard },
+    { href: '/super-admin/guarderias', label: 'Guarderías', icon: Building2 },
     { href: '/super-admin/usuarios', label: 'Usuarios', icon: Users },
     { href: '/super-admin/pricing', label: 'Pricing', icon: Tag },
   ],
