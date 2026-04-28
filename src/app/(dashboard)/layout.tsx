@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { getActiveMarina } from '@/lib/auth/session';
+import { getActiveMarina, getPostLoginRedirect } from '@/lib/auth/session';
 import { Sidebar } from '@/components/shared/sidebar';
 
 // Roles con acceso al dashboard web. El resto (socio, invitado, etc.)
@@ -8,7 +8,12 @@ const WEB_DASHBOARD_ROLES = ['administrador_general', 'operario'] as const;
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const ctx = await getActiveMarina();
-  if (!ctx) redirect('/no-access');
+  if (!ctx) {
+    // Super admin sin membership en ninguna guardería va al panel de plataforma.
+    // Resto cae en /no-access.
+    const target = await getPostLoginRedirect();
+    redirect(target === '/dashboard' ? '/no-access' : target);
+  }
 
   const { profile, activeMembership, activeGuarderia } = ctx;
 

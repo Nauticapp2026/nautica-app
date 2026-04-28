@@ -32,14 +32,11 @@ export async function login(_: ActionResult | null, formData: FormData): Promise
 
   if (error) return { error: translateAuthError(error.message) };
 
-  // El operario no tiene acceso al dashboard ni al resto del panel; su única
-  // sección es /tareas. El resto de roles web van al dashboard.
-  const { getActiveMarina } = await import('@/lib/auth/session');
-  const ctx = await getActiveMarina();
-  const isOperario = !!ctx && !ctx.profile.isSuperAdmin && ctx.activeMembership.rol === 'operario';
+  const { getPostLoginRedirect } = await import('@/lib/auth/session');
+  const target = await getPostLoginRedirect();
 
   revalidatePath('/', 'layout');
-  redirect(isOperario ? '/tareas' : '/dashboard');
+  redirect(target);
 }
 
 export async function signup(_: ActionResult | null, formData: FormData): Promise<ActionResult> {

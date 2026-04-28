@@ -106,3 +106,25 @@ export async function requireSuperAdmin() {
 
   return { user, profile };
 }
+
+// Decide a dónde mandar al usuario logueado.
+// - Operario con membership → /tareas
+// - Otro rol web con membership → /dashboard
+// - Sin membership pero super admin → /super-admin (caso super admin de plataforma)
+// - Sin membership y no super admin → /no-access
+// - Sin sesión → /login
+export async function getPostLoginRedirect(): Promise<string> {
+  const user = await getCurrentUser();
+  if (!user) return '/login';
+
+  const ctx = await getActiveMarina();
+  if (ctx) {
+    if (!ctx.profile.isSuperAdmin && ctx.activeMembership.rol === 'operario') return '/tareas';
+    return '/dashboard';
+  }
+
+  const [profile] = await db.select().from(profiles).where(eq(profiles.id, user.id)).limit(1);
+  if (profile?.isSuperAdmin) return '/super-admin';
+
+  return '/no-access';
+}

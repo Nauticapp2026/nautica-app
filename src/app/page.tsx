@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { getCurrentUser } from '@/lib/auth/session';
+import { getCurrentUser, getPostLoginRedirect } from '@/lib/auth/session';
 import { Header } from '@/components/landing/header';
 import { Hero } from '@/components/landing/hero';
 import { ComoFunciona } from '@/components/landing/como-funciona';
@@ -12,7 +12,7 @@ import { Footer } from '@/components/landing/footer';
 
 export default async function Home() {
   const user = await getCurrentUser();
-  if (user) redirect('/dashboard');
+  if (user) redirect(await getPostLoginRedirect());
 
   return (
     <>
