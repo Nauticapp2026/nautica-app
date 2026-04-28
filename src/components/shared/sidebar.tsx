@@ -34,18 +34,31 @@ const ROL_LABELS: Record<string, string> = {
   seguridad: 'Seguridad',
 };
 
-export type SidebarItem = { href: string; label: string; icon: LucideIcon };
+type SidebarItem = { href: string; label: string; icon: LucideIcon };
 
-const DASHBOARD_NAV: SidebarItem[] = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/usuarios', label: 'Usuarios', icon: Users },
-  { href: '/tareas', label: 'Tareas', icon: ClipboardList },
-  { href: '/espacios', label: 'Espacios', icon: Anchor },
-  { href: '/comunicaciones', label: 'Comunicaciones', icon: MessageSquare },
-  { href: '/facturacion', label: 'Facturación', icon: FileText },
-  { href: '/tarifario', label: 'Tarifario', icon: Tag },
-  { href: '/configuracion', label: 'Configuración', icon: Settings },
-];
+export type SidebarVariant = 'dashboard' | 'super-admin';
+
+// Los navs viven dentro de este modulo 'use client' a proposito: las icon
+// components de lucide son funciones de React y no se pueden pasar como
+// prop desde un Server Component a un Client Component (cruzar el bound
+// los serializa). Asi que en lugar de aceptar items por prop, recibimos
+// `variant` y resolvemos el nav aca adentro.
+const NAV_BY_VARIANT: Record<SidebarVariant, SidebarItem[]> = {
+  dashboard: [
+    { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { href: '/usuarios', label: 'Usuarios', icon: Users },
+    { href: '/tareas', label: 'Tareas', icon: ClipboardList },
+    { href: '/espacios', label: 'Espacios', icon: Anchor },
+    { href: '/comunicaciones', label: 'Comunicaciones', icon: MessageSquare },
+    { href: '/facturacion', label: 'Facturación', icon: FileText },
+    { href: '/tarifario', label: 'Tarifario', icon: Tag },
+    { href: '/configuracion', label: 'Configuración', icon: Settings },
+  ],
+  'super-admin': [
+    { href: '/super-admin', label: 'Inicio', icon: LayoutDashboard },
+    { href: '/super-admin/pricing', label: 'Pricing', icon: Tag },
+  ],
+};
 
 // El operario solo accede a Tareas desde el admin UI.
 const OPERARIO_ALLOWED = new Set(['/tareas']);
@@ -55,16 +68,18 @@ type Props = {
   userName: string;
   userInitial: string;
   rol: string;
-  items?: SidebarItem[];
+  variant?: SidebarVariant;
 };
 
-export function Sidebar({ subtitle, userName, userInitial, rol, items: itemsProp }: Props) {
+export function Sidebar({ subtitle, userName, userInitial, rol, variant = 'dashboard' }: Props) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
-  const items = itemsProp
-    ? itemsProp
-    : DASHBOARD_NAV.filter(({ href }) => (rol === 'operario' ? OPERARIO_ALLOWED.has(href) : true));
+  const baseItems = NAV_BY_VARIANT[variant];
+  const items =
+    variant === 'dashboard'
+      ? baseItems.filter(({ href }) => (rol === 'operario' ? OPERARIO_ALLOWED.has(href) : true))
+      : baseItems;
 
   return (
     <>

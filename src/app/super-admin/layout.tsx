@@ -1,11 +1,5 @@
-import { LayoutDashboard, Tag } from 'lucide-react';
 import { requireSuperAdmin } from '@/lib/auth/session';
-import { Sidebar, type SidebarItem } from '@/components/shared/sidebar';
-
-const SUPER_ADMIN_NAV: SidebarItem[] = [
-  { href: '/super-admin', label: 'Inicio', icon: LayoutDashboard },
-  { href: '/super-admin/pricing', label: 'Pricing', icon: Tag },
-];
+import { Sidebar } from '@/components/shared/sidebar';
 
 export default async function SuperAdminLayout({ children }: { children: React.ReactNode }) {
   const { profile } = await requireSuperAdmin();
@@ -23,7 +17,7 @@ export default async function SuperAdminLayout({ children }: { children: React.R
         userName={userName}
         userInitial={userInitial}
         rol="super_admin"
-        items={SUPER_ADMIN_NAV}
+        variant="super-admin"
       />
       <main className="min-w-0 flex-1 overflow-auto">{children}</main>
     </div>
