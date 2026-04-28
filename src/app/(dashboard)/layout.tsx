@@ -31,7 +31,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   return (
     <div className="flex min-h-screen flex-col bg-[#F9FAFB] md:flex-row">
       <Sidebar
-        guarderiaName={activeGuarderia.nombre}
+        subtitle={activeGuarderia.nombre}
         userName={userName}
         userInitial={userInitial}
         rol={activeMembership.rol}
