@@ -17,9 +17,11 @@ import {
   LogOut,
   Menu,
   X,
+  type LucideIcon,
 } from 'lucide-react';
 
 const ROL_LABELS: Record<string, string> = {
+  super_admin: 'Super admin',
   administrador_general: 'Administrador general',
   operario: 'Operario',
   contable: 'Contable',
@@ -32,7 +34,9 @@ const ROL_LABELS: Record<string, string> = {
   seguridad: 'Seguridad',
 };
 
-const NAV = [
+export type SidebarItem = { href: string; label: string; icon: LucideIcon };
+
+const DASHBOARD_NAV: SidebarItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/usuarios', label: 'Usuarios', icon: Users },
   { href: '/tareas', label: 'Tareas', icon: ClipboardList },
@@ -47,17 +51,20 @@ const NAV = [
 const OPERARIO_ALLOWED = new Set(['/tareas']);
 
 type Props = {
-  guarderiaName: string;
+  subtitle: string;
   userName: string;
   userInitial: string;
   rol: string;
+  items?: SidebarItem[];
 };
 
-export function Sidebar({ guarderiaName, userName, userInitial, rol }: Props) {
+export function Sidebar({ subtitle, userName, userInitial, rol, items: itemsProp }: Props) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
-  const items = NAV.filter(({ href }) => (rol === 'operario' ? OPERARIO_ALLOWED.has(href) : true));
+  const items = itemsProp
+    ? itemsProp
+    : DASHBOARD_NAV.filter(({ href }) => (rol === 'operario' ? OPERARIO_ALLOWED.has(href) : true));
 
   return (
     <>
@@ -101,19 +108,25 @@ export function Sidebar({ guarderiaName, userName, userInitial, rol }: Props) {
           <X className="h-5 w-5" />
         </button>
 
-        {/* Logo + guardería */}
+        {/* Logo + subtítulo */}
         <div className="px-4 pt-5 pb-3">
           <Logo size={36} />
-          <p className="mt-1.5 truncate text-xs text-gray-400">{guarderiaName}</p>
+          <p className="mt-1.5 truncate text-xs text-gray-400">{subtitle}</p>
         </div>
 
         {/* Nav */}
         <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-2">
           {items.map(({ href, label, icon: Icon }) => {
-            const active =
-              href === '/dashboard'
-                ? pathname === '/dashboard'
-                : pathname === href || pathname.startsWith(href + '/');
+            // Si este item es prefijo de otro (ej. /super-admin con
+            // /super-admin/pricing), solo se activa con match exacto. Si no,
+            // matchea también subpaths para que /usuarios/123 deje
+            // /usuarios resaltado.
+            const hasChildren = items.some(
+              (other) => other.href !== href && other.href.startsWith(href + '/'),
+            );
+            const active = hasChildren
+              ? pathname === href
+              : pathname === href || pathname.startsWith(href + '/');
             return (
               <Link
                 key={href}
