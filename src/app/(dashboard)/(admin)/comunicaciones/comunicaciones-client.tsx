@@ -9,6 +9,7 @@ import {
   updateComunicacionAction,
   type ComunicacionInput,
 } from '@/app/actions/comunicaciones';
+import { formatArgentinaDate } from '@/lib/dates';
 
 export type TipoComunicacion = 'socios' | 'publica';
 export type CategoriaComunicacion =
@@ -41,14 +42,6 @@ const TIPO_LABELS: Record<TipoComunicacion, { label: string; cls: string }> = {
   socios: { label: 'Socios', cls: 'bg-purple-50 text-purple-700' },
   publica: { label: 'Pública', cls: 'bg-sky-50 text-sky-700' },
 };
-
-function formatFecha(iso: string | null): string {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  const dd = String(d.getUTCDate()).padStart(2, '0');
-  const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
-  return `${dd}/${mm}/${d.getUTCFullYear()}`;
-}
 
 const inputCls =
   'h-11 w-full rounded-[10px] border border-gray-200 bg-white px-4 text-sm text-[#101828] focus:border-[#175861] focus:outline-none focus:ring-1 focus:ring-[#175861]';
@@ -205,7 +198,7 @@ function ComunicacionCard({ c, onEdit }: { c: Comunicacion; onEdit: () => void }
         </div>
         <div className="flex shrink-0 items-center gap-1 text-xs text-gray-500">
           <Calendar className="h-3.5 w-3.5" />
-          {formatFecha(c.fecha)}
+          {formatArgentinaDate(c.fecha)}
         </div>
       </div>
 

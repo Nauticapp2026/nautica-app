@@ -12,6 +12,7 @@ import {
   type BatchResult,
   type MovimientoPendiente,
 } from '@/app/actions/facturacion';
+import { formatArgentinaDate } from '@/lib/dates';
 
 // ─── Tipos ──────────────────────────────────────────────────────────────────
 
@@ -108,14 +109,7 @@ function fmtMoney(value: string | number | null): string {
   return `$${n.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-function fmtDate(iso: string | null): string {
-  if (!iso) return '—';
-  return new Date(iso).toLocaleDateString('es-AR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  });
-}
+const fmtDate = formatArgentinaDate;
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);

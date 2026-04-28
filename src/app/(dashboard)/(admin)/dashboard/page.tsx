@@ -26,12 +26,14 @@ import {
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
+const TZ_AR = 'America/Argentina/Buenos_Aires';
+
 function formatDate() {
   const now = new Date();
-  const weekday = now.toLocaleDateString('es-AR', { weekday: 'long' });
-  const day = now.getDate();
-  const month = now.toLocaleDateString('es-AR', { month: 'long' });
-  const year = now.getFullYear();
+  const weekday = now.toLocaleDateString('es-AR', { timeZone: TZ_AR, weekday: 'long' });
+  const day = now.toLocaleDateString('es-AR', { timeZone: TZ_AR, day: 'numeric' });
+  const month = now.toLocaleDateString('es-AR', { timeZone: TZ_AR, month: 'long' });
+  const year = now.toLocaleDateString('es-AR', { timeZone: TZ_AR, year: 'numeric' });
   return `${weekday[0].toUpperCase()}${weekday.slice(1)}, ${day} ${month[0].toUpperCase()}${month.slice(1)} ${year}`;
 }
 
@@ -49,7 +51,11 @@ function formatCurrency(value: string | null): string {
 
 function formatShortDate(date: Date | null): string {
   if (!date) return '';
-  return date.toLocaleDateString('es-AR', { day: 'numeric', month: 'short' });
+  return date.toLocaleDateString('es-AR', {
+    timeZone: TZ_AR,
+    day: 'numeric',
+    month: 'short',
+  });
 }
 
 // ─── Sub-components ──────────────────────────────────────────────────────────

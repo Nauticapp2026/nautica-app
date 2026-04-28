@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { addMovimientoAction, marcarPagadasAction } from '@/app/actions/movimientos';
 import { updateSocioAction } from '@/app/actions/socios';
+import { formatArgentinaDate, formatArgentinaDateTime } from '@/lib/dates';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -125,14 +126,7 @@ function fmt(amount: number) {
   return `$${amount.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`;
 }
 
-function fmtDate(iso: string | null) {
-  if (!iso) return '—';
-  return new Date(iso).toLocaleDateString('es-AR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  });
-}
+const fmtDate = formatArgentinaDate;
 
 const ESTADO_BADGE: Record<string, string> = {
   pagado: 'bg-gray-100 text-gray-600',
@@ -657,17 +651,7 @@ export type SalidaItem = {
   createdAt: string;
 };
 
-function fmtFechaHoraSalida(iso: string | null): string {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  return d.toLocaleString('es-AR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
+const fmtFechaHoraSalida = formatArgentinaDateTime;
 
 export function SocioDetail({
   socio,
@@ -741,11 +725,7 @@ export function SocioDetail({
   const nombre = [socio.nombre, socio.apellido].filter(Boolean).join(' ') || socio.email;
   const inicial = (socio.nombre?.[0] ?? socio.email[0]).toUpperCase();
 
-  const memberDate = new Date(socio.memberSince).toLocaleDateString('es-AR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  });
+  const memberDate = formatArgentinaDate(socio.memberSince);
 
   const totalIngresos = movimientos.reduce((sum, m) => sum + parseFloat(m.debe ?? '0'), 0);
   const totalPendiente = movimientos
@@ -1285,7 +1265,7 @@ export function SocioDetail({
                     <p className="truncate text-sm font-semibold text-[#101828]">{d.nombre}</p>
                     <p className="text-xs text-gray-500">
                       {d.tipo ? TIPO_DOC_LABEL[d.tipo] : 'Sin categoría'} ·{' '}
-                      {new Date(d.createdAt).toLocaleDateString('es-AR')}
+                      {formatArgentinaDate(d.createdAt)}
                     </p>
                   </div>
                   {d.signedUrl ? (
