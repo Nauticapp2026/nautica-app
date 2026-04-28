@@ -93,3 +93,16 @@ export async function requireRole(allowed: Rol[]) {
 
   return ctx;
 }
+
+// Para el panel de super admin: solo carga el profile (no requiere membership
+// activa en ninguna guardería) y exige is_super_admin = true.
+export async function requireSuperAdmin() {
+  const user = await getCurrentUser();
+  if (!user) redirect('/login');
+
+  const [profile] = await db.select().from(profiles).where(eq(profiles.id, user.id)).limit(1);
+
+  if (!profile?.isSuperAdmin) redirect('/no-access');
+
+  return { user, profile };
+}

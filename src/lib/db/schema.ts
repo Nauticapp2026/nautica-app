@@ -8,6 +8,7 @@ import {
   numeric,
   timestamp,
   date,
+  jsonb,
   uniqueIndex,
   index,
 } from 'drizzle-orm/pg-core';
@@ -1021,6 +1022,32 @@ export const solicitudesLavado = pgTable(
 );
 
 // =============================================================================
+// PLATFORM (super admin) — config global, no scopeada por guardería
+// =============================================================================
+
+// Planes públicos de la landing. La presentación (colores, features, plan
+// destacado) sigue en código; acá solo viven los datos que cambian seguido:
+// nombre visible y rate por lugar de guarda. El precio mostrado se calcula
+// como `rate * capacidad` en el cliente.
+export const pricingPlans = pgTable('pricing_plans', {
+  slug: planEnum('slug').primaryKey(),
+  name: text('name').notNull(),
+  rate: integer('rate').notNull(),
+  displayOrder: integer('display_order').notNull().default(0),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedBy: uuid('updated_by').references(() => profiles.id, { onDelete: 'set null' }),
+});
+
+// Tabla genérica key/value para settings globales de la plataforma. Hoy guarda
+// `pricing_capacities` (array de capacidades del slider de la landing).
+export const platformSettings = pgTable('platform_settings', {
+  key: text('key').primaryKey(),
+  value: jsonb('value').notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedBy: uuid('updated_by').references(() => profiles.id, { onDelete: 'set null' }),
+});
+
+// =============================================================================
 // RELACIONES
 // =============================================================================
 
@@ -1143,3 +1170,6 @@ export type MovimientoCuentaCorriente = typeof movimientosCuentaCorriente.$infer
 export type Alerta = typeof alertas.$inferSelect;
 export type SolicitudLavado = typeof solicitudesLavado.$inferSelect;
 export type NewSolicitudLavado = typeof solicitudesLavado.$inferInsert;
+export type PricingPlan = typeof pricingPlans.$inferSelect;
+export type NewPricingPlan = typeof pricingPlans.$inferInsert;
+export type PlatformSetting = typeof platformSettings.$inferSelect;
