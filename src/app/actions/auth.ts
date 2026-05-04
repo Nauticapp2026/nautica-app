@@ -93,7 +93,10 @@ export async function requestPasswordReset(
     redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback?next=/reset-password`,
   });
 
-  if (error) return { error: translateAuthError(error.message) };
+  if (error) {
+    console.error('[requestPasswordReset]', error);
+    return { error: translateAuthError(error.message) };
+  }
 
   return {};
 }
