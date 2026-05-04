@@ -131,6 +131,7 @@ function toDatetimeLocal(iso: string | null): string {
 function TareaCard({
   tarea,
   canEditAll,
+  dndEnabled,
   operarios,
   onEdit,
   onMoveEstado,
@@ -140,6 +141,7 @@ function TareaCard({
 }: {
   tarea: Tarea;
   canEditAll: boolean;
+  dndEnabled: boolean;
   operarios: OperarioOpt[];
   onEdit: (t: Tarea) => void;
   onMoveEstado: (t: Tarea, destino: EstadoTarea) => void;
@@ -158,10 +160,12 @@ function TareaCard({
     });
   };
 
+  const draggable = canEditAll && dndEnabled;
+
   return (
     <div
-      draggable={canEditAll}
-      onDragStart={() => onDragStart(tarea)}
+      draggable={draggable}
+      onDragStart={() => draggable && onDragStart(tarea)}
       onDragEnd={onDragEnd}
       onClick={() => onEdit(tarea)}
       className={`cursor-pointer rounded-[12px] border border-gray-200 bg-white p-3 shadow-sm transition-opacity hover:shadow-md ${busy ? 'opacity-60' : ''}`}
@@ -455,6 +459,7 @@ export function TareasClient({
 
   const [filterOperario, setFilterOperario] = useState<string>('');
   const [filterEmbarcacion, setFilterEmbarcacion] = useState<string>('');
+  const [tab, setTab] = useState<'operativa' | 'lavado'>('operativa');
 
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverState, setDragOverState] = useState<EstadoTarea | null>(null);
@@ -605,72 +610,106 @@ export function TareasClient({
         </div>
       )}
 
-      {/* Kanban */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {COLUMNAS.map((col) => {
-          const lista = agrupadas[col.estado];
-          const Icon = col.icon;
-          const isOver = dragOverState === col.estado;
-          return (
-            <div
-              key={col.estado}
-              onDragOver={(e) => {
-                if (!canEditAll) return;
-                e.preventDefault();
-                if (dragOverState !== col.estado) setDragOverState(col.estado);
-              }}
-              onDragLeave={() => {
-                if (dragOverState === col.estado) setDragOverState(null);
-              }}
-              onDrop={(e) => {
-                e.preventDefault();
-                onDropOnColumn(col.estado);
-              }}
-              className={`flex min-h-[280px] flex-col overflow-hidden rounded-2xl border ${
-                isOver ? 'border-[#175861] ring-2 ring-[#175861]/30' : 'border-gray-200'
-              } ${col.body}`}
-            >
-              <div
-                className={`flex items-center justify-between ${col.header} px-4 py-3 text-white`}
-              >
-                <div className="flex items-center gap-2">
-                  <Icon className="h-4 w-4" />
-                  <span className="text-sm font-semibold">{col.label}</span>
-                </div>
-                <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-xs font-bold text-white">
-                  {lista.length}
-                </span>
-              </div>
-
-              <div className="flex-1 space-y-2.5 p-3">
-                {lista.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center gap-2 py-10 text-gray-400">
-                    <ClipboardList className="h-6 w-6 opacity-40" />
-                    <p className="text-xs">Sin tareas</p>
-                  </div>
-                ) : (
-                  lista.map((t) => (
-                    <TareaCard
-                      key={t.id}
-                      tarea={t}
-                      canEditAll={canEditAll}
-                      operarios={operarios}
-                      onEdit={(x) => setModal({ mode: 'edit', tarea: x })}
-                      onMoveEstado={moverTarea}
-                      busy={isPending && busyId === t.id}
-                      onDragStart={() => setDraggingId(t.id)}
-                      onDragEnd={() => {
-                        setDraggingId(null);
-                        setDragOverState(null);
-                      }}
-                    />
-                  ))
-                )}
-              </div>
-            </div>
-          );
-        })}
+      {/* Tabs */}
+      <div className="flex w-fit gap-1 rounded-[12px] border border-gray-200 bg-white p-1">
+        <button
+          type="button"
+          onClick={() => setTab('operativa')}
+          className={`rounded-[8px] px-4 py-2 text-sm font-semibold transition-colors ${
+            tab === 'operativa' ? 'bg-[#175861] text-white' : 'text-gray-600 hover:bg-gray-50'
+          }`}
+        >
+          Operativa
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab('lavado')}
+          className={`rounded-[8px] px-4 py-2 text-sm font-semibold transition-colors ${
+            tab === 'lavado' ? 'bg-[#175861] text-white' : 'text-gray-600 hover:bg-gray-50'
+          }`}
+        >
+          Lavado ({agrupadas.lavado.length})
+        </button>
       </div>
+
+      {/* Kanban */}
+      {(() => {
+        const cols = COLUMNAS.filter((c) =>
+          tab === 'operativa' ? c.estado !== 'lavado' : c.estado === 'lavado',
+        );
+        const dndEnabled = tab === 'operativa';
+        const gridCls =
+          tab === 'operativa' ? 'grid grid-cols-1 gap-4 md:grid-cols-3' : 'grid grid-cols-1 gap-4';
+        return (
+          <div className={gridCls}>
+            {cols.map((col) => {
+              const lista = agrupadas[col.estado];
+              const Icon = col.icon;
+              const isOver = dndEnabled && dragOverState === col.estado;
+              return (
+                <div
+                  key={col.estado}
+                  onDragOver={(e) => {
+                    if (!canEditAll || !dndEnabled) return;
+                    e.preventDefault();
+                    if (dragOverState !== col.estado) setDragOverState(col.estado);
+                  }}
+                  onDragLeave={() => {
+                    if (dragOverState === col.estado) setDragOverState(null);
+                  }}
+                  onDrop={(e) => {
+                    if (!dndEnabled) return;
+                    e.preventDefault();
+                    onDropOnColumn(col.estado);
+                  }}
+                  className={`flex min-h-[280px] flex-col overflow-hidden rounded-2xl border ${
+                    isOver ? 'border-[#175861] ring-2 ring-[#175861]/30' : 'border-gray-200'
+                  } ${col.body}`}
+                >
+                  <div
+                    className={`flex items-center justify-between ${col.header} px-4 py-3 text-white`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Icon className="h-4 w-4" />
+                      <span className="text-sm font-semibold">{col.label}</span>
+                    </div>
+                    <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-xs font-bold text-white">
+                      {lista.length}
+                    </span>
+                  </div>
+
+                  <div className="flex-1 space-y-2.5 p-3">
+                    {lista.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center gap-2 py-10 text-gray-400">
+                        <ClipboardList className="h-6 w-6 opacity-40" />
+                        <p className="text-xs">Sin tareas</p>
+                      </div>
+                    ) : (
+                      lista.map((t) => (
+                        <TareaCard
+                          key={t.id}
+                          tarea={t}
+                          canEditAll={canEditAll}
+                          dndEnabled={dndEnabled}
+                          operarios={operarios}
+                          onEdit={(x) => setModal({ mode: 'edit', tarea: x })}
+                          onMoveEstado={moverTarea}
+                          busy={isPending && busyId === t.id}
+                          onDragStart={() => setDraggingId(t.id)}
+                          onDragEnd={() => {
+                            setDraggingId(null);
+                            setDragOverState(null);
+                          }}
+                        />
+                      ))
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
 
       <TareaModal
         key={modal?.mode === 'edit' ? `edit-${modal.tarea.id}` : 'create'}
