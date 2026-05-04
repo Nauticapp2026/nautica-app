@@ -4,6 +4,8 @@ Overview del repo web. Para setup y comandos básicos ver `README.md`. Para regl
 
 Este es el repo del **dashboard web** del producto. Hay una app mobile separada (no en este repo) que cubre los roles que operan desde celular (socio, invitado, seguridad/portería, etc.). Acá no se documenta el mobile — cada repo tiene su propio doc.
 
+Mobile y web comparten **el mismo proyecto Supabase**, así que se comunican vía tablas y triggers (ver sección "Integración mobile↔web" más abajo).
+
 ---
 
 ## Stack
@@ -134,6 +136,12 @@ export async function updateXAction(input: UpdateXInput): Promise<{ error?: stri
 
 Las del super admin reemplazan `getActiveMarina` por `requireSuperAdmin()` y no scopean por guardería.
 
+### Uploads de archivos
+
+- Las fotos / archivos se suben pasando un `File` por `FormData` a un Server Action, que sube a Supabase Storage con el cliente admin (service role).
+- El default de Next.js para Server Actions es **1 MB**. En este repo está subido a **10 MB** en `next.config.ts` (`experimental.serverActions.bodySizeLimit`) — sin esto, las fotos típicas (2-5 MB) fallan silenciosamente.
+- Si en algún momento se necesitan archivos > 10 MB, conviene migrar a upload directo a Storage desde el cliente con Signed URL.
+
 ---
 
 ## Auth flow
@@ -146,6 +154,14 @@ Las del super admin reemplazan `getActiveMarina` por `requireSuperAdmin()` y no 
    - Sin membership y no super admin → `/no-access`.
 3. Layouts protegen: `(dashboard)/layout.tsx` exige membership; `super-admin/layout.tsx` exige `is_super_admin`.
 4. `src/middleware.ts` refresca la sesión en cada request via `updateSession`.
+
+### Reset de contraseña
+
+- `/forgot-password` (form pidiendo email) → `requestPasswordReset` action que dispara `supabase.auth.resetPasswordForEmail` con redirect a `/auth/callback?next=/reset-password`.
+- El usuario recibe un mail (template HTML en `email-templates/05-reset-password.html`) con un link.
+- Click en el link → `/auth/callback` setea la sesión de recovery → redirige a `/reset-password`.
+- `/reset-password` (form de nueva contraseña) → `updatePassword` action que llama a `supabase.auth.updateUser({ password })` y redirige según rol con `getPostLoginRedirect()`.
+- En Supabase: las URLs de callback (preview y prod) deben estar en Auth → URL Configuration → Redirect URLs. Sin SMTP custom configurado, el envío del mail tiene rate limits muy bajos (~4/hora).
 
 Helpers principales en `src/lib/auth/session.ts`:
 
@@ -160,10 +176,26 @@ Helpers principales en `src/lib/auth/session.ts`:
 ## DB y migraciones
 
 - **Schema** en `src/lib/db/schema.ts` (Drizzle). Fuente de verdad de tipos.
-- **Migraciones SQL** en `supabase/migrations/` (numeradas `0001_…`, `0002_…`, etc.). Se aplican manualmente en el SQL Editor de Supabase contra prod. Hay un único proyecto Supabase (no hay dev separado).
+- **Migraciones SQL** en `supabase/migrations/` (numeradas `0001_…`, `0002_…`, etc.). Se aplican manualmente en el SQL Editor de Supabase contra prod, o con scripts ad-hoc tipo `scripts/apply-X.mjs` que usan `DIRECT_URL`. Hay un único proyecto Supabase (no hay dev separado).
 - `pnpm db:generate` está roto en este entorno (issue de TTY); las migraciones se escriben a mano.
 - `drizzle/meta/` está en `.gitignore` por la misma razón.
 - RLS habilitado en cada tabla relevante; todas las policies viven en estas migraciones.
+- `supabase/migrations/` también contiene **triggers y funciones PL/pgSQL** (no solo policies). Ej. `0010_lavado_auto_tarea_trigger.sql` materializa una tarea automáticamente cuando mobile crea una solicitud de lavado.
+
+---
+
+## Integración mobile↔web
+
+Las dos apps comparten un solo proyecto Supabase, así que la comunicación es **vía tablas y triggers**, no APIs.
+
+Tablas/flujos relevantes:
+
+- **`solicitudes_lavado`** — el socio crea una solicitud desde mobile; un trigger Postgres (`AFTER INSERT WHEN tarea_id IS NULL`) materializa automáticamente una `tarea` con estado='lavado' y popula el `tarea_id` de la solicitud. El web la muestra en la tab Lavado de `/tareas`. Cuando el operario cambia el estado de la solicitud (Pendiente / En proceso / Lista / Cancelada) desde el web, la app mobile lo ve en la solicitud del socio. Ver `updateSolicitudLavadoEstadoAction` en `actions/tareas.ts`.
+- **`porteria_invitados`** — el admin invita personas desde el web; el portero las ve en mobile al escanear QR.
+- **`actividad_porteria`** — registros de ingresos/egresos creados por el portero en mobile; se ven en el web.
+- **`tareas`** con `porteria_id` no nulo — pueden venir de mobile.
+
+Antes de cambiar una tabla compartida (renombrar columna, cambiar enum, dropear tabla), pensar si rompe algo del lado mobile.
 
 ---
 

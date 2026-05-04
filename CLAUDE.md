@@ -41,6 +41,16 @@ Cualquier input que venga del cliente (form, query string, body) se valida con Z
 
 Todo lo que se muestre al usuario con hora/fecha tiene que estar en TZ `America/Argentina/Buenos_Aires`. Postgres guarda en UTC; convertir al formatear. (Ya pasó: alertas del dashboard mostraban UTC en lugar de hora local — fix `f202efb`.)
 
+### 5.1. Archivos `'use server'` solo exportan async functions
+
+Los archivos en `src/app/actions/` empiezan con `'use server'`. Next.js 15 con Turbopack solo permite **exportar async functions** desde esos archivos. Si exportás una const, un type, un objeto o cualquier valor no-async, el typecheck pasa pero **runtime crashea** con:
+
+> A "use server" file can only export async functions, found object.
+
+Y el cliente ve solo "This page couldn't load. A server error occurred."
+
+Si necesitás compartir constantes / types / enums entre el cliente y un server action, ponelos en un archivo separado sin `'use server'` (ej. `src/app/(dashboard)/tareas/constants.ts`) y que ambos los importen de ahí.
+
 ### 6. Super admin (cross-tenant)
 
 `super_admin` es un nivel de **plataforma**, no de guardería. Modelado con `profiles.is_super_admin` (boolean) + función SQL `public.is_super_admin()` para bypass en RLS. El valor `'super_admin'` en el enum `rol` es algo distinto (rol dentro de una guardería) y prácticamente no se usa.
@@ -61,7 +71,7 @@ Todo lo que se muestre al usuario con hora/fecha tiene que estar en TZ `America/
 
 ## Convenciones de código
 
-- **Schema de DB**: `src/lib/db/schema.ts`. Cambios → `pnpm db:generate` → revisar la migración generada en `drizzle/`.
+- **Schema de DB**: `src/lib/db/schema.ts` es la fuente de verdad de tipos. `pnpm db:generate` está roto — las migraciones SQL se escriben a mano en `supabase/migrations/` y se aplican desde el SQL Editor de Supabase o con un script `scripts/apply-X.mjs`. La carpeta `supabase/migrations/` también guarda triggers y funciones PL/pgSQL, no solo policies.
 - **Supabase clients**: usar el correcto según contexto.
   - `src/lib/supabase/server.ts` — server components y server actions.
   - `src/lib/supabase/client.ts` — client components.
@@ -70,6 +80,7 @@ Todo lo que se muestre al usuario con hora/fecha tiene que estar en TZ `America/
 - **Errores**: usar los tipados de `src/lib/auth/errors.ts` cuando aplique.
 - **Tipos**: schema de DB es la fuente de verdad. Inferir tipos desde Drizzle (`InferSelectModel`, `InferInsertModel`).
 - **UI**: componentes shadcn/ui en `src/components/ui/`, propios reusables en `src/components/shared/`.
+- **Uploads de archivos**: van por Server Action con `FormData`. El bodySizeLimit está seteado a 10 MB en `next.config.ts`. Si el archivo puede pasar de 10 MB, migrar a upload directo a Storage con Signed URL.
 
 ---
 
@@ -97,7 +108,8 @@ Husky + lint-staged corren prettier y eslint en cada commit. Si un hook falla, a
 
 ## Integraciones externas
 
-- **Supabase** — Auth, Postgres, RLS. Dos proyectos: dev y prod.
+- **Supabase** — Auth, Postgres, RLS. Único proyecto (prod).
+- **App mobile** — repo separado pero **comparte la misma DB Supabase**. La comunicación entre web y mobile es vía tablas compartidas y triggers Postgres. Antes de cambiar una tabla compartida (`solicitudes_lavado`, `porteria_invitados`, `actividad_porteria`, `tareas`, etc.), pensar si rompe algo del lado mobile.
 - **tusfacturas.app** — emisión de facturas AFIP. Cliente y mappers en `src/lib/tusfacturas/`. Las credenciales `TUSFACTURAS_*` están en env vars.
 - **Vercel Cron** — `src/app/api/cron/mensuales` corre los movimientos mensuales. Si tocás ese código, considerar idempotencia (puede correrse dos veces).
 
