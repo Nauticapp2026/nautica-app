@@ -1083,7 +1083,7 @@ function Step9({ onNext, onBack }: { onNext: () => void; onBack: () => void }) {
       />
       <div
         className="calendly-inline-widget mb-6 rounded-2xl border border-gray-200"
-        data-url="https://calendly.com/marcosienragarre/nauticapp"
+        data-url="https://calendly.com/nauticapp/nauticapp?hide_event_type_details=1&hide_gdpr_banner=1"
         style={{ minWidth: '320px', height: '700px' }}
       />
       <Script
