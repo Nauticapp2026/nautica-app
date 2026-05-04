@@ -1,9 +1,9 @@
 'use client';
 
 import { useActionState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { login, type ActionResult } from '@/app/actions/auth';
-import { Logo } from '@/components/shared/logo';
 
 const inputCls =
   'w-full rounded-[10px] border border-gray-200 px-4 py-3 text-sm outline-none transition focus:border-[#175861] focus:ring-1 focus:ring-[#175861]';
@@ -14,7 +14,7 @@ export default function LoginPage() {
   return (
     <div className="w-full max-w-sm rounded-2xl bg-white p-8 shadow-2xl">
       <div className="mb-6 flex justify-center">
-        <Logo size={52} />
+        <Image src="/logo-nauticapp.png" alt="NauticApp" width={174} height={60} priority />
       </div>
 
       <form action={formAction} className="space-y-4">
