@@ -17,9 +17,11 @@ import {
 import {
   createTareaAction,
   deleteTareaAction,
+  updateSolicitudLavadoEstadoAction,
   updateTareaAction,
   updateTareaEstadoAction,
   updateTareaOperarioAction,
+  type EstadoSolicitudLavado,
 } from '@/app/actions/tareas';
 import { ESTADOS_TAREA, type EstadoTarea } from './constants';
 
@@ -37,6 +39,14 @@ export type Tarea = {
   embarcacionId: string | null;
   embarcacionNombre: string | null;
   socioNombre: string | null;
+  solicitudLavadoEstado: EstadoSolicitudLavado | null;
+};
+
+const ESTADO_SOLICITUD_LAVADO_LABEL: Record<EstadoSolicitudLavado, string> = {
+  pendiente: 'Pendiente',
+  en_proceso: 'En proceso',
+  lista: 'Lista',
+  cancelada: 'Cancelada',
 };
 
 type OperarioOpt = { id: string; nombre: string };
@@ -160,6 +170,14 @@ function TareaCard({
     });
   };
 
+  const changeEstadoLavado = (estado: EstadoSolicitudLavado) => {
+    startTransition(async () => {
+      const res = await updateSolicitudLavadoEstadoAction(tarea.id, estado);
+      if (res.error) alert(res.error);
+      else router.refresh();
+    });
+  };
+
   const draggable = canEditAll && dndEnabled;
 
   return (
@@ -214,6 +232,20 @@ function TareaCard({
             {ESTADOS_TAREA.filter((e) => e !== tarea.estado).map((e) => (
               <option key={e} value={e}>
                 {ESTADO_LABEL[e]}
+              </option>
+            ))}
+          </select>
+        )}
+        {tarea.estado === 'lavado' && tarea.solicitudLavadoEstado && (
+          <select
+            className="h-8 w-full rounded-[8px] border border-gray-200 bg-white px-2 text-xs text-[#175861] focus:border-[#175861] focus:outline-none"
+            value={tarea.solicitudLavadoEstado}
+            onChange={(e) => changeEstadoLavado(e.target.value as EstadoSolicitudLavado)}
+            disabled={pending}
+          >
+            {(Object.keys(ESTADO_SOLICITUD_LAVADO_LABEL) as EstadoSolicitudLavado[]).map((e) => (
+              <option key={e} value={e}>
+                {ESTADO_SOLICITUD_LAVADO_LABEL[e]}
               </option>
             ))}
           </select>

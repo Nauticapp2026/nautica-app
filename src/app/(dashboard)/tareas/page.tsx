@@ -3,7 +3,7 @@ import { alias } from 'drizzle-orm/pg-core';
 
 import { getActiveMarina } from '@/lib/auth/session';
 import { db } from '@/lib/db';
-import { embarcaciones, memberships, profiles, tareas } from '@/lib/db/schema';
+import { embarcaciones, memberships, profiles, solicitudesLavado, tareas } from '@/lib/db/schema';
 
 import { TareasClient } from './tareas-client';
 
@@ -37,11 +37,13 @@ export default async function TareasPage() {
         socioNombre: socioProfile.nombre,
         socioApellido: socioProfile.apellido,
         socioEmail: socioProfile.email,
+        solicitudLavadoEstado: solicitudesLavado.estado,
       })
       .from(tareas)
       .leftJoin(profiles, eq(profiles.id, tareas.operarioId))
       .leftJoin(embarcaciones, eq(embarcaciones.id, tareas.embarcacionId))
       .leftJoin(socioProfile, eq(socioProfile.id, embarcaciones.profileId))
+      .leftJoin(solicitudesLavado, eq(solicitudesLavado.tareaId, tareas.id))
       .where(eq(tareas.guarderiaId, gId))
       .orderBy(desc(tareas.createdAt))
       .limit(500),
@@ -88,6 +90,12 @@ export default async function TareasPage() {
     embarcacionId: t.embarcacionId,
     embarcacionNombre: t.embarcacionNombre,
     socioNombre: [t.socioNombre, t.socioApellido].filter(Boolean).join(' ') || t.socioEmail || null,
+    solicitudLavadoEstado: t.solicitudLavadoEstado as
+      | 'pendiente'
+      | 'en_proceso'
+      | 'lista'
+      | 'cancelada'
+      | null,
   }));
 
   const operarios = operariosList.map((o) => ({

@@ -4,9 +4,12 @@ import { revalidatePath } from 'next/cache';
 import { and, eq } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
-import { tareas, memberships, embarcaciones } from '@/lib/db/schema';
+import { tareas, memberships, embarcaciones, solicitudesLavado } from '@/lib/db/schema';
 import { getActiveMarina } from '@/lib/auth/session';
 import { ESTADOS_TAREA, type EstadoTarea } from '@/app/(dashboard)/tareas/constants';
+
+export const ESTADOS_SOLICITUD_LAVADO = ['pendiente', 'en_proceso', 'lista', 'cancelada'] as const;
+export type EstadoSolicitudLavado = (typeof ESTADOS_SOLICITUD_LAVADO)[number];
 
 export type CreateTareaData = {
   descripcion: string;
@@ -200,6 +203,48 @@ export async function updateTareaOperarioAction(
     .update(tareas)
     .set({ operarioId })
     .where(and(eq(tareas.id, tareaId), eq(tareas.guarderiaId, gId)));
+
+  revalidatePath('/tareas');
+  return {};
+}
+
+// ─── Cambiar estado de solicitud de lavado asociada (admin u operario asignado) ─
+
+export async function updateSolicitudLavadoEstadoAction(
+  tareaId: string,
+  estado: EstadoSolicitudLavado,
+): Promise<{ error?: string }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+
+  if (!ESTADOS_SOLICITUD_LAVADO.includes(estado)) {
+    return { error: 'Estado inválido.' };
+  }
+
+  const gId = ctx.activeMembership.guarderiaId;
+
+  const [tarea] = await db
+    .select({ id: tareas.id, operarioId: tareas.operarioId })
+    .from(tareas)
+    .where(and(eq(tareas.id, tareaId), eq(tareas.guarderiaId, gId)))
+    .limit(1);
+  if (!tarea) return { error: 'Tarea no encontrada.' };
+
+  const canMove =
+    isAdmin(ctx) || (ctx.activeMembership.rol === 'operario' && tarea.operarioId === ctx.user.id);
+  if (!canMove) return { error: 'No tenés permiso para actualizar este lavado.' };
+
+  const [solicitud] = await db
+    .select({ id: solicitudesLavado.id })
+    .from(solicitudesLavado)
+    .where(and(eq(solicitudesLavado.tareaId, tareaId), eq(solicitudesLavado.guarderiaId, gId)))
+    .limit(1);
+  if (!solicitud) return { error: 'Esta tarea no tiene una solicitud de lavado asociada.' };
+
+  await db
+    .update(solicitudesLavado)
+    .set({ estado, updatedAt: new Date() })
+    .where(eq(solicitudesLavado.id, solicitud.id));
 
   revalidatePath('/tareas');
   return {};
