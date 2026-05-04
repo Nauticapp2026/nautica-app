@@ -72,6 +72,67 @@ export async function logout() {
   redirect('/login');
 }
 
+const requestPasswordResetSchema = z.object({
+  email: z.string().email('Email inválido'),
+});
+
+export async function requestPasswordReset(
+  _: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const parsed = requestPasswordResetSchema.safeParse({
+    email: formData.get('email'),
+  });
+
+  if (!parsed.success) {
+    return { fieldErrors: parsed.error.flatten().fieldErrors };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email, {
+    redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback?next=/reset-password`,
+  });
+
+  if (error) return { error: translateAuthError(error.message) };
+
+  return {};
+}
+
+const updatePasswordSchema = z
+  .object({
+    password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres'),
+    confirmPassword: z.string(),
+  })
+  .refine((d) => d.password === d.confirmPassword, {
+    message: 'Las contraseñas no coinciden',
+    path: ['confirmPassword'],
+  });
+
+export async function updatePassword(
+  _: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const parsed = updatePasswordSchema.safeParse({
+    password: formData.get('password'),
+    confirmPassword: formData.get('confirmPassword'),
+  });
+
+  if (!parsed.success) {
+    return { fieldErrors: parsed.error.flatten().fieldErrors };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.updateUser({ password: parsed.data.password });
+
+  if (error) return { error: translateAuthError(error.message) };
+
+  const { getPostLoginRedirect } = await import('@/lib/auth/session');
+  const target = await getPostLoginRedirect();
+
+  revalidatePath('/', 'layout');
+  redirect(target);
+}
+
 /**
  * Devuelve el contexto de acceso del usuario actual para decidir a dónde
  * mandarlo después de setear su contraseña.
