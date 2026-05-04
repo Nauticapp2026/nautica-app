@@ -2,8 +2,8 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import Script from 'next/script';
-import { Logo } from '@/components/shared/logo';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -131,7 +131,7 @@ function Shell({ step, children }: { step: number; children: React.ReactNode }) 
       {/* White header */}
       <div className="bg-white">
         <div className="flex items-center justify-between px-6 py-3">
-          <Logo size={36} />
+          <Image src="/logo-nauticapp.png" alt="NauticApp" width={120} height={42} priority />
           <span className="text-xs text-gray-400">
             Paso {step} de {TOTAL_STEPS}
           </span>
@@ -166,7 +166,7 @@ function Shell({ step, children }: { step: number; children: React.ReactNode }) 
 function StepHeader({ title, subtitle }: { title: string; subtitle?: React.ReactNode }) {
   return (
     <div className="mb-6 flex flex-col items-center gap-2 text-center">
-      <Logo size={48} />
+      <Image src="/logo-nauticapp.png" alt="NauticApp" width={155} height={54} />
       <h1 className="mt-2 text-2xl font-bold" style={{ color: '#175861' }}>
         {title}
       </h1>
@@ -1099,7 +1099,7 @@ function Step10() {
   const router = useRouter();
   return (
     <div className="flex flex-col items-center gap-4 py-4 text-center">
-      <Logo size={48} />
+      <Image src="/logo-nauticapp.png" alt="NauticApp" width={155} height={54} />
       <div
         className="mt-2 flex h-16 w-16 items-center justify-center rounded-full"
         style={{ background: '#E6F9F0' }}

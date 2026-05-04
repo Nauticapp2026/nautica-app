@@ -1,9 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Logo } from './logo';
 import { logout } from '@/app/actions/auth';
 import {
   LayoutDashboard,
@@ -97,7 +97,7 @@ export function Sidebar({ subtitle, userName, userInitial, rol, variant = 'dashb
         >
           <Menu className="h-5 w-5" />
         </button>
-        <Logo size={28} />
+        <Image src="/logo-nauticapp.png" alt="NauticApp" width={92} height={32} priority />
         <div className="w-9" aria-hidden />
       </div>
 
@@ -128,7 +128,7 @@ export function Sidebar({ subtitle, userName, userInitial, rol, variant = 'dashb
 
         {/* Logo + subtítulo */}
         <div className="px-4 pt-5 pb-3">
-          <Logo size={36} />
+          <Image src="/logo-nauticapp.png" alt="NauticApp" width={120} height={42} priority />
           <p className="mt-1.5 truncate text-xs text-gray-400">{subtitle}</p>
         </div>
 
