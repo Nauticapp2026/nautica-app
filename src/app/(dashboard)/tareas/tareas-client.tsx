@@ -21,9 +21,8 @@ import {
   updateTareaAction,
   updateTareaEstadoAction,
   updateTareaOperarioAction,
-  type EstadoSolicitudLavado,
 } from '@/app/actions/tareas';
-import { ESTADOS_TAREA, type EstadoTarea } from './constants';
+import { ESTADOS_TAREA, type EstadoSolicitudLavado, type EstadoTarea } from './constants';
 
 // ─── Tipos ──────────────────────────────────────────────────────────────────
 
