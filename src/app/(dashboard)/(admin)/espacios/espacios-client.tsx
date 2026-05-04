@@ -3,11 +3,22 @@
 import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Anchor, Building2, Check, Plus, Trash2, X } from 'lucide-react';
+import {
+  DndContext,
+  PointerSensor,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
 
 import {
+  addPisoAction,
   createAreaAction,
   deleteAreaAction,
   deleteEspacioAction,
+  moveEspacioToPisoAction,
   updateEspacioAction,
   type CreateAreaInput,
 } from '@/app/actions/espacios';
@@ -461,39 +472,168 @@ function NaveSection({
   onEditEspacio: (cell: EspacioCell) => void;
   onDeleteEspacio: (cell: EspacioCell) => void;
 }) {
+  const router = useRouter();
+  const [movingId, setMovingId] = useState<string | null>(null);
+  const [pendingAddPiso, startAddPiso] = useTransition();
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+
+  const onDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over) return;
+    const espacioId = String(active.id);
+    const targetPisoId = String(over.id);
+    setMovingId(espacioId);
+    void moveEspacioToPisoAction(espacioId, targetPisoId).then((res) => {
+      setMovingId(null);
+      if (!res.error) router.refresh();
+    });
+  };
+
+  const onAddPiso = (ladoId: string) => {
+    startAddPiso(async () => {
+      const res = await addPisoAction(ladoId);
+      if (!res.error) router.refresh();
+    });
+  };
+
   return (
-    <section className="rounded-2xl border border-gray-200 bg-white">
-      <header className="flex items-center gap-2 rounded-t-2xl bg-[#175861] px-5 py-3 text-sm font-semibold text-white">
-        <Anchor className="h-4 w-4" />
-        {area.nombre}
-      </header>
-      <div className="p-5">
-        {area.lados.length === 0 ? (
-          <p className="py-4 text-center text-xs text-gray-400">Sin lados cargados.</p>
-        ) : (
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-            {area.lados.map((l) => (
-              <div key={l.ladoId}>
-                <div className="mb-2 flex items-center gap-2 text-xs text-gray-500">
-                  <Anchor className="h-3.5 w-3.5" />
-                  {l.nombre}
-                </div>
-                {l.pisos.map((pi) => (
-                  <div key={pi.pisoId} className="mb-3">
-                    <p className="mb-1 text-[11px] text-gray-400">{pi.nombre}</p>
-                    <EspaciosRow
+    <DndContext sensors={sensors} onDragEnd={onDragEnd}>
+      <section className="rounded-2xl border border-gray-200 bg-white">
+        <header className="flex items-center gap-2 rounded-t-2xl bg-[#175861] px-5 py-3 text-sm font-semibold text-white">
+          <Anchor className="h-4 w-4" />
+          {area.nombre}
+        </header>
+        <div className="p-5">
+          {area.lados.length === 0 ? (
+            <p className="py-4 text-center text-xs text-gray-400">Sin lados cargados.</p>
+          ) : (
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+              {area.lados.map((l) => (
+                <div key={l.ladoId}>
+                  <div className="mb-2 flex items-center gap-2 text-xs text-gray-500">
+                    <Anchor className="h-3.5 w-3.5" />
+                    {l.nombre}
+                  </div>
+                  {l.pisos.map((pi) => (
+                    <DroppablePiso
+                      key={pi.pisoId}
+                      pisoId={pi.pisoId}
+                      nombre={pi.nombre}
                       espacios={pi.espacios}
+                      movingId={movingId}
                       onEditEspacio={onEditEspacio}
                       onDeleteEspacio={onDeleteEspacio}
                     />
-                  </div>
-                ))}
-              </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => onAddPiso(l.ladoId)}
+                    disabled={pendingAddPiso}
+                    className="mt-1 inline-flex w-full items-center justify-center gap-1.5 rounded-[10px] border border-dashed border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-500 transition-colors hover:border-[#175861] hover:text-[#175861] disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    {pendingAddPiso ? 'Agregando...' : 'Agregar piso'}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+    </DndContext>
+  );
+}
+
+function DroppablePiso({
+  pisoId,
+  nombre,
+  espacios,
+  movingId,
+  onEditEspacio,
+  onDeleteEspacio,
+}: {
+  pisoId: string;
+  nombre: string;
+  espacios: EspacioCell[];
+  movingId: string | null;
+  onEditEspacio: (cell: EspacioCell) => void;
+  onDeleteEspacio: (cell: EspacioCell) => void;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: pisoId });
+  return (
+    <div className="mb-3">
+      <p className="mb-1 text-[11px] text-gray-400">{nombre}</p>
+      <div
+        ref={setNodeRef}
+        className={`min-h-[2.5rem] rounded-[10px] border p-1.5 transition-colors ${
+          isOver ? 'border-[#175861] bg-[#D9EBE9]/40' : 'border-dashed border-transparent'
+        }`}
+      >
+        {espacios.length === 0 ? (
+          <p className="px-1 py-1 text-[11px] text-gray-400">Sin espacios.</p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {espacios.map((e) => (
+              <DraggableEspacio
+                key={e.id}
+                cell={e}
+                isMoving={movingId === e.id}
+                onEdit={() => onEditEspacio(e)}
+                onDelete={() => onDeleteEspacio(e)}
+              />
             ))}
           </div>
         )}
       </div>
-    </section>
+    </div>
+  );
+}
+
+function DraggableEspacio({
+  cell,
+  isMoving,
+  onEdit,
+  onDelete,
+}: {
+  cell: EspacioCell;
+  isMoving: boolean;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: cell.id,
+  });
+  const style: React.CSSProperties = {
+    transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
+    opacity: isDragging || isMoving ? 0.5 : 1,
+    zIndex: isDragging ? 10 : undefined,
+  };
+  return (
+    <div ref={setNodeRef} style={style} className="group relative">
+      <button
+        type="button"
+        onClick={onEdit}
+        title={`Editar espacio ${cell.nomenclatura} — arrastrá para mover`}
+        className={`inline-flex h-7 min-w-[2.25rem] cursor-grab items-center justify-center rounded-[8px] border px-2 text-xs font-semibold transition-colors hover:brightness-95 active:cursor-grabbing ${ESTADO_CLS[cell.estado]}`}
+        {...listeners}
+        {...attributes}
+      >
+        {cell.nomenclatura}
+      </button>
+      <button
+        type="button"
+        onClick={(ev) => {
+          ev.stopPropagation();
+          onDelete();
+        }}
+        title={`Eliminar espacio ${cell.nomenclatura}`}
+        aria-label={`Eliminar espacio ${cell.nomenclatura}`}
+        className="absolute -top-1.5 -right-1.5 hidden h-4 w-4 items-center justify-center rounded-full bg-red-500 text-white shadow transition-colors group-hover:flex hover:bg-red-600"
+      >
+        <X className="h-3 w-3" strokeWidth={3} />
+      </button>
+    </div>
   );
 }
 

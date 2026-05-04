@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import {
@@ -318,6 +318,132 @@ export async function deleteAreaAction(id: string): Promise<{ error?: string }> 
   await db.delete(naves).where(eq(naves.areaId, id));
   await db.delete(marinas).where(eq(marinas.areaId, id));
   await db.delete(areas).where(eq(areas.id, id));
+
+  revalidatePath('/espacios');
+  return {};
+}
+
+export async function addPisoAction(ladoId: string): Promise<{ error?: string; pisoId?: string }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+  if (!isAdmin(ctx)) return { error: 'Solo administradores pueden agregar pisos.' };
+
+  const guarderiaId = ctx.activeMembership.guarderiaId;
+
+  const [lado] = await db
+    .select({ id: ladosTable.id, areaId: ladosTable.areaId, naveId: ladosTable.naveId })
+    .from(ladosTable)
+    .where(and(eq(ladosTable.id, ladoId), eq(ladosTable.guarderiaId, guarderiaId)))
+    .limit(1);
+  if (!lado) return { error: 'Lado no encontrado.' };
+
+  const pisosLado = await db
+    .select({ id: pisosTable.id, orden: pisosTable.orden })
+    .from(pisosTable)
+    .where(eq(pisosTable.ladoId, ladoId))
+    .orderBy(desc(pisosTable.orden));
+  if (pisosLado.length === 0) {
+    return { error: 'El lado no tiene pisos previos para usar como referencia.' };
+  }
+
+  const ultimoPiso = pisosLado[0];
+  const nuevoOrden = (ultimoPiso.orden ?? 0) + 1;
+
+  const espaciosUltimoPiso = await db
+    .select({ id: espacios.id })
+    .from(espacios)
+    .where(eq(espacios.pisoId, ultimoPiso.id));
+  const cantEspacios = espaciosUltimoPiso.length;
+
+  // Continuar la secuencia numérica del lado para no colisionar con nomenclaturas existentes.
+  const espaciosLado = await db
+    .select({ nomenclatura: espacios.nomenclatura })
+    .from(espacios)
+    .where(eq(espacios.ladoId, ladoId));
+  const maxNum = espaciosLado.reduce((acc, e) => {
+    const n = Number(e.nomenclatura);
+    return Number.isFinite(n) && n > acc ? n : acc;
+  }, 0);
+
+  const [piso] = await db
+    .insert(pisosTable)
+    .values({
+      areaId: lado.areaId,
+      ladoId: lado.id,
+      nombre: `Piso ${pisosLado.length + 1}`,
+      orden: nuevoOrden,
+    })
+    .returning({ id: pisosTable.id });
+
+  if (cantEspacios > 0) {
+    const rows = [];
+    for (let k = 0; k < cantEspacios; k++) {
+      rows.push({
+        guarderiaId,
+        areaId: lado.areaId,
+        naveId: lado.naveId,
+        ladoId: lado.id,
+        pisoId: piso.id,
+        nomenclatura: String(maxNum + 1 + k),
+        estado: 'disponible' as const,
+      });
+    }
+    await db.insert(espacios).values(rows);
+  }
+
+  revalidatePath('/espacios');
+  return { pisoId: piso.id };
+}
+
+export async function moveEspacioToPisoAction(
+  espacioId: string,
+  targetPisoId: string,
+): Promise<{ error?: string }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+  if (!isAdmin(ctx)) return { error: 'Solo administradores pueden mover espacios.' };
+
+  const guarderiaId = ctx.activeMembership.guarderiaId;
+
+  const [espacio] = await db
+    .select({
+      id: espacios.id,
+      naveId: espacios.naveId,
+      pisoId: espacios.pisoId,
+    })
+    .from(espacios)
+    .where(and(eq(espacios.id, espacioId), eq(espacios.guarderiaId, guarderiaId)))
+    .limit(1);
+  if (!espacio) return { error: 'Espacio no encontrado.' };
+
+  if (espacio.pisoId === targetPisoId) return {};
+
+  // Validar que el piso destino pertenezca a un lado de la misma nave (y guardería).
+  const [destino] = await db
+    .select({
+      pisoId: pisosTable.id,
+      ladoId: ladosTable.id,
+      naveId: ladosTable.naveId,
+      areaId: ladosTable.areaId,
+    })
+    .from(pisosTable)
+    .innerJoin(ladosTable, eq(ladosTable.id, pisosTable.ladoId))
+    .where(and(eq(pisosTable.id, targetPisoId), eq(ladosTable.guarderiaId, guarderiaId)))
+    .limit(1);
+  if (!destino) return { error: 'Piso destino no encontrado.' };
+
+  if (!espacio.naveId || destino.naveId !== espacio.naveId) {
+    return { error: 'Solo se puede mover el espacio a otro piso de la misma nave.' };
+  }
+
+  await db
+    .update(espacios)
+    .set({
+      pisoId: destino.pisoId,
+      ladoId: destino.ladoId,
+      areaId: destino.areaId,
+    })
+    .where(eq(espacios.id, espacioId));
 
   revalidatePath('/espacios');
   return {};
