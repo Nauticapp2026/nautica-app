@@ -200,24 +200,24 @@ function TareaCard({
             </option>
           ))}
         </select>
-        {/* Selector "Mover a" — alternativa al drag & drop para touch/mobile.
-            El valor siempre se resetea a "" después de disparar el move. */}
-        <select
-          className="h-8 w-full rounded-[8px] border border-gray-200 bg-white px-2 text-xs text-[#175861] focus:border-[#175861] focus:outline-none"
-          value=""
-          onChange={(e) => {
-            const dest = e.target.value as EstadoTarea;
-            if (dest) onMoveEstado(tarea, dest);
-          }}
-          disabled={!canEditAll || pending}
-        >
-          <option value="">Mover a…</option>
-          {ESTADOS_TAREA.filter((e) => e !== tarea.estado).map((e) => (
-            <option key={e} value={e}>
-              {ESTADO_LABEL[e]}
-            </option>
-          ))}
-        </select>
+        {tarea.estado !== 'lavado' && (
+          <select
+            className="h-8 w-full rounded-[8px] border border-gray-200 bg-white px-2 text-xs text-[#175861] focus:border-[#175861] focus:outline-none"
+            value=""
+            onChange={(e) => {
+              const dest = e.target.value as EstadoTarea;
+              if (dest) onMoveEstado(tarea, dest);
+            }}
+            disabled={!canEditAll || pending}
+          >
+            <option value="">Mover a…</option>
+            {ESTADOS_TAREA.filter((e) => e !== tarea.estado).map((e) => (
+              <option key={e} value={e}>
+                {ESTADO_LABEL[e]}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
     </div>
   );
