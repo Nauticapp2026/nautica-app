@@ -189,7 +189,9 @@ function TareaCard({
     >
       <div className="mb-1 flex items-start justify-between gap-2">
         <p className="truncate text-xs font-medium text-gray-600">{tarea.socioNombre ?? '—'}</p>
-        <span className="shrink-0 text-xs text-gray-500">{fmtHora(tarea.fechaHora)}</span>
+        {tarea.estado !== 'lavado' && (
+          <span className="shrink-0 text-xs text-gray-500">{fmtHora(tarea.fechaHora)}</span>
+        )}
       </div>
 
       <p className="text-base font-bold" style={{ color: '#101828' }}>
