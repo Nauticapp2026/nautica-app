@@ -6,10 +6,12 @@ import { and, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { tareas, memberships, embarcaciones, solicitudesLavado } from '@/lib/db/schema';
 import { getActiveMarina } from '@/lib/auth/session';
-import { ESTADOS_TAREA, type EstadoTarea } from '@/app/(dashboard)/tareas/constants';
-
-export const ESTADOS_SOLICITUD_LAVADO = ['pendiente', 'en_proceso', 'lista', 'cancelada'] as const;
-export type EstadoSolicitudLavado = (typeof ESTADOS_SOLICITUD_LAVADO)[number];
+import {
+  ESTADOS_SOLICITUD_LAVADO,
+  ESTADOS_TAREA,
+  type EstadoSolicitudLavado,
+  type EstadoTarea,
+} from '@/app/(dashboard)/tareas/constants';
 
 export type CreateTareaData = {
   descripcion: string;
