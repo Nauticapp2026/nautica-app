@@ -77,35 +77,42 @@ function formatNumber(value: number) {
 }
 
 export function PricingClient({ plans, capacities }: Props) {
-  const sorted = [...capacities].sort((a, b) => a - b);
+  const STEP = 10;
+  const [markers, setMarkers] = useState<number[]>(() => capacities);
+
+  const sorted = [...markers].sort((a, b) => a - b);
   const min = sorted[0] ?? 0;
   const max = sorted[sorted.length - 1] ?? 0;
-  const STEP = 10;
-  const defaultValue = sorted.length > 1 ? sorted[1] : (sorted[0] ?? 0);
+
+  const defaultValue = markers[1] ?? markers[0] ?? 0;
   const [capacity, setCapacity] = useState<number>(defaultValue);
-  const [inputValue, setInputValue] = useState<string>(String(defaultValue));
 
-  const clamp = (v: number) => Math.max(min, Math.min(max, v));
+  const clampedCapacity = Math.max(min, Math.min(max, capacity));
+  const handlePercent = max > min ? ((clampedCapacity - min) / (max - min)) * 100 : 0;
 
-  const handleSlider = (v: number) => {
-    setCapacity(v);
-    setInputValue(String(v));
-  };
+  const handleSlider = (v: number) => setCapacity(v);
 
-  const handleInputChange = (raw: string) => {
-    setInputValue(raw);
+  const handleMarkerChange = (i: number, raw: string) => {
+    if (raw === '') {
+      setMarkers((prev) => {
+        const next = [...prev];
+        next[i] = 0;
+        return next;
+      });
+      return;
+    }
     const n = Number(raw);
-    if (Number.isFinite(n)) setCapacity(clamp(Math.round(n)));
+    if (!Number.isFinite(n) || n < 0) return;
+    const rounded = Math.round(n);
+    setMarkers((prev) => {
+      const next = [...prev];
+      next[i] = rounded;
+      return next;
+    });
+    setCapacity(rounded);
   };
 
-  const handleInputBlur = () => {
-    const n = Number(inputValue);
-    const final = Number.isFinite(n) ? clamp(Math.round(n)) : defaultValue;
-    setCapacity(final);
-    setInputValue(String(final));
-  };
-
-  const handlePercent = max > min ? ((capacity - min) / (max - min)) * 100 : 0;
+  const handleMarkerSelect = (i: number) => setCapacity(markers[i]);
 
   return (
     <section id="planes" className="bg-[#F3F4F6] py-20">
@@ -134,26 +141,31 @@ export function PricingClient({ plans, capacities }: Props) {
               min={min}
               max={max}
               step={STEP}
-              value={capacity}
+              value={clampedCapacity}
               onChange={(e) => handleSlider(Number(e.target.value))}
               aria-label="Cantidad de lugares"
               className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
             />
           </div>
-          <div className="mt-3 flex items-center justify-between gap-3 text-sm font-bold text-[#677B85]">
-            <span>{formatNumber(min)}</span>
-            <input
-              type="number"
-              min={min}
-              max={max}
-              step={STEP}
-              value={inputValue}
-              onChange={(e) => handleInputChange(e.target.value)}
-              onBlur={handleInputBlur}
-              aria-label="Cantidad de lugares"
-              className="h-11 w-32 rounded-[10px] border border-gray-200 bg-white px-3 text-center text-base font-bold text-[#175861] focus:border-[#175861] focus:ring-1 focus:ring-[#175861] focus:outline-none"
-            />
-            <span>{formatNumber(max)}</span>
+          <div className="mt-3 flex justify-between gap-2 text-sm font-bold">
+            {markers.map((m, i) => {
+              const activo = m === capacity;
+              return (
+                <input
+                  key={i}
+                  type="number"
+                  min={0}
+                  step={STEP}
+                  value={m}
+                  onChange={(e) => handleMarkerChange(i, e.target.value)}
+                  onFocus={() => handleMarkerSelect(i)}
+                  aria-label={`Marcador ${i + 1}`}
+                  className={`w-16 cursor-pointer bg-transparent text-center transition-colors hover:text-[#175861] focus:outline-none ${
+                    activo ? 'text-[#175861]' : 'text-[#677B85]'
+                  }`}
+                />
+              );
+            })}
           </div>
         </div>
 
