@@ -20,6 +20,7 @@ export default async function SuperAdminComunicacionesPage() {
       tipo: platformComunicaciones.tipo,
       publicar: platformComunicaciones.publicar,
       fecha: platformComunicaciones.fecha,
+      imagenUrls: platformComunicaciones.imagenUrls,
       autorNombre: profiles.nombre,
       autorApellido: profiles.apellido,
       autorEmail: profiles.email,
@@ -36,6 +37,7 @@ export default async function SuperAdminComunicacionesPage() {
     tipo: r.tipo ?? 'socios',
     publicar: r.publicar ?? false,
     fecha: r.fecha ? r.fecha.toISOString() : null,
+    imagenUrls: r.imagenUrls ?? [],
     autor:
       [r.autorNombre, r.autorApellido].filter(Boolean).join(' ').trim() || r.autorEmail || null,
   }));

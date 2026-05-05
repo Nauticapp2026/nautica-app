@@ -7,9 +7,11 @@ import { Calendar, Edit3, FilterX, Globe, MessageSquare, Plus, Send, Users, X } 
 import {
   createComunicacionAction,
   updateComunicacionAction,
+  uploadComunicacionImagenAction,
   type ComunicacionInput,
 } from '@/app/actions/comunicaciones';
 import { formatArgentinaDate } from '@/lib/dates';
+import { ImagesUploader } from '@/components/shared/images-uploader';
 
 export type TipoComunicacion = 'socios' | 'publica';
 export type CategoriaComunicacion =
@@ -27,6 +29,7 @@ export type Comunicacion = {
   tipo: TipoComunicacion;
   publicar: boolean;
   fecha: string | null;
+  imagenUrls: string[];
   autor: string | null;
 };
 
@@ -235,6 +238,7 @@ function ComunicacionModal({
   const [texto, setTexto] = useState(initial?.texto ?? '');
   const [tipo, setTipo] = useState<'' | TipoComunicacion>(initial?.tipo ?? '');
   const [categoria, setCategoria] = useState<'' | CategoriaComunicacion>(initial?.categoria ?? '');
+  const [imagenUrls, setImagenUrls] = useState<string[]>(initial?.imagenUrls ?? []);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -261,6 +265,7 @@ function ComunicacionModal({
       tipo,
       categoria,
       publicar,
+      imagenUrls,
     };
 
     startTransition(async () => {
@@ -340,6 +345,20 @@ function ComunicacionModal({
                 <option value="alerta">Alerta</option>
               </select>
             </div>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-semibold text-gray-700">Imágenes</label>
+            <ImagesUploader
+              urls={imagenUrls}
+              onChange={setImagenUrls}
+              upload={async (file) => {
+                const fd = new FormData();
+                fd.append('file', file);
+                return uploadComunicacionImagenAction(fd);
+              }}
+              onError={setError}
+            />
           </div>
 
           {error && <p className="text-sm text-red-600">{error}</p>}

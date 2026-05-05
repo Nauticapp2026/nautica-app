@@ -697,6 +697,7 @@ export const comunicaciones = pgTable(
     tipo: tipoComunicacionEnum('tipo').default('socios'),
     publicar: boolean('publicar').default(false),
     fecha: timestamp('fecha', { withTimezone: true }).defaultNow(),
+    imagenUrls: text('imagen_urls').array(),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
@@ -1060,6 +1061,7 @@ export const platformComunicaciones = pgTable('platform_comunicaciones', {
   tipo: tipoComunicacionEnum('tipo').default('socios'),
   publicar: boolean('publicar').default(false),
   fecha: timestamp('fecha', { withTimezone: true }).defaultNow(),
+  imagenUrls: text('imagen_urls').array(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
