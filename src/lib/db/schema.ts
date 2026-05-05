@@ -761,6 +761,7 @@ export const movimientosCuentaCorriente = pgTable(
       .notNull()
       .references(() => profiles.id, { onDelete: 'cascade' }),
     servicioId: uuid('servicio_id').references(() => servicios.id, { onDelete: 'set null' }),
+    espacioId: uuid('espacio_id').references(() => espacios.id, { onDelete: 'set null' }),
     concepto: text('concepto'),
     tipo: tipoCuentaCorrienteEnum('tipo'),
     estado: estadoCtaCteEnum('estado').default('no_pagado'),

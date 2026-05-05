@@ -260,6 +260,7 @@ export async function updateEspacioAction(input: UpdateEspacioInput): Promise<{ 
         : servicioNombre;
       await ensureMonthlyMovimiento({
         socioId: input.ocupanteId,
+        espacioId: input.id,
         servicioId: input.servicioId,
         precio: importe,
         concepto,
