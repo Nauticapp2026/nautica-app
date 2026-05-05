@@ -147,20 +147,23 @@ export function PricingClient({ plans, capacities }: Props) {
               className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
             />
           </div>
-          <div className="mt-3 flex justify-between gap-2 text-sm font-bold">
+          <div className="mt-3 flex flex-wrap justify-between gap-x-2 gap-y-1 text-sm font-bold">
             {markers.map((m, i) => {
               const activo = m === capacity;
               return (
                 <input
                   key={i}
-                  type="number"
-                  min={0}
-                  step={STEP}
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   value={m}
-                  onChange={(e) => handleMarkerChange(i, e.target.value)}
-                  onFocus={() => handleMarkerSelect(i)}
+                  onChange={(e) => handleMarkerChange(i, e.target.value.replace(/[^0-9]/g, ''))}
+                  onFocus={(e) => {
+                    handleMarkerSelect(i);
+                    e.currentTarget.select();
+                  }}
                   aria-label={`Marcador ${i + 1}`}
-                  className={`w-16 cursor-pointer bg-transparent text-center transition-colors hover:text-[#175861] focus:outline-none ${
+                  className={`w-12 cursor-pointer rounded bg-transparent text-center transition-colors hover:text-[#175861] focus:bg-white focus:text-[#175861] focus:ring-1 focus:ring-[#175861] focus:outline-none ${
                     activo ? 'text-[#175861]' : 'text-[#677B85]'
                   }`}
                 />
