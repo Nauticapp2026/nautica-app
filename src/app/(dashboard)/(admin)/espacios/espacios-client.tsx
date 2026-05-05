@@ -61,6 +61,10 @@ export type ServicioEspacio = {
 
 type Filtro = 'marina' | 'nave';
 
+export type LugarEspacio =
+  | { tipo: 'marina'; peine: string }
+  | { tipo: 'nave'; lado: string; piso: string };
+
 const ESTADO_CLS: Record<EstadoEspacio, string> = {
   ocupado: 'bg-red-100 text-red-700 border-red-200',
   reservado: 'bg-amber-100 text-amber-700 border-amber-200',
@@ -108,9 +112,11 @@ export function EspaciosClient({
   const [deletingEspacio, startDeleteEspacio] = useTransition();
   const [deleteEspacioError, setDeleteEspacioError] = useState<string | null>(null);
 
-  const [editEspacio, setEditEspacio] = useState<{ cell: EspacioCell; areaNombre: string } | null>(
-    null,
-  );
+  const [editEspacio, setEditEspacio] = useState<{
+    cell: EspacioCell;
+    areaNombre: string;
+    lugar: LugarEspacio;
+  } | null>(null);
 
   const onDelete = () => {
     if (!confirmDelete) return;
@@ -258,7 +264,9 @@ export function EspaciosClient({
               <MarinaSection
                 key={a.id}
                 area={a}
-                onEditEspacio={(cell) => setEditEspacio({ cell, areaNombre: a.nombre })}
+                onEditEspacio={(cell, lugar) =>
+                  setEditEspacio({ cell, areaNombre: a.nombre, lugar })
+                }
                 onDeleteEspacio={(cell) => {
                   setDeleteEspacioError(null);
                   setConfirmDeleteEspacio(cell);
@@ -268,7 +276,9 @@ export function EspaciosClient({
               <NaveSection
                 key={a.id}
                 area={a}
-                onEditEspacio={(cell) => setEditEspacio({ cell, areaNombre: a.nombre })}
+                onEditEspacio={(cell, lugar) =>
+                  setEditEspacio({ cell, areaNombre: a.nombre, lugar })
+                }
                 onDeleteEspacio={(cell) => {
                   setDeleteEspacioError(null);
                   setConfirmDeleteEspacio(cell);
@@ -313,6 +323,7 @@ export function EspaciosClient({
         <EditarEspacioModal
           cell={editEspacio.cell}
           areaNombre={editEspacio.areaNombre}
+          lugar={editEspacio.lugar}
           socios={socios}
           serviciosEspacios={serviciosEspacios}
           onClose={() => setEditEspacio(null)}
@@ -431,7 +442,7 @@ function MarinaSection({
   onDeleteEspacio,
 }: {
   area: AreaView;
-  onEditEspacio: (cell: EspacioCell) => void;
+  onEditEspacio: (cell: EspacioCell, lugar: LugarEspacio) => void;
   onDeleteEspacio: (cell: EspacioCell) => void;
 }) {
   return (
@@ -452,7 +463,7 @@ function MarinaSection({
               </div>
               <EspaciosRow
                 espacios={p.espacios}
-                onEditEspacio={onEditEspacio}
+                onEditEspacio={(cell) => onEditEspacio(cell, { tipo: 'marina', peine: p.nombre })}
                 onDeleteEspacio={onDeleteEspacio}
               />
             </div>
@@ -469,7 +480,7 @@ function NaveSection({
   onDeleteEspacio,
 }: {
   area: AreaView;
-  onEditEspacio: (cell: EspacioCell) => void;
+  onEditEspacio: (cell: EspacioCell, lugar: LugarEspacio) => void;
   onDeleteEspacio: (cell: EspacioCell) => void;
 }) {
   const router = useRouter();
@@ -522,7 +533,13 @@ function NaveSection({
                       nombre={pi.nombre}
                       espacios={pi.espacios}
                       movingId={movingId}
-                      onEditEspacio={onEditEspacio}
+                      onEditEspacio={(cell) =>
+                        onEditEspacio(cell, {
+                          tipo: 'nave',
+                          lado: l.nombre,
+                          piso: pi.nombre,
+                        })
+                      }
                       onDeleteEspacio={onDeleteEspacio}
                     />
                   ))}
@@ -1060,6 +1077,7 @@ const ESTADO_LABEL: Record<EstadoEspacio, string> = {
 function EditarEspacioModal({
   cell,
   areaNombre,
+  lugar,
   socios,
   serviciosEspacios,
   onClose,
@@ -1068,12 +1086,17 @@ function EditarEspacioModal({
 }: {
   cell: EspacioCell;
   areaNombre: string;
+  lugar: LugarEspacio;
   socios: SocioOpt[];
   serviciosEspacios: ServicioEspacio[];
   onClose: () => void;
   onSaved: () => void;
   onDelete: () => void;
 }) {
+  const breadcrumb =
+    lugar.tipo === 'marina'
+      ? `${areaNombre} / ${lugar.peine}`
+      : `${areaNombre} / ${lugar.lado} / ${lugar.piso}`;
   const [ocupanteId, setOcupanteId] = useState<string>(cell.ocupanteId ?? '');
   const [nomenclatura, setNomenclatura] = useState<string>(cell.nomenclatura);
   const [estado, setEstado] = useState<EstadoEspacio>(cell.estado);
@@ -1128,10 +1151,10 @@ function EditarEspacioModal({
         <div className="flex items-start justify-between p-6 pb-4">
           <div>
             <h2 className="text-lg font-bold" style={{ color: '#101828' }}>
-              Editar espacio
+              Editar espacio {cell.nomenclatura}
             </h2>
             <p className="mt-0.5 text-sm" style={{ color: '#669E9D' }}>
-              {areaNombre}
+              {breadcrumb}
             </p>
           </div>
           <button
