@@ -26,6 +26,36 @@ function endOfMonth(d: Date = new Date()): Date {
   return new Date(next.getTime() - 1);
 }
 
+function daysInMonth(d: Date): number {
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
+}
+
+/**
+ * Para asignaciones a mitad de mes, cobramos solo los días que quedan
+ * (incluye el día de asignación). Si la fecha es el día 1, devuelve el
+ * mes completo. El cron mensual usa siempre el precio completo.
+ */
+export function calcularProporcionalMes(
+  precio: number,
+  fecha: Date = new Date(),
+): {
+  importe: number;
+  diasRestantes: number;
+  diasMes: number;
+  esProporcional: boolean;
+} {
+  const diasMes = daysInMonth(fecha);
+  const diaActual = fecha.getUTCDate();
+  const diasRestantes = diasMes - diaActual + 1;
+  const importe = Math.round((precio / diasMes) * diasRestantes * 100) / 100;
+  return {
+    importe,
+    diasRestantes,
+    diasMes,
+    esProporcional: diasRestantes !== diasMes,
+  };
+}
+
 /**
  * Se asegura de que exista el movimiento mensual para (socio, servicio) en el
  * mes corriente. Si ya hay uno en el mismo rango, no hace nada. Devuelve el id
