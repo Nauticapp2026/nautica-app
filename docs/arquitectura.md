@@ -141,6 +141,8 @@ Las del super admin reemplazan `getActiveMarina` por `requireSuperAdmin()` y no 
 - Las fotos / archivos se suben pasando un `File` por `FormData` a un Server Action, que sube a Supabase Storage con el cliente admin (service role).
 - El default de Next.js para Server Actions es **1 MB**. En este repo está subido a **10 MB** en `next.config.ts` (`experimental.serverActions.bodySizeLimit`) — sin esto, las fotos típicas (2-5 MB) fallan silenciosamente.
 - Si en algún momento se necesitan archivos > 10 MB, conviene migrar a upload directo a Storage desde el cliente con Signed URL.
+- **Buckets actuales**: `documentos` (privado, docs adjuntos a socios), `guarderia-fotos` (público, galería del club), `comunicaciones` (público, imágenes adjuntas a comunicaciones — varias por aviso, persistidas como `text[]`). Los buckets se crean on-demand desde la primer subida (`ensureBucket`).
+- Componente UI compartido `src/components/shared/images-uploader.tsx` (`ImagesUploader`) — multi-imagen con preview y botón quitar; lo usan los modales de comunicaciones (admin y super admin).
 
 ---
 
@@ -222,11 +224,23 @@ Componentes shadcn/ui en `src/components/ui/`:
 
 ---
 
+## Facturación / Movimientos mensuales
+
+La cuota mensual de un socio se genera **por espacio asignado con servicio**, no por ser socio.
+
+- **Disparador 1**: al asignar ocupante + servicio en `updateEspacioAction` (`src/app/actions/espacios.ts`) → crea el movimiento del mes corriente, con prorrateo si cae a mitad de mes (`(precio / días_del_mes) * días_restantes`, incluye el día de asignación). El `concepto` lleva sufijo `"(proporcional X/Y días)"` cuando aplica.
+- **Disparador 2**: cron `/api/cron/mensuales` el día 1 de cada mes recorre todos los espacios con ocupante + servicio y crea los movimientos del mes nuevo (siempre mes completo).
+- **Helper común**: `ensureMonthlyMovimiento` en `src/lib/movimientos-mensuales.ts`. Idempotencia por `(socio_id, espacio_id, tipo='mensual', fecha en mes corriente)` — un socio con N espacios genera N movimientos por mes, incluso si comparten servicio.
+- **Tabla**: `movimientos_cuenta_corriente` con columnas `socio_id`, `espacio_id` (FK a `espacios.id`, ON DELETE SET NULL — agregada en migración 0013), `servicio_id`, `concepto`, `tipo`, `debe`, `haber`, `fecha`, `proximo_pago`.
+- **No se cobra al alta del socio**. `createSocioAction` no genera ningún movimiento.
+
+---
+
 ## Integraciones externas
 
 - **Supabase** — Auth, Postgres, RLS. Único proyecto (prod).
 - **tusfacturas.app** — emisión de facturas AFIP. Credenciales `TUSFACTURAS_*` en env vars.
-- **Vercel Cron** — `src/app/api/cron/mensuales` corre los movimientos mensuales. Es idempotente (puede correrse dos veces sin generar duplicados).
+- **Vercel Cron** — `src/app/api/cron/mensuales` corre los movimientos mensuales (ver sección anterior). Es idempotente.
 
 ---
 
