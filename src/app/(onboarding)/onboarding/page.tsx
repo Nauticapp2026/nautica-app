@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Script from 'next/script';
@@ -29,6 +29,7 @@ import {
 import { Check, Trash2, Plus, ChevronRight } from 'lucide-react';
 
 const TOTAL_STEPS = 10;
+const STORAGE_KEY = 'onboarding-state-v1';
 
 const DIAS = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'] as const;
 const DIAS_LABELS: Record<string, string> = {
@@ -78,8 +79,8 @@ type Data = {
   // step 4
   equipo: TeamMember[];
   // step 5
-  cantidadNaves: string;
-  cantidadPeines: string;
+  espaciosNaves: string;
+  espaciosMarinas: string;
   // step 6
   activarNotificaciones: boolean;
   activarClimaYMareas: boolean;
@@ -819,7 +820,7 @@ function Step5({
   onBack,
 }: {
   data: Data;
-  onChange: (k: 'cantidadNaves' | 'cantidadPeines', v: string) => void;
+  onChange: (k: 'espaciosNaves' | 'espaciosMarinas', v: string) => void;
   onNext: () => void;
   onBack: () => void;
 }) {
@@ -829,51 +830,32 @@ function Step5({
         title="Configuración de espacios"
         subtitle={
           <>
-            Define la estructura de <span style={{ color: '#669E9D' }}>naves</span> y peines de tu
-            guardería
+            ¿Cuántos espacios de guarda tenés en tu{' '}
+            <span style={{ color: '#669E9D' }}>guardería</span>?
           </>
         }
       />
-      <div className="mb-6 rounded-2xl p-5" style={{ background: '#FEF3E8' }}>
-        <p className="mb-4 font-semibold" style={{ color: '#175861' }}>
-          Paso 1: Cantidad de naves y peines
-        </p>
-        <div className="grid grid-cols-2 gap-4">
-          <Field label="¿Cuántas naves tenés?">
-            <Input
-              className={inputCls}
-              type="number"
-              placeholder="3"
-              value={data.cantidadNaves}
-              onChange={(e) => onChange('cantidadNaves', e.target.value)}
-            />
-          </Field>
-          <Field label="¿Cuántos peines tenés?">
-            <Input
-              className={inputCls}
-              type="number"
-              placeholder="2"
-              value={data.cantidadPeines}
-              onChange={(e) => onChange('cantidadPeines', e.target.value)}
-            />
-          </Field>
-        </div>
-        <div className="mt-4 flex gap-3">
-          <button
-            type="button"
-            className="rounded-[10px] px-5 py-2.5 text-sm font-semibold text-white transition hover:opacity-90"
-            style={{ background: '#175861' }}
-          >
-            Generar naves
-          </button>
-          <button
-            type="button"
-            className="rounded-[10px] px-5 py-2.5 text-sm font-semibold text-white transition hover:opacity-90"
-            style={{ background: '#175861' }}
-          >
-            Generar peines
-          </button>
-        </div>
+      <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2">
+        <Field label="Espacios en naves">
+          <Input
+            className={inputCls}
+            type="number"
+            min={0}
+            placeholder="0"
+            value={data.espaciosNaves}
+            onChange={(e) => onChange('espaciosNaves', e.target.value)}
+          />
+        </Field>
+        <Field label="Espacios en marinas">
+          <Input
+            className={inputCls}
+            type="number"
+            min={0}
+            placeholder="0"
+            value={data.espaciosMarinas}
+            onChange={(e) => onChange('espaciosMarinas', e.target.value)}
+          />
+        </Field>
       </div>
       <NavButtons onBack={onBack} onNext={onNext} />
     </>
@@ -1158,8 +1140,8 @@ export default function OnboardingPage() {
     descripcion: '',
     horarios: DEFAULT_HORARIOS,
     equipo: [],
-    cantidadNaves: '',
-    cantidadPeines: '',
+    espaciosNaves: '',
+    espaciosMarinas: '',
     activarNotificaciones: true,
     activarClimaYMareas: true,
     activarReservasOnline: true,
@@ -1167,6 +1149,51 @@ export default function OnboardingPage() {
     activarMenuGastronomico: false,
     plan: 'classic',
   });
+
+  // El wizard vive en useState, asi que un refresh perdia todo el progreso y
+  // mandaba al usuario al Step 1. Persistimos step + data en localStorage para
+  // que sobreviva refreshes / cierres de pestana. Excluimos password porque ya
+  // se usa solo en el Step 1 para crear el auth user.
+  const hydratedRef = useRef(false);
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as { step?: number; data?: Partial<Data> };
+        if (typeof parsed.step === 'number' && parsed.step >= 1 && parsed.step <= TOTAL_STEPS) {
+          // Hidratacion desde localStorage: el lazy init de useState causaria
+          // hydration mismatch en SSR; el setState aca es la forma correcta.
+          // eslint-disable-next-line react-hooks/set-state-in-effect
+          setStep(parsed.step);
+        }
+        if (parsed.data && typeof parsed.data === 'object') {
+          setData((prev) => ({ ...prev, ...parsed.data }));
+        }
+      }
+    } catch {
+      // ignoramos errores de parse / storage deshabilitado
+    }
+    hydratedRef.current = true;
+  }, []);
+
+  useEffect(() => {
+    if (!hydratedRef.current) return;
+    try {
+      const { password, ...rest } = data;
+      void password;
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ step, data: rest }));
+    } catch {
+      // ignoramos quota / storage deshabilitado
+    }
+  }, [step, data]);
+
+  useEffect(() => {
+    if (step !== TOTAL_STEPS) return;
+    try {
+      window.localStorage.removeItem(STORAGE_KEY);
+    } catch {}
+  }, [step]);
 
   function set(k: keyof Data, v: unknown) {
     setData((prev) => ({ ...prev, [k]: v }));
