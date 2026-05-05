@@ -2,13 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { db } from '@/lib/db';
-import {
-  documentos,
-  embarcaciones,
-  memberships,
-  movimientosCuentaCorriente,
-  profiles,
-} from '@/lib/db/schema';
+import { documentos, embarcaciones, memberships, profiles } from '@/lib/db/schema';
 import { getActiveMarina } from '@/lib/auth/session';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { translateInviteError } from '@/lib/auth/errors';
@@ -31,11 +25,6 @@ export type CreateSocioData = {
 };
 
 export type SocioResult = { error?: string; socioId?: string };
-
-function nextMonthStart(): Date {
-  const now = new Date();
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
-}
 
 export async function createSocioAction(data: CreateSocioData): Promise<SocioResult> {
   const ctx = await getActiveMarina();
@@ -114,16 +103,6 @@ export async function createSocioAction(data: CreateSocioData): Promise<SocioRes
         seguro: data.seguro.trim() || null,
       });
     }
-
-    // 5. Create first monthly billing movement
-    await db.insert(movimientosCuentaCorriente).values({
-      socioId: profileId,
-      concepto: 'Cuota mensual',
-      tipo: 'mensual',
-      estado: 'no_pagado',
-      fecha: new Date(),
-      proximoPago: nextMonthStart(),
-    });
 
     revalidatePath('/usuarios');
     return { socioId: profileId };
