@@ -1047,6 +1047,22 @@ export const platformSettings = pgTable('platform_settings', {
   updatedBy: uuid('updated_by').references(() => profiles.id, { onDelete: 'set null' }),
 });
 
+// Comunicaciones a nivel plataforma NauticApp (no scopeadas por guardería).
+// Mismo modelo que `comunicaciones` pero sin `guarderia_id`. Solo super admin
+// las crea/edita; cualquier authenticated las lee.
+export const platformComunicaciones = pgTable('platform_comunicaciones', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  autorId: uuid('autor_id').references(() => profiles.id, { onDelete: 'set null' }),
+  titulo: text('titulo').notNull(),
+  texto: text('texto'),
+  categoria: categoriaComunicacionEnum('categoria'),
+  tipo: tipoComunicacionEnum('tipo').default('socios'),
+  publicar: boolean('publicar').default(false),
+  fecha: timestamp('fecha', { withTimezone: true }).defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
 // =============================================================================
 // RELACIONES
 // =============================================================================
@@ -1173,3 +1189,5 @@ export type NewSolicitudLavado = typeof solicitudesLavado.$inferInsert;
 export type PricingPlan = typeof pricingPlans.$inferSelect;
 export type NewPricingPlan = typeof pricingPlans.$inferInsert;
 export type PlatformSetting = typeof platformSettings.$inferSelect;
+export type PlatformComunicacion = typeof platformComunicaciones.$inferSelect;
+export type NewPlatformComunicacion = typeof platformComunicaciones.$inferInsert;
