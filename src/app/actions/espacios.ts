@@ -15,7 +15,7 @@ import {
   servicios,
 } from '@/lib/db/schema';
 import { getActiveMarina } from '@/lib/auth/session';
-import { ensureMonthlyMovimiento } from '@/lib/movimientos-mensuales';
+import { calcularProporcionalMes, ensureMonthlyMovimiento } from '@/lib/movimientos-mensuales';
 
 export type CreateAreaInput =
   | {
@@ -253,11 +253,16 @@ export async function updateEspacioAction(input: UpdateEspacioInput): Promise<{ 
   // corriente. Los movimientos históricos no se tocan (por decisión del usuario).
   if (input.ocupanteId && input.servicioId && servicioNombre) {
     try {
+      const { importe, diasRestantes, diasMes, esProporcional } =
+        calcularProporcionalMes(servicioPrecioNum);
+      const concepto = esProporcional
+        ? `${servicioNombre} (proporcional ${diasRestantes}/${diasMes} días)`
+        : servicioNombre;
       await ensureMonthlyMovimiento({
         socioId: input.ocupanteId,
         servicioId: input.servicioId,
-        precio: servicioPrecioNum,
-        concepto: servicioNombre,
+        precio: importe,
+        concepto,
       });
     } catch (err) {
       // No bloqueamos el save del espacio si falla el movimiento.
