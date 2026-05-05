@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Anchor, Building2, Check, Plus, Trash2, X } from 'lucide-react';
+import { Anchor, Building2, Check, ChevronDown, Plus, Trash2, X } from 'lucide-react';
 import {
   DndContext,
   PointerSensor,
@@ -121,6 +121,15 @@ export function EspaciosClient({
     areaNombre: string;
     lugar: LugarEspacio;
   } | null>(null);
+
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const toggleCollapsed = (areaId: string) =>
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(areaId)) next.delete(areaId);
+      else next.add(areaId);
+      return next;
+    });
 
   const [confirmDeleteContenedor, setConfirmDeleteContenedor] = useState<{
     tipo: 'peine' | 'piso';
@@ -294,6 +303,8 @@ export function EspaciosClient({
               <MarinaSection
                 key={a.id}
                 area={a}
+                collapsed={collapsed.has(a.id)}
+                onToggleCollapsed={() => toggleCollapsed(a.id)}
                 onEditEspacio={(cell, lugar) =>
                   setEditEspacio({ cell, areaNombre: a.nombre, lugar })
                 }
@@ -320,6 +331,8 @@ export function EspaciosClient({
               <NaveSection
                 key={a.id}
                 area={a}
+                collapsed={collapsed.has(a.id)}
+                onToggleCollapsed={() => toggleCollapsed(a.id)}
                 onEditEspacio={(cell, lugar) =>
                   setEditEspacio({ cell, areaNombre: a.nombre, lugar })
                 }
@@ -506,12 +519,16 @@ function LeyendaItem({ color, label }: { color: string; label: string }) {
 
 function MarinaSection({
   area,
+  collapsed,
+  onToggleCollapsed,
   onEditEspacio,
   onDeleteEspacio,
   onDeletePeine,
   onAddEspacio,
 }: {
   area: AreaView;
+  collapsed: boolean;
+  onToggleCollapsed: () => void;
   onEditEspacio: (cell: EspacioCell, lugar: LugarEspacio) => void;
   onDeleteEspacio: (cell: EspacioCell) => void;
   onDeletePeine: (peine: AreaView['peines'][number]) => void;
@@ -519,52 +536,66 @@ function MarinaSection({
 }) {
   return (
     <section className="rounded-2xl border border-gray-200 bg-white">
-      <header className="flex items-center gap-2 rounded-t-2xl bg-[#175861] px-5 py-3 text-sm font-semibold text-white">
+      <button
+        type="button"
+        onClick={onToggleCollapsed}
+        aria-expanded={!collapsed}
+        className={`flex w-full items-center gap-2 bg-[#175861] px-5 py-3 text-left text-sm font-semibold text-white transition-colors hover:bg-[#0f4249] ${
+          collapsed ? 'rounded-2xl' : 'rounded-t-2xl'
+        }`}
+      >
+        <ChevronDown className={`h-4 w-4 transition-transform ${collapsed ? '-rotate-90' : ''}`} />
         <Building2 className="h-4 w-4" />
         {area.nombre}
-      </header>
-      <div className="space-y-5 p-5">
-        {area.peines.length === 0 ? (
-          <p className="py-4 text-center text-xs text-gray-400">Sin peines cargados.</p>
-        ) : (
-          area.peines.map((p) => (
-            <div key={p.marinaId}>
-              <div className="mb-2 flex items-center justify-between gap-2 text-xs text-gray-500">
-                <div className="flex items-center gap-2">
-                  <Anchor className="h-3.5 w-3.5" />
-                  {p.nombre}
+      </button>
+      {collapsed ? null : (
+        <div className="space-y-5 p-5">
+          {area.peines.length === 0 ? (
+            <p className="py-4 text-center text-xs text-gray-400">Sin peines cargados.</p>
+          ) : (
+            area.peines.map((p) => (
+              <div key={p.marinaId}>
+                <div className="mb-2 flex items-center justify-between gap-2 text-xs text-gray-500">
+                  <div className="flex items-center gap-2">
+                    <Anchor className="h-3.5 w-3.5" />
+                    {p.nombre}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onDeletePeine(p)}
+                    title={`Eliminar ${p.nombre}`}
+                    className="rounded-[8px] p-1 text-red-500 hover:bg-red-50"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => onDeletePeine(p)}
-                  title={`Eliminar ${p.nombre}`}
-                  className="rounded-[8px] p-1 text-red-500 hover:bg-red-50"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
+                <EspaciosRow
+                  espacios={p.espacios}
+                  onEditEspacio={(cell) => onEditEspacio(cell, { tipo: 'marina', peine: p.nombre })}
+                  onDeleteEspacio={onDeleteEspacio}
+                  onAdd={() => onAddEspacio(p.marinaId)}
+                />
               </div>
-              <EspaciosRow
-                espacios={p.espacios}
-                onEditEspacio={(cell) => onEditEspacio(cell, { tipo: 'marina', peine: p.nombre })}
-                onDeleteEspacio={onDeleteEspacio}
-                onAdd={() => onAddEspacio(p.marinaId)}
-              />
-            </div>
-          ))
-        )}
-      </div>
+            ))
+          )}
+        </div>
+      )}
     </section>
   );
 }
 
 function NaveSection({
   area,
+  collapsed,
+  onToggleCollapsed,
   onEditEspacio,
   onDeleteEspacio,
   onDeletePiso,
   onAddEspacio,
 }: {
   area: AreaView;
+  collapsed: boolean;
+  onToggleCollapsed: () => void;
   onEditEspacio: (cell: EspacioCell, lugar: LugarEspacio) => void;
   onDeleteEspacio: (cell: EspacioCell) => void;
   onDeletePiso: (piso: AreaView['lados'][number]['pisos'][number]) => void;
@@ -598,54 +629,66 @@ function NaveSection({
   return (
     <DndContext sensors={sensors} onDragEnd={onDragEnd}>
       <section className="rounded-2xl border border-gray-200 bg-white">
-        <header className="flex items-center gap-2 rounded-t-2xl bg-[#175861] px-5 py-3 text-sm font-semibold text-white">
+        <button
+          type="button"
+          onClick={onToggleCollapsed}
+          aria-expanded={!collapsed}
+          className={`flex w-full items-center gap-2 bg-[#175861] px-5 py-3 text-left text-sm font-semibold text-white transition-colors hover:bg-[#0f4249] ${
+            collapsed ? 'rounded-2xl' : 'rounded-t-2xl'
+          }`}
+        >
+          <ChevronDown
+            className={`h-4 w-4 transition-transform ${collapsed ? '-rotate-90' : ''}`}
+          />
           <Anchor className="h-4 w-4" />
           {area.nombre}
-        </header>
-        <div className="p-5">
-          {area.lados.length === 0 ? (
-            <p className="py-4 text-center text-xs text-gray-400">Sin lados cargados.</p>
-          ) : (
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-              {area.lados.map((l) => (
-                <div key={l.ladoId}>
-                  <div className="mb-2 flex items-center gap-2 text-xs text-gray-500">
-                    <Anchor className="h-3.5 w-3.5" />
-                    {l.nombre}
+        </button>
+        {collapsed ? null : (
+          <div className="p-5">
+            {area.lados.length === 0 ? (
+              <p className="py-4 text-center text-xs text-gray-400">Sin lados cargados.</p>
+            ) : (
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                {area.lados.map((l) => (
+                  <div key={l.ladoId}>
+                    <div className="mb-2 flex items-center gap-2 text-xs text-gray-500">
+                      <Anchor className="h-3.5 w-3.5" />
+                      {l.nombre}
+                    </div>
+                    {l.pisos.map((pi) => (
+                      <DroppablePiso
+                        key={pi.pisoId}
+                        pisoId={pi.pisoId}
+                        nombre={pi.nombre}
+                        espacios={pi.espacios}
+                        movingId={movingId}
+                        onEditEspacio={(cell) =>
+                          onEditEspacio(cell, {
+                            tipo: 'nave',
+                            lado: l.nombre,
+                            piso: pi.nombre,
+                          })
+                        }
+                        onDeleteEspacio={onDeleteEspacio}
+                        onDeletePiso={() => onDeletePiso(pi)}
+                        onAddEspacio={() => onAddEspacio(pi.pisoId)}
+                      />
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => onAddPiso(l.ladoId)}
+                      disabled={pendingAddPiso}
+                      className="mt-1 inline-flex w-full items-center justify-center gap-1.5 rounded-[10px] border border-dashed border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-500 transition-colors hover:border-[#175861] hover:text-[#175861] disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      {pendingAddPiso ? 'Agregando...' : 'Agregar piso'}
+                    </button>
                   </div>
-                  {l.pisos.map((pi) => (
-                    <DroppablePiso
-                      key={pi.pisoId}
-                      pisoId={pi.pisoId}
-                      nombre={pi.nombre}
-                      espacios={pi.espacios}
-                      movingId={movingId}
-                      onEditEspacio={(cell) =>
-                        onEditEspacio(cell, {
-                          tipo: 'nave',
-                          lado: l.nombre,
-                          piso: pi.nombre,
-                        })
-                      }
-                      onDeleteEspacio={onDeleteEspacio}
-                      onDeletePiso={() => onDeletePiso(pi)}
-                      onAddEspacio={() => onAddEspacio(pi.pisoId)}
-                    />
-                  ))}
-                  <button
-                    type="button"
-                    onClick={() => onAddPiso(l.ladoId)}
-                    disabled={pendingAddPiso}
-                    className="mt-1 inline-flex w-full items-center justify-center gap-1.5 rounded-[10px] border border-dashed border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-500 transition-colors hover:border-[#175861] hover:text-[#175861] disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    {pendingAddPiso ? 'Agregando...' : 'Agregar piso'}
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </section>
     </DndContext>
   );
