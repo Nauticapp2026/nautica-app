@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Script from 'next/script';
@@ -29,6 +29,7 @@ import {
 import { Check, Trash2, Plus, ChevronRight } from 'lucide-react';
 
 const TOTAL_STEPS = 10;
+const STORAGE_KEY = 'onboarding-state-v1';
 
 const DIAS = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'] as const;
 const DIAS_LABELS: Record<string, string> = {
@@ -1148,6 +1149,51 @@ export default function OnboardingPage() {
     activarMenuGastronomico: false,
     plan: 'classic',
   });
+
+  // El wizard vive en useState, asi que un refresh perdia todo el progreso y
+  // mandaba al usuario al Step 1. Persistimos step + data en localStorage para
+  // que sobreviva refreshes / cierres de pestana. Excluimos password porque ya
+  // se usa solo en el Step 1 para crear el auth user.
+  const hydratedRef = useRef(false);
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as { step?: number; data?: Partial<Data> };
+        if (typeof parsed.step === 'number' && parsed.step >= 1 && parsed.step <= TOTAL_STEPS) {
+          // Hidratacion desde localStorage: el lazy init de useState causaria
+          // hydration mismatch en SSR; el setState aca es la forma correcta.
+          // eslint-disable-next-line react-hooks/set-state-in-effect
+          setStep(parsed.step);
+        }
+        if (parsed.data && typeof parsed.data === 'object') {
+          setData((prev) => ({ ...prev, ...parsed.data }));
+        }
+      }
+    } catch {
+      // ignoramos errores de parse / storage deshabilitado
+    }
+    hydratedRef.current = true;
+  }, []);
+
+  useEffect(() => {
+    if (!hydratedRef.current) return;
+    try {
+      const { password, ...rest } = data;
+      void password;
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ step, data: rest }));
+    } catch {
+      // ignoramos quota / storage deshabilitado
+    }
+  }, [step, data]);
+
+  useEffect(() => {
+    if (step !== TOTAL_STEPS) return;
+    try {
+      window.localStorage.removeItem(STORAGE_KEY);
+    } catch {}
+  }, [step]);
 
   function set(k: keyof Data, v: unknown) {
     setData((prev) => ({ ...prev, [k]: v }));
