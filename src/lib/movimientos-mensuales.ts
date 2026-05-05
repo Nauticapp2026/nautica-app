@@ -57,12 +57,16 @@ export function calcularProporcionalMes(
 }
 
 /**
- * Se asegura de que exista el movimiento mensual para (socio, servicio) en el
+ * Se asegura de que exista el movimiento mensual para (socio, espacio) en el
  * mes corriente. Si ya hay uno en el mismo rango, no hace nada. Devuelve el id
  * si se creó, o null si ya existía.
+ *
+ * Idempotencia por espacio_id: dos espacios del mismo socio que comparten
+ * servicio_id generan dos movimientos distintos (uno por espacio).
  */
 export async function ensureMonthlyMovimiento(params: {
   socioId: string;
+  espacioId: string;
   servicioId: string;
   precio: number;
   concepto: string;
@@ -78,7 +82,7 @@ export async function ensureMonthlyMovimiento(params: {
     .where(
       and(
         eq(movimientosCuentaCorriente.socioId, params.socioId),
-        eq(movimientosCuentaCorriente.servicioId, params.servicioId),
+        eq(movimientosCuentaCorriente.espacioId, params.espacioId),
         eq(movimientosCuentaCorriente.tipo, 'mensual'),
         gte(movimientosCuentaCorriente.fecha, mStart),
         lte(movimientosCuentaCorriente.fecha, mEnd),
@@ -94,6 +98,7 @@ export async function ensureMonthlyMovimiento(params: {
     .insert(movimientosCuentaCorriente)
     .values({
       socioId: params.socioId,
+      espacioId: params.espacioId,
       servicioId: params.servicioId,
       concepto: params.concepto,
       tipo: 'mensual',
@@ -118,6 +123,7 @@ export async function runMonthlyGeneration(now: Date = new Date()): Promise<{
 }> {
   const rows = await db
     .select({
+      espacioId: espacios.id,
       ocupanteId: espacios.ocupanteId,
       servicioId: espacios.servicioId,
       servicioNombre: servicios.nombre,
@@ -133,6 +139,7 @@ export async function runMonthlyGeneration(now: Date = new Date()): Promise<{
     const precio = r.servicioPrecio != null ? Number(r.servicioPrecio) : 0;
     const res = await ensureMonthlyMovimiento({
       socioId: r.ocupanteId,
+      espacioId: r.espacioId,
       servicioId: r.servicioId,
       precio,
       concepto: r.servicioNombre,
