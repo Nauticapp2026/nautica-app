@@ -14,6 +14,8 @@ import {
 } from '@dnd-kit/core';
 
 import {
+  addEspacioToMarinaAction,
+  addEspacioToPisoAction,
   addPisoAction,
   createAreaAction,
   deleteAreaAction,
@@ -309,6 +311,10 @@ export function EspaciosClient({
                     ocupadosCount: p.espacios.filter((e) => e.estado === 'ocupado').length,
                   });
                 }}
+                onAddEspacio={async (marinaId) => {
+                  const res = await addEspacioToMarinaAction(marinaId);
+                  if (!res.error) router.refresh();
+                }}
               />
             ) : (
               <NaveSection
@@ -330,6 +336,10 @@ export function EspaciosClient({
                     espaciosCount: pi.espacios.length,
                     ocupadosCount: pi.espacios.filter((e) => e.estado === 'ocupado').length,
                   });
+                }}
+                onAddEspacio={async (pisoId) => {
+                  const res = await addEspacioToPisoAction(pisoId);
+                  if (!res.error) router.refresh();
                 }}
               />
             ),
@@ -499,11 +509,13 @@ function MarinaSection({
   onEditEspacio,
   onDeleteEspacio,
   onDeletePeine,
+  onAddEspacio,
 }: {
   area: AreaView;
   onEditEspacio: (cell: EspacioCell, lugar: LugarEspacio) => void;
   onDeleteEspacio: (cell: EspacioCell) => void;
   onDeletePeine: (peine: AreaView['peines'][number]) => void;
+  onAddEspacio: (marinaId: string) => Promise<void>;
 }) {
   return (
     <section className="rounded-2xl border border-gray-200 bg-white">
@@ -535,6 +547,7 @@ function MarinaSection({
                 espacios={p.espacios}
                 onEditEspacio={(cell) => onEditEspacio(cell, { tipo: 'marina', peine: p.nombre })}
                 onDeleteEspacio={onDeleteEspacio}
+                onAdd={() => onAddEspacio(p.marinaId)}
               />
             </div>
           ))
@@ -549,11 +562,13 @@ function NaveSection({
   onEditEspacio,
   onDeleteEspacio,
   onDeletePiso,
+  onAddEspacio,
 }: {
   area: AreaView;
   onEditEspacio: (cell: EspacioCell, lugar: LugarEspacio) => void;
   onDeleteEspacio: (cell: EspacioCell) => void;
   onDeletePiso: (piso: AreaView['lados'][number]['pisos'][number]) => void;
+  onAddEspacio: (pisoId: string) => Promise<void>;
 }) {
   const router = useRouter();
   const [movingId, setMovingId] = useState<string | null>(null);
@@ -614,6 +629,7 @@ function NaveSection({
                       }
                       onDeleteEspacio={onDeleteEspacio}
                       onDeletePiso={() => onDeletePiso(pi)}
+                      onAddEspacio={() => onAddEspacio(pi.pisoId)}
                     />
                   ))}
                   <button
@@ -643,6 +659,7 @@ function DroppablePiso({
   onEditEspacio,
   onDeleteEspacio,
   onDeletePiso,
+  onAddEspacio,
 }: {
   pisoId: string;
   nombre: string;
@@ -651,6 +668,7 @@ function DroppablePiso({
   onEditEspacio: (cell: EspacioCell) => void;
   onDeleteEspacio: (cell: EspacioCell) => void;
   onDeletePiso: () => void;
+  onAddEspacio: () => Promise<void>;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: pisoId });
   return (
@@ -672,11 +690,11 @@ function DroppablePiso({
           isOver ? 'border-[#175861] bg-[#D9EBE9]/40' : 'border-dashed border-transparent'
         }`}
       >
-        {espacios.length === 0 ? (
-          <p className="px-1 py-1 text-[11px] text-gray-400">Sin espacios.</p>
-        ) : (
-          <div className="flex flex-wrap gap-2">
-            {espacios.map((e) => (
+        <div className="flex flex-wrap items-center gap-2">
+          {espacios.length === 0 ? (
+            <p className="px-1 py-1 text-[11px] text-gray-400">Sin espacios.</p>
+          ) : (
+            espacios.map((e) => (
               <DraggableEspacio
                 key={e.id}
                 cell={e}
@@ -684,9 +702,10 @@ function DroppablePiso({
                 onEdit={() => onEditEspacio(e)}
                 onDelete={() => onDeleteEspacio(e)}
               />
-            ))}
-          </div>
-        )}
+            ))
+          )}
+          <AddEspacioButton onAdd={onAddEspacio} />
+        </div>
       </div>
     </div>
   );
@@ -743,41 +762,61 @@ function EspaciosRow({
   espacios,
   onEditEspacio,
   onDeleteEspacio,
+  onAdd,
 }: {
   espacios: EspacioCell[];
   onEditEspacio: (cell: EspacioCell) => void;
   onDeleteEspacio: (cell: EspacioCell) => void;
+  onAdd?: () => Promise<void>;
 }) {
-  if (espacios.length === 0) {
-    return <p className="text-[11px] text-gray-400">Sin espacios.</p>;
-  }
   return (
-    <div className="flex flex-wrap gap-2">
-      {espacios.map((e) => (
-        <div key={e.id} className="group relative">
-          <button
-            type="button"
-            onClick={() => onEditEspacio(e)}
-            title={`Editar espacio ${e.nomenclatura}`}
-            className={`inline-flex h-7 min-w-[2.25rem] items-center justify-center rounded-[8px] border px-2 text-xs font-semibold transition-colors hover:brightness-95 ${ESTADO_CLS[e.estado]}`}
-          >
-            {e.nomenclatura}
-          </button>
-          <button
-            type="button"
-            onClick={(ev) => {
-              ev.stopPropagation();
-              onDeleteEspacio(e);
-            }}
-            title={`Eliminar espacio ${e.nomenclatura}`}
-            aria-label={`Eliminar espacio ${e.nomenclatura}`}
-            className="absolute -top-1.5 -right-1.5 hidden h-4 w-4 items-center justify-center rounded-full bg-red-500 text-white shadow transition-colors group-hover:flex hover:bg-red-600"
-          >
-            <X className="h-3 w-3" strokeWidth={3} />
-          </button>
-        </div>
-      ))}
+    <div className="flex flex-wrap items-center gap-2">
+      {espacios.length === 0 ? (
+        <p className="text-[11px] text-gray-400">Sin espacios.</p>
+      ) : (
+        espacios.map((e) => (
+          <div key={e.id} className="group relative">
+            <button
+              type="button"
+              onClick={() => onEditEspacio(e)}
+              title={`Editar espacio ${e.nomenclatura}`}
+              className={`inline-flex h-7 min-w-[2.25rem] items-center justify-center rounded-[8px] border px-2 text-xs font-semibold transition-colors hover:brightness-95 ${ESTADO_CLS[e.estado]}`}
+            >
+              {e.nomenclatura}
+            </button>
+            <button
+              type="button"
+              onClick={(ev) => {
+                ev.stopPropagation();
+                onDeleteEspacio(e);
+              }}
+              title={`Eliminar espacio ${e.nomenclatura}`}
+              aria-label={`Eliminar espacio ${e.nomenclatura}`}
+              className="absolute -top-1.5 -right-1.5 hidden h-4 w-4 items-center justify-center rounded-full bg-red-500 text-white shadow transition-colors group-hover:flex hover:bg-red-600"
+            >
+              <X className="h-3 w-3" strokeWidth={3} />
+            </button>
+          </div>
+        ))
+      )}
+      {onAdd && <AddEspacioButton onAdd={onAdd} />}
     </div>
+  );
+}
+
+function AddEspacioButton({ onAdd }: { onAdd: () => Promise<void> }) {
+  const [pending, startAdd] = useTransition();
+  return (
+    <button
+      type="button"
+      onClick={() => startAdd(async () => onAdd())}
+      disabled={pending}
+      title="Agregar espacio"
+      aria-label="Agregar espacio"
+      className="inline-flex h-7 min-w-[2.25rem] items-center justify-center rounded-[8px] border border-dashed border-gray-300 bg-white px-2 text-gray-400 transition-colors hover:border-[#175861] hover:text-[#175861] disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      <Plus className="h-3.5 w-3.5" />
+    </button>
   );
 }
 
