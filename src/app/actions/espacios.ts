@@ -329,6 +329,104 @@ export async function deleteAreaAction(id: string): Promise<{ error?: string }> 
   return {};
 }
 
+/**
+ * Devuelve el próximo número disponible (max+1) parseando las nomenclaturas
+ * existentes como enteros. Si ninguna parsea o no hay espacios, devuelve 1.
+ */
+function nextNomenclatura(existentes: { nomenclatura: string | null }[]): string {
+  let max = 0;
+  for (const e of existentes) {
+    const n = parseInt(e.nomenclatura ?? '', 10);
+    if (Number.isFinite(n) && n > max) max = n;
+  }
+  return String(max + 1);
+}
+
+export async function addEspacioToMarinaAction(
+  marinaId: string,
+): Promise<{ error?: string; id?: string }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+  if (!isAdmin(ctx)) return { error: 'Solo administradores pueden agregar espacios.' };
+
+  const guarderiaId = ctx.activeMembership.guarderiaId;
+
+  const [m] = await db
+    .select({ id: marinas.id, areaId: marinas.areaId })
+    .from(marinas)
+    .where(and(eq(marinas.id, marinaId), eq(marinas.guarderiaId, guarderiaId)))
+    .limit(1);
+  if (!m) return { error: 'Peine no encontrado.' };
+
+  const existentes = await db
+    .select({ nomenclatura: espacios.nomenclatura })
+    .from(espacios)
+    .where(eq(espacios.marinaId, marinaId));
+
+  const [row] = await db
+    .insert(espacios)
+    .values({
+      guarderiaId,
+      areaId: m.areaId,
+      marinaId,
+      nomenclatura: nextNomenclatura(existentes),
+      estado: 'disponible',
+    })
+    .returning({ id: espacios.id });
+
+  revalidatePath('/espacios');
+  return { id: row.id };
+}
+
+export async function addEspacioToPisoAction(
+  pisoId: string,
+): Promise<{ error?: string; id?: string }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+  if (!isAdmin(ctx)) return { error: 'Solo administradores pueden agregar espacios.' };
+
+  const guarderiaId = ctx.activeMembership.guarderiaId;
+
+  // pisos no tiene guarderia_id, validamos via lado.
+  const [p] = await db
+    .select({
+      id: pisosTable.id,
+      areaId: pisosTable.areaId,
+      ladoId: pisosTable.ladoId,
+      naveId: ladosTable.naveId,
+    })
+    .from(pisosTable)
+    .innerJoin(ladosTable, eq(ladosTable.id, pisosTable.ladoId))
+    .where(and(eq(pisosTable.id, pisoId), eq(ladosTable.guarderiaId, guarderiaId)))
+    .limit(1);
+  if (!p) return { error: 'Piso no encontrado.' };
+
+  // La numeración en una nave es por lado (no por piso), para que no
+  // colisione con otros pisos del mismo lado.
+  const existentesLado = p.ladoId
+    ? await db
+        .select({ nomenclatura: espacios.nomenclatura })
+        .from(espacios)
+        .where(eq(espacios.ladoId, p.ladoId))
+    : [];
+
+  const [row] = await db
+    .insert(espacios)
+    .values({
+      guarderiaId,
+      areaId: p.areaId,
+      naveId: p.naveId,
+      ladoId: p.ladoId,
+      pisoId,
+      nomenclatura: nextNomenclatura(existentesLado),
+      estado: 'disponible',
+    })
+    .returning({ id: espacios.id });
+
+  revalidatePath('/espacios');
+  return { id: row.id };
+}
+
 export async function deletePeineAction(marinaId: string): Promise<{ error?: string }> {
   const ctx = await getActiveMarina();
   if (!ctx) return { error: 'No autenticado' };
