@@ -329,6 +329,50 @@ export async function deleteAreaAction(id: string): Promise<{ error?: string }> 
   return {};
 }
 
+export async function deletePeineAction(marinaId: string): Promise<{ error?: string }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+  if (!isAdmin(ctx)) return { error: 'Solo administradores pueden eliminar peines.' };
+
+  const guarderiaId = ctx.activeMembership.guarderiaId;
+
+  const [m] = await db
+    .select({ id: marinas.id })
+    .from(marinas)
+    .where(and(eq(marinas.id, marinaId), eq(marinas.guarderiaId, guarderiaId)))
+    .limit(1);
+  if (!m) return { error: 'Peine no encontrado.' };
+
+  await db.delete(espacios).where(eq(espacios.marinaId, marinaId));
+  await db.delete(marinas).where(eq(marinas.id, marinaId));
+
+  revalidatePath('/espacios');
+  return {};
+}
+
+export async function deletePisoAction(pisoId: string): Promise<{ error?: string }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+  if (!isAdmin(ctx)) return { error: 'Solo administradores pueden eliminar pisos.' };
+
+  const guarderiaId = ctx.activeMembership.guarderiaId;
+
+  // pisos no tiene guarderia_id, validamos via lado.
+  const [p] = await db
+    .select({ id: pisosTable.id })
+    .from(pisosTable)
+    .innerJoin(ladosTable, eq(ladosTable.id, pisosTable.ladoId))
+    .where(and(eq(pisosTable.id, pisoId), eq(ladosTable.guarderiaId, guarderiaId)))
+    .limit(1);
+  if (!p) return { error: 'Piso no encontrado.' };
+
+  await db.delete(espacios).where(eq(espacios.pisoId, pisoId));
+  await db.delete(pisosTable).where(eq(pisosTable.id, pisoId));
+
+  revalidatePath('/espacios');
+  return {};
+}
+
 export async function addPisoAction(ladoId: string): Promise<{ error?: string; pisoId?: string }> {
   const ctx = await getActiveMarina();
   if (!ctx) return { error: 'No autenticado' };

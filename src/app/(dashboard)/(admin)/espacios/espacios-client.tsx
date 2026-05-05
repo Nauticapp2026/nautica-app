@@ -18,6 +18,8 @@ import {
   createAreaAction,
   deleteAreaAction,
   deleteEspacioAction,
+  deletePeineAction,
+  deletePisoAction,
   moveEspacioToPisoAction,
   updateEspacioAction,
   type CreateAreaInput,
@@ -118,6 +120,16 @@ export function EspaciosClient({
     lugar: LugarEspacio;
   } | null>(null);
 
+  const [confirmDeleteContenedor, setConfirmDeleteContenedor] = useState<{
+    tipo: 'peine' | 'piso';
+    id: string;
+    nombre: string;
+    espaciosCount: number;
+    ocupadosCount: number;
+  } | null>(null);
+  const [deletingContenedor, startDeleteContenedor] = useTransition();
+  const [deleteContenedorError, setDeleteContenedorError] = useState<string | null>(null);
+
   const onDelete = () => {
     if (!confirmDelete) return;
     setDeleteError(null);
@@ -139,6 +151,22 @@ export function EspaciosClient({
       if (res.error) setDeleteEspacioError(res.error);
       else {
         setConfirmDeleteEspacio(null);
+        router.refresh();
+      }
+    });
+  };
+
+  const onDeleteContenedor = () => {
+    if (!confirmDeleteContenedor) return;
+    setDeleteContenedorError(null);
+    startDeleteContenedor(async () => {
+      const res =
+        confirmDeleteContenedor.tipo === 'peine'
+          ? await deletePeineAction(confirmDeleteContenedor.id)
+          : await deletePisoAction(confirmDeleteContenedor.id);
+      if (res.error) setDeleteContenedorError(res.error);
+      else {
+        setConfirmDeleteContenedor(null);
         router.refresh();
       }
     });
@@ -271,6 +299,16 @@ export function EspaciosClient({
                   setDeleteEspacioError(null);
                   setConfirmDeleteEspacio(cell);
                 }}
+                onDeletePeine={(p) => {
+                  setDeleteContenedorError(null);
+                  setConfirmDeleteContenedor({
+                    tipo: 'peine',
+                    id: p.marinaId,
+                    nombre: p.nombre,
+                    espaciosCount: p.espacios.length,
+                    ocupadosCount: p.espacios.filter((e) => e.estado === 'ocupado').length,
+                  });
+                }}
               />
             ) : (
               <NaveSection
@@ -282,6 +320,16 @@ export function EspaciosClient({
                 onDeleteEspacio={(cell) => {
                   setDeleteEspacioError(null);
                   setConfirmDeleteEspacio(cell);
+                }}
+                onDeletePiso={(pi) => {
+                  setDeleteContenedorError(null);
+                  setConfirmDeleteContenedor({
+                    tipo: 'piso',
+                    id: pi.pisoId,
+                    nombre: pi.nombre,
+                    espaciosCount: pi.espacios.length,
+                    ocupadosCount: pi.espacios.filter((e) => e.estado === 'ocupado').length,
+                  });
                 }}
               />
             ),
@@ -316,6 +364,16 @@ export function EspaciosClient({
           error={deleteEspacioError}
           onCancel={() => setConfirmDeleteEspacio(null)}
           onConfirm={onDeleteEspacio}
+        />
+      )}
+
+      {confirmDeleteContenedor && (
+        <ConfirmDeleteContenedorModal
+          contenedor={confirmDeleteContenedor}
+          pending={deletingContenedor}
+          error={deleteContenedorError}
+          onCancel={() => setConfirmDeleteContenedor(null)}
+          onConfirm={onDeleteContenedor}
         />
       )}
 
@@ -440,10 +498,12 @@ function MarinaSection({
   area,
   onEditEspacio,
   onDeleteEspacio,
+  onDeletePeine,
 }: {
   area: AreaView;
   onEditEspacio: (cell: EspacioCell, lugar: LugarEspacio) => void;
   onDeleteEspacio: (cell: EspacioCell) => void;
+  onDeletePeine: (peine: AreaView['peines'][number]) => void;
 }) {
   return (
     <section className="rounded-2xl border border-gray-200 bg-white">
@@ -457,9 +517,19 @@ function MarinaSection({
         ) : (
           area.peines.map((p) => (
             <div key={p.marinaId}>
-              <div className="mb-2 flex items-center gap-2 text-xs text-gray-500">
-                <Anchor className="h-3.5 w-3.5" />
-                {p.nombre}
+              <div className="mb-2 flex items-center justify-between gap-2 text-xs text-gray-500">
+                <div className="flex items-center gap-2">
+                  <Anchor className="h-3.5 w-3.5" />
+                  {p.nombre}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onDeletePeine(p)}
+                  title={`Eliminar ${p.nombre}`}
+                  className="rounded-[8px] p-1 text-red-500 hover:bg-red-50"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
               </div>
               <EspaciosRow
                 espacios={p.espacios}
@@ -478,10 +548,12 @@ function NaveSection({
   area,
   onEditEspacio,
   onDeleteEspacio,
+  onDeletePiso,
 }: {
   area: AreaView;
   onEditEspacio: (cell: EspacioCell, lugar: LugarEspacio) => void;
   onDeleteEspacio: (cell: EspacioCell) => void;
+  onDeletePiso: (piso: AreaView['lados'][number]['pisos'][number]) => void;
 }) {
   const router = useRouter();
   const [movingId, setMovingId] = useState<string | null>(null);
@@ -541,6 +613,7 @@ function NaveSection({
                         })
                       }
                       onDeleteEspacio={onDeleteEspacio}
+                      onDeletePiso={() => onDeletePiso(pi)}
                     />
                   ))}
                   <button
@@ -569,6 +642,7 @@ function DroppablePiso({
   movingId,
   onEditEspacio,
   onDeleteEspacio,
+  onDeletePiso,
 }: {
   pisoId: string;
   nombre: string;
@@ -576,11 +650,22 @@ function DroppablePiso({
   movingId: string | null;
   onEditEspacio: (cell: EspacioCell) => void;
   onDeleteEspacio: (cell: EspacioCell) => void;
+  onDeletePiso: () => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: pisoId });
   return (
     <div className="mb-3">
-      <p className="mb-1 text-[11px] text-gray-400">{nombre}</p>
+      <div className="mb-1 flex items-center justify-between gap-2">
+        <p className="text-[11px] text-gray-400">{nombre}</p>
+        <button
+          type="button"
+          onClick={onDeletePiso}
+          title={`Eliminar ${nombre}`}
+          className="rounded-[8px] p-0.5 text-red-500 hover:bg-red-50"
+        >
+          <Trash2 className="h-3 w-3" />
+        </button>
+      </div>
       <div
         ref={setNodeRef}
         className={`min-h-[2.5rem] rounded-[10px] border p-1.5 transition-colors ${
@@ -1042,6 +1127,66 @@ function ConfirmDeleteEspacioModal({
           <p className="mt-2 text-sm text-gray-600">
             ¿Seguro querés eliminar el espacio <strong>{espacio.nomenclatura}</strong>? Esta acción
             no se puede deshacer.
+          </p>
+          {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+        </div>
+        <div className="flex justify-end gap-3 border-t border-gray-200 p-6">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={pending}
+            className="rounded-[10px] border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-[#101828] hover:bg-gray-50 disabled:opacity-60"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={pending}
+            className="rounded-[10px] bg-red-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+          >
+            {pending ? 'Eliminando…' : 'Eliminar'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ConfirmDeleteContenedorModal({
+  contenedor,
+  pending,
+  error,
+  onCancel,
+  onConfirm,
+}: {
+  contenedor: {
+    tipo: 'peine' | 'piso';
+    nombre: string;
+    espaciosCount: number;
+    ocupadosCount: number;
+  };
+  pending: boolean;
+  error: string | null;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const tipoLabel = contenedor.tipo === 'peine' ? 'peine' : 'piso';
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="flex w-full max-w-md flex-col rounded-2xl bg-white shadow-2xl">
+        <div className="p-6">
+          <h2 className="text-lg font-bold" style={{ color: '#101828' }}>
+            Eliminar {tipoLabel}
+          </h2>
+          <p className="mt-2 text-sm text-gray-600">
+            ¿Seguro querés eliminar el {tipoLabel} <strong>{contenedor.nombre}</strong>? Se van a
+            borrar también <strong>{contenedor.espaciosCount}</strong>{' '}
+            {contenedor.espaciosCount === 1 ? 'espacio' : 'espacios'}
+            {contenedor.ocupadosCount > 0
+              ? ` (${contenedor.ocupadosCount} con ocupante asignado)`
+              : ''}
+            . Esta acción no se puede deshacer.
           </p>
           {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
         </div>
