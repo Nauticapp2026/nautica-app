@@ -65,7 +65,6 @@ export type TarifaEspaciosInput = TarifaInputBase & {
   eslora: number | null;
   manga: number | null;
   puntual: number | null;
-  clases: string;
 };
 
 export type CreateTarifaData = TarifaCuotaMensualInput | TarifaServiciosInput | TarifaEspaciosInput;
@@ -123,7 +122,6 @@ function buildValues(data: CreateTarifaData) {
       eslora: data.eslora != null ? data.eslora.toFixed(2) : null,
       manga: data.manga != null ? data.manga.toFixed(2) : null,
       puntual: data.puntual != null ? data.puntual.toFixed(2) : null,
-      clases: data.clases.trim() || null,
     };
   }
   return base;
@@ -182,7 +180,6 @@ export async function updateTarifaAction(data: UpdateTarifaData): Promise<{ erro
           eslora: null,
           manga: null,
           puntual: null,
-          clases: null,
         }
       : data.tipo === 'espacios'
         ? { medida: null }
@@ -193,7 +190,6 @@ export async function updateTarifaAction(data: UpdateTarifaData): Promise<{ erro
             eslora: null,
             manga: null,
             puntual: null,
-            clases: null,
           };
 
   await db

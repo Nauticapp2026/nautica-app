@@ -53,7 +53,6 @@ export type Tarifa = {
   eslora: number | null;
   manga: number | null;
   puntual: number | null;
-  clases: string | null;
 };
 
 const MEDIDAS: MedidaTarifa[] = [
@@ -353,7 +352,6 @@ function TarifaModal({
   const [puntual, setPuntual] = useState<string>(
     initial?.puntual != null ? String(initial.puntual) : '',
   );
-  const [clases, setClases] = useState<string>(initial?.clases ?? '');
 
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -408,7 +406,6 @@ function TarifaModal({
         eslora: toNumOrNull(eslora),
         manga: toNumOrNull(manga),
         puntual: toNumOrNull(puntual),
-        clases,
       };
     } else {
       payload = {
@@ -550,16 +547,6 @@ function TarifaModal({
                 </div>
               </div>
               <p className="-mt-2 text-xs text-gray-500">{conversion}</p>
-
-              <div>
-                <label className="mb-1 block text-sm font-semibold text-gray-700">Clases</label>
-                <input
-                  className={inputCls}
-                  placeholder="Clases"
-                  value={clases}
-                  onChange={(e) => setClases(e.target.value)}
-                />
-              </div>
             </>
           )}
 
