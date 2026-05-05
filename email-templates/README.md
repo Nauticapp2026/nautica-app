@@ -40,29 +40,24 @@ Los templates usan variables que Supabase reemplaza al enviar:
 
 ## Configurar SMTP custom (para que no salgan desde supabase.io)
 
-El remitente va a ser `noreply@nauticapp.com`. Pasos:
+El remitente va a ser `noreply@nauticapp.club`. Pasos:
 
-### 1. Registrar el dominio
-
-Comprar `nauticapp.com` en un registrar (Namecheap, Cloudflare Registrar,
-Google Domains, etc). Si ya tiene DNS administrado en otro lado (ej
-Cloudflare), anotá dónde vas a cargar los registros.
-
-### 2. Crear cuenta en Resend
+### 1. Crear cuenta en Resend
 
 1. Ir a https://resend.com y registrarse.
-2. En el dashboard, Domains → Add Domain → `nauticapp.com`.
+2. En el dashboard, Domains → Add Domain → `nauticapp.club`.
 3. Resend muestra 3–4 registros DNS (SPF, DKIM, a veces DMARC).
-4. Cargarlos en el DNS del dominio. Esperar 5–30 min a que se verifiquen.
+4. Cargarlos en el DNS del dominio (GoDaddy → DNS Management). Esperar
+   5–30 min a que se verifiquen.
 5. Apenas el dominio queda "Verified", crear una API Key en API Keys →
    Create API Key → permiso "Sending access".
 
-### 3. Configurar SMTP en Supabase
+### 2. Configurar SMTP en Supabase
 
 Dashboard → Project Settings → Authentication → SMTP Settings → Enable
 custom SMTP. Datos:
 
-- Sender email: `noreply@nauticapp.com`
+- Sender email: `noreply@nauticapp.club`
 - Sender name: `NauticApp`
 - Host: `smtp.resend.com`
 - Port: `465`
@@ -71,12 +66,12 @@ custom SMTP. Datos:
 
 Guardar. Mandá un test (por ejemplo desde Authentication → Users → invitar
 a un email de prueba) y verificá que el mail llega con remitente
-`NauticApp <noreply@nauticapp.com>`.
+`NauticApp <noreply@nauticapp.club>`.
 
-### 4. (Opcional pero recomendado) DMARC
+### 3. (Opcional pero recomendado) DMARC
 
 Una vez que SPF y DKIM están OK, agregar un registro TXT DMARC en
-`_dmarc.nauticapp.com`:
-`v=DMARC1; p=quarantine; rua=mailto:dmarc@nauticapp.com`
+`_dmarc.nauticapp.club`:
+`v=DMARC1; p=quarantine; rua=mailto:dmarc@nauticapp.club`
 
 Mejora la entregabilidad y evita que otros suplanten el dominio.
