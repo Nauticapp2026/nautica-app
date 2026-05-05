@@ -25,6 +25,7 @@ export default async function ComunicacionesPage() {
       tipo: comunicaciones.tipo,
       publicar: comunicaciones.publicar,
       fecha: comunicaciones.fecha,
+      imagenUrls: comunicaciones.imagenUrls,
       autorNombre: profiles.nombre,
       autorApellido: profiles.apellido,
       autorEmail: profiles.email,
@@ -42,6 +43,7 @@ export default async function ComunicacionesPage() {
     tipo: r.tipo ?? 'socios',
     publicar: r.publicar ?? false,
     fecha: r.fecha ? r.fecha.toISOString() : null,
+    imagenUrls: r.imagenUrls ?? [],
     autor:
       [r.autorNombre, r.autorApellido].filter(Boolean).join(' ').trim() || r.autorEmail || null,
   }));
