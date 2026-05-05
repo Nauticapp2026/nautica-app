@@ -1122,8 +1122,8 @@ function Step10() {
       </button>
       <p className="mt-2 text-xs text-gray-400">
         ¿Necesitás ayuda? Contactanos en{' '}
-        <a href="mailto:soporte@nauticapp.com" style={{ color: '#669E9D' }} className="underline">
-          soporte@nauticapp.com
+        <a href="mailto:soporte@nauticapp.club" style={{ color: '#669E9D' }} className="underline">
+          soporte@nauticapp.club
         </a>
       </p>
     </div>
