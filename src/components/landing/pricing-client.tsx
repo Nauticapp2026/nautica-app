@@ -140,26 +140,26 @@ export function PricingClient({ plans, capacities }: Props) {
               className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
             />
           </div>
-          <div className="mt-3 flex justify-between text-sm font-bold text-[#677B85]">
-            {sorted.map((c) => (
-              <span key={c}>{formatNumber(c)}</span>
-            ))}
+          <div className="mt-3 flex items-center justify-between gap-3 text-sm font-bold text-[#677B85]">
+            <span>{formatNumber(min)}</span>
+            <input
+              type="number"
+              min={min}
+              max={max}
+              step={STEP}
+              value={inputValue}
+              onChange={(e) => handleInputChange(e.target.value)}
+              onBlur={handleInputBlur}
+              aria-label="Cantidad de lugares"
+              className="h-11 w-32 rounded-[10px] border border-gray-200 bg-white px-3 text-center text-base font-bold text-[#175861] focus:border-[#175861] focus:ring-1 focus:ring-[#175861] focus:outline-none"
+            />
+            <span>{formatNumber(max)}</span>
           </div>
         </div>
 
         <div className="mt-16 grid gap-6 md:grid-cols-3 md:items-stretch">
           {plans.map((plan) => (
-            <PlanCard
-              key={plan.slug}
-              plan={plan}
-              capacity={capacity}
-              inputValue={inputValue}
-              min={min}
-              max={max}
-              step={STEP}
-              onInputChange={handleInputChange}
-              onInputBlur={handleInputBlur}
-            />
+            <PlanCard key={plan.slug} plan={plan} capacity={capacity} />
           ))}
         </div>
 
@@ -178,27 +178,10 @@ export function PricingClient({ plans, capacities }: Props) {
   );
 }
 
-function PlanCard({
-  plan,
-  capacity,
-  inputValue,
-  min,
-  max,
-  step,
-  onInputChange,
-  onInputBlur,
-}: {
-  plan: PricingPlanView;
-  capacity: number;
-  inputValue: string;
-  min: number;
-  max: number;
-  step: number;
-  onInputChange: (raw: string) => void;
-  onInputBlur: () => void;
-}) {
+function PlanCard({ plan, capacity }: { plan: PricingPlanView; capacity: number }) {
   const presentation = PLAN_PRESENTATION[plan.slug] ?? PLAN_PRESENTATION.classic;
   const price = `$${formatNumber(plan.rate * capacity)}`;
+  const capacityLabel = formatNumber(capacity);
 
   return (
     <div
@@ -212,19 +195,8 @@ function PlanCard({
         className="px-6 py-7 text-center text-white"
         style={{ backgroundColor: presentation.headerColor }}
       >
-        <p className="flex items-center justify-center gap-2 text-2xl font-semibold tracking-wider md:text-3xl">
-          <span>{plan.name}</span>
-          <input
-            type="number"
-            min={min}
-            max={max}
-            step={step}
-            value={inputValue}
-            onChange={(e) => onInputChange(e.target.value)}
-            onBlur={onInputBlur}
-            aria-label={`Cantidad de lugares para ${plan.name}`}
-            className="w-28 rounded-[8px] border-b-2 border-white/40 bg-transparent text-center font-bold text-white transition-colors outline-none hover:border-white/80 focus:border-white"
-          />
+        <p className="text-2xl font-semibold tracking-wider md:text-3xl">
+          {plan.name} <span className="font-bold">{capacityLabel}</span>
         </p>
         <p className="mt-2 text-base">
           <span className="font-semibold">{price}</span> <span className="font-bold">/MES</span>
