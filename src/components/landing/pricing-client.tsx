@@ -77,10 +77,35 @@ function formatNumber(value: number) {
 }
 
 export function PricingClient({ plans, capacities }: Props) {
-  const defaultIndex = capacities.length > 1 ? 1 : 0;
-  const [index, setIndex] = useState<number>(defaultIndex);
-  const capacity = capacities[index] ?? capacities[0] ?? 0;
-  const handlePercent = capacities.length > 1 ? (index / (capacities.length - 1)) * 100 : 0;
+  const sorted = [...capacities].sort((a, b) => a - b);
+  const min = sorted[0] ?? 0;
+  const max = sorted[sorted.length - 1] ?? 0;
+  const STEP = 10;
+  const defaultValue = sorted.length > 1 ? sorted[1] : (sorted[0] ?? 0);
+  const [capacity, setCapacity] = useState<number>(defaultValue);
+  const [inputValue, setInputValue] = useState<string>(String(defaultValue));
+
+  const clamp = (v: number) => Math.max(min, Math.min(max, v));
+
+  const handleSlider = (v: number) => {
+    setCapacity(v);
+    setInputValue(String(v));
+  };
+
+  const handleInputChange = (raw: string) => {
+    setInputValue(raw);
+    const n = Number(raw);
+    if (Number.isFinite(n)) setCapacity(clamp(Math.round(n)));
+  };
+
+  const handleInputBlur = () => {
+    const n = Number(inputValue);
+    const final = Number.isFinite(n) ? clamp(Math.round(n)) : defaultValue;
+    setCapacity(final);
+    setInputValue(String(final));
+  };
+
+  const handlePercent = max > min ? ((capacity - min) / (max - min)) * 100 : 0;
 
   return (
     <section id="planes" className="bg-[#F3F4F6] py-20">
@@ -95,29 +120,45 @@ export function PricingClient({ plans, capacities }: Props) {
         </div>
 
         <div className="mx-auto mt-12 max-w-4xl">
+          <div className="mb-6 flex justify-center">
+            <label className="flex items-center gap-3 text-sm font-bold text-[#175861]">
+              <span>Cantidad de lugares:</span>
+              <input
+                type="number"
+                min={min}
+                max={max}
+                step={STEP}
+                value={inputValue}
+                onChange={(e) => handleInputChange(e.target.value)}
+                onBlur={handleInputBlur}
+                className="h-11 w-32 rounded-[10px] border border-gray-200 bg-white px-3 text-center text-base font-bold text-[#175861] focus:border-[#175861] focus:ring-1 focus:ring-[#175861] focus:outline-none"
+              />
+            </label>
+          </div>
+
           <div className="relative h-3.5 rounded-full bg-gradient-to-r from-white via-[#669E9D]/40 to-[#175861] ring-2 ring-gray-200">
             <div
-              className="absolute inset-y-0 left-0 rounded-l-full bg-gradient-to-r from-[#175861] to-[#669E9D] transition-[width] duration-200"
+              className="pointer-events-none absolute inset-y-0 left-0 rounded-l-full bg-gradient-to-r from-[#175861] to-[#669E9D]"
               style={{ width: `${handlePercent}%` }}
             />
             <div
-              className="absolute -top-1 size-6 -translate-x-1/2 rounded-full border-2 border-white bg-[#175861] shadow-md transition-[left] duration-200"
+              className="pointer-events-none absolute -top-1 size-6 -translate-x-1/2 rounded-full border-2 border-white bg-[#175861] shadow-md"
               style={{ left: `${handlePercent}%` }}
             />
+            <input
+              type="range"
+              min={min}
+              max={max}
+              step={STEP}
+              value={capacity}
+              onChange={(e) => handleSlider(Number(e.target.value))}
+              aria-label="Cantidad de lugares"
+              className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+            />
           </div>
-          <div className="mt-3 flex justify-between text-sm font-bold">
-            {capacities.map((c, i) => (
-              <button
-                key={c}
-                type="button"
-                onClick={() => setIndex(i)}
-                aria-pressed={i === index}
-                className={`cursor-pointer transition ${
-                  i === index ? 'text-[#175861]' : 'text-[#677B85] hover:text-[#175861]'
-                }`}
-              >
-                {formatNumber(c)}
-              </button>
+          <div className="mt-3 flex justify-between text-sm font-bold text-[#677B85]">
+            {sorted.map((c) => (
+              <span key={c}>{formatNumber(c)}</span>
             ))}
           </div>
         </div>
