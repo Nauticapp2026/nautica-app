@@ -30,9 +30,10 @@ function checkPrelaunchGate(request: NextRequest): 'ok' | 'unauthorized' | 'disa
 
 export async function middleware(request: NextRequest) {
   // Webhooks y crons llamados desde fuera del browser tienen su propia
-  // autenticación (CRON_SECRET, firma HMAC). El gate de Basic Auth no
-  // aplica para ellos — los rompería.
-  const isPublicAPI = request.nextUrl.pathname.startsWith('/api/cron');
+  // autenticación (CRON_SECRET, secret en query param). El gate de Basic
+  // Auth no aplica para ellos — los rompería.
+  const { pathname } = request.nextUrl;
+  const isPublicAPI = pathname.startsWith('/api/cron') || pathname.startsWith('/api/webhooks');
 
   if (!isPublicAPI) {
     const gate = checkPrelaunchGate(request);
