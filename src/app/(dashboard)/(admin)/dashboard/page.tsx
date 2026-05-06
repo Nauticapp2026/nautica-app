@@ -13,16 +13,7 @@ import {
 import { and, asc, count, desc, eq, gte, lte, sum } from 'drizzle-orm';
 
 import { AlertasOperativasList, type AlertaOperativa } from './alertas-operativas';
-import {
-  Ship,
-  Users,
-  TrendingUp,
-  AlertTriangle,
-  Bell,
-  Anchor,
-  Plus,
-  MessageSquare,
-} from 'lucide-react';
+import { Ship, Users, TrendingUp, Bell, Anchor, Plus, MessageSquare } from 'lucide-react';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -145,7 +136,6 @@ export default async function DashboardPage() {
     [{ totalEmbarcaciones }],
     [{ totalSocios }],
     [{ totalIngresos }],
-    [{ totalAlertas }],
     operariosList,
     comunicacionesList,
     alertasOperativasRows,
@@ -177,11 +167,6 @@ export default async function DashboardPage() {
           lte(facturacion.emision, endOfMonth),
         ),
       ),
-
-    db
-      .select({ totalAlertas: count() })
-      .from(facturacion)
-      .where(and(eq(facturacion.guarderiaId, gId), eq(facturacion.estado, 'vencida'))),
 
     db
       .select({
@@ -266,7 +251,7 @@ export default async function DashboardPage() {
       </div>
 
       {/* Metric cards */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
         <MetricCard
           icon={<Ship className="h-5 w-5 text-white" />}
           iconBg="#175861"
@@ -284,12 +269,6 @@ export default async function DashboardPage() {
           iconBg="#ABC2B3"
           value={formatCurrency(totalIngresos)}
           label="Ingresos del mes"
-        />
-        <MetricCard
-          icon={<AlertTriangle className="h-5 w-5 text-white" />}
-          iconBg="#4B5563"
-          value={String(totalAlertas)}
-          label="Alertas pendientes"
         />
       </div>
 
