@@ -86,7 +86,7 @@ export type CreateTarifaData = TarifaCuotaMensualInput | TarifaServiciosInput | 
 export type UpdateTarifaData = CreateTarifaData & { id: string; estado: Estado };
 
 export type AjusteMasivoData =
-  | { tipo: 'porcentaje'; valor: number }
+  | { tipo: 'porcentaje'; direccion: 'aumento' | 'descuento'; valor: number }
   | { tipo: 'monto'; valor: number };
 
 function isAdmin(ctx: NonNullable<Awaited<ReturnType<typeof getActiveMarina>>>): boolean {
@@ -233,6 +233,14 @@ export async function ajusteMasivoTarifasAction(
   if (!Number.isFinite(data.valor) || data.valor < 0) {
     return { error: 'El valor debe ser un número mayor o igual a 0.' };
   }
+  if (data.tipo === 'porcentaje') {
+    if (data.direccion !== 'aumento' && data.direccion !== 'descuento') {
+      return { error: 'Dirección inválida.' };
+    }
+    if (data.direccion === 'descuento' && data.valor > 100) {
+      return { error: 'El descuento no puede ser mayor a 100%.' };
+    }
+  }
 
   const guarderiaId = ctx.activeMembership.guarderiaId;
   const origen: Origen = data.tipo === 'porcentaje' ? 'masivo_porcentaje' : 'masivo_monto';
@@ -250,9 +258,15 @@ export async function ajusteMasivoTarifasAction(
 
     for (const row of rows) {
       const actual = row.precio != null ? Number(row.precio) : 0;
-      // porcentaje: incrementa el precio actual en X%.
+      // porcentaje: aplica X% como aumento (+) o descuento (-) sobre el actual.
       // monto: reemplaza el precio por el valor indicado.
-      const nuevo = data.tipo === 'porcentaje' ? actual * (1 + data.valor / 100) : data.valor;
+      let nuevo: number;
+      if (data.tipo === 'porcentaje') {
+        const factor = data.direccion === 'aumento' ? 1 + data.valor / 100 : 1 - data.valor / 100;
+        nuevo = Math.max(0, actual * factor);
+      } else {
+        nuevo = data.valor;
+      }
 
       await tx
         .update(servicios)

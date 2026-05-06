@@ -766,17 +766,24 @@ function AjusteMasivoSection({
   onApplied: () => void;
 }) {
   const [tipo, setTipo] = useState<'' | AjusteMasivoData['tipo']>('');
+  const [direccion, setDireccion] = useState<'aumento' | 'descuento'>('aumento');
   const [valor, setValor] = useState<string>('');
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'error' | 'success'; msg: string } | null>(null);
   const [pending, startTransition] = useTransition();
 
   const valorNum = Number(valor);
-  const valido = Boolean(tipo) && Number.isFinite(valorNum) && valorNum >= 0 && valor !== '';
+  const sobrepasa100 = tipo === 'porcentaje' && direccion === 'descuento' && valorNum > 100;
+  const valido =
+    Boolean(tipo) && Number.isFinite(valorNum) && valorNum >= 0 && valor !== '' && !sobrepasa100;
   const sinTarifas = totalTarifas === 0;
 
   const handleAplicar = () => {
     setFeedback(null);
+    if (sobrepasa100) {
+      setFeedback({ type: 'error', msg: 'El descuento no puede superar el 100%.' });
+      return;
+    }
     if (!valido) {
       setFeedback({ type: 'error', msg: 'Elegí tipo de ajuste y un valor ≥ 0.' });
       return;
@@ -788,7 +795,11 @@ function AjusteMasivoSection({
     if (!tipo || !Number.isFinite(valorNum)) return;
     setFeedback(null);
     startTransition(async () => {
-      const res = await ajusteMasivoTarifasAction({ tipo, valor: valorNum });
+      const payload: AjusteMasivoData =
+        tipo === 'porcentaje'
+          ? { tipo: 'porcentaje', direccion, valor: valorNum }
+          : { tipo: 'monto', valor: valorNum };
+      const res = await ajusteMasivoTarifasAction(payload);
       if (res.error) {
         setFeedback({ type: 'error', msg: res.error });
         setConfirmOpen(false);
@@ -796,6 +807,7 @@ function AjusteMasivoSection({
         setConfirmOpen(false);
         setValor('');
         setTipo('');
+        setDireccion('aumento');
         setFeedback({
           type: 'success',
           msg: `Ajuste aplicado a ${res.afectadas ?? 0} tarifa(s).`,
@@ -807,7 +819,7 @@ function AjusteMasivoSection({
 
   const previewTexto =
     tipo === 'porcentaje'
-      ? `un aumento de ${valor}%`
+      ? `${direccion === 'aumento' ? 'un aumento' : 'un descuento'} de ${valor}%`
       : tipo === 'monto'
         ? `el monto fijo $${valor} (se reemplaza el precio actual)`
         : '';
@@ -827,7 +839,9 @@ function AjusteMasivoSection({
             className={`${inputCls} max-w-[220px]`}
             value={tipo}
             onChange={(e) => {
-              setTipo(e.target.value as '' | AjusteMasivoData['tipo']);
+              const next = e.target.value as '' | AjusteMasivoData['tipo'];
+              setTipo(next);
+              if (next !== 'porcentaje') setDireccion('aumento');
               setFeedback(null);
             }}
           >
@@ -835,6 +849,20 @@ function AjusteMasivoSection({
             <option value="porcentaje">Porcentaje</option>
             <option value="monto">Monto</option>
           </select>
+
+          {tipo === 'porcentaje' && (
+            <select
+              className={`${inputCls} max-w-[180px]`}
+              value={direccion}
+              onChange={(e) => {
+                setDireccion(e.target.value as 'aumento' | 'descuento');
+                setFeedback(null);
+              }}
+            >
+              <option value="aumento">Aumentar</option>
+              <option value="descuento">Descontar</option>
+            </select>
+          )}
 
           {tipo && (
             <input
