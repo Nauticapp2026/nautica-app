@@ -1,4 +1,4 @@
-import { and, asc, desc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq, isNull, notInArray, or } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 
 import { getActiveMarina } from '@/lib/auth/session';
@@ -44,7 +44,15 @@ export default async function TareasPage() {
       .leftJoin(embarcaciones, eq(embarcaciones.id, tareas.embarcacionId))
       .leftJoin(socioProfile, eq(socioProfile.id, embarcaciones.profileId))
       .leftJoin(solicitudesLavado, eq(solicitudesLavado.tareaId, tareas.id))
-      .where(eq(tareas.guarderiaId, gId))
+      .where(
+        and(
+          eq(tareas.guarderiaId, gId),
+          or(
+            isNull(solicitudesLavado.estado),
+            notInArray(solicitudesLavado.estado, ['lista', 'cancelada']),
+          ),
+        ),
+      )
       .orderBy(desc(tareas.createdAt))
       .limit(500),
 
