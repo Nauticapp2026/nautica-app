@@ -18,6 +18,7 @@ import {
   Menu,
   X,
   Building2,
+  MessageCircle,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -162,6 +163,9 @@ export function Sidebar({ subtitle, userName, userInitial, rol, variant = 'dashb
           })}
         </nav>
 
+        {/* Botón de soporte: solo en dashboard (admin + operario), no en super-admin. */}
+        {variant === 'dashboard' && <SoporteButton />}
+
         {/* User */}
         <div className="border-t border-gray-100 px-4 py-4">
           <div className="flex items-center gap-3">
@@ -190,5 +194,30 @@ export function Sidebar({ subtitle, userName, userInitial, rol, variant = 'dashb
         </div>
       </aside>
     </>
+  );
+}
+
+// El número de soporte vive en NEXT_PUBLIC_SOPORTE_TEL (Vercel). Si no
+// está seteado, el botón se ve pero al click no hace nada — esto deja
+// que el diseño viva en producción mientras el cliente define el número.
+function SoporteButton() {
+  const tel = process.env.NEXT_PUBLIC_SOPORTE_TEL?.trim();
+  const href = tel ? `tel:${tel}` : '#';
+
+  return (
+    <div className="px-3 pt-2 pb-3">
+      <a
+        href={href}
+        className="flex items-center gap-3 rounded-[14px] border border-[#D6E5E6] bg-[#F4F8F8] p-2.5 transition-colors hover:bg-[#E8F0F1]"
+      >
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#669E9D] text-white">
+          <MessageCircle className="h-[18px] w-[18px]" />
+        </span>
+        <span className="min-w-0 flex-1 leading-tight">
+          <span className="block text-sm font-bold text-[#175861]">¿Necesitas ayuda?</span>
+          <span className="block text-xs text-gray-500">Contacta a soporte</span>
+        </span>
+      </a>
+    </div>
   );
 }
