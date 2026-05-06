@@ -533,6 +533,9 @@ export const espacios = pgTable(
     marinaId: uuid('marina_id').references(() => marinas.id, { onDelete: 'set null' }),
     ocupanteId: uuid('ocupante_id').references(() => profiles.id, { onDelete: 'set null' }),
     servicioId: uuid('servicio_id').references(() => servicios.id, { onDelete: 'set null' }),
+    // Día de cobro mensual: se setea cuando ocupanteId pasa de null a not null
+    // o cambia de socio. NULL = modelo viejo (cobro el día 1).
+    fechaAsignacion: timestamp('fecha_asignacion', { withTimezone: true }),
     nomenclatura: text('nomenclatura'),
     lugar: text('lugar'),
     tipo: text('tipo'),
