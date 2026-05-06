@@ -22,7 +22,8 @@ export type TusFacturasCliente = {
   razon_social: string;
   email: string;
   domicilio: string;
-  provincia: string; // código: '2' = CABA, '1' = Buenos Aires, etc.
+  provincia: string; // código AFIP: '1' = CABA, '2' = Buenos Aires, etc.
+  condicion_pago_otra?: string; // requerido si condicion_pago === '214' (Otra)
   envia_por_mail: 'S' | 'N';
   reclama_deuda: 'S' | 'N';
   condicion_pago: string; // '201' contado, '211' 30 días, etc.
@@ -196,12 +197,31 @@ export async function administrarPuntoVenta(
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-/** Formatea Date | ISO a 'DD/MM/YYYY' que requiere tusfacturas. */
+/**
+ * Formatea Date | ISO a 'DD/MM/YYYY' que requiere tusfacturas.
+ *
+ * - Si recibe un string 'YYYY-MM-DD' (formato de inputs date), lo trata como
+ *   fecha civil sin zona horaria — evita el off-by-one que generaba `new Date(...)`.
+ * - Para Date u otros strings, convierte a TZ Argentina antes de extraer dd/mm/yyyy
+ *   (ver regla 5 de CLAUDE.md: postgres guarda en UTC, mostrar en hora local).
+ */
 export function toTusFecha(d: Date | string | null | undefined): string {
   if (!d) d = new Date();
+
+  if (typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d)) {
+    const [y, m, day] = d.split('-');
+    return `${day}/${m}/${y}`;
+  }
+
   const date = typeof d === 'string' ? new Date(d) : d;
-  const dd = String(date.getUTCDate()).padStart(2, '0');
-  const mm = String(date.getUTCMonth() + 1).padStart(2, '0');
-  const yyyy = date.getUTCFullYear();
+  const parts = new Intl.DateTimeFormat('es-AR', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).formatToParts(date);
+  const dd = parts.find((p) => p.type === 'day')!.value;
+  const mm = parts.find((p) => p.type === 'month')!.value;
+  const yyyy = parts.find((p) => p.type === 'year')!.value;
   return `${dd}/${mm}/${yyyy}`;
 }

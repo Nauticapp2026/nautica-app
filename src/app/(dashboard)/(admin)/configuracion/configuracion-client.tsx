@@ -808,6 +808,14 @@ function PuntoVentaTab({ initial }: { initial: PuntoVentaData }) {
         </div>
       )}
 
+      {!yaConfigurado && (
+        <div className="mb-6 rounded-[10px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <strong>Antes de continuar:</strong> el número de punto de venta tiene que estar dado de
+          alta previamente en AFIP (Servicios → Administrador de Relaciones → POS de Facturación
+          Electrónica). Si no existe en AFIP, las facturas van a ser rechazadas al emitirlas.
+        </div>
+      )}
+
       <div className="space-y-4">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <Field label="Punto de venta" required>

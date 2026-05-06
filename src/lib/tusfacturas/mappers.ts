@@ -29,24 +29,25 @@ export const CONDICION_IVA_API: Record<string, string> = {
 };
 
 // condicion_venta (db) → tusfacturas condicion_pago
-// Los códigos vienen de la tabla interna de tusfacturas (ver docs).
+// Códigos oficiales tusfacturas/AFIP. Si se manda '214' (Otra), buildCliente
+// agrega `condicion_pago_otra` con la descripción.
 export const CONDICION_PAGO_API: Record<string, string> = {
   contado: '201',
-  cuenta_corriente: '202',
-  tarjeta_credito: '210',
-  tarjeta_debito: '209',
-  transferencia_bancaria: '202',
-  mercadopago: '202',
-  payway: '202',
-  dias_5: '211',
-  dias_10: '211',
-  dias_15: '211',
-  dias_20: '211',
-  dias_30: '211',
-  dias_45: '211',
-  dias_60: '211',
-  dias_90: '211',
-  otros: '201',
+  cuenta_corriente: '205',
+  tarjeta_credito: '211',
+  tarjeta_debito: '212',
+  transferencia_bancaria: '210',
+  mercadopago: '216',
+  payway: '217',
+  dias_5: '213',
+  dias_10: '206',
+  dias_15: '207',
+  dias_20: '209',
+  dias_30: '202',
+  dias_45: '208',
+  dias_60: '203',
+  dias_90: '204',
+  otros: '214',
 };
 
 // forma de pago (db medio_pago) → descripcion humana que va en pagos.formas_pago
