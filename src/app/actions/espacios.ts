@@ -574,8 +574,8 @@ export async function moveEspacioToPisoAction(
   const [espacio] = await db
     .select({
       id: espacios.id,
-      naveId: espacios.naveId,
       pisoId: espacios.pisoId,
+      marinaId: espacios.marinaId,
     })
     .from(espacios)
     .where(and(eq(espacios.id, espacioId), eq(espacios.guarderiaId, guarderiaId)))
@@ -583,8 +583,12 @@ export async function moveEspacioToPisoAction(
   if (!espacio) return { error: 'Espacio no encontrado.' };
 
   if (espacio.pisoId === targetPisoId) return {};
+  if (espacio.marinaId) {
+    return { error: 'No se puede mover un espacio de marina a un piso de nave.' };
+  }
 
-  // Validar que el piso destino pertenezca a un lado de la misma nave (y guardería).
+  // Resolver toda la jerarquía del piso destino (lado → nave → área)
+  // para mantener los FK del espacio consistentes después del move.
   const [destino] = await db
     .select({
       pisoId: pisosTable.id,
@@ -598,16 +602,60 @@ export async function moveEspacioToPisoAction(
     .limit(1);
   if (!destino) return { error: 'Piso destino no encontrado.' };
 
-  if (!espacio.naveId || destino.naveId !== espacio.naveId) {
-    return { error: 'Solo se puede mover el espacio a otro piso de la misma nave.' };
-  }
-
   await db
     .update(espacios)
     .set({
       pisoId: destino.pisoId,
       ladoId: destino.ladoId,
+      naveId: destino.naveId,
       areaId: destino.areaId,
+      updatedAt: new Date(),
+    })
+    .where(eq(espacios.id, espacioId));
+
+  revalidatePath('/espacios');
+  return {};
+}
+
+export async function moveEspacioToMarinaAction(
+  espacioId: string,
+  targetMarinaId: string,
+): Promise<{ error?: string }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+  if (!isAdmin(ctx)) return { error: 'Solo administradores pueden mover espacios.' };
+
+  const guarderiaId = ctx.activeMembership.guarderiaId;
+
+  const [espacio] = await db
+    .select({
+      id: espacios.id,
+      marinaId: espacios.marinaId,
+      pisoId: espacios.pisoId,
+    })
+    .from(espacios)
+    .where(and(eq(espacios.id, espacioId), eq(espacios.guarderiaId, guarderiaId)))
+    .limit(1);
+  if (!espacio) return { error: 'Espacio no encontrado.' };
+
+  if (espacio.marinaId === targetMarinaId) return {};
+  if (espacio.pisoId) {
+    return { error: 'No se puede mover un espacio de nave a un peine de marina.' };
+  }
+
+  const [destino] = await db
+    .select({ marinaId: marinas.id, areaId: marinas.areaId })
+    .from(marinas)
+    .where(and(eq(marinas.id, targetMarinaId), eq(marinas.guarderiaId, guarderiaId)))
+    .limit(1);
+  if (!destino) return { error: 'Peine destino no encontrado.' };
+
+  await db
+    .update(espacios)
+    .set({
+      marinaId: destino.marinaId,
+      areaId: destino.areaId,
+      updatedAt: new Date(),
     })
     .where(eq(espacios.id, espacioId));
 
