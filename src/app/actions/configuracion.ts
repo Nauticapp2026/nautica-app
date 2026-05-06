@@ -157,6 +157,19 @@ const CONDICIONES_IVA = [
 ] as const;
 type CondicionIva = (typeof CONDICIONES_IVA)[number];
 
+/**
+ * Construye la URL del webhook de tusfacturas para este deployment.
+ * - Devuelve undefined si falta TUSFACTURAS_WEBHOOK_SECRET o NEXT_PUBLIC_APP_URL.
+ * - tusfacturas exige HTTPS, así que en dev (http://localhost) no se setea.
+ */
+function buildTusFacturasWebhookUrl(): string | undefined {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '');
+  const secret = process.env.TUSFACTURAS_WEBHOOK_SECRET;
+  if (!appUrl || !secret) return undefined;
+  if (!appUrl.startsWith('https://')) return undefined;
+  return `${appUrl}/api/webhooks/tusfacturas?secret=${encodeURIComponent(secret)}`;
+}
+
 export type SavePuntoVentaData = {
   puntoDeVenta: number;
   razonSocial: string;
@@ -208,6 +221,8 @@ export async function savePuntoVentaAction(data: SavePuntoVentaData): Promise<{ 
   const ivaCode = CONDICION_IVA_API[data.condicionIva];
   if (!ivaCode) return { error: 'No se pudo mapear la condición IVA.' };
 
+  const webhookUrl = buildTusFacturasWebhookUrl();
+
   let tusResponse;
   try {
     tusResponse = await administrarPuntoVenta({
@@ -225,6 +240,7 @@ export async function savePuntoVentaAction(data: SavePuntoVentaData): Promise<{ 
       esta_activo: 'S',
       es_predeterminado: 'S',
       conceptos_tipo: 'PS',
+      ...(webhookUrl ? { webhook: webhookUrl } : {}),
     });
   } catch (err) {
     return {
