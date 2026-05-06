@@ -173,6 +173,14 @@ Helpers principales en `src/lib/auth/session.ts`:
 - `requireSuperAdmin()` — exige el flag `is_super_admin`, no exige membership.
 - `getPostLoginRedirect()` — decide la URL de destino según el contexto.
 
+### Pre-launch gate (Basic Auth)
+
+Mientras el producto no está lanzado al público, toda la web está protegida con un muro de **HTTP Basic Auth** implementado en `src/middleware.ts`. El navegador muestra el prompt nativo no cerrable; cualquier request sin credencial válida recibe 401. Es **server-side** — no se puede bypasear desde el cliente.
+
+- **Activación por env vars**: `PRELAUNCH_GATE_USER` y `PRELAUNCH_GATE_PASSWORD` en Vercel. Con ambas seteadas, el muro está activo. Si falta alguna, el muro queda desactivado (kill switch sin redeploy: borrás las vars y el sitio se "destraba").
+- **Excluido del gate**: `/api/cron/*` (los crons de Vercel tienen su propia auth via `CRON_SECRET`). Si se agrega un endpoint público nuevo (webhook que viene de afuera del browser, ej. tusfacturas), excluirlo igual — sino queda inaccesible.
+- **No afecta al signup desde mobile**: la app mobile usa deep link (`nauticaappmobile://confirm`) en `emailRedirectTo`, así que los socios que se autorregistran nunca pasan por la web. Si alguna vez se vuelve a plantear "el muro rompe el confirm signup", verificar primero que la mobile siga usando el deep link.
+
 ---
 
 ## DB y migraciones
@@ -183,6 +191,28 @@ Helpers principales en `src/lib/auth/session.ts`:
 - `drizzle/meta/` está en `.gitignore` por la misma razón.
 - RLS habilitado en cada tabla relevante; todas las policies viven en estas migraciones.
 - `supabase/migrations/` también contiene **triggers y funciones PL/pgSQL** (no solo policies). Ej. `0010_lavado_auto_tarea_trigger.sql` materializa una tarea automáticamente cuando mobile crea una solicitud de lavado.
+
+### Auditoría de cambios desde Drizzle (patrón GUC)
+
+El cliente Drizzle (`src/lib/db/index.ts`) se conecta al pooler de Supabase con la connection string del rol postgres directamente — **no pasa por Supabase Auth**. Eso significa que cualquier trigger/función que use `auth.uid()` recibe `null` cuando el UPDATE viene de una server action. Para auditar quién hizo un cambio, hay que pasar el `user_id` por GUC dentro de una transacción.
+
+Patrón aplicado por primera vez en el historial de tarifario (mig `0015_servicios_historial.sql`, ver `src/app/actions/tarifario.ts`):
+
+1. En el trigger Postgres, leer el GUC seteado por la app:
+   ```sql
+   v_user := nullif(current_setting('app.usuario_id', true), '')::uuid;
+   ```
+2. En la server action, envolver el UPDATE en `db.transaction` y setear el GUC con `is_local = true` (el tercer parámetro de `set_config`) — eso lo hace local a la transacción y evita que se filtre al pool:
+   ```ts
+   await db.transaction(async (tx) => {
+     await tx.execute(sql`SELECT set_config('app.usuario_id', ${ctx.profile.id}, true)`);
+     await tx.execute(sql`SELECT set_config('app.origen_cambio', ${origen}, true)`);
+     await tx.update(servicios).set(...).where(...);
+   });
+   ```
+3. El trigger usa el GUC para clasificar el cambio (`origen` = `manual` / `masivo_porcentaje` / `masivo_monto`) y atribuirlo a un usuario.
+
+Reusar este patrón si hay que auditar cambios en otra tabla.
 
 ---
 
@@ -226,11 +256,15 @@ Componentes shadcn/ui en `src/components/ui/`:
 
 ## Facturación / Movimientos mensuales
 
-La cuota mensual de un socio se genera **por espacio asignado con servicio**, no por ser socio.
+La cuota mensual de un socio se genera **por espacio asignado con servicio**, no por ser socio. Cada espacio tiene su propio día de cobro = el día en que se asignó al socio (modelo "aniversario", introducido por la migración 0017).
 
-- **Disparador 1**: al asignar ocupante + servicio en `updateEspacioAction` (`src/app/actions/espacios.ts`) → crea el movimiento del mes corriente, con prorrateo si cae a mitad de mes (`(precio / días_del_mes) * días_restantes`, incluye el día de asignación). El `concepto` lleva sufijo `"(proporcional X/Y días)"` cuando aplica.
-- **Disparador 2**: cron `/api/cron/mensuales` el día 1 de cada mes recorre todos los espacios con ocupante + servicio y crea los movimientos del mes nuevo (siempre mes completo).
-- **Helper común**: `ensureMonthlyMovimiento` en `src/lib/movimientos-mensuales.ts`. Idempotencia por `(socio_id, espacio_id, tipo='mensual', fecha en mes corriente)` — un socio con N espacios genera N movimientos por mes, incluso si comparten servicio.
+- **Disparador 1 — alta**: al asignar ocupante + servicio en `updateEspacioAction` (`src/app/actions/espacios.ts`) → crea el movimiento del mes corriente, con prorrateo si cae a mitad de mes (`(precio / días_del_mes) * días_restantes`, incluye el día de asignación). El `concepto` lleva sufijo `"(proporcional X/Y días)"` cuando aplica. La server action también setea `espacios.fecha_asignacion = NOW()` (el "aniversario" del espacio).
+- **Disparador 2 — cron diario**: `/api/cron/mensuales` corre **todos los días** (`vercel.json` cron `0 5 * * *` ≈ 2 AM ARG). Recorre todos los espacios con ocupante + servicio y, para cada uno, decide si hoy es su día de cobro:
+  - Espacios con `fecha_asignacion = NULL` (modelo viejo, asignados antes del deploy de la mig 0017): cobra solo el día 1 del mes.
+  - Espacios con `fecha_asignacion` seteada: cobra cuando hoy es el aniversario. Edge case: si el día original no existe en el mes corriente (ej. asignación día 31, mes con 28 días), cobra el último día del mes — `Math.min(diaOriginal, diasDelMesActual)`.
+- **Helper común**: `ensureMonthlyMovimiento` en `src/lib/movimientos-mensuales.ts`. Idempotencia por `(socio_id, espacio_id, tipo='mensual', fecha en últimos 27 días)` — la ventana cubre tanto el modelo viejo (cobros cada ~30 días) como el aniversario (28-31 días) sin permitir duplicados, y absorbe re-runs del cron en el mismo día. Un socio con N espacios genera N movimientos por ciclo, incluso si comparten servicio.
+- **Cambio de ocupante**: cuando `ocupanteId` pasa de un socio a otro (o de null a not null), `fecha_asignacion` se actualiza a `NOW()` → ciclo nuevo, prorrateo nuevo. Si `ocupanteId` pasa a null, `fecha_asignacion` también vuelve a null.
+- **Precio del cobro**: se usa la tarifa **vigente** en el momento del cron, no la del ciclo anterior. Cambios de tarifa impactan al siguiente cobro mensual.
 - **Tabla**: `movimientos_cuenta_corriente` con columnas `socio_id`, `espacio_id` (FK a `espacios.id`, ON DELETE SET NULL — agregada en migración 0013), `servicio_id`, `concepto`, `tipo`, `debe`, `haber`, `fecha`, `proximo_pago`.
 - **No se cobra al alta del socio**. `createSocioAction` no genera ningún movimiento.
 
