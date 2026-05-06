@@ -117,16 +117,20 @@ function buildCliente(p: {
   const razon =
     p.razonSocial?.trim() || [p.nombre, p.apellido].filter(Boolean).join(' ').trim() || p.email;
 
+  const condicionPago = CONDICION_PAGO_API[p.condicionVenta] ?? '201';
+
   return {
     documento_tipo: TIPO_DOC_API[p.tipoDocumento ?? ''] ?? 'OTRO',
     documento_nro: p.numeroDocumento ?? '',
     razon_social: razon,
     email: p.email,
     domicilio: p.direccion ?? '',
-    provincia: '2', // CABA por defecto — TODO: hacer configurable por guardería
+    provincia: '1', // CABA por defecto — TODO: hacer configurable por guardería/socio
     envia_por_mail: 'N',
     reclama_deuda: 'N',
-    condicion_pago: CONDICION_PAGO_API[p.condicionVenta] ?? '201',
+    condicion_pago: condicionPago,
+    // Si condicionVenta = 'otros' (código 214), AFIP requiere descripción adicional.
+    ...(condicionPago === '214' ? { condicion_pago_otra: 'Otros' } : {}),
     condicion_iva: CONDICION_IVA_API[p.condicionIva ?? ''] ?? 'CF',
     condicion_iva_operacion: '1',
   };
@@ -246,7 +250,10 @@ export async function createInvoiceAction(data: CreateInvoiceData): Promise<{
   });
   if (validacionSocio) return { error: validacionSocio };
 
-  // 1.b Traer POS + creds de la guardería (con fallback a env vars).
+  // 1.b Traer POS + creds propias de la guardería.
+  // SIN fallback a env vars: las env vars son las creds master de NauticaApp y
+  // solo se usan para dar de alta el POS. Facturar con ellas haría que la
+  // factura saliera a nombre de NauticaApp, no de la guardería.
   const [guarderia] = await db
     .select({
       puntoDeVenta: guarderias.puntoDeVenta,
@@ -259,23 +266,26 @@ export async function createInvoiceAction(data: CreateInvoiceData): Promise<{
     .where(eq(guarderias.id, gId))
     .limit(1);
 
-  // Mandamos el número sin padding — así es como lo registramos en tusfacturas
-  // al crear el POS (administrarPuntoVenta usa String(puntoDeVenta) directo).
-  const puntoVenta =
-    guarderia?.puntoDeVenta != null
-      ? String(guarderia.puntoDeVenta)
-      : (process.env.TUSFACTURAS_PUNTO_VENTA ?? '00001');
+  if (
+    !guarderia ||
+    guarderia.puntoDeVenta == null ||
+    !guarderia.tusfacturasApikey ||
+    !guarderia.tusfacturasApitoken ||
+    !guarderia.tusfacturasUsertoken
+  ) {
+    return {
+      error:
+        'Esta guardería todavía no tiene punto de venta configurado. Andá a Configuración → Punto de venta y completá los datos antes de facturar.',
+    };
+  }
 
-  const rubroGuarderia = guarderia?.rubro ?? process.env.TUSFACTURAS_RUBRO ?? 'Servicios náuticos';
-
-  const credsOverride: TusFacturasCredentials | undefined =
-    guarderia?.tusfacturasApikey && guarderia.tusfacturasApitoken && guarderia.tusfacturasUsertoken
-      ? {
-          apikey: guarderia.tusfacturasApikey,
-          apitoken: guarderia.tusfacturasApitoken,
-          usertoken: guarderia.tusfacturasUsertoken,
-        }
-      : undefined;
+  const puntoVenta = String(guarderia.puntoDeVenta);
+  const rubroGuarderia = guarderia.rubro ?? 'Servicios náuticos';
+  const credsOverride: TusFacturasCredentials = {
+    apikey: guarderia.tusfacturasApikey,
+    apitoken: guarderia.tusfacturasApitoken,
+    usertoken: guarderia.tusfacturasUsertoken,
+  };
 
   // 2. Construir items desde movimientos (si llegaron) o desde items libres
   let items: { descripcion: string; cantidad: number; importeUnitario: number }[] = [];
