@@ -197,7 +197,11 @@ export async function updateEspacioAction(input: UpdateEspacioInput): Promise<{ 
   const guarderiaId = ctx.activeMembership.guarderiaId;
 
   const [current] = await db
-    .select({ id: espacios.id })
+    .select({
+      id: espacios.id,
+      ocupanteId: espacios.ocupanteId,
+      fechaAsignacion: espacios.fechaAsignacion,
+    })
     .from(espacios)
     .where(and(eq(espacios.id, input.id), eq(espacios.guarderiaId, guarderiaId)))
     .limit(1);
@@ -235,6 +239,19 @@ export async function updateEspacioAction(input: UpdateEspacioInput): Promise<{ 
     servicioPrecioNum = s.precio != null ? Number(s.precio) : 0;
   }
 
+  // Día de cobro mensual: arranca cuando se asigna o se cambia el ocupante.
+  // Si el ocupante no cambió, conservamos el valor previo. Si pasa a null
+  // (espacio liberado), también limpiamos la fecha.
+  const ocupanteCambio = current.ocupanteId !== input.ocupanteId;
+  let nuevaFechaAsignacion: Date | null;
+  if (input.ocupanteId === null) {
+    nuevaFechaAsignacion = null;
+  } else if (ocupanteCambio) {
+    nuevaFechaAsignacion = new Date();
+  } else {
+    nuevaFechaAsignacion = current.fechaAsignacion;
+  }
+
   await db
     .update(espacios)
     .set({
@@ -246,6 +263,7 @@ export async function updateEspacioAction(input: UpdateEspacioInput): Promise<{ 
       manga: input.manga != null ? input.manga.toFixed(2) : null,
       puntual: input.puntual != null ? input.puntual.toFixed(2) : null,
       tarifa: tarifaPrecio,
+      fechaAsignacion: nuevaFechaAsignacion,
     })
     .where(eq(espacios.id, input.id));
 
