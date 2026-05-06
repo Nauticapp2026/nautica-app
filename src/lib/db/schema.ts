@@ -478,6 +478,30 @@ export const servicios = pgTable(
   (t) => [index('servicios_guarderia_idx').on(t.guarderiaId)],
 );
 
+// Historial de cambios de precio. Lo escribe el trigger
+// `_on_servicio_precio_change` definido en 0015_servicios_historial.sql.
+export const serviciosHistorial = pgTable(
+  'servicios_historial',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    servicioId: uuid('servicio_id')
+      .notNull()
+      .references(() => servicios.id, { onDelete: 'cascade' }),
+    guarderiaId: uuid('guarderia_id')
+      .notNull()
+      .references(() => guarderias.id, { onDelete: 'cascade' }),
+    precioAnterior: numeric('precio_anterior', { precision: 12, scale: 2 }),
+    precioNuevo: numeric('precio_nuevo', { precision: 12, scale: 2 }),
+    origen: text('origen').notNull().default('manual'),
+    usuarioId: uuid('usuario_id').references(() => profiles.id, { onDelete: 'set null' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index('servicios_historial_servicio_idx').on(t.servicioId, t.createdAt),
+    index('servicios_historial_guarderia_idx').on(t.guarderiaId),
+  ],
+);
+
 // Tarifas = bandas de precio por medida de eslora
 export const tarifas = pgTable(
   'tarifas',

@@ -1,11 +1,25 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { and, eq } from 'drizzle-orm';
+import { and, desc, eq, sql } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
-import { servicios } from '@/lib/db/schema';
+import { profiles, servicios, serviciosHistorial } from '@/lib/db/schema';
 import { getActiveMarina } from '@/lib/auth/session';
+
+type Origen = 'manual' | 'masivo_porcentaje' | 'masivo_monto';
+
+// Setea los GUCs que el trigger `_on_servicio_precio_change` lee para
+// armar la fila del historial. Tiene que ejecutarse dentro de la misma
+// transacción que el UPDATE para que `is_local=true` lo aísle del pool.
+async function setOrigenGUC(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  origen: Origen,
+  usuarioId: string,
+) {
+  await tx.execute(sql`SELECT set_config('app.origen_cambio', ${origen}, true)`);
+  await tx.execute(sql`SELECT set_config('app.usuario_id', ${usuarioId}, true)`);
+}
 
 const TIPOS = ['cuota_mensual', 'servicios', 'espacios'] as const;
 type Tipo = (typeof TIPOS)[number];
@@ -192,15 +206,18 @@ export async function updateTarifaAction(data: UpdateTarifaData): Promise<{ erro
             puntual: null,
           };
 
-  await db
-    .update(servicios)
-    .set({
-      ...base,
-      ...extras,
-      estado: data.estado,
-      updatedAt: new Date(),
-    })
-    .where(eq(servicios.id, data.id));
+  await db.transaction(async (tx) => {
+    await setOrigenGUC(tx, 'manual', ctx.profile.id);
+    await tx
+      .update(servicios)
+      .set({
+        ...base,
+        ...extras,
+        estado: data.estado,
+        updatedAt: new Date(),
+      })
+      .where(eq(servicios.id, data.id));
+  });
 
   revalidatePath('/tarifario');
   return {};
@@ -218,30 +235,95 @@ export async function ajusteMasivoTarifasAction(
   }
 
   const guarderiaId = ctx.activeMembership.guarderiaId;
+  const origen: Origen = data.tipo === 'porcentaje' ? 'masivo_porcentaje' : 'masivo_monto';
 
-  const rows = await db
-    .select({ id: servicios.id, precio: servicios.precio })
-    .from(servicios)
-    .where(eq(servicios.guarderiaId, guarderiaId));
+  const afectadas = await db.transaction(async (tx) => {
+    await setOrigenGUC(tx, origen, ctx.profile.id);
 
-  let afectadas = 0;
-  const now = new Date();
+    const rows = await tx
+      .select({ id: servicios.id, precio: servicios.precio })
+      .from(servicios)
+      .where(eq(servicios.guarderiaId, guarderiaId));
 
-  for (const row of rows) {
-    const actual = row.precio != null ? Number(row.precio) : 0;
-    // porcentaje: incrementa el precio actual en X%.
-    // monto: reemplaza el precio por el valor indicado.
-    const nuevo = data.tipo === 'porcentaje' ? actual * (1 + data.valor / 100) : data.valor;
+    let count = 0;
+    const now = new Date();
 
-    await db
-      .update(servicios)
-      .set({ precio: nuevo.toFixed(2), updatedAt: now })
-      .where(eq(servicios.id, row.id));
-    afectadas++;
-  }
+    for (const row of rows) {
+      const actual = row.precio != null ? Number(row.precio) : 0;
+      // porcentaje: incrementa el precio actual en X%.
+      // monto: reemplaza el precio por el valor indicado.
+      const nuevo = data.tipo === 'porcentaje' ? actual * (1 + data.valor / 100) : data.valor;
+
+      await tx
+        .update(servicios)
+        .set({ precio: nuevo.toFixed(2), updatedAt: now })
+        .where(eq(servicios.id, row.id));
+      count++;
+    }
+
+    return count;
+  });
 
   revalidatePath('/tarifario');
   return { afectadas };
+}
+
+export type HistorialEntry = {
+  id: string;
+  precioAnterior: number | null;
+  precioNuevo: number | null;
+  origen: Origen;
+  usuarioNombre: string | null;
+  createdAt: string;
+};
+
+export async function getHistorialTarifaAction(
+  servicioId: string,
+): Promise<{ error?: string; entries?: HistorialEntry[] }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+  if (!isAdmin(ctx)) return { error: 'Solo administradores pueden ver el historial.' };
+
+  const guarderiaId = ctx.activeMembership.guarderiaId;
+
+  const [tarifa] = await db
+    .select({ id: servicios.id })
+    .from(servicios)
+    .where(and(eq(servicios.id, servicioId), eq(servicios.guarderiaId, guarderiaId)))
+    .limit(1);
+
+  if (!tarifa) return { error: 'Tarifa no encontrada.' };
+
+  const rows = await db
+    .select({
+      id: serviciosHistorial.id,
+      precioAnterior: serviciosHistorial.precioAnterior,
+      precioNuevo: serviciosHistorial.precioNuevo,
+      origen: serviciosHistorial.origen,
+      createdAt: serviciosHistorial.createdAt,
+      usuarioNombre: profiles.nombre,
+      usuarioApellido: profiles.apellido,
+      usuarioEmail: profiles.email,
+    })
+    .from(serviciosHistorial)
+    .leftJoin(profiles, eq(profiles.id, serviciosHistorial.usuarioId))
+    .where(eq(serviciosHistorial.servicioId, servicioId))
+    .orderBy(desc(serviciosHistorial.createdAt))
+    .limit(20);
+
+  const entries: HistorialEntry[] = rows.map((r) => {
+    const fullName = [r.usuarioNombre, r.usuarioApellido].filter(Boolean).join(' ').trim();
+    return {
+      id: r.id,
+      precioAnterior: r.precioAnterior != null ? Number(r.precioAnterior) : null,
+      precioNuevo: r.precioNuevo != null ? Number(r.precioNuevo) : null,
+      origen: r.origen as Origen,
+      usuarioNombre: fullName || r.usuarioEmail || null,
+      createdAt: r.createdAt.toISOString(),
+    };
+  });
+
+  return { entries };
 }
 
 export async function deleteTarifaAction(id: string): Promise<{ error?: string }> {

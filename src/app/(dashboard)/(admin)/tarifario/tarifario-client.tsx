@@ -2,14 +2,16 @@
 
 import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Edit3, Plus, Tag, Trash2, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Edit3, History, Plus, Tag, Trash2, X } from 'lucide-react';
 
 import {
   ajusteMasivoTarifasAction,
   createTarifaAction,
   deleteTarifaAction,
+  getHistorialTarifaAction,
   updateTarifaAction,
   type AjusteMasivoData,
+  type HistorialEntry,
 } from '@/app/actions/tarifario';
 
 export type TipoTarifa = 'cuota_mensual' | 'servicios' | 'espacios';
@@ -620,6 +622,8 @@ function TarifaModal({
           )}
 
           {error && <p className="text-sm text-red-600">{error}</p>}
+
+          {isEdit && <HistorialAccordion servicioId={state.tarifa.id} />}
         </div>
 
         <div className="flex justify-end gap-3 border-t border-gray-200 p-6">
@@ -641,6 +645,115 @@ function TarifaModal({
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+const ORIGEN_LABELS: Record<HistorialEntry['origen'], string> = {
+  manual: 'Edición manual',
+  masivo_porcentaje: 'Ajuste masivo (%)',
+  masivo_monto: 'Ajuste masivo (monto)',
+};
+
+const FECHA_FMT = new Intl.DateTimeFormat('es-AR', {
+  timeZone: 'America/Argentina/Buenos_Aires',
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+});
+
+function HistorialAccordion({ servicioId }: { servicioId: string }) {
+  const [open, setOpen] = useState(false);
+  const [entries, setEntries] = useState<HistorialEntry[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleToggle = async () => {
+    const next = !open;
+    setOpen(next);
+    if (next && entries === null && !loading) {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await getHistorialTarifaAction(servicioId);
+        if (res.error) setError(res.error);
+        else setEntries(res.entries ?? []);
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  return (
+    <div className="rounded-[10px] border border-gray-200 bg-gray-50">
+      <button
+        type="button"
+        onClick={handleToggle}
+        className="flex w-full items-center justify-between gap-2 px-4 py-3 text-sm font-semibold text-[#101828]"
+      >
+        <span className="flex items-center gap-2">
+          <History className="h-4 w-4 text-[#669E9D]" />
+          Historial de cambios
+        </span>
+        {open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+      </button>
+
+      {open && (
+        <div className="border-t border-gray-200 px-4 py-3">
+          {loading && <p className="text-xs text-gray-500">Cargando…</p>}
+          {error && <p className="text-xs text-red-600">{error}</p>}
+          {!loading && !error && entries && entries.length === 0 && (
+            <p className="text-xs text-gray-500">Esta tarifa todavía no registró cambios.</p>
+          )}
+          {!loading && !error && entries && entries.length > 0 && (
+            <ul className="space-y-2">
+              {entries.map((e) => {
+                const ant = e.precioAnterior;
+                const nuevo = e.precioNuevo;
+                const delta =
+                  ant != null && nuevo != null && ant !== 0 ? ((nuevo - ant) / ant) * 100 : null;
+                return (
+                  <li
+                    key={e.id}
+                    className="flex flex-col gap-0.5 rounded-[8px] bg-white px-3 py-2 text-xs"
+                  >
+                    <div className="flex flex-wrap items-baseline justify-between gap-2">
+                      <span className="font-semibold text-[#101828]">
+                        {ant != null ? formatARS(ant) : '—'}{' '}
+                        <span className="text-gray-400">→</span>{' '}
+                        {nuevo != null ? formatARS(nuevo) : '—'}
+                      </span>
+                      {delta != null && (
+                        <span
+                          className={`font-semibold ${
+                            delta >= 0 ? 'text-green-700' : 'text-red-600'
+                          }`}
+                        >
+                          {delta >= 0 ? '+' : ''}
+                          {delta.toFixed(1)}%
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-x-3 text-gray-500">
+                      <span>{FECHA_FMT.format(new Date(e.createdAt))}</span>
+                      <span>·</span>
+                      <span>{ORIGEN_LABELS[e.origen] ?? e.origen}</span>
+                      {e.usuarioNombre && (
+                        <>
+                          <span>·</span>
+                          <span>{e.usuarioNombre}</span>
+                        </>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      )}
     </div>
   );
 }
