@@ -22,6 +22,7 @@ import {
   deleteEspacioAction,
   deletePeineAction,
   deletePisoAction,
+  moveEspacioToMarinaAction,
   moveEspacioToPisoAction,
   updateEspacioAction,
   type CreateAreaInput,
@@ -140,6 +141,37 @@ export function EspaciosClient({
   } | null>(null);
   const [deletingContenedor, startDeleteContenedor] = useTransition();
   const [deleteContenedorError, setDeleteContenedorError] = useState<string | null>(null);
+
+  // Drag-and-drop global de espacios. Un único DndContext envuelve todas las
+  // áreas para permitir mover entre áreas distintas (cross-area). El handler
+  // valida que el tipo coincida (nave→piso, marina→peine) y descarta el
+  // resto.
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+  const [movingId, setMovingId] = useState<string | null>(null);
+
+  const onDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over) return;
+    const activeParts = String(active.id).split(':');
+    const overParts = String(over.id).split(':');
+    if (activeParts.length !== 2 || overParts.length !== 2) return;
+    const [activeTipo, activeId] = activeParts;
+    const [overTipo, overId] = overParts;
+
+    const isNaveMove = activeTipo === 'nave' && overTipo === 'piso';
+    const isMarinaMove = activeTipo === 'marina' && overTipo === 'peine';
+    if (!isNaveMove && !isMarinaMove) return;
+
+    setMovingId(activeId);
+    const promise = isNaveMove
+      ? moveEspacioToPisoAction(activeId, overId)
+      : moveEspacioToMarinaAction(activeId, overId);
+
+    void promise.then((res) => {
+      setMovingId(null);
+      if (!res.error) router.refresh();
+    });
+  };
 
   const onDelete = () => {
     if (!confirmDelete) return;
@@ -297,67 +329,71 @@ export function EspaciosClient({
           </p>
         </div>
       ) : (
-        <div className="space-y-4">
-          {areasFiltradas.map((a) =>
-            a.tipo === 'marina' ? (
-              <MarinaSection
-                key={a.id}
-                area={a}
-                collapsed={collapsed.has(a.id)}
-                onToggleCollapsed={() => toggleCollapsed(a.id)}
-                onEditEspacio={(cell, lugar) =>
-                  setEditEspacio({ cell, areaNombre: a.nombre, lugar })
-                }
-                onDeleteEspacio={(cell) => {
-                  setDeleteEspacioError(null);
-                  setConfirmDeleteEspacio(cell);
-                }}
-                onDeletePeine={(p) => {
-                  setDeleteContenedorError(null);
-                  setConfirmDeleteContenedor({
-                    tipo: 'peine',
-                    id: p.marinaId,
-                    nombre: p.nombre,
-                    espaciosCount: p.espacios.length,
-                    ocupadosCount: p.espacios.filter((e) => e.estado === 'ocupado').length,
-                  });
-                }}
-                onAddEspacio={async (marinaId) => {
-                  const res = await addEspacioToMarinaAction(marinaId);
-                  if (!res.error) router.refresh();
-                }}
-              />
-            ) : (
-              <NaveSection
-                key={a.id}
-                area={a}
-                collapsed={collapsed.has(a.id)}
-                onToggleCollapsed={() => toggleCollapsed(a.id)}
-                onEditEspacio={(cell, lugar) =>
-                  setEditEspacio({ cell, areaNombre: a.nombre, lugar })
-                }
-                onDeleteEspacio={(cell) => {
-                  setDeleteEspacioError(null);
-                  setConfirmDeleteEspacio(cell);
-                }}
-                onDeletePiso={(pi) => {
-                  setDeleteContenedorError(null);
-                  setConfirmDeleteContenedor({
-                    tipo: 'piso',
-                    id: pi.pisoId,
-                    nombre: pi.nombre,
-                    espaciosCount: pi.espacios.length,
-                    ocupadosCount: pi.espacios.filter((e) => e.estado === 'ocupado').length,
-                  });
-                }}
-                onAddEspacio={async (pisoId) => {
-                  const res = await addEspacioToPisoAction(pisoId);
-                  if (!res.error) router.refresh();
-                }}
-              />
-            ),
-          )}
-        </div>
+        <DndContext sensors={sensors} onDragEnd={onDragEnd}>
+          <div className="space-y-4">
+            {areasFiltradas.map((a) =>
+              a.tipo === 'marina' ? (
+                <MarinaSection
+                  key={a.id}
+                  area={a}
+                  collapsed={collapsed.has(a.id)}
+                  movingId={movingId}
+                  onToggleCollapsed={() => toggleCollapsed(a.id)}
+                  onEditEspacio={(cell, lugar) =>
+                    setEditEspacio({ cell, areaNombre: a.nombre, lugar })
+                  }
+                  onDeleteEspacio={(cell) => {
+                    setDeleteEspacioError(null);
+                    setConfirmDeleteEspacio(cell);
+                  }}
+                  onDeletePeine={(p) => {
+                    setDeleteContenedorError(null);
+                    setConfirmDeleteContenedor({
+                      tipo: 'peine',
+                      id: p.marinaId,
+                      nombre: p.nombre,
+                      espaciosCount: p.espacios.length,
+                      ocupadosCount: p.espacios.filter((e) => e.estado === 'ocupado').length,
+                    });
+                  }}
+                  onAddEspacio={async (marinaId) => {
+                    const res = await addEspacioToMarinaAction(marinaId);
+                    if (!res.error) router.refresh();
+                  }}
+                />
+              ) : (
+                <NaveSection
+                  key={a.id}
+                  area={a}
+                  collapsed={collapsed.has(a.id)}
+                  movingId={movingId}
+                  onToggleCollapsed={() => toggleCollapsed(a.id)}
+                  onEditEspacio={(cell, lugar) =>
+                    setEditEspacio({ cell, areaNombre: a.nombre, lugar })
+                  }
+                  onDeleteEspacio={(cell) => {
+                    setDeleteEspacioError(null);
+                    setConfirmDeleteEspacio(cell);
+                  }}
+                  onDeletePiso={(pi) => {
+                    setDeleteContenedorError(null);
+                    setConfirmDeleteContenedor({
+                      tipo: 'piso',
+                      id: pi.pisoId,
+                      nombre: pi.nombre,
+                      espaciosCount: pi.espacios.length,
+                      ocupadosCount: pi.espacios.filter((e) => e.estado === 'ocupado').length,
+                    });
+                  }}
+                  onAddEspacio={async (pisoId) => {
+                    const res = await addEspacioToPisoAction(pisoId);
+                    if (!res.error) router.refresh();
+                  }}
+                />
+              ),
+            )}
+          </div>
+        </DndContext>
       )}
 
       {modalOpen && (
@@ -520,6 +556,7 @@ function LeyendaItem({ color, label }: { color: string; label: string }) {
 function MarinaSection({
   area,
   collapsed,
+  movingId,
   onToggleCollapsed,
   onEditEspacio,
   onDeleteEspacio,
@@ -528,6 +565,7 @@ function MarinaSection({
 }: {
   area: AreaView;
   collapsed: boolean;
+  movingId: string | null;
   onToggleCollapsed: () => void;
   onEditEspacio: (cell: EspacioCell, lugar: LugarEspacio) => void;
   onDeleteEspacio: (cell: EspacioCell) => void;
@@ -569,11 +607,13 @@ function MarinaSection({
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 </div>
-                <EspaciosRow
+                <DroppablePeine
+                  marinaId={p.marinaId}
                   espacios={p.espacios}
+                  movingId={movingId}
                   onEditEspacio={(cell) => onEditEspacio(cell, { tipo: 'marina', peine: p.nombre })}
                   onDeleteEspacio={onDeleteEspacio}
-                  onAdd={() => onAddEspacio(p.marinaId)}
+                  onAddEspacio={() => onAddEspacio(p.marinaId)}
                 />
               </div>
             ))
@@ -587,6 +627,7 @@ function MarinaSection({
 function NaveSection({
   area,
   collapsed,
+  movingId,
   onToggleCollapsed,
   onEditEspacio,
   onDeleteEspacio,
@@ -595,6 +636,7 @@ function NaveSection({
 }: {
   area: AreaView;
   collapsed: boolean;
+  movingId: string | null;
   onToggleCollapsed: () => void;
   onEditEspacio: (cell: EspacioCell, lugar: LugarEspacio) => void;
   onDeleteEspacio: (cell: EspacioCell) => void;
@@ -602,22 +644,7 @@ function NaveSection({
   onAddEspacio: (pisoId: string) => Promise<void>;
 }) {
   const router = useRouter();
-  const [movingId, setMovingId] = useState<string | null>(null);
   const [pendingAddPiso, startAddPiso] = useTransition();
-
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
-
-  const onDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (!over) return;
-    const espacioId = String(active.id);
-    const targetPisoId = String(over.id);
-    setMovingId(espacioId);
-    void moveEspacioToPisoAction(espacioId, targetPisoId).then((res) => {
-      setMovingId(null);
-      if (!res.error) router.refresh();
-    });
-  };
 
   const onAddPiso = (ladoId: string) => {
     startAddPiso(async () => {
@@ -627,70 +654,66 @@ function NaveSection({
   };
 
   return (
-    <DndContext sensors={sensors} onDragEnd={onDragEnd}>
-      <section className="rounded-2xl border border-gray-200 bg-white">
-        <button
-          type="button"
-          onClick={onToggleCollapsed}
-          aria-expanded={!collapsed}
-          className={`flex w-full items-center gap-2 bg-[#175861] px-5 py-3 text-left text-sm font-semibold text-white transition-colors hover:bg-[#0f4249] ${
-            collapsed ? 'rounded-2xl' : 'rounded-t-2xl'
-          }`}
-        >
-          <ChevronDown
-            className={`h-4 w-4 transition-transform ${collapsed ? '-rotate-90' : ''}`}
-          />
-          <Anchor className="h-4 w-4" />
-          {area.nombre}
-        </button>
-        {collapsed ? null : (
-          <div className="p-5">
-            {area.lados.length === 0 ? (
-              <p className="py-4 text-center text-xs text-gray-400">Sin lados cargados.</p>
-            ) : (
-              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                {area.lados.map((l) => (
-                  <div key={l.ladoId}>
-                    <div className="mb-2 flex items-center gap-2 text-xs text-gray-500">
-                      <Anchor className="h-3.5 w-3.5" />
-                      {l.nombre}
-                    </div>
-                    {l.pisos.map((pi) => (
-                      <DroppablePiso
-                        key={pi.pisoId}
-                        pisoId={pi.pisoId}
-                        nombre={pi.nombre}
-                        espacios={pi.espacios}
-                        movingId={movingId}
-                        onEditEspacio={(cell) =>
-                          onEditEspacio(cell, {
-                            tipo: 'nave',
-                            lado: l.nombre,
-                            piso: pi.nombre,
-                          })
-                        }
-                        onDeleteEspacio={onDeleteEspacio}
-                        onDeletePiso={() => onDeletePiso(pi)}
-                        onAddEspacio={() => onAddEspacio(pi.pisoId)}
-                      />
-                    ))}
-                    <button
-                      type="button"
-                      onClick={() => onAddPiso(l.ladoId)}
-                      disabled={pendingAddPiso}
-                      className="mt-1 inline-flex w-full items-center justify-center gap-1.5 rounded-[10px] border border-dashed border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-500 transition-colors hover:border-[#175861] hover:text-[#175861] disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                      {pendingAddPiso ? 'Agregando...' : 'Agregar piso'}
-                    </button>
+    <section className="rounded-2xl border border-gray-200 bg-white">
+      <button
+        type="button"
+        onClick={onToggleCollapsed}
+        aria-expanded={!collapsed}
+        className={`flex w-full items-center gap-2 bg-[#175861] px-5 py-3 text-left text-sm font-semibold text-white transition-colors hover:bg-[#0f4249] ${
+          collapsed ? 'rounded-2xl' : 'rounded-t-2xl'
+        }`}
+      >
+        <ChevronDown className={`h-4 w-4 transition-transform ${collapsed ? '-rotate-90' : ''}`} />
+        <Anchor className="h-4 w-4" />
+        {area.nombre}
+      </button>
+      {collapsed ? null : (
+        <div className="p-5">
+          {area.lados.length === 0 ? (
+            <p className="py-4 text-center text-xs text-gray-400">Sin lados cargados.</p>
+          ) : (
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+              {area.lados.map((l) => (
+                <div key={l.ladoId}>
+                  <div className="mb-2 flex items-center gap-2 text-xs text-gray-500">
+                    <Anchor className="h-3.5 w-3.5" />
+                    {l.nombre}
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-      </section>
-    </DndContext>
+                  {l.pisos.map((pi) => (
+                    <DroppablePiso
+                      key={pi.pisoId}
+                      pisoId={pi.pisoId}
+                      nombre={pi.nombre}
+                      espacios={pi.espacios}
+                      movingId={movingId}
+                      onEditEspacio={(cell) =>
+                        onEditEspacio(cell, {
+                          tipo: 'nave',
+                          lado: l.nombre,
+                          piso: pi.nombre,
+                        })
+                      }
+                      onDeleteEspacio={onDeleteEspacio}
+                      onDeletePiso={() => onDeletePiso(pi)}
+                      onAddEspacio={() => onAddEspacio(pi.pisoId)}
+                    />
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => onAddPiso(l.ladoId)}
+                    disabled={pendingAddPiso}
+                    className="mt-1 inline-flex w-full items-center justify-center gap-1.5 rounded-[10px] border border-dashed border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-500 transition-colors hover:border-[#175861] hover:text-[#175861] disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    {pendingAddPiso ? 'Agregando...' : 'Agregar piso'}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -713,7 +736,7 @@ function DroppablePiso({
   onDeletePiso: () => void;
   onAddEspacio: () => Promise<void>;
 }) {
-  const { setNodeRef, isOver } = useDroppable({ id: pisoId });
+  const { setNodeRef, isOver } = useDroppable({ id: `piso:${pisoId}` });
   return (
     <div className="mb-3">
       <div className="mb-1 flex items-center justify-between gap-2">
@@ -741,6 +764,7 @@ function DroppablePiso({
               <DraggableEspacio
                 key={e.id}
                 cell={e}
+                tipo="nave"
                 isMoving={movingId === e.id}
                 onEdit={() => onEditEspacio(e)}
                 onDelete={() => onDeleteEspacio(e)}
@@ -754,19 +778,68 @@ function DroppablePiso({
   );
 }
 
+function DroppablePeine({
+  marinaId,
+  espacios,
+  movingId,
+  onEditEspacio,
+  onDeleteEspacio,
+  onAddEspacio,
+}: {
+  marinaId: string;
+  espacios: EspacioCell[];
+  movingId: string | null;
+  onEditEspacio: (cell: EspacioCell) => void;
+  onDeleteEspacio: (cell: EspacioCell) => void;
+  onAddEspacio: () => Promise<void>;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: `peine:${marinaId}` });
+  return (
+    <div
+      ref={setNodeRef}
+      className={`min-h-[2.5rem] rounded-[10px] border p-1.5 transition-colors ${
+        isOver ? 'border-[#175861] bg-[#D9EBE9]/40' : 'border-dashed border-transparent'
+      }`}
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        {espacios.length === 0 ? (
+          <p className="px-1 py-1 text-[11px] text-gray-400">Sin espacios.</p>
+        ) : (
+          espacios.map((e) => (
+            <DraggableEspacio
+              key={e.id}
+              cell={e}
+              tipo="marina"
+              isMoving={movingId === e.id}
+              onEdit={() => onEditEspacio(e)}
+              onDelete={() => onDeleteEspacio(e)}
+            />
+          ))
+        )}
+        <AddEspacioButton onAdd={onAddEspacio} />
+      </div>
+    </div>
+  );
+}
+
 function DraggableEspacio({
   cell,
+  tipo,
   isMoving,
   onEdit,
   onDelete,
 }: {
   cell: EspacioCell;
+  tipo: 'nave' | 'marina';
   isMoving: boolean;
   onEdit: () => void;
   onDelete: () => void;
 }) {
+  // Prefijo del id distingue origen para que el handler global del DndContext
+  // valide que se arrastra solo entre droppables del mismo tipo (nave→piso,
+  // marina→peine). Cross-tipo se ignora.
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-    id: cell.id,
+    id: `${tipo}:${cell.id}`,
   });
   const style: React.CSSProperties = {
     transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
@@ -797,52 +870,6 @@ function DraggableEspacio({
       >
         <X className="h-3 w-3" strokeWidth={3} />
       </button>
-    </div>
-  );
-}
-
-function EspaciosRow({
-  espacios,
-  onEditEspacio,
-  onDeleteEspacio,
-  onAdd,
-}: {
-  espacios: EspacioCell[];
-  onEditEspacio: (cell: EspacioCell) => void;
-  onDeleteEspacio: (cell: EspacioCell) => void;
-  onAdd?: () => Promise<void>;
-}) {
-  return (
-    <div className="flex flex-wrap items-center gap-2">
-      {espacios.length === 0 ? (
-        <p className="text-[11px] text-gray-400">Sin espacios.</p>
-      ) : (
-        espacios.map((e) => (
-          <div key={e.id} className="group relative">
-            <button
-              type="button"
-              onClick={() => onEditEspacio(e)}
-              title={`Editar espacio ${e.nomenclatura}`}
-              className={`inline-flex h-7 min-w-[2.25rem] items-center justify-center rounded-[8px] border px-2 text-xs font-semibold transition-colors hover:brightness-95 ${ESTADO_CLS[e.estado]}`}
-            >
-              {e.nomenclatura}
-            </button>
-            <button
-              type="button"
-              onClick={(ev) => {
-                ev.stopPropagation();
-                onDeleteEspacio(e);
-              }}
-              title={`Eliminar espacio ${e.nomenclatura}`}
-              aria-label={`Eliminar espacio ${e.nomenclatura}`}
-              className="absolute -top-1.5 -right-1.5 hidden h-4 w-4 items-center justify-center rounded-full bg-red-500 text-white shadow transition-colors group-hover:flex hover:bg-red-600"
-            >
-              <X className="h-3 w-3" strokeWidth={3} />
-            </button>
-          </div>
-        ))
-      )}
-      {onAdd && <AddEspacioButton onAdd={onAdd} />}
     </div>
   );
 }
