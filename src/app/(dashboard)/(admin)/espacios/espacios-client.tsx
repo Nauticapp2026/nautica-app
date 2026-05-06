@@ -1150,6 +1150,9 @@ function ConfirmDeleteModal({
   onCancel: () => void;
   onConfirm: () => void;
 }) {
+  const [confirmText, setConfirmText] = useState('');
+  const canConfirm = confirmText === 'ELIMINAR' && !pending;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="flex w-full max-w-md flex-col rounded-2xl bg-white shadow-2xl">
@@ -1161,6 +1164,21 @@ function ConfirmDeleteModal({
             ¿Seguro querés eliminar <strong>{area.nombre}</strong>? Se borran también todos los
             peines, lados, pisos y espacios asociados. Esta acción no se puede deshacer.
           </p>
+          <div className="mt-4">
+            <label htmlFor="confirm-area-text" className="text-sm text-gray-700">
+              Para confirmar, escribí <strong>ELIMINAR</strong>:
+            </label>
+            <input
+              id="confirm-area-text"
+              type="text"
+              value={confirmText}
+              onChange={(e) => setConfirmText(e.target.value)}
+              autoFocus
+              autoComplete="off"
+              placeholder="ELIMINAR"
+              className="border-input focus-visible:border-ring focus-visible:ring-ring/50 mt-2 w-full rounded-[10px] border bg-transparent px-3 py-2 text-sm outline-none placeholder:text-gray-400 focus-visible:ring-[3px]"
+            />
+          </div>
           {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
         </div>
         <div className="flex justify-end gap-3 border-t border-gray-200 p-6">
@@ -1175,8 +1193,8 @@ function ConfirmDeleteModal({
           <button
             type="button"
             onClick={onConfirm}
-            disabled={pending}
-            className="rounded-[10px] bg-red-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+            disabled={!canConfirm}
+            className="rounded-[10px] bg-red-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {pending ? 'Eliminando…' : 'Eliminar'}
           </button>
@@ -1254,6 +1272,9 @@ function ConfirmDeleteContenedorModal({
   onConfirm: () => void;
 }) {
   const tipoLabel = contenedor.tipo === 'peine' ? 'peine' : 'piso';
+  const [confirmText, setConfirmText] = useState('');
+  const canConfirm = confirmText === 'ELIMINAR' && !pending;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="flex w-full max-w-md flex-col rounded-2xl bg-white shadow-2xl">
@@ -1270,6 +1291,21 @@ function ConfirmDeleteContenedorModal({
               : ''}
             . Esta acción no se puede deshacer.
           </p>
+          <div className="mt-4">
+            <label htmlFor="confirm-contenedor-text" className="text-sm text-gray-700">
+              Para confirmar, escribí <strong>ELIMINAR</strong>:
+            </label>
+            <input
+              id="confirm-contenedor-text"
+              type="text"
+              value={confirmText}
+              onChange={(e) => setConfirmText(e.target.value)}
+              autoFocus
+              autoComplete="off"
+              placeholder="ELIMINAR"
+              className="border-input focus-visible:border-ring focus-visible:ring-ring/50 mt-2 w-full rounded-[10px] border bg-transparent px-3 py-2 text-sm outline-none placeholder:text-gray-400 focus-visible:ring-[3px]"
+            />
+          </div>
           {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
         </div>
         <div className="flex justify-end gap-3 border-t border-gray-200 p-6">
@@ -1284,8 +1320,8 @@ function ConfirmDeleteContenedorModal({
           <button
             type="button"
             onClick={onConfirm}
-            disabled={pending}
-            className="rounded-[10px] bg-red-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+            disabled={!canConfirm}
+            className="rounded-[10px] bg-red-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {pending ? 'Eliminando…' : 'Eliminar'}
           </button>
