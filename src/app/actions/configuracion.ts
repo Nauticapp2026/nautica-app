@@ -8,6 +8,7 @@ import { guarderias, horariosDia, memberships, profiles } from '@/lib/db/schema'
 import { getActiveMarina } from '@/lib/auth/session';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { translateInviteError } from '@/lib/auth/errors';
+import { geocodeAddress } from '@/lib/geocoding';
 import { administrarPuntoVenta, toTusFecha } from '@/lib/tusfacturas/client';
 import { CONDICION_IVA_API } from '@/lib/tusfacturas/mappers';
 
@@ -60,6 +61,15 @@ export async function updateGuarderiaGeneralAction(
   if (!data.cuit.trim()) return { error: 'El CUIT es obligatorio.' };
   if (!TIPOS.includes(data.tipo)) return { error: 'Tipo de establecimiento inválido.' };
 
+  // Geocoding automático (Nominatim) — convierte direccion+ciudad+provincia
+  // en lat/long que la app móvil usa para Clima/mapa de viento. Si falla,
+  // dejamos las coordenadas anteriores intactas.
+  const coords = await geocodeAddress({
+    direccion: data.direccion.trim(),
+    ciudad: data.ciudad.trim(),
+    provincia: data.provincia.trim(),
+  });
+
   await db
     .update(guarderias)
     .set({
@@ -72,6 +82,12 @@ export async function updateGuarderiaGeneralAction(
       codigoPostal: data.codigoPostal.trim(),
       telefono: data.telefono.trim(),
       email: data.email.trim(),
+      ...(coords
+        ? {
+            latitud: coords.lat.toFixed(6),
+            longitud: coords.lng.toFixed(6),
+          }
+        : {}),
       updatedAt: new Date(),
     })
     .where(eq(guarderias.id, guarderiaId));

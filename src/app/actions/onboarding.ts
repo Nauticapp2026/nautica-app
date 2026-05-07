@@ -5,6 +5,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { translateAuthError, translateInviteError } from '@/lib/auth/errors';
 import { db } from '@/lib/db';
 import { guarderias, memberships, horariosDia, profiles } from '@/lib/db/schema';
+import { geocodeAddress } from '@/lib/geocoding';
 import { eq } from 'drizzle-orm';
 
 function toSlug(name: string) {
@@ -90,6 +91,14 @@ export async function createGuarderiaStep(data: {
     slug = `${baseSlug}-${attempt}`;
   }
 
+  // Geocoding automático (Nominatim) — usado por la app móvil para Clima.
+  // Si falla, queda en NULL y la app móvil cae a su fallback.
+  const coords = await geocodeAddress({
+    direccion: data.direccion,
+    ciudad: data.ciudad,
+    provincia: data.provincia,
+  });
+
   const [guarderia] = await db
     .insert(guarderias)
     .values({
@@ -105,6 +114,8 @@ export async function createGuarderiaStep(data: {
       email: data.email,
       instagram: data.instagram || null,
       facebook: data.facebook || null,
+      latitud: coords ? coords.lat.toFixed(6) : null,
+      longitud: coords ? coords.lng.toFixed(6) : null,
     })
     .returning({ id: guarderias.id });
 
