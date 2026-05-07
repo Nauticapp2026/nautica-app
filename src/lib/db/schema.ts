@@ -237,6 +237,10 @@ export const guarderias = pgTable(
     ciudad: text('ciudad'),
     provincia: text('provincia'),
     codigoPostal: text('codigo_postal'),
+    // Coordenadas geográficas, geocodificadas con Nominatim a partir de direccion+ciudad+provincia.
+    // NULL si el geocoding falló: la app móvil cae a fallback (Tigre).
+    latitud: numeric('latitud', { precision: 9, scale: 6 }),
+    longitud: numeric('longitud', { precision: 9, scale: 6 }),
     tipo: text('tipo'),
     logoUrl: text('logo_url'),
     imagenes: text('imagenes').array(),
