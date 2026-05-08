@@ -9,6 +9,7 @@ import {
   savePuntoVentaAction,
   updateGuarderiaFeaturesAction,
   updateGuarderiaGeneralAction,
+  uploadGuarderiaImagenAction,
   type CreateMiembroEquipoData,
   type GuarderiaFeatures,
   type HorarioInput,
@@ -16,6 +17,7 @@ import {
   type UpdateGuarderiaGeneralData,
 } from '@/app/actions/configuracion';
 import { EmptyState } from '@/components/shared/empty-state';
+import { ImagesUploader } from '@/components/shared/images-uploader';
 
 export type TabKey = 'info' | 'equipo' | 'punto_venta' | 'notificaciones';
 
@@ -310,6 +312,22 @@ function InfoGeneralForm({ initial }: { initial: InfoGeneralData }) {
               </div>
             </div>
           ))}
+        </div>
+
+        <div className="pt-2">
+          <label className="mb-2 block text-sm font-semibold text-gray-700">
+            Fotos de la guardería
+          </label>
+          <ImagesUploader
+            urls={data.imagenes}
+            onChange={(next) => onField('imagenes', next)}
+            upload={async (file) => {
+              const fd = new FormData();
+              fd.append('file', file);
+              return uploadGuarderiaImagenAction(fd);
+            }}
+            onError={(msg) => setFeedback({ type: 'error', msg })}
+          />
         </div>
 
         {feedback && (

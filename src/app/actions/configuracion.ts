@@ -41,6 +41,7 @@ export type UpdateGuarderiaGeneralData = {
   telefono: string;
   email: string;
   horarios: HorarioInput[];
+  imagenes: string[];
 };
 
 function isAdmin(ctx: NonNullable<Awaited<ReturnType<typeof getActiveMarina>>>): boolean {
@@ -82,6 +83,7 @@ export async function updateGuarderiaGeneralAction(
       codigoPostal: data.codigoPostal.trim(),
       telefono: data.telefono.trim(),
       email: data.email.trim(),
+      imagenes: data.imagenes,
       ...(coords
         ? {
             latitud: coords.lat.toFixed(6),
@@ -384,4 +386,55 @@ export async function createMiembroEquipoAction(
     await admin.auth.admin.deleteUser(profileId).catch(() => null);
     return { error: 'Error al registrar el miembro. Intentá de nuevo.' };
   }
+}
+
+// =============================================================================
+// IMAGENES DE LA GUARDERIA
+// =============================================================================
+
+const BUCKET_GUARDERIA_FOTOS = 'guarderia-fotos';
+const MAX_IMAGEN_BYTES = 8 * 1024 * 1024; // 8 MB
+const TIPOS_IMAGEN_ACEPTADOS = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+
+async function ensureGuarderiaFotosBucket(
+  admin: ReturnType<typeof createAdminClient>,
+): Promise<void> {
+  const { data: buckets } = await admin.storage.listBuckets();
+  const exists = buckets?.some((b) => b.name === BUCKET_GUARDERIA_FOTOS);
+  if (!exists) {
+    await admin.storage.createBucket(BUCKET_GUARDERIA_FOTOS, { public: true });
+  }
+}
+
+// Sube una imagen de la guarderia al bucket publico y devuelve la URL.
+// La persistencia del array `imagenes` la hace updateGuarderiaGeneralAction
+// cuando el admin guarda el form — esta action solo se encarga del upload.
+export async function uploadGuarderiaImagenAction(
+  formData: FormData,
+): Promise<{ error?: string; url?: string }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+  if (!isAdmin(ctx)) return { error: 'Solo administradores pueden subir imágenes.' };
+
+  const file = formData.get('file');
+  if (!(file instanceof File)) return { error: 'Archivo inválido.' };
+  if (file.size === 0) return { error: 'El archivo está vacío.' };
+  if (file.size > MAX_IMAGEN_BYTES) return { error: 'La imagen supera el tamaño máximo (8 MB).' };
+  if (file.type && !TIPOS_IMAGEN_ACEPTADOS.includes(file.type)) {
+    return { error: 'Formato no soportado. Usá JPG, PNG, WebP o GIF.' };
+  }
+
+  const admin = createAdminClient();
+  await ensureGuarderiaFotosBucket(admin);
+
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const path = `${ctx.activeMembership.guarderiaId}/${Date.now()}-${safeName}`;
+
+  const { error: uploadErr } = await admin.storage
+    .from(BUCKET_GUARDERIA_FOTOS)
+    .upload(path, file, { contentType: file.type || 'application/octet-stream' });
+  if (uploadErr) return { error: `Error subiendo imagen: ${uploadErr.message}` };
+
+  const { data: urlData } = admin.storage.from(BUCKET_GUARDERIA_FOTOS).getPublicUrl(path);
+  return { url: urlData.publicUrl };
 }
