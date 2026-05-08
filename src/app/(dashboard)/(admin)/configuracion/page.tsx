@@ -59,6 +59,7 @@ export default async function ConfiguracionPage({ searchParams }: Props) {
       condicionIva: guarderias.condicionIva,
       rubro: guarderias.rubro,
       fechaInicio: guarderias.fechaInicio,
+      imagenes: guarderias.imagenes,
     })
     .from(guarderias)
     .where(eq(guarderias.id, guarderiaId))
@@ -92,6 +93,7 @@ export default async function ConfiguracionPage({ searchParams }: Props) {
     telefono: guarderia?.telefono ?? '',
     email: guarderia?.email ?? '',
     horarios,
+    imagenes: guarderia?.imagenes ?? [],
   };
 
   const miembrosRows = await db
