@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useTransition } from 'react';
+import { useEffect, useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Bell, Building2, FilterX, Minus, Plus, Receipt, Users, X } from 'lucide-react';
 
@@ -16,7 +16,7 @@ import {
   type UpdateGuarderiaGeneralData,
 } from '@/app/actions/configuracion';
 
-type TabKey = 'info' | 'equipo' | 'punto_venta' | 'notificaciones';
+export type TabKey = 'info' | 'equipo' | 'punto_venta' | 'notificaciones';
 
 const TABS: { key: TabKey; label: string; icon: typeof Bell }[] = [
   { key: 'info', label: 'Información general', icon: Receipt },
@@ -101,13 +101,26 @@ export function ConfiguracionClient({
   miembros,
   features,
   puntoVenta,
+  initialTab = 'info',
+  initialAltaEquipoOpen = false,
 }: {
   infoGeneral: InfoGeneralData;
   miembros: MiembroEquipo[];
   features: GuarderiaFeatures;
   puntoVenta: PuntoVentaData;
+  initialTab?: TabKey;
+  initialAltaEquipoOpen?: boolean;
 }) {
-  const [activeTab, setActiveTab] = useState<TabKey>('info');
+  const router = useRouter();
+  const [activeTab, setActiveTab] = useState<TabKey>(initialTab);
+
+  // Limpiar la query string después de consumirla, así un reload no reabre el modal.
+  useEffect(() => {
+    if (initialTab !== 'info' || initialAltaEquipoOpen) {
+      router.replace('/configuracion');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="p-4 md:p-8">
@@ -140,7 +153,9 @@ export function ConfiguracionClient({
       </div>
 
       {activeTab === 'info' && <InfoGeneralForm initial={infoGeneral} />}
-      {activeTab === 'equipo' && <EquipoTab miembros={miembros} />}
+      {activeTab === 'equipo' && (
+        <EquipoTab miembros={miembros} initialModalOpen={initialAltaEquipoOpen} />
+      )}
       {activeTab === 'punto_venta' && <PuntoVentaTab initial={puntoVenta} />}
       {activeTab === 'notificaciones' && <NotificacionesTab initial={features} />}
     </div>
@@ -317,8 +332,14 @@ function InfoGeneralForm({ initial }: { initial: InfoGeneralData }) {
   );
 }
 
-function EquipoTab({ miembros }: { miembros: MiembroEquipo[] }) {
-  const [modalOpen, setModalOpen] = useState(false);
+function EquipoTab({
+  miembros,
+  initialModalOpen = false,
+}: {
+  miembros: MiembroEquipo[];
+  initialModalOpen?: boolean;
+}) {
+  const [modalOpen, setModalOpen] = useState(initialModalOpen);
   const [filterNombre, setFilterNombre] = useState('');
   const [filterEmail, setFilterEmail] = useState('');
   const [filterRol, setFilterRol] = useState<'' | Rol>('');
