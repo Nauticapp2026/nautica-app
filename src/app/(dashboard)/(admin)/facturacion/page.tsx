@@ -2,7 +2,13 @@ import { and, count, desc, eq, gte, lte, sql, sum } from 'drizzle-orm';
 
 import { getActiveMarina } from '@/lib/auth/session';
 import { db } from '@/lib/db';
-import { facturacion, memberships, movimientosCuentaCorriente, profiles } from '@/lib/db/schema';
+import {
+  facturacion,
+  guarderias,
+  memberships,
+  movimientosCuentaCorriente,
+  profiles,
+} from '@/lib/db/schema';
 
 import { FacturacionClient } from './facturacion-client';
 
@@ -22,6 +28,7 @@ export default async function FacturacionPage() {
     [{ totalFacturado }],
     lista,
     sociosList,
+    [guarderiaInfo],
   ] = await Promise.all([
     db
       .select({ pendientesCount: count() })
@@ -104,6 +111,15 @@ export default async function FacturacionPage() {
       )
       .groupBy(profiles.id)
       .orderBy(profiles.apellido, profiles.nombre),
+
+    db
+      .select({
+        puntoDeVenta: guarderias.puntoDeVenta,
+        certificadoAfipOk: guarderias.certificadoAfipOk,
+      })
+      .from(guarderias)
+      .where(eq(guarderias.id, gId))
+      .limit(1),
   ]);
 
   const facturas = lista.map((f) => ({
@@ -131,6 +147,9 @@ export default async function FacturacionPage() {
     pendienteTotal: s.pendienteTotal,
   }));
 
+  const posConfigurado = guarderiaInfo?.puntoDeVenta != null;
+  const certificadoOk = guarderiaInfo?.certificadoAfipOk ?? false;
+
   return (
     <FacturacionClient
       facturas={facturas}
@@ -141,6 +160,8 @@ export default async function FacturacionPage() {
         vencidas,
         totalFacturado: totalFacturado ?? '0',
       }}
+      posConfigurado={posConfigurado}
+      certificadoOk={certificadoOk}
     />
   );
 }
