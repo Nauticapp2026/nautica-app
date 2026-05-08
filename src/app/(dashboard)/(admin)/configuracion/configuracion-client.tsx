@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Bell, Building2, FilterX, Minus, Plus, Receipt, Users, X } from 'lucide-react';
 
 import {
+  confirmarCertificadoAfipAction,
   createMiembroEquipoAction,
   savePuntoVentaAction,
   solicitarCertificadoAfipAction,
@@ -55,6 +56,7 @@ export type PuntoVentaData = {
   condicionIva: SavePuntoVentaData['condicionIva'];
   rubro: string;
   fechaInicio: string; // 'YYYY-MM-DD' o ''
+  certificadoAfipOk: boolean;
 };
 
 const CONDICION_IVA_OPTS: { value: SavePuntoVentaData['condicionIva']; label: string }[] = [
@@ -849,7 +851,7 @@ function PuntoVentaTab({ initial }: { initial: PuntoVentaData }) {
         fechaInicio: data.fechaInicio,
       });
       if (res.error) setFeedback({ type: 'error', msg: res.error });
-      else setFeedback({ type: 'success', msg: 'Punto de venta sincronizado con tusfacturas.' });
+      else setFeedback({ type: 'success', msg: 'Punto de venta sincronizado con TusFacturas.' });
     });
   };
 
@@ -863,7 +865,7 @@ function PuntoVentaTab({ initial }: { initial: PuntoVentaData }) {
 
       {yaConfigurado && (
         <div className="mb-6 rounded-[10px] border border-[#CAE6E4] bg-[#ECFDF3] px-4 py-3 text-sm text-[#175861]">
-          Este punto de venta ya fue creado en tusfacturas. Los datos no se pueden modificar desde
+          Este punto de venta ya fue creado en TusFacturas. Los datos no se pueden modificar desde
           acá.
         </div>
       )}
@@ -962,11 +964,11 @@ function PuntoVentaTab({ initial }: { initial: PuntoVentaData }) {
             <h3 className="mb-1 text-sm font-bold" style={{ color: '#101828' }}>
               Certificado de enlace con AFIP
             </h3>
-            <p className="mb-3 text-xs text-gray-500">
-              Pedile a tusfacturas que genere el certificado de enlace para emitir facturas
-              electrónicas. Las instrucciones llegan al mail del administrador de la cuenta.
-            </p>
-            <SolicitarCertificadoButton onFeedback={setFeedback} />
+            <CertificadoAfipSection
+              ok={data.certificadoAfipOk}
+              onChangeOk={(ok) => setData((prev) => ({ ...prev, certificadoAfipOk: ok }))}
+              onFeedback={setFeedback}
+            />
           </div>
         )}
       </div>
@@ -974,23 +976,28 @@ function PuntoVentaTab({ initial }: { initial: PuntoVentaData }) {
   );
 }
 
-function SolicitarCertificadoButton({
+function CertificadoAfipSection({
+  ok,
+  onChangeOk,
   onFeedback,
 }: {
+  ok: boolean;
+  onChangeOk: (ok: boolean) => void;
   onFeedback: (f: { type: 'error' | 'success'; msg: string } | null) => void;
 }) {
-  const [pending, startTransition] = useTransition();
+  const [pendingSolicitar, startSolicitar] = useTransition();
+  const [pendingConfirmar, startConfirmar] = useTransition();
 
-  function handleClick() {
+  function handleSolicitar() {
     if (
       !window.confirm(
-        '¿Solicitar el certificado de enlace con AFIP? Tusfacturas va a enviar las instrucciones al mail del administrador de la cuenta.',
+        '¿Solicitar el certificado de enlace con AFIP? TusFacturas va a enviar las instrucciones al mail del administrador de la cuenta.',
       )
     ) {
       return;
     }
     onFeedback(null);
-    startTransition(async () => {
+    startSolicitar(async () => {
       const res = await solicitarCertificadoAfipAction();
       if (res.error) {
         onFeedback({ type: 'error', msg: res.error });
@@ -1003,15 +1010,75 @@ function SolicitarCertificadoButton({
     });
   }
 
+  function handleConfirmar(nextOk: boolean) {
+    onFeedback(null);
+    startConfirmar(async () => {
+      const res = await confirmarCertificadoAfipAction(nextOk);
+      if (res.error) {
+        onFeedback({ type: 'error', msg: res.error });
+        return;
+      }
+      onChangeOk(nextOk);
+      onFeedback({
+        type: 'success',
+        msg: nextOk
+          ? 'Certificado marcado como instalado. Ya podés emitir facturas.'
+          : 'Certificado marcado como pendiente. La emisión de facturas queda bloqueada.',
+      });
+    });
+  }
+
   return (
-    <button
-      type="button"
-      onClick={handleClick}
-      disabled={pending}
-      className="rounded-[10px] border border-[#175861] bg-white px-5 py-3 text-sm font-semibold text-[#175861] transition-colors hover:bg-[#175861] hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
-    >
-      {pending ? 'Solicitando…' : 'Solicitar certificado AFIP'}
-    </button>
+    <>
+      {ok ? (
+        <div className="mb-3 flex items-center gap-2 rounded-[10px] border border-[#CAE6E4] bg-[#ECFDF3] px-4 py-3 text-sm text-[#175861]">
+          <span className="font-semibold">✓ Certificado instalado.</span>
+          <span>La emisión de facturas está habilitada.</span>
+        </div>
+      ) : (
+        <div className="mb-3 rounded-[10px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <strong>Pendiente:</strong> hasta que el certificado esté instalado, la emisión de
+          facturas (manual y automática) queda bloqueada.
+        </div>
+      )}
+
+      <p className="mb-3 text-xs text-gray-500">
+        Pedile a TusFacturas que genere el certificado de enlace y, una vez que sigas las
+        instrucciones del mail e instales el certificado en TusFacturas/AFIP, confirmá la
+        instalación con el botón de la derecha.
+      </p>
+
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={handleSolicitar}
+          disabled={pendingSolicitar}
+          className="rounded-[10px] border border-[#175861] bg-white px-5 py-3 text-sm font-semibold text-[#175861] transition-colors hover:bg-[#175861] hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {pendingSolicitar ? 'Solicitando…' : 'Solicitar certificado AFIP'}
+        </button>
+
+        {ok ? (
+          <button
+            type="button"
+            onClick={() => handleConfirmar(false)}
+            disabled={pendingConfirmar}
+            className="rounded-[10px] border border-red-200 bg-white px-5 py-3 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {pendingConfirmar ? 'Guardando…' : 'Marcar como pendiente'}
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => handleConfirmar(true)}
+            disabled={pendingConfirmar}
+            className="rounded-[10px] bg-[#175861] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#0f4249] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {pendingConfirmar ? 'Guardando…' : 'Confirmar instalación'}
+          </button>
+        )}
+      </div>
+    </>
   );
 }
 
