@@ -205,16 +205,28 @@ function validarDocumentoSocio(p: {
 
 // ─── Action: factura individual ─────────────────────────────────────────────
 
-export async function createInvoiceAction(data: CreateInvoiceData): Promise<{
+export type FacturaResult = {
   error?: string;
   facturaId?: string;
   comprobanteNro?: string;
   pdfUrl?: string;
-}> {
+};
+
+export async function createInvoiceAction(data: CreateInvoiceData): Promise<FacturaResult> {
   const ctx = await getActiveMarina();
   if (!ctx) return { error: 'No autenticado' };
+  return crearFacturaCore({ ...data, guarderiaId: ctx.activeMembership.guarderiaId });
+}
 
-  const gId = ctx.activeMembership.guarderiaId;
+/**
+ * Core de emisión de factura, sin chequeo de sesión. Llamable desde:
+ * - createInvoiceAction (manual, con auth)
+ * - cron de auto-facturación (sin auth, recibe guarderiaId)
+ */
+export async function crearFacturaCore(
+  data: CreateInvoiceData & { guarderiaId: string },
+): Promise<FacturaResult> {
+  const gId = data.guarderiaId;
 
   // 1. Traer socio validando que sea miembro de la guardería activa
   const [socio] = await db

@@ -260,6 +260,8 @@ export const guarderias = pgTable(
     rubro: text('rubro'),
     iibb: text('iibb'),
     fechaInicio: timestamp('fecha_inicio', { withTimezone: true }),
+    // Día del mes (1-28) en que se generan movimientos mensuales y auto-facturación.
+    diaFacturacion: integer('dia_facturacion').default(1),
     // Credenciales devueltas por tusfacturas al crear el POS de esta guardería.
     tusfacturasApikey: text('tusfacturas_apikey'),
     tusfacturasApitoken: text('tusfacturas_apitoken'),

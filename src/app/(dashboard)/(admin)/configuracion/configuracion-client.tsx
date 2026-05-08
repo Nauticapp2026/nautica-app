@@ -283,6 +283,22 @@ function InfoGeneralForm({ initial }: { initial: InfoGeneralData }) {
           </Field>
         </div>
 
+        <Field label="Día de facturación" required>
+          <input
+            className={inputCls}
+            type="number"
+            min={1}
+            max={28}
+            value={data.diaFacturacion}
+            onChange={(e) => onField('diaFacturacion', parseInt(e.target.value, 10) || 1)}
+          />
+          <p className="mt-1 text-xs text-gray-500">
+            Día del mes (1 a 28) en que se generan los movimientos mensuales y se emiten las
+            facturas automáticas para los socios. La primera factura de cada socio se emite
+            manualmente; las siguientes se generan ese día automáticamente.
+          </p>
+        </Field>
+
         <div className="grid grid-cols-1 gap-4 pt-2 md:grid-cols-2">
           {data.horarios.map((h) => (
             <div key={h.dia}>
