@@ -17,7 +17,12 @@ import {
   AlertTriangle,
   X,
 } from 'lucide-react';
-import { addMovimientoAction, marcarPagadasAction } from '@/app/actions/movimientos';
+import {
+  addMovimientoAction,
+  eliminarPagoAction,
+  informarPagoAction,
+  marcarPagadasAction,
+} from '@/app/actions/movimientos';
 import { updateSocioAction } from '@/app/actions/socios';
 import { formatArgentinaDate, formatArgentinaDateTime } from '@/lib/dates';
 import { EmptyState } from '@/components/shared/empty-state';
@@ -612,6 +617,172 @@ function AgregarServicioModal({
   );
 }
 
+// ─── Informar Pago Modal ──────────────────────────────────────────────────────
+
+function InformarPagoModal({
+  open,
+  onClose,
+  socioId,
+  socioNombre,
+}: {
+  open: boolean;
+  onClose: () => void;
+  socioId: string;
+  socioNombre: string;
+}) {
+  const router = useRouter();
+  const [concepto, setConcepto] = useState('');
+  const [monto, setMonto] = useState('');
+  const [fecha, setFecha] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  const isValid = Boolean(concepto.trim() && monto && parseFloat(monto) > 0);
+
+  function handleClose() {
+    setConcepto('');
+    setMonto('');
+    setFecha('');
+    setError(null);
+    onClose();
+  }
+
+  function handleSubmit() {
+    setError(null);
+    startTransition(async () => {
+      const res = await informarPagoAction({ socioId, concepto, monto, fecha });
+      if (res.error) {
+        setError(res.error);
+      } else {
+        handleClose();
+        router.refresh();
+      }
+    });
+  }
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl">
+        <div className="flex items-start justify-between p-6 pb-4">
+          <div>
+            <h2 className="text-[18px] font-bold" style={{ color: '#101828' }}>
+              Informar pago
+            </h2>
+            <p className="mt-0.5 text-sm" style={{ color: '#669E9D' }}>
+              Registre un pago a cuenta de {socioNombre}
+            </p>
+          </div>
+          <button
+            onClick={handleClose}
+            className="rounded-[8px] p-1 text-gray-400 hover:bg-gray-100"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="border-t border-gray-200" />
+
+        <div className="space-y-4 p-6">
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
+              Concepto / forma de pago
+            </label>
+            <input
+              className={inputCls}
+              placeholder="Ej. Pago en efectivo · Transferencia Galicia"
+              value={concepto}
+              onChange={(e) => setConcepto(e.target.value)}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
+                Monto
+              </label>
+              <input
+                className={inputCls}
+                placeholder="$0,00"
+                value={monto ? fmt(parseFloat(monto)) : ''}
+                onChange={(e) => setMonto(e.target.value.replace(/[^0-9.]/g, ''))}
+              />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
+                Fecha
+              </label>
+              <input
+                type="date"
+                className={inputCls}
+                value={fecha}
+                onChange={(e) => setFecha(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {error && <p className="text-sm text-red-600">{error}</p>}
+        </div>
+
+        <div className="border-t border-gray-200 p-6">
+          <div className="flex gap-3">
+            <button
+              onClick={handleClose}
+              className="flex-1 rounded-[10px] border border-[#d1d5dc] bg-white py-2.5 text-sm font-medium text-[#364153] transition hover:bg-gray-50"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={isPending || !isValid}
+              className="flex-1 rounded-[10px] py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+              style={{ background: '#175861' }}
+            >
+              {isPending ? 'Guardando...' : 'Guardar pago'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Eliminar Pago Button ─────────────────────────────────────────────────────
+
+function EliminarPagoButton({ movimientoId, socioId }: { movimientoId: string; socioId: string }) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+
+  function handleClick() {
+    if (!window.confirm('¿Anular este pago a cuenta? El saldo del socio se va a recalcular.')) {
+      return;
+    }
+    startTransition(async () => {
+      const res = await eliminarPagoAction(movimientoId);
+      if (res.error) {
+        window.alert(res.error);
+        return;
+      }
+      router.refresh();
+    });
+  }
+
+  // socioId solo se usa para que el path quede claro al lector; revalidatePath ya lo maneja.
+  void socioId;
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      disabled={isPending}
+      title="Anular pago"
+      className="rounded-[8px] p-1 text-red-400 transition hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
+    >
+      <X className="h-4 w-4" />
+    </button>
+  );
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export type DocumentoItem = {
@@ -661,6 +832,7 @@ export function SocioDetail({
   const [activeTab, setActiveTab] = useState<TabId>('generales');
   const [modalServicioOpen, setModalServicioOpen] = useState(false);
   const [modalPagoOpen, setModalPagoOpen] = useState(false);
+  const [modalInformarPagoOpen, setModalInformarPagoOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   // Generales edit mode
@@ -716,9 +888,15 @@ export function SocioDetail({
   const memberDate = formatArgentinaDate(socio.memberSince);
 
   const totalIngresos = movimientos.reduce((sum, m) => sum + parseFloat(m.debe ?? '0'), 0);
-  const totalPendiente = movimientos
+  const totalCargosPendientes = movimientos
     .filter((m) => m.estado === 'no_pagado')
     .reduce((sum, m) => sum + parseFloat(m.debe ?? '0'), 0);
+  // Pagos a cuenta: movimientos con haber > 0 que no estan imputados a una
+  // factura. Hoy todavia no linkeamos pagos a facturas, asi que tomamos
+  // todos los haber como "sin imputar". Cuando se implemente la imputacion,
+  // filtrar por una columna `factura_id IS NULL`.
+  const totalPagosACuenta = movimientos.reduce((sum, m) => sum + parseFloat(m.haber ?? '0'), 0);
+  const totalPendiente = Math.max(0, totalCargosPendientes - totalPagosACuenta);
 
   function toggleId(id: string) {
     setSelectedIds((prev) => {
@@ -744,6 +922,12 @@ export function SocioDetail({
         selectedIds={Array.from(selectedIds)}
         socioId={socio.id}
         onSuccess={() => setSelectedIds(new Set())}
+      />
+      <InformarPagoModal
+        open={modalInformarPagoOpen}
+        onClose={() => setModalInformarPagoOpen(false)}
+        socioId={socio.id}
+        socioNombre={nombre}
       />
 
       {/* Back */}
@@ -1003,12 +1187,21 @@ export function SocioDetail({
             <p className="text-[18px] font-bold" style={{ color: '#101828' }}>
               Movimientos de cuenta
             </p>
-            <button
-              onClick={() => setModalServicioOpen(true)}
-              className="shrink-0 justify-center rounded-[10px] border border-[#d1d5dc] px-4 py-2 text-sm font-medium text-[#364153] transition hover:bg-gray-50"
-            >
-              Agregar servicio
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setModalInformarPagoOpen(true)}
+                className="shrink-0 justify-center rounded-[10px] border border-[#d1d5dc] px-4 py-2 text-sm font-medium text-[#364153] transition hover:bg-gray-50"
+              >
+                Informar pago
+              </button>
+              <button
+                onClick={() => setModalServicioOpen(true)}
+                className="shrink-0 justify-center rounded-[10px] px-4 py-2 text-sm font-medium text-white transition hover:opacity-90"
+                style={{ background: '#175861' }}
+              >
+                Agregar servicio
+              </button>
+            </div>
           </div>
 
           {/* Metric cards */}
@@ -1081,43 +1274,55 @@ export function SocioDetail({
                     </tr>
                   </thead>
                   <tbody>
-                    {movimientos.map((m) => (
-                      <tr
-                        key={m.id}
-                        className={`border-t border-gray-100 transition hover:bg-gray-50/50 ${
-                          selectedIds.has(m.id) ? 'bg-teal-50/40' : ''
-                        }`}
-                      >
-                        <td className="px-4 py-3">
-                          <input
-                            type="checkbox"
-                            className="h-4 w-4 cursor-pointer rounded accent-[#175861]"
-                            checked={selectedIds.has(m.id)}
-                            onChange={() => toggleId(m.id)}
-                          />
-                        </td>
-                        <td className="px-4 py-3 text-gray-500">{fmtDate(m.fecha)}</td>
-                        <td className="px-4 py-3 font-medium" style={{ color: '#175861' }}>
-                          {m.servicioNombre ?? '—'}
-                        </td>
-                        <td className="px-4 py-3 text-gray-500">{m.concepto ?? '—'}</td>
-                        <td
-                          className="px-4 py-3 text-right font-medium"
-                          style={{ color: '#101828' }}
+                    {movimientos.map((m) => {
+                      const haber = parseFloat(m.haber ?? '0');
+                      const debe = parseFloat(m.debe ?? '0');
+                      const esPago = haber > 0 && debe === 0;
+                      return (
+                        <tr
+                          key={m.id}
+                          className={`border-t border-gray-100 transition hover:bg-gray-50/50 ${
+                            selectedIds.has(m.id) ? 'bg-teal-50/40' : ''
+                          }`}
                         >
-                          {fmt(parseFloat(m.debe ?? '0'))}
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <span
-                            className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${
-                              ESTADO_BADGE[m.estado ?? ''] ?? 'bg-gray-100 text-gray-500'
-                            }`}
+                          <td className="px-4 py-3">
+                            {esPago ? null : (
+                              <input
+                                type="checkbox"
+                                className="h-4 w-4 cursor-pointer rounded accent-[#175861]"
+                                checked={selectedIds.has(m.id)}
+                                onChange={() => toggleId(m.id)}
+                              />
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-gray-500">{fmtDate(m.fecha)}</td>
+                          <td className="px-4 py-3 font-medium" style={{ color: '#175861' }}>
+                            {esPago ? 'Pago a cuenta' : (m.servicioNombre ?? '—')}
+                          </td>
+                          <td className="px-4 py-3 text-gray-500">{m.concepto ?? '—'}</td>
+                          <td
+                            className="px-4 py-3 text-right font-medium"
+                            style={{ color: esPago ? '#1B9A5A' : '#101828' }}
                           >
-                            {ESTADO_LABEL[m.estado ?? ''] ?? m.estado ?? '—'}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
+                            {esPago ? `−${fmt(haber)}` : fmt(debe)}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <span
+                                className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${
+                                  ESTADO_BADGE[m.estado ?? ''] ?? 'bg-gray-100 text-gray-500'
+                                }`}
+                              >
+                                {ESTADO_LABEL[m.estado ?? ''] ?? m.estado ?? '—'}
+                              </span>
+                              {esPago && (
+                                <EliminarPagoButton movimientoId={m.id} socioId={socio.id} />
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
