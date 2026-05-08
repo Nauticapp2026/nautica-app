@@ -13,6 +13,7 @@ import {
   type AjusteMasivoData,
   type HistorialEntry,
 } from '@/app/actions/tarifario';
+import { EmptyState } from '@/components/shared/empty-state';
 
 export type TipoTarifa = 'cuota_mensual' | 'servicios' | 'espacios';
 export type EstadoTarifa = 'activo' | 'inactivo';
@@ -198,12 +199,15 @@ export function TarifarioClient({ tarifas }: { tarifas: Tarifa[] }) {
       </section>
 
       {grupos.length === 0 ? (
-        <div className="rounded-2xl border border-gray-200 bg-white p-16 text-center">
-          <p className="text-sm text-gray-500">
-            {tarifas.length === 0
-              ? 'Todavía no hay tarifas cargadas.'
-              : 'Sin tarifas en esta categoría.'}
-          </p>
+        <div className="rounded-2xl border border-gray-200 bg-white">
+          <EmptyState
+            icon={<Tag className="h-7 w-7 opacity-40" />}
+            text={
+              tarifas.length === 0
+                ? 'Todavía no hay tarifas cargadas.'
+                : 'Sin tarifas en esta categoría.'
+            }
+          />
         </div>
       ) : (
         grupos.map(({ tipo, tarifas: list }) => (

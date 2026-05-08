@@ -27,6 +27,7 @@ import {
   updateEspacioAction,
   type CreateAreaInput,
 } from '@/app/actions/espacios';
+import { EmptyState } from '@/components/shared/empty-state';
 
 export type EstadoEspacio = 'ocupado' | 'reservado' | 'disponible';
 
@@ -275,7 +276,10 @@ export function EspaciosClient({
           </h2>
         </div>
         {areas.length === 0 ? (
-          <p className="py-6 text-center text-sm text-gray-500">Todavía no hay áreas cargadas.</p>
+          <EmptyState
+            icon={<Building2 className="h-7 w-7 opacity-40" />}
+            text="Todavía no hay áreas cargadas."
+          />
         ) : (
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
             {areas.map((a) => (
@@ -323,10 +327,17 @@ export function EspaciosClient({
       </div>
 
       {areasFiltradas.length === 0 ? (
-        <div className="rounded-2xl border border-gray-200 bg-white p-16 text-center">
-          <p className="text-sm text-gray-500">
-            No hay áreas de tipo {filtro === 'marina' ? 'marina' : 'nave'} cargadas.
-          </p>
+        <div className="rounded-2xl border border-gray-200 bg-white">
+          <EmptyState
+            icon={
+              filtro === 'marina' ? (
+                <Anchor className="h-7 w-7 opacity-40" />
+              ) : (
+                <Building2 className="h-7 w-7 opacity-40" />
+              )
+            }
+            text={`No hay áreas de tipo ${filtro === 'marina' ? 'marina' : 'nave'} cargadas.`}
+          />
         </div>
       ) : (
         <DndContext sensors={sensors} onDragEnd={onDragEnd}>

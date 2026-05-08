@@ -20,6 +20,7 @@ import {
 import { addMovimientoAction, marcarPagadasAction } from '@/app/actions/movimientos';
 import { updateSocioAction } from '@/app/actions/socios';
 import { formatArgentinaDate, formatArgentinaDateTime } from '@/lib/dates';
+import { EmptyState } from '@/components/shared/empty-state';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -139,19 +140,6 @@ const ESTADO_LABEL: Record<string, string> = {
   facturado: 'Facturado',
   no_pagado: 'Pendiente',
 };
-
-// ─── Empty tab ────────────────────────────────────────────────────────────────
-
-function EmptyTab({ icon, text }: { icon: React.ReactNode; text: string }) {
-  return (
-    <div className="flex flex-col items-center justify-center gap-3 py-16 text-gray-400">
-      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gray-100">
-        {icon}
-      </div>
-      <p className="text-sm">{text}</p>
-    </div>
-  );
-}
 
 // ─── Field helper ─────────────────────────────────────────────────────────────
 
@@ -958,7 +946,7 @@ export function SocioDetail({
       {activeTab === 'embarcacion' && (
         <div className="rounded-2xl border border-gray-200 bg-white p-4 md:p-6">
           {embarcaciones.length === 0 ? (
-            <EmptyTab
+            <EmptyState
               icon={<Ship className="h-7 w-7 opacity-40" />}
               text="Este socio no tiene embarcaciones registradas."
             />
@@ -1061,7 +1049,7 @@ export function SocioDetail({
 
           {/* Table */}
           {movimientos.length === 0 ? (
-            <EmptyTab
+            <EmptyState
               icon={<CreditCard className="h-7 w-7 opacity-40" />}
               text="No hay movimientos en la cuenta corriente."
             />
@@ -1141,7 +1129,7 @@ export function SocioDetail({
       {/* Facturación */}
       {activeTab === 'facturacion' && (
         <div className="rounded-2xl border border-gray-200 bg-white p-4 md:p-6">
-          <EmptyTab
+          <EmptyState
             icon={<DollarSign className="h-7 w-7 opacity-40" />}
             text="No hay facturas registradas."
           />
@@ -1152,7 +1140,7 @@ export function SocioDetail({
       {activeTab === 'navegantes' && (
         <div className="rounded-2xl border border-gray-200 bg-white p-4 md:p-6">
           {invitados.length === 0 ? (
-            <EmptyTab
+            <EmptyState
               icon={<Users className="h-7 w-7 opacity-40" />}
               text="No hay navegantes autorizados."
             />
@@ -1207,7 +1195,7 @@ export function SocioDetail({
       {activeTab === 'salidas' && (
         <div className="rounded-2xl border border-gray-200 bg-white p-4 md:p-6">
           {salidas.length === 0 ? (
-            <EmptyTab
+            <EmptyState
               icon={<Clock className="h-7 w-7 opacity-40" />}
               text="No hay salidas registradas."
             />
@@ -1249,7 +1237,7 @@ export function SocioDetail({
       {activeTab === 'documentacion' && (
         <div className="rounded-2xl border border-gray-200 bg-white p-4 md:p-6">
           {documentos.length === 0 ? (
-            <EmptyTab
+            <EmptyState
               icon={<FileText className="h-7 w-7 opacity-40" />}
               text="No hay documentos adjuntos."
             />

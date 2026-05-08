@@ -13,6 +13,7 @@ import {
   type MovimientoPendiente,
 } from '@/app/actions/facturacion';
 import { formatArgentinaDate } from '@/lib/dates';
+import { EmptyState } from '@/components/shared/empty-state';
 
 // ─── Tipos ──────────────────────────────────────────────────────────────────
 
@@ -1063,16 +1064,14 @@ export function FacturacionClient({
         </div>
 
         {filtradas.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-3 py-16 text-gray-400">
-            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gray-100">
-              <FileText className="h-7 w-7 opacity-40" />
-            </div>
-            <p className="text-sm">
-              {search
+          <EmptyState
+            icon={<FileText className="h-7 w-7 opacity-40" />}
+            text={
+              search
                 ? 'No se encontraron facturas con ese criterio.'
-                : 'Todavía no hay facturas emitidas.'}
-            </p>
-          </div>
+                : 'Todavía no hay facturas emitidas.'
+            }
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[900px] text-sm">

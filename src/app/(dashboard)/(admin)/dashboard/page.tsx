@@ -14,6 +14,7 @@ import {
 import { and, asc, count, desc, eq, gte, lte, sum } from 'drizzle-orm';
 
 import { AlertasOperativasList, type AlertaOperativa } from './alertas-operativas';
+import { EmptyState } from '@/components/shared/empty-state';
 import { Ship, Users, TrendingUp, Bell, Anchor, Plus, MessageSquare } from 'lucide-react';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -77,17 +78,6 @@ function MetricCard({
       <p className="mt-0.5 text-sm" style={{ color: '#669E9D' }}>
         {label}
       </p>
-    </div>
-  );
-}
-
-function EmptyState({ icon, text }: { icon: React.ReactNode; text: string }) {
-  return (
-    <div className="flex flex-col items-center justify-center gap-3 py-10 text-gray-400">
-      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gray-100">
-        {icon}
-      </div>
-      <p className="text-sm">{text}</p>
     </div>
   );
 }
