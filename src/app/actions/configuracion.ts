@@ -9,7 +9,11 @@ import { getActiveMarina } from '@/lib/auth/session';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { translateInviteError } from '@/lib/auth/errors';
 import { geocodeAddress } from '@/lib/geocoding';
-import { administrarPuntoVenta, toTusFecha } from '@/lib/tusfacturas/client';
+import {
+  administrarPuntoVenta,
+  solicitarCertificadoEnlace,
+  toTusFecha,
+} from '@/lib/tusfacturas/client';
 import { CONDICION_IVA_API } from '@/lib/tusfacturas/mappers';
 
 const DIAS = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'] as const;
@@ -292,6 +296,49 @@ export async function savePuntoVentaAction(data: SavePuntoVentaData): Promise<{ 
 
   revalidatePath('/configuracion');
   return {};
+}
+
+// Solicita el certificado de enlace con AFIP para el POS de la guarderia
+// activa. Tusfacturas genera el certificado y manda instrucciones al mail
+// del admin. Loggeamos el response crudo la primera vez para entender
+// qué devuelve.
+export async function solicitarCertificadoAfipAction(): Promise<{ error?: string }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+  if (!isAdmin(ctx)) return { error: 'Solo administradores pueden solicitar el certificado.' };
+
+  const guarderiaId = ctx.activeMembership.guarderiaId;
+
+  const [g] = await db
+    .select({
+      puntoDeVenta: guarderias.puntoDeVenta,
+      apikey: guarderias.tusfacturasApikey,
+      apitoken: guarderias.tusfacturasApitoken,
+      usertoken: guarderias.tusfacturasUsertoken,
+    })
+    .from(guarderias)
+    .where(eq(guarderias.id, guarderiaId))
+    .limit(1);
+
+  if (!g || g.puntoDeVenta == null || !g.apikey || !g.apitoken || !g.usertoken) {
+    return {
+      error: 'Primero configurá los datos de facturación (POS) antes de solicitar el certificado.',
+    };
+  }
+
+  try {
+    const res = await solicitarCertificadoEnlace({
+      apikey: g.apikey,
+      apitoken: g.apitoken,
+      usertoken: g.usertoken,
+    });
+    console.log('[certificado-afip] response', { guarderiaId, res });
+    return {};
+  } catch (err) {
+    return {
+      error: err instanceof Error ? err.message : 'Error al solicitar el certificado.',
+    };
+  }
 }
 
 // =============================================================================

@@ -7,6 +7,7 @@ import { Bell, Building2, FilterX, Minus, Plus, Receipt, Users, X } from 'lucide
 import {
   createMiembroEquipoAction,
   savePuntoVentaAction,
+  solicitarCertificadoAfipAction,
   updateGuarderiaFeaturesAction,
   updateGuarderiaGeneralAction,
   uploadGuarderiaImagenAction,
@@ -24,7 +25,7 @@ export type TabKey = 'info' | 'equipo' | 'punto_venta' | 'notificaciones';
 const TABS: { key: TabKey; label: string; icon: typeof Bell }[] = [
   { key: 'info', label: 'Información general', icon: Receipt },
   { key: 'equipo', label: 'Equipo', icon: Users },
-  { key: 'punto_venta', label: 'Punto de venta', icon: Building2 },
+  { key: 'punto_venta', label: 'Datos de facturación', icon: Building2 },
   { key: 'notificaciones', label: 'Notificaciones', icon: Bell },
 ];
 
@@ -857,7 +858,7 @@ function PuntoVentaTab({ initial }: { initial: PuntoVentaData }) {
   return (
     <section className="rounded-2xl border border-gray-200 bg-white p-4 md:p-8">
       <h2 className="mb-2 text-base font-bold" style={{ color: '#101828' }}>
-        Configure su punto de venta
+        Datos de facturación
       </h2>
 
       {yaConfigurado && (
@@ -955,8 +956,62 @@ function PuntoVentaTab({ initial }: { initial: PuntoVentaData }) {
             </button>
           </div>
         )}
+
+        {yaConfigurado && (
+          <div className="mt-2 border-t border-gray-200 pt-6">
+            <h3 className="mb-1 text-sm font-bold" style={{ color: '#101828' }}>
+              Certificado de enlace con AFIP
+            </h3>
+            <p className="mb-3 text-xs text-gray-500">
+              Pedile a tusfacturas que genere el certificado de enlace para emitir facturas
+              electrónicas. Las instrucciones llegan al mail del administrador de la cuenta.
+            </p>
+            <SolicitarCertificadoButton onFeedback={setFeedback} />
+          </div>
+        )}
       </div>
     </section>
+  );
+}
+
+function SolicitarCertificadoButton({
+  onFeedback,
+}: {
+  onFeedback: (f: { type: 'error' | 'success'; msg: string } | null) => void;
+}) {
+  const [pending, startTransition] = useTransition();
+
+  function handleClick() {
+    if (
+      !window.confirm(
+        '¿Solicitar el certificado de enlace con AFIP? Tusfacturas va a enviar las instrucciones al mail del administrador de la cuenta.',
+      )
+    ) {
+      return;
+    }
+    onFeedback(null);
+    startTransition(async () => {
+      const res = await solicitarCertificadoAfipAction();
+      if (res.error) {
+        onFeedback({ type: 'error', msg: res.error });
+        return;
+      }
+      onFeedback({
+        type: 'success',
+        msg: 'Solicitud enviada. Revisá el mail del administrador para las instrucciones.',
+      });
+    });
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      disabled={pending}
+      className="rounded-[10px] border border-[#175861] bg-white px-5 py-3 text-sm font-semibold text-[#175861] transition-colors hover:bg-[#175861] hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+    >
+      {pending ? 'Solicitando…' : 'Solicitar certificado AFIP'}
+    </button>
   );
 }
 

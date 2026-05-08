@@ -195,6 +195,48 @@ export async function administrarPuntoVenta(
   return data;
 }
 
+// ─── Certificado de enlace con AFIP ─────────────────────────────────────────
+
+// El response del endpoint no está documentado por tusfacturas — vamos a
+// loguear el payload crudo la primera vez y ajustar el tipo si hace falta.
+export type TusFacturasCertificadoResponse = {
+  error?: 'S' | 'N';
+  errores?: string[];
+  rta?: string;
+  // Cualquier otro campo que TF devuelva queda en el payload crudo.
+  [key: string]: unknown;
+};
+
+/**
+ * Solicita el certificado de enlace con AFIP/ARCA para el CUIT asociado
+ * a las creds. Tusfacturas genera el certificado y manda el resultado
+ * (con instrucciones, según ellos) al mail del usuario administrador.
+ *
+ * Las creds deben ser las propias del POS de la guarderia, no las
+ * master de NauticaApp — cada guardería gestiona su propio CUIT.
+ */
+export async function solicitarCertificadoEnlace(
+  creds: TusFacturasCredentials = getCredentialsFromEnv(),
+): Promise<TusFacturasCertificadoResponse> {
+  const res = await fetch(`${TUSFACTURAS_BASE}/puntos_venta/certificado`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(creds),
+    cache: 'no-store',
+  });
+
+  if (!res.ok) {
+    throw new Error(`tusfacturas HTTP ${res.status}`);
+  }
+
+  const data = (await res.json()) as TusFacturasCertificadoResponse;
+  if (data.error === 'S') {
+    const msg = data.errores?.join(' · ') ?? data.rta ?? 'Error al solicitar el certificado';
+    throw new Error(msg);
+  }
+  return data;
+}
+
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 /**

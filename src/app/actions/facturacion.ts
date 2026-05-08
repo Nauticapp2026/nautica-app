@@ -126,7 +126,7 @@ function buildCliente(p: {
     email: p.email,
     domicilio: p.direccion ?? '',
     provincia: '1', // CABA por defecto — TODO: hacer configurable por guardería/socio
-    envia_por_mail: 'N',
+    envia_por_mail: 'S',
     reclama_deuda: 'N',
     condicion_pago: condicionPago,
     // Si condicionVenta = 'otros' (código 214), AFIP requiere descripción adicional.
