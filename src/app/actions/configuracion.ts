@@ -42,6 +42,7 @@ export type UpdateGuarderiaGeneralData = {
   email: string;
   horarios: HorarioInput[];
   imagenes: string[];
+  diaFacturacion: number;
 };
 
 function isAdmin(ctx: NonNullable<Awaited<ReturnType<typeof getActiveMarina>>>): boolean {
@@ -61,6 +62,13 @@ export async function updateGuarderiaGeneralAction(
   if (!nombre) return { error: 'El nombre es obligatorio.' };
   if (!data.cuit.trim()) return { error: 'El CUIT es obligatorio.' };
   if (!TIPOS.includes(data.tipo)) return { error: 'Tipo de establecimiento inválido.' };
+  if (
+    !Number.isInteger(data.diaFacturacion) ||
+    data.diaFacturacion < 1 ||
+    data.diaFacturacion > 28
+  ) {
+    return { error: 'El día de facturación debe ser un entero entre 1 y 28.' };
+  }
 
   // Geocoding automático (Nominatim) — convierte direccion+ciudad+provincia
   // en lat/long que la app móvil usa para Clima/mapa de viento. Si falla,
@@ -84,6 +92,7 @@ export async function updateGuarderiaGeneralAction(
       telefono: data.telefono.trim(),
       email: data.email.trim(),
       imagenes: data.imagenes,
+      diaFacturacion: data.diaFacturacion,
       ...(coords
         ? {
             latitud: coords.lat.toFixed(6),
