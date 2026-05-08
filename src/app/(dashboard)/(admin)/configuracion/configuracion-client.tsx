@@ -15,6 +15,7 @@ import {
   type SavePuntoVentaData,
   type UpdateGuarderiaGeneralData,
 } from '@/app/actions/configuracion';
+import { EmptyState } from '@/components/shared/empty-state';
 
 export type TabKey = 'info' | 'equipo' | 'punto_venta' | 'notificaciones';
 
@@ -419,11 +420,14 @@ function EquipoTab({
       </div>
 
       {filtered.length === 0 ? (
-        <p className="py-8 text-center text-sm text-gray-500">
-          {miembros.length === 0
-            ? 'Aún no hay miembros en el equipo.'
-            : 'Sin resultados con los filtros actuales.'}
-        </p>
+        <EmptyState
+          icon={<Users className="h-7 w-7 opacity-40" />}
+          text={
+            miembros.length === 0
+              ? 'Aún no hay miembros en el equipo.'
+              : 'Sin resultados con los filtros actuales.'
+          }
+        />
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {filtered.map((m) => (

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Eye, FileText, Package, Paperclip, Plus, Search, UserPlus, Users, X } from 'lucide-react';
 import { createSocioAction, uploadSocioDocumentoAction } from '@/app/actions/socios';
+import { EmptyState } from '@/components/shared/empty-state';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -526,16 +527,14 @@ export function UsuariosClient({ socios }: { socios: Socio[] }) {
 
             {/* Table */}
             {filtered.length === 0 ? (
-              <div className="flex flex-col items-center justify-center gap-3 py-16 text-gray-400">
-                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gray-100">
-                  <Users className="h-7 w-7 opacity-40" />
-                </div>
-                <p className="text-sm">
-                  {search
+              <EmptyState
+                icon={<Users className="h-7 w-7 opacity-40" />}
+                text={
+                  search
                     ? 'No se encontraron socios con ese criterio.'
-                    : 'No hay socios cargados aún.'}
-                </p>
-              </div>
+                    : 'No hay socios cargados aún.'
+                }
+              />
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[640px] text-sm">
@@ -609,23 +608,19 @@ export function UsuariosClient({ socios }: { socios: Socio[] }) {
 
         {activeTab === 'invitados' && (
           <div className="rounded-2xl border border-gray-200 bg-white">
-            <div className="flex flex-col items-center justify-center gap-3 py-16 text-gray-400">
-              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gray-100">
-                <UserPlus className="h-7 w-7 opacity-40" />
-              </div>
-              <p className="text-sm">No hay invitados cargados aún.</p>
-            </div>
+            <EmptyState
+              icon={<UserPlus className="h-7 w-7 opacity-40" />}
+              text="No hay invitados cargados aún."
+            />
           </div>
         )}
 
         {activeTab === 'proveedores' && (
           <div className="rounded-2xl border border-gray-200 bg-white">
-            <div className="flex flex-col items-center justify-center gap-3 py-16 text-gray-400">
-              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gray-100">
-                <Package className="h-7 w-7 opacity-40" />
-              </div>
-              <p className="text-sm">No hay proveedores cargados aún.</p>
-            </div>
+            <EmptyState
+              icon={<Package className="h-7 w-7 opacity-40" />}
+              text="No hay proveedores cargados aún."
+            />
           </div>
         )}
       </div>

@@ -12,6 +12,7 @@ import {
 } from '@/app/actions/super-admin/comunicaciones';
 import { formatArgentinaDate } from '@/lib/dates';
 import { ImagesUploader } from '@/components/shared/images-uploader';
+import { EmptyState } from '@/components/shared/empty-state';
 
 export type TipoComunicacion = 'socios' | 'publica';
 export type CategoriaComunicacion =
@@ -122,12 +123,15 @@ export function PlatformComunicacionesClient({
       </div>
 
       {filtered.length === 0 ? (
-        <div className="rounded-2xl border border-gray-200 bg-white p-16 text-center">
-          <p className="text-sm text-gray-500">
-            {comunicaciones.length === 0
-              ? 'Todavía no hay comunicaciones cargadas.'
-              : 'Sin resultados con esa búsqueda.'}
-          </p>
+        <div className="rounded-2xl border border-gray-200 bg-white">
+          <EmptyState
+            icon={<MessageSquare className="h-7 w-7 opacity-40" />}
+            text={
+              comunicaciones.length === 0
+                ? 'Todavía no hay comunicaciones cargadas.'
+                : 'Sin resultados con esa búsqueda.'
+            }
+          />
         </div>
       ) : (
         <div className="space-y-3">
