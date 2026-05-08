@@ -985,15 +985,21 @@ export function FacturacionClient({
   facturas,
   socios,
   kpis,
+  posConfigurado,
+  certificadoOk,
 }: {
   facturas: Factura[];
   socios: Socio[];
   kpis: Kpis;
+  posConfigurado: boolean;
+  certificadoOk: boolean;
 }) {
   const [search, setSearch] = useState('');
   const [nuevaOpen, setNuevaOpen] = useState(false);
   const [loteOpen, setLoteOpen] = useState(false);
   const [pagarFactura, setPagarFactura] = useState<Factura | null>(null);
+
+  const puedeFacturar = posConfigurado && certificadoOk;
 
   const filtradas = useMemo(() => {
     if (!search.trim()) return facturas;
@@ -1028,14 +1034,26 @@ export function FacturacionClient({
         <div className="flex shrink-0 flex-wrap gap-2">
           <button
             onClick={() => setLoteOpen(true)}
-            className="flex items-center justify-center gap-2 rounded-[10px] border border-[#d1d5dc] bg-white px-4 py-2.5 text-sm font-semibold text-[#364153] transition hover:bg-gray-50"
+            disabled={!puedeFacturar}
+            title={
+              !puedeFacturar
+                ? 'Configurá los datos de facturación y confirmá el certificado AFIP para poder facturar.'
+                : undefined
+            }
+            className="flex items-center justify-center gap-2 rounded-[10px] border border-[#d1d5dc] bg-white px-4 py-2.5 text-sm font-semibold text-[#364153] transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-white"
           >
             <Plus className="h-4 w-4" />
             Factura en lote
           </button>
           <button
             onClick={() => setNuevaOpen(true)}
-            className="flex items-center justify-center gap-2 rounded-[10px] px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90"
+            disabled={!puedeFacturar}
+            title={
+              !puedeFacturar
+                ? 'Configurá los datos de facturación y confirmá el certificado AFIP para poder facturar.'
+                : undefined
+            }
+            className="flex items-center justify-center gap-2 rounded-[10px] px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:opacity-40"
             style={{ background: '#175861' }}
           >
             <Plus className="h-4 w-4" />
@@ -1043,6 +1061,24 @@ export function FacturacionClient({
           </button>
         </div>
       </div>
+
+      {!puedeFacturar && (
+        <div className="rounded-[10px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <strong>Emisión bloqueada.</strong>{' '}
+          {!posConfigurado ? (
+            <>
+              Andá a <strong>Configuración → Datos de facturación</strong> y completá los datos del
+              POS antes de emitir facturas.
+            </>
+          ) : (
+            <>
+              El certificado de enlace con AFIP todavía no está confirmado. Andá a{' '}
+              <strong>Configuración → Datos de facturación</strong>, solicitá el certificado y
+              confirmá la instalación.
+            </>
+          )}
+        </div>
+      )}
 
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
