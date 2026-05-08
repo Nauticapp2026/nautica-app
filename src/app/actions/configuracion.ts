@@ -275,7 +275,7 @@ export async function savePuntoVentaAction(data: SavePuntoVentaData): Promise<{ 
     });
   } catch (err) {
     return {
-      error: err instanceof Error ? err.message : 'Error al sincronizar con tusfacturas.app',
+      error: err instanceof Error ? err.message : 'Error al sincronizar con TusFacturas.',
     };
   }
 
@@ -293,6 +293,25 @@ export async function savePuntoVentaAction(data: SavePuntoVentaData): Promise<{ 
       updatedAt: new Date(),
     })
     .where(eq(guarderias.id, guarderiaId));
+
+  revalidatePath('/configuracion');
+  return {};
+}
+
+// Marca el certificado AFIP como instalado/confirmado por el admin.
+// Después de "Solicitar certificado AFIP" tusfacturas manda instrucciones
+// al mail del admin de la cuenta TF. Una vez que las sigue (instala el
+// certificado en TF/AFIP) vuelve y clickea "Confirmar instalación", que
+// dispara esta action y desbloquea la facturación.
+export async function confirmarCertificadoAfipAction(ok: boolean): Promise<{ error?: string }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+  if (!isAdmin(ctx)) return { error: 'Solo administradores pueden confirmar el certificado.' };
+
+  await db
+    .update(guarderias)
+    .set({ certificadoAfipOk: ok, updatedAt: new Date() })
+    .where(eq(guarderias.id, ctx.activeMembership.guarderiaId));
 
   revalidatePath('/configuracion');
   return {};

@@ -273,6 +273,7 @@ export async function crearFacturaCore(
       tusfacturasApikey: guarderias.tusfacturasApikey,
       tusfacturasApitoken: guarderias.tusfacturasApitoken,
       tusfacturasUsertoken: guarderias.tusfacturasUsertoken,
+      certificadoAfipOk: guarderias.certificadoAfipOk,
     })
     .from(guarderias)
     .where(eq(guarderias.id, gId))
@@ -287,7 +288,14 @@ export async function crearFacturaCore(
   ) {
     return {
       error:
-        'Esta guardería todavía no tiene punto de venta configurado. Andá a Configuración → Punto de venta y completá los datos antes de facturar.',
+        'Esta guardería todavía no tiene los datos de facturación configurados. Andá a Configuración → Datos de facturación y completá los datos antes de facturar.',
+    };
+  }
+
+  if (!guarderia.certificadoAfipOk) {
+    return {
+      error:
+        'El certificado de enlace con AFIP todavía no está confirmado. Andá a Configuración → Datos de facturación, solicitá el certificado y confirmá la instalación antes de emitir facturas.',
     };
   }
 
@@ -364,7 +372,7 @@ export async function crearFacturaCore(
     apiResponse = await crearFactura({ cliente, comprobante }, credsOverride);
   } catch (err) {
     return {
-      error: err instanceof Error ? err.message : 'Error al emitir factura en tusfacturas.app',
+      error: err instanceof Error ? err.message : 'Error al emitir factura en TusFacturas.',
     };
   }
 

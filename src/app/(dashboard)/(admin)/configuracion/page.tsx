@@ -61,6 +61,7 @@ export default async function ConfiguracionPage({ searchParams }: Props) {
       fechaInicio: guarderias.fechaInicio,
       imagenes: guarderias.imagenes,
       diaFacturacion: guarderias.diaFacturacion,
+      certificadoAfipOk: guarderias.certificadoAfipOk,
     })
     .from(guarderias)
     .where(eq(guarderias.id, guarderiaId))
@@ -137,6 +138,7 @@ export default async function ConfiguracionPage({ searchParams }: Props) {
     condicionIva: (guarderia?.condicionIva ?? 'monotributo') as PuntoVentaData['condicionIva'],
     rubro: guarderia?.rubro ?? '',
     fechaInicio: guarderia?.fechaInicio ? guarderia.fechaInicio.toISOString().slice(0, 10) : '',
+    certificadoAfipOk: guarderia?.certificadoAfipOk ?? false,
   };
 
   return (
