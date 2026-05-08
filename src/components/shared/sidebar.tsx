@@ -197,17 +197,23 @@ export function Sidebar({ subtitle, userName, userInitial, rol, variant = 'dashb
   );
 }
 
-// El número de soporte vive en NEXT_PUBLIC_SOPORTE_TEL (Vercel). Si no
-// está seteado, el botón se ve pero al click no hace nada — esto deja
-// que el diseño viva en producción mientras el cliente define el número.
+// El número de soporte vive en NEXT_PUBLIC_SOPORTE_TEL (Vercel). El click
+// abre WhatsApp (wa.me/<numero>) en una pestaña nueva — funciona consistente
+// en mobile y desktop, a diferencia de tel: que en desktop depende de la
+// app que tenga el navegador asociada. Si la env no esta seteada, el boton
+// se ve pero el click no hace nada.
 function SoporteButton() {
   const tel = process.env.NEXT_PUBLIC_SOPORTE_TEL?.trim();
-  const href = tel ? `tel:${tel}` : '#';
+  // wa.me espera solo digitos (sin +, espacios o guiones).
+  const numero = tel?.replace(/\D/g, '');
+  const href = numero ? `https://wa.me/${numero}` : '#';
 
   return (
     <div className="px-3 pt-2 pb-3">
       <a
         href={href}
+        target="_blank"
+        rel="noopener noreferrer"
         className="flex items-center gap-3 rounded-[14px] border border-[#D6E5E6] bg-[#F4F8F8] p-2.5 transition-colors hover:bg-[#E8F0F1]"
       >
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#669E9D] text-white">
@@ -215,7 +221,7 @@ function SoporteButton() {
         </span>
         <span className="min-w-0 flex-1 leading-tight">
           <span className="block text-sm font-bold text-[#175861]">¿Necesitas ayuda?</span>
-          <span className="block text-xs text-gray-500">Contacta a soporte</span>
+          <span className="block text-xs text-gray-500">Soporte por WhatsApp</span>
         </span>
       </a>
     </div>
