@@ -12,11 +12,24 @@ import {
   type InfoGeneralData,
   type MiembroEquipo,
   type PuntoVentaData,
+  type TabKey,
 } from './configuracion-client';
 
 const DIAS = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'] as const;
 
-export default async function ConfiguracionPage() {
+const VALID_TABS: TabKey[] = ['info', 'equipo', 'punto_venta', 'notificaciones'];
+
+type Props = {
+  searchParams: Promise<{ tab?: string; nuevo?: string }>;
+};
+
+export default async function ConfiguracionPage({ searchParams }: Props) {
+  const { tab, nuevo } = await searchParams;
+  const initialTab: TabKey = (VALID_TABS as string[]).includes(tab ?? '')
+    ? (tab as TabKey)
+    : 'info';
+  const initialAltaEquipoOpen = initialTab === 'equipo' && nuevo === '1';
+
   const ctx = await getActiveMarina();
   if (!ctx) return null;
 
@@ -128,6 +141,8 @@ export default async function ConfiguracionPage() {
       miembros={miembros}
       features={features}
       puntoVenta={puntoVenta}
+      initialTab={initialTab}
+      initialAltaEquipoOpen={initialAltaEquipoOpen}
     />
   );
 }
