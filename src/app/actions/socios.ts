@@ -28,7 +28,7 @@ export type SocioResult = { error?: string; socioId?: string };
 
 export async function createSocioAction(data: CreateSocioData): Promise<SocioResult> {
   const ctx = await getActiveMarina();
-  if (!ctx) return { error: 'No autenticado' };
+  if (!ctx) return { error: 'Tu sesión expiró. Recargá la página e intentá de nuevo.' };
 
   const gId = ctx.activeMembership.guarderiaId;
   const admin = createAdminClient();
@@ -117,6 +117,7 @@ export type UpdateSocioData = {
   socioId: string;
   nombre: string;
   apellido: string;
+  email: string;
   telefono: string;
   tipoDocumento: string;
   numeroDocumento: string;
@@ -127,7 +128,46 @@ export type UpdateSocioData = {
 
 export async function updateSocioAction(data: UpdateSocioData): Promise<{ error?: string }> {
   const ctx = await getActiveMarina();
-  if (!ctx) return { error: 'No autenticado' };
+  if (!ctx) return { error: 'Tu sesión expiró. Recargá la página e intentá de nuevo.' };
+
+  const gId = ctx.activeMembership.guarderiaId;
+
+  // Verificar que el socio pertenezca a la guardería activa.
+  const [membership] = await db
+    .select({ id: memberships.id })
+    .from(memberships)
+    .where(
+      and(
+        eq(memberships.userId, data.socioId),
+        eq(memberships.guarderiaId, gId),
+        eq(memberships.rol, 'socio'),
+      ),
+    )
+    .limit(1);
+  if (!membership) return { error: 'Socio no pertenece a esta guardería.' };
+
+  const newEmail = data.email.toLowerCase().trim();
+  if (!newEmail) return { error: 'El email es obligatorio.' };
+
+  // Si el email cambió, actualizar también en Supabase Auth (es el username de login).
+  const [current] = await db
+    .select({ email: profiles.email })
+    .from(profiles)
+    .where(eq(profiles.id, data.socioId))
+    .limit(1);
+
+  const emailChanged = current && current.email.toLowerCase() !== newEmail;
+
+  if (emailChanged) {
+    const admin = createAdminClient();
+    const { error: authErr } = await admin.auth.admin.updateUserById(data.socioId, {
+      email: newEmail,
+      email_confirm: true,
+    });
+    if (authErr) {
+      return { error: translateInviteError(authErr.message) };
+    }
+  }
 
   try {
     await db
@@ -135,6 +175,7 @@ export async function updateSocioAction(data: UpdateSocioData): Promise<{ error?
       .set({
         nombre: data.nombre.trim() || null,
         apellido: data.apellido.trim() || null,
+        email: newEmail,
         telefono: data.telefono.trim() || null,
         tipoDocumento: (data.tipoDocumento || null) as never,
         numeroDocumento: data.numeroDocumento.trim() || null,
@@ -148,6 +189,38 @@ export async function updateSocioAction(data: UpdateSocioData): Promise<{ error?
     return {};
   } catch {
     return { error: 'Error al actualizar los datos.' };
+  }
+}
+
+// ─── Eliminar socio (soft delete) ────────────────────────────────────────────
+
+/**
+ * Soft delete: marca la membership del socio como 'removed' para esta guardería.
+ * El listado de socios filtra por status='active', así que desaparece de la UI.
+ * Se conserva todo el historial (movimientos, facturas, embarcaciones) intacto.
+ */
+export async function deleteSocioAction(socioId: string): Promise<{ error?: string }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'Tu sesión expiró. Recargá la página e intentá de nuevo.' };
+
+  const gId = ctx.activeMembership.guarderiaId;
+
+  try {
+    await db
+      .update(memberships)
+      .set({ status: 'removed' })
+      .where(
+        and(
+          eq(memberships.userId, socioId),
+          eq(memberships.guarderiaId, gId),
+          eq(memberships.rol, 'socio'),
+        ),
+      );
+
+    revalidatePath('/usuarios');
+    return {};
+  } catch {
+    return { error: 'Error al eliminar el socio.' };
   }
 }
 

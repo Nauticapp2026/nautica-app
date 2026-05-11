@@ -212,6 +212,13 @@ function CrearSocioModal({ open, onClose }: { open: boolean; onClose: () => void
 
         <div className="border-t border-gray-200" />
 
+        {/* Error banner — visible siempre arriba */}
+        {error && (
+          <div className="mx-6 mt-4 rounded-[10px] border border-red-200 bg-red-50 p-3">
+            <p className="text-sm font-medium text-red-700">{error}</p>
+          </div>
+        )}
+
         {/* Scrollable body */}
         <div className="max-h-[65vh] overflow-y-auto p-6">
           <div className="space-y-6">
@@ -421,7 +428,6 @@ function CrearSocioModal({ open, onClose }: { open: boolean; onClose: () => void
             </div>
 
             {uploadProgress && <p className="text-sm text-[#669E9D]">{uploadProgress}</p>}
-            {error && <p className="text-sm text-red-600">{error}</p>}
           </div>
         </div>
 
