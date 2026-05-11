@@ -951,19 +951,51 @@ function EmbarcacionesTab({
     });
   }
 
+  // Solo permitimos 1 embarcación por socio — tomamos la primera.
+  const embarcacion = embarcaciones[0] ?? null;
+  const editando = embarcacion != null && editandoId === embarcacion.id;
+
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-4 md:p-6">
-      {error && (
-        <div className="mb-4 rounded-[10px] border border-red-200 bg-red-50 p-3">
-          <p className="text-sm font-medium text-red-700">{error}</p>
-        </div>
-      )}
+      {/* Header — mismo patrón que la tab Generales */}
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-[18px] font-bold" style={{ color: '#101828' }}>
+          {agregando ? 'Nueva embarcación' : 'Datos de la Embarcación'}
+        </p>
+        {embarcacion && !editando && !agregando && (
+          <button
+            onClick={() => startEdit(embarcacion)}
+            className="shrink-0 justify-center rounded-[10px] border border-[#d1d5dc] px-4 py-2 text-sm font-medium text-[#364153] transition hover:bg-gray-50"
+          >
+            Editar
+          </button>
+        )}
+        {(editando || agregando) && (
+          <div className="flex shrink-0 gap-2">
+            <button
+              onClick={cancel}
+              disabled={isSaving}
+              className="flex-1 justify-center rounded-[10px] border border-[#d1d5dc] px-4 py-2 text-sm font-medium text-[#364153] transition hover:bg-gray-50 disabled:opacity-40 sm:flex-none"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={() => (agregando ? guardarNueva() : guardarEdicion(embarcacion!.id))}
+              disabled={isSaving}
+              className="flex-1 justify-center rounded-[10px] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-40 sm:flex-none"
+              style={{ background: '#175861' }}
+            >
+              {isSaving ? 'Guardando...' : agregando ? 'Crear' : 'Guardar'}
+            </button>
+          </div>
+        )}
+      </div>
 
-      {embarcaciones.length === 0 && !agregando ? (
+      {!embarcacion && !agregando ? (
         <div className="space-y-4">
           <EmptyState
             icon={<Ship className="h-7 w-7 opacity-40" />}
-            text="Este socio no tiene embarcaciones registradas."
+            text="Este socio no tiene embarcación registrada."
           />
           <div className="flex justify-center">
             <button
@@ -978,161 +1010,68 @@ function EmbarcacionesTab({
         </div>
       ) : (
         <div className="space-y-4">
-          {embarcaciones.map((e) => {
-            const editando = editandoId === e.id;
-            return (
-              <div key={e.id} className="rounded-[10px] border border-gray-100 bg-gray-50 p-4">
-                <div className="mb-3 flex items-center justify-between">
-                  <p className="text-sm font-bold" style={{ color: '#101828' }}>
-                    {editando ? 'Editando embarcación' : e.nombre}
-                  </p>
-                  {!editando && (
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => startEdit(e)}
-                        className="rounded-[8px] border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-[#364153] hover:bg-gray-100"
-                      >
-                        Editar
-                      </button>
-                      <button
-                        onClick={() => setConfirmDeleteId(e.id)}
-                        className="inline-flex items-center gap-1 rounded-[8px] border border-red-200 bg-white px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                        Eliminar
-                      </button>
-                    </div>
-                  )}
-                </div>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div>
-                    <label className="mb-1 block text-xs font-semibold text-gray-500">Nombre</label>
-                    {editando ? (
-                      <input
-                        className={inputCls}
-                        value={form.nombre}
-                        onChange={setField('nombre')}
-                      />
-                    ) : (
-                      <p className="text-sm font-medium" style={{ color: '#101828' }}>
-                        {e.nombre}
-                      </p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-semibold text-gray-500">
-                      Matrícula
-                    </label>
-                    {editando ? (
-                      <input
-                        className={inputCls}
-                        value={form.matricula}
-                        onChange={setField('matricula')}
-                      />
-                    ) : (
-                      <p className="text-sm" style={{ color: '#101828' }}>
-                        {e.matricula ?? '—'}
-                      </p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-semibold text-gray-500">Modelo</label>
-                    {editando ? (
-                      <input
-                        className={inputCls}
-                        value={form.modelo}
-                        onChange={setField('modelo')}
-                      />
-                    ) : (
-                      <p className="text-sm" style={{ color: '#101828' }}>
-                        {e.modelo ?? '—'}
-                      </p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-semibold text-gray-500">Seguro</label>
-                    {editando ? (
-                      <input
-                        className={inputCls}
-                        value={form.seguro}
-                        onChange={setField('seguro')}
-                      />
-                    ) : (
-                      <p className="text-sm" style={{ color: '#101828' }}>
-                        {e.seguro ?? '—'}
-                      </p>
-                    )}
-                  </div>
-                </div>
-                {editando && (
-                  <div className="mt-4 flex justify-end gap-2">
-                    <button
-                      onClick={cancel}
-                      disabled={isSaving}
-                      className="rounded-[10px] border border-[#d1d5dc] bg-white px-4 py-2 text-sm font-medium text-[#364153] hover:bg-gray-50 disabled:opacity-40"
-                    >
-                      Cancelar
-                    </button>
-                    <button
-                      onClick={() => guardarEdicion(e.id)}
-                      disabled={isSaving}
-                      className="rounded-[10px] px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
-                      style={{ background: '#175861' }}
-                    >
-                      {isSaving ? 'Guardando...' : 'Guardar'}
-                    </button>
-                  </div>
-                )}
-              </div>
-            );
-          })}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold text-gray-500">Nombre</label>
+              {editando || agregando ? (
+                <input className={inputCls} value={form.nombre} onChange={setField('nombre')} />
+              ) : (
+                <p className="text-sm font-medium" style={{ color: '#101828' }}>
+                  {embarcacion?.nombre ?? '—'}
+                </p>
+              )}
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold text-gray-500">Matrícula</label>
+              {editando || agregando ? (
+                <input
+                  className={inputCls}
+                  value={form.matricula}
+                  onChange={setField('matricula')}
+                />
+              ) : (
+                <p className="text-sm" style={{ color: '#101828' }}>
+                  {embarcacion?.matricula ?? '—'}
+                </p>
+              )}
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold text-gray-500">Modelo</label>
+              {editando || agregando ? (
+                <input className={inputCls} value={form.modelo} onChange={setField('modelo')} />
+              ) : (
+                <p className="text-sm" style={{ color: '#101828' }}>
+                  {embarcacion?.modelo ?? '—'}
+                </p>
+              )}
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold text-gray-500">Seguro</label>
+              {editando || agregando ? (
+                <input className={inputCls} value={form.seguro} onChange={setField('seguro')} />
+              ) : (
+                <p className="text-sm" style={{ color: '#101828' }}>
+                  {embarcacion?.seguro ?? '—'}
+                </p>
+              )}
+            </div>
+          </div>
 
-          {agregando && (
-            <div className="rounded-[10px] border border-[#175861] bg-white p-4">
-              <p className="mb-3 text-sm font-bold" style={{ color: '#101828' }}>
-                Nueva embarcación
-              </p>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-xs font-semibold text-gray-500">Nombre</label>
-                  <input className={inputCls} value={form.nombre} onChange={setField('nombre')} />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-semibold text-gray-500">
-                    Matrícula
-                  </label>
-                  <input
-                    className={inputCls}
-                    value={form.matricula}
-                    onChange={setField('matricula')}
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-semibold text-gray-500">Modelo</label>
-                  <input className={inputCls} value={form.modelo} onChange={setField('modelo')} />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-semibold text-gray-500">Seguro</label>
-                  <input className={inputCls} value={form.seguro} onChange={setField('seguro')} />
-                </div>
-              </div>
-              <div className="mt-4 flex justify-end gap-2">
-                <button
-                  onClick={cancel}
-                  disabled={isSaving}
-                  className="rounded-[10px] border border-[#d1d5dc] bg-white px-4 py-2 text-sm font-medium text-[#364153] hover:bg-gray-50 disabled:opacity-40"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={guardarNueva}
-                  disabled={isSaving}
-                  className="rounded-[10px] px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
-                  style={{ background: '#175861' }}
-                >
-                  {isSaving ? 'Guardando...' : 'Crear'}
-                </button>
-              </div>
+          {error && (
+            <div className="rounded-[10px] border border-red-200 bg-red-50 p-3">
+              <p className="text-sm font-medium text-red-700">{error}</p>
+            </div>
+          )}
+
+          {embarcacion && !editando && !agregando && (
+            <div className="border-t border-gray-100 pt-4">
+              <button
+                onClick={() => setConfirmDeleteId(embarcacion.id)}
+                className="inline-flex items-center gap-2 rounded-[10px] border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50 hover:text-red-700"
+              >
+                <Trash2 className="h-4 w-4" />
+                Eliminar embarcación
+              </button>
             </div>
           )}
         </div>
@@ -1261,19 +1200,18 @@ function DocumentacionTab({
   }
 
   return (
-    <div className="space-y-4">
-      <div className="rounded-2xl border border-gray-200 bg-white p-4 md:p-6">
-        <p className="mb-3 text-sm font-bold" style={{ color: '#101828' }}>
-          Subir documento
+    <div className="rounded-2xl border border-gray-200 bg-white p-4 md:p-6">
+      {/* Header — mismo patrón que la tab Generales */}
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-[18px] font-bold" style={{ color: '#101828' }}>
+          Documentación
         </p>
-        <label className="flex min-h-16 cursor-pointer flex-col items-center justify-center gap-1 rounded-[10px] border-2 border-dashed border-gray-300 px-4 py-3 text-sm text-gray-500 hover:border-[#175861] hover:text-[#175861]">
-          <div className="flex items-center gap-2">
-            <Paperclip className="h-4 w-4" />
-            <span>Seleccionar documentos</span>
-          </div>
-          <span className="text-xs text-gray-400">
-            PDF, Word, Excel, imágenes — varios archivos
-          </span>
+        <label
+          className="inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-[10px] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90"
+          style={{ background: '#175861' }}
+        >
+          <Paperclip className="h-4 w-4" />
+          Subir documento
           <input
             type="file"
             multiple
@@ -1285,13 +1223,19 @@ function DocumentacionTab({
             }}
           />
         </label>
+      </div>
 
+      <div className="space-y-4">
+        {/* Pendientes de subir */}
         {pendientes.length > 0 && (
-          <div className="mt-3 space-y-2">
+          <div className="space-y-2 rounded-[10px] border border-gray-100 bg-gray-50 p-3">
+            <p className="text-xs font-semibold text-gray-500">
+              {pendientes.length} archivo(s) seleccionado(s) — elegí el tipo y subí
+            </p>
             {pendientes.map((p, idx) => (
               <div
                 key={idx}
-                className="flex items-center gap-2 rounded-[8px] border border-gray-200 bg-gray-50 px-3 py-2"
+                className="flex items-center gap-2 rounded-[8px] border border-gray-200 bg-white px-3 py-2"
               >
                 <FileText className="h-4 w-4 shrink-0 text-[#669E9D]" />
                 <span className="min-w-0 flex-1 truncate text-xs text-gray-700">{p.file.name}</span>
@@ -1320,7 +1264,14 @@ function DocumentacionTab({
                 </button>
               </div>
             ))}
-            <div className="flex justify-end">
+            <div className="flex justify-end gap-2 pt-1">
+              <button
+                onClick={() => setPendientes([])}
+                disabled={isUploading}
+                className="rounded-[10px] border border-[#d1d5dc] bg-white px-4 py-2 text-sm font-medium text-[#364153] hover:bg-gray-50 disabled:opacity-40"
+              >
+                Cancelar
+              </button>
               <button
                 onClick={subir}
                 disabled={isUploading}
@@ -1334,15 +1285,14 @@ function DocumentacionTab({
           </div>
         )}
 
-        {progreso && <p className="mt-3 text-sm text-[#669E9D]">{progreso}</p>}
+        {progreso && <p className="text-sm text-[#669E9D]">{progreso}</p>}
         {error && (
-          <div className="mt-3 rounded-[10px] border border-red-200 bg-red-50 p-3">
+          <div className="rounded-[10px] border border-red-200 bg-red-50 p-3">
             <p className="text-sm font-medium text-red-700">{error}</p>
           </div>
         )}
-      </div>
 
-      <div className="rounded-2xl border border-gray-200 bg-white p-4 md:p-6">
+        {/* Lista de documentos cargados */}
         {documentos.length === 0 ? (
           <EmptyState
             icon={<FileText className="h-7 w-7 opacity-40" />}
