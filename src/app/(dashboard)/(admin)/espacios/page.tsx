@@ -136,6 +136,7 @@ export default async function EspaciosPage() {
         eslora: servicios.eslora,
         manga: servicios.manga,
         puntual: servicios.puntual,
+        unidadMetraje: servicios.unidadMetraje,
       })
       .from(servicios)
       .where(
@@ -245,6 +246,7 @@ export default async function EspaciosPage() {
     eslora: toNum(s.eslora),
     manga: toNum(s.manga),
     puntual: toNum(s.puntual),
+    unidadMetraje: s.unidadMetraje ?? null,
   }));
 
   return <EspaciosClient areas={areasView} socios={socios} serviciosEspacios={serviciosEspacios} />;
