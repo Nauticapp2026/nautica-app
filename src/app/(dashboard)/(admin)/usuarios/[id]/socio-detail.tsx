@@ -15,7 +15,10 @@ import {
   Ship,
   TrendingUp,
   AlertTriangle,
+  Paperclip,
+  Plus,
   Trash2,
+  Upload,
   X,
 } from 'lucide-react';
 import {
@@ -24,7 +27,17 @@ import {
   informarPagoAction,
   marcarPagadasAction,
 } from '@/app/actions/movimientos';
-import { deleteSocioAction, updateSocioAction } from '@/app/actions/socios';
+import {
+  createEmbarcacionAction,
+  deleteEmbarcacionAction,
+  updateEmbarcacionAction,
+} from '@/app/actions/embarcaciones';
+import {
+  deleteSocioAction,
+  deleteSocioDocumentoAction,
+  updateSocioAction,
+  uploadSocioDocumentoAction,
+} from '@/app/actions/socios';
 import { formatArgentinaDate, formatArgentinaDateTime } from '@/lib/dates';
 import { EmptyState } from '@/components/shared/empty-state';
 
@@ -64,6 +77,7 @@ type Movimiento = {
   haber: string | null;
   servicioNombre: string | null;
   servicioId: string | null;
+  facturaCodigo: string | null;
 };
 
 type Servicio = {
@@ -507,7 +521,13 @@ function AgregarServicioModal({
   function handleSubmit() {
     setError(null);
     startTransition(async () => {
-      const res = await addMovimientoAction({ socioId, servicioId, concepto, monto, fecha });
+      const res = await addMovimientoAction({
+        socioId,
+        servicioId,
+        concepto,
+        monto: montoToNumberStr(monto),
+        fecha,
+      });
       if (res.error) {
         setError(res.error);
       } else {
@@ -575,9 +595,10 @@ function AgregarServicioModal({
               </label>
               <input
                 className={inputCls}
-                placeholder="$0,00"
-                value={monto ? fmt(parseFloat(monto)) : ''}
-                onChange={(e) => setMonto(e.target.value.replace(/[^0-9.]/g, ''))}
+                inputMode="decimal"
+                placeholder="0,00"
+                value={monto}
+                onChange={(e) => setMonto(sanitizeMontoInput(e.target.value))}
               />
             </div>
             <div>
@@ -639,7 +660,7 @@ function InformarPagoModal({
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const isValid = Boolean(concepto.trim() && monto && parseFloat(monto) > 0);
+  const isValid = Boolean(concepto.trim() && monto && parseFloat(montoToNumberStr(monto)) > 0);
 
   function handleClose() {
     setConcepto('');
@@ -652,7 +673,12 @@ function InformarPagoModal({
   function handleSubmit() {
     setError(null);
     startTransition(async () => {
-      const res = await informarPagoAction({ socioId, concepto, monto, fecha });
+      const res = await informarPagoAction({
+        socioId,
+        concepto,
+        monto: montoToNumberStr(monto),
+        fecha,
+      });
       if (res.error) {
         setError(res.error);
       } else {
@@ -705,9 +731,10 @@ function InformarPagoModal({
               </label>
               <input
                 className={inputCls}
-                placeholder="$0,00"
-                value={monto ? fmt(parseFloat(monto)) : ''}
-                onChange={(e) => setMonto(e.target.value.replace(/[^0-9.]/g, ''))}
+                inputMode="decimal"
+                placeholder="0,00"
+                value={monto}
+                onChange={(e) => setMonto(sanitizeMontoInput(e.target.value))}
               />
             </div>
             <div>
@@ -813,6 +840,592 @@ export type SalidaItem = {
 };
 
 const fmtFechaHoraSalida = formatArgentinaDateTime;
+
+// Filtra a digitos + un separador decimal (acepta coma o punto).
+// El usuario ve lo que tipea sin reformatear en cada keystroke.
+function sanitizeMontoInput(raw: string): string {
+  let out = raw.replace(/[^0-9.,]/g, '');
+  // Permitir solo un separador decimal: dejar el primero, sacar los siguientes.
+  const firstSep = out.search(/[.,]/);
+  if (firstSep >= 0) {
+    out = out.slice(0, firstSep + 1) + out.slice(firstSep + 1).replace(/[.,]/g, '');
+  }
+  return out;
+}
+
+// Convierte el input del usuario al formato que esperan los actions (parseFloat).
+function montoToNumberStr(input: string): string {
+  return input.replace(',', '.');
+}
+
+// ─── Embarcaciones tab ───────────────────────────────────────────────────────
+
+const EMBARCACION_VACIA = { nombre: '', matricula: '', modelo: '', seguro: '' };
+
+function EmbarcacionesTab({
+  socioId,
+  embarcaciones,
+}: {
+  socioId: string;
+  embarcaciones: Embarcacion[];
+}) {
+  const router = useRouter();
+  const [editandoId, setEditandoId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [agregando, setAgregando] = useState(false);
+  const [form, setForm] = useState(EMBARCACION_VACIA);
+  const [error, setError] = useState<string | null>(null);
+  const [isSaving, startSaving] = useTransition();
+
+  function startEdit(e: Embarcacion) {
+    setError(null);
+    setEditandoId(e.id);
+    setAgregando(false);
+    setForm({
+      nombre: e.nombre,
+      matricula: e.matricula ?? '',
+      modelo: e.modelo ?? '',
+      seguro: e.seguro ?? '',
+    });
+  }
+
+  function cancel() {
+    setEditandoId(null);
+    setAgregando(false);
+    setForm(EMBARCACION_VACIA);
+    setError(null);
+  }
+
+  function startAgregar() {
+    setError(null);
+    setEditandoId(null);
+    setForm(EMBARCACION_VACIA);
+    setAgregando(true);
+  }
+
+  function setField(k: keyof typeof form) {
+    return (e: React.ChangeEvent<HTMLInputElement>) =>
+      setForm((f) => ({
+        ...f,
+        [k]: k === 'matricula' ? e.target.value.toUpperCase() : e.target.value,
+      }));
+  }
+
+  function guardarEdicion(id: string) {
+    setError(null);
+    startSaving(async () => {
+      const res = await updateEmbarcacionAction({ id, ...form });
+      if (res.error) {
+        setError(res.error);
+        return;
+      }
+      cancel();
+      router.refresh();
+    });
+  }
+
+  function guardarNueva() {
+    setError(null);
+    startSaving(async () => {
+      const res = await createEmbarcacionAction({ socioId, ...form });
+      if (res.error) {
+        setError(res.error);
+        return;
+      }
+      cancel();
+      router.refresh();
+    });
+  }
+
+  function eliminar(id: string) {
+    setError(null);
+    startSaving(async () => {
+      const res = await deleteEmbarcacionAction(id);
+      if (res.error) {
+        setError(res.error);
+        setConfirmDeleteId(null);
+        return;
+      }
+      setConfirmDeleteId(null);
+      router.refresh();
+    });
+  }
+
+  return (
+    <div className="rounded-2xl border border-gray-200 bg-white p-4 md:p-6">
+      {error && (
+        <div className="mb-4 rounded-[10px] border border-red-200 bg-red-50 p-3">
+          <p className="text-sm font-medium text-red-700">{error}</p>
+        </div>
+      )}
+
+      {embarcaciones.length === 0 && !agregando ? (
+        <div className="space-y-4">
+          <EmptyState
+            icon={<Ship className="h-7 w-7 opacity-40" />}
+            text="Este socio no tiene embarcaciones registradas."
+          />
+          <div className="flex justify-center">
+            <button
+              onClick={startAgregar}
+              className="inline-flex items-center gap-2 rounded-[10px] px-4 py-2 text-sm font-semibold text-white"
+              style={{ background: '#175861' }}
+            >
+              <Plus className="h-4 w-4" />
+              Agregar embarcación
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {embarcaciones.map((e) => {
+            const editando = editandoId === e.id;
+            return (
+              <div key={e.id} className="rounded-[10px] border border-gray-100 bg-gray-50 p-4">
+                <div className="mb-3 flex items-center justify-between">
+                  <p className="text-sm font-bold" style={{ color: '#101828' }}>
+                    {editando ? 'Editando embarcación' : e.nombre}
+                  </p>
+                  {!editando && (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => startEdit(e)}
+                        className="rounded-[8px] border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-[#364153] hover:bg-gray-100"
+                      >
+                        Editar
+                      </button>
+                      <button
+                        onClick={() => setConfirmDeleteId(e.id)}
+                        className="inline-flex items-center gap-1 rounded-[8px] border border-red-200 bg-white px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        Eliminar
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-gray-500">Nombre</label>
+                    {editando ? (
+                      <input
+                        className={inputCls}
+                        value={form.nombre}
+                        onChange={setField('nombre')}
+                      />
+                    ) : (
+                      <p className="text-sm font-medium" style={{ color: '#101828' }}>
+                        {e.nombre}
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-gray-500">
+                      Matrícula
+                    </label>
+                    {editando ? (
+                      <input
+                        className={inputCls}
+                        value={form.matricula}
+                        onChange={setField('matricula')}
+                      />
+                    ) : (
+                      <p className="text-sm" style={{ color: '#101828' }}>
+                        {e.matricula ?? '—'}
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-gray-500">Modelo</label>
+                    {editando ? (
+                      <input
+                        className={inputCls}
+                        value={form.modelo}
+                        onChange={setField('modelo')}
+                      />
+                    ) : (
+                      <p className="text-sm" style={{ color: '#101828' }}>
+                        {e.modelo ?? '—'}
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-gray-500">Seguro</label>
+                    {editando ? (
+                      <input
+                        className={inputCls}
+                        value={form.seguro}
+                        onChange={setField('seguro')}
+                      />
+                    ) : (
+                      <p className="text-sm" style={{ color: '#101828' }}>
+                        {e.seguro ?? '—'}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                {editando && (
+                  <div className="mt-4 flex justify-end gap-2">
+                    <button
+                      onClick={cancel}
+                      disabled={isSaving}
+                      className="rounded-[10px] border border-[#d1d5dc] bg-white px-4 py-2 text-sm font-medium text-[#364153] hover:bg-gray-50 disabled:opacity-40"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={() => guardarEdicion(e.id)}
+                      disabled={isSaving}
+                      className="rounded-[10px] px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
+                      style={{ background: '#175861' }}
+                    >
+                      {isSaving ? 'Guardando...' : 'Guardar'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
+          {agregando && (
+            <div className="rounded-[10px] border border-[#175861] bg-white p-4">
+              <p className="mb-3 text-sm font-bold" style={{ color: '#101828' }}>
+                Nueva embarcación
+              </p>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-gray-500">Nombre</label>
+                  <input className={inputCls} value={form.nombre} onChange={setField('nombre')} />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-gray-500">
+                    Matrícula
+                  </label>
+                  <input
+                    className={inputCls}
+                    value={form.matricula}
+                    onChange={setField('matricula')}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-gray-500">Modelo</label>
+                  <input className={inputCls} value={form.modelo} onChange={setField('modelo')} />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-gray-500">Seguro</label>
+                  <input className={inputCls} value={form.seguro} onChange={setField('seguro')} />
+                </div>
+              </div>
+              <div className="mt-4 flex justify-end gap-2">
+                <button
+                  onClick={cancel}
+                  disabled={isSaving}
+                  className="rounded-[10px] border border-[#d1d5dc] bg-white px-4 py-2 text-sm font-medium text-[#364153] hover:bg-gray-50 disabled:opacity-40"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={guardarNueva}
+                  disabled={isSaving}
+                  className="rounded-[10px] px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
+                  style={{ background: '#175861' }}
+                >
+                  {isSaving ? 'Guardando...' : 'Crear'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {confirmDeleteId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="mb-4 flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-50">
+                <AlertTriangle className="h-5 w-5 text-red-600" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold" style={{ color: '#101828' }}>
+                  Eliminar embarcación
+                </h3>
+                <p className="mt-1 text-sm text-gray-600">
+                  Se va a eliminar la embarcación. Las tareas y salidas asociadas dejan de tener
+                  referencia, pero no se borran.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmDeleteId(null)}
+                disabled={isSaving}
+                className="flex-1 rounded-[10px] border border-[#d1d5dc] bg-white py-2.5 text-sm font-medium text-[#364153] hover:bg-gray-50 disabled:opacity-40"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => eliminar(confirmDeleteId)}
+                disabled={isSaving}
+                className="flex-1 rounded-[10px] bg-red-600 py-2.5 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-40"
+              >
+                {isSaving ? 'Eliminando...' : 'Eliminar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Documentación tab ───────────────────────────────────────────────────────
+
+const TIPO_DOC_OPTS_DETAIL: { value: 'carnet_nautico' | 'matricula' | 'seguro'; label: string }[] =
+  [
+    { value: 'carnet_nautico', label: 'Certificado Náutico' },
+    { value: 'matricula', label: 'Matrícula' },
+    { value: 'seguro', label: 'Seguro' },
+  ];
+
+function DocumentacionTab({
+  socioId,
+  documentos,
+}: {
+  socioId: string;
+  documentos: DocumentoItem[];
+}) {
+  const router = useRouter();
+  const [pendientes, setPendientes] = useState<
+    { file: File; tipo: 'carnet_nautico' | 'matricula' | 'seguro' }[]
+  >([]);
+  const [progreso, setProgreso] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [isUploading, startUploading] = useTransition();
+  const [isDeleting, startDeleting] = useTransition();
+
+  function addFiles(files: FileList | null) {
+    if (!files) return;
+    const next = Array.from(files).map((f) => ({ file: f, tipo: 'carnet_nautico' as const }));
+    setPendientes((prev) => [...prev, ...next]);
+  }
+
+  function updatePendiente(
+    idx: number,
+    patch: Partial<{ tipo: 'carnet_nautico' | 'matricula' | 'seguro' }>,
+  ) {
+    setPendientes((prev) => prev.map((p, i) => (i === idx ? { ...p, ...patch } : p)));
+  }
+
+  function removePendiente(idx: number) {
+    setPendientes((prev) => prev.filter((_, i) => i !== idx));
+  }
+
+  function subir() {
+    if (pendientes.length === 0) return;
+    setError(null);
+    startUploading(async () => {
+      for (let i = 0; i < pendientes.length; i++) {
+        const p = pendientes[i];
+        setProgreso(`Subiendo ${i + 1}/${pendientes.length}: ${p.file.name}`);
+        const fd = new FormData();
+        fd.append('socioId', socioId);
+        fd.append('tipo', p.tipo);
+        fd.append('file', p.file);
+        const res = await uploadSocioDocumentoAction(fd);
+        if (res.error) {
+          setError(`Falló "${p.file.name}": ${res.error}`);
+          setProgreso(null);
+          router.refresh();
+          return;
+        }
+      }
+      setPendientes([]);
+      setProgreso(null);
+      router.refresh();
+    });
+  }
+
+  function eliminar(id: string) {
+    setError(null);
+    startDeleting(async () => {
+      const res = await deleteSocioDocumentoAction(id);
+      if (res.error) {
+        setError(res.error);
+        setConfirmDeleteId(null);
+        return;
+      }
+      setConfirmDeleteId(null);
+      router.refresh();
+    });
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-2xl border border-gray-200 bg-white p-4 md:p-6">
+        <p className="mb-3 text-sm font-bold" style={{ color: '#101828' }}>
+          Subir documento
+        </p>
+        <label className="flex min-h-16 cursor-pointer flex-col items-center justify-center gap-1 rounded-[10px] border-2 border-dashed border-gray-300 px-4 py-3 text-sm text-gray-500 hover:border-[#175861] hover:text-[#175861]">
+          <div className="flex items-center gap-2">
+            <Paperclip className="h-4 w-4" />
+            <span>Seleccionar documentos</span>
+          </div>
+          <span className="text-xs text-gray-400">
+            PDF, Word, Excel, imágenes — varios archivos
+          </span>
+          <input
+            type="file"
+            multiple
+            accept=".pdf,.doc,.docx,.xls,.xlsx,image/*"
+            className="hidden"
+            onChange={(e) => {
+              addFiles(e.target.files);
+              e.target.value = '';
+            }}
+          />
+        </label>
+
+        {pendientes.length > 0 && (
+          <div className="mt-3 space-y-2">
+            {pendientes.map((p, idx) => (
+              <div
+                key={idx}
+                className="flex items-center gap-2 rounded-[8px] border border-gray-200 bg-gray-50 px-3 py-2"
+              >
+                <FileText className="h-4 w-4 shrink-0 text-[#669E9D]" />
+                <span className="min-w-0 flex-1 truncate text-xs text-gray-700">{p.file.name}</span>
+                <select
+                  className="h-8 rounded-[6px] border border-gray-200 bg-white px-2 text-xs text-[#101828]"
+                  value={p.tipo}
+                  onChange={(e) =>
+                    updatePendiente(idx, {
+                      tipo: e.target.value as 'carnet_nautico' | 'matricula' | 'seguro',
+                    })
+                  }
+                >
+                  {TIPO_DOC_OPTS_DETAIL.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => removePendiente(idx)}
+                  title="Quitar"
+                  className="rounded-[6px] p-1 text-gray-400 hover:bg-red-50 hover:text-red-600"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ))}
+            <div className="flex justify-end">
+              <button
+                onClick={subir}
+                disabled={isUploading}
+                className="inline-flex items-center gap-2 rounded-[10px] px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
+                style={{ background: '#175861' }}
+              >
+                <Upload className="h-4 w-4" />
+                {isUploading ? 'Subiendo...' : `Subir ${pendientes.length} archivo(s)`}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {progreso && <p className="mt-3 text-sm text-[#669E9D]">{progreso}</p>}
+        {error && (
+          <div className="mt-3 rounded-[10px] border border-red-200 bg-red-50 p-3">
+            <p className="text-sm font-medium text-red-700">{error}</p>
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-2xl border border-gray-200 bg-white p-4 md:p-6">
+        {documentos.length === 0 ? (
+          <EmptyState
+            icon={<FileText className="h-7 w-7 opacity-40" />}
+            text="No hay documentos adjuntos."
+          />
+        ) : (
+          <div className="space-y-2">
+            {documentos.map((d) => (
+              <div
+                key={d.id}
+                className="flex items-center gap-3 rounded-[10px] border border-gray-200 bg-white px-4 py-3 hover:bg-gray-50"
+              >
+                <FileText className="h-5 w-5 shrink-0 text-[#669E9D]" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-[#101828]">{d.nombre}</p>
+                  <p className="text-xs text-gray-500">
+                    {d.tipo ? TIPO_DOC_LABEL[d.tipo] : 'Sin categoría'} ·{' '}
+                    {formatArgentinaDate(d.createdAt)}
+                  </p>
+                </div>
+                {d.signedUrl ? (
+                  <a
+                    href={d.signedUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="shrink-0 rounded-[8px] border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-[#175861] hover:bg-gray-50"
+                  >
+                    Ver
+                  </a>
+                ) : (
+                  <span className="shrink-0 text-xs text-gray-400">Sin archivo</span>
+                )}
+                <button
+                  onClick={() => setConfirmDeleteId(d.id)}
+                  className="shrink-0 rounded-[8px] p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600"
+                  title="Eliminar"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {confirmDeleteId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="mb-4 flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-50">
+                <AlertTriangle className="h-5 w-5 text-red-600" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold" style={{ color: '#101828' }}>
+                  Eliminar documento
+                </h3>
+                <p className="mt-1 text-sm text-gray-600">
+                  El archivo se borra del almacenamiento también. Esta acción no se puede deshacer.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmDeleteId(null)}
+                disabled={isDeleting}
+                className="flex-1 rounded-[10px] border border-[#d1d5dc] bg-white py-2.5 text-sm font-medium text-[#364153] hover:bg-gray-50 disabled:opacity-40"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => eliminar(confirmDeleteId)}
+                disabled={isDeleting}
+                className="flex-1 rounded-[10px] bg-red-600 py-2.5 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-40"
+              >
+                {isDeleting ? 'Eliminando...' : 'Eliminar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function SocioDetail({
   socio,
@@ -1212,55 +1825,7 @@ export function SocioDetail({
 
       {/* Embarcación */}
       {activeTab === 'embarcacion' && (
-        <div className="rounded-2xl border border-gray-200 bg-white p-4 md:p-6">
-          {embarcaciones.length === 0 ? (
-            <EmptyState
-              icon={<Ship className="h-7 w-7 opacity-40" />}
-              text="Este socio no tiene embarcaciones registradas."
-            />
-          ) : (
-            <div className="space-y-4">
-              {embarcaciones.map((e) => (
-                <div key={e.id} className="rounded-[10px] border border-gray-100 bg-gray-50 p-4">
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div>
-                      <label className="mb-1 block text-xs font-semibold text-gray-500">
-                        Nombre
-                      </label>
-                      <p className="text-sm font-medium" style={{ color: '#101828' }}>
-                        {e.nombre}
-                      </p>
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-xs font-semibold text-gray-500">
-                        Matrícula
-                      </label>
-                      <p className="text-sm" style={{ color: '#101828' }}>
-                        {e.matricula ?? '—'}
-                      </p>
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-xs font-semibold text-gray-500">
-                        Modelo
-                      </label>
-                      <p className="text-sm" style={{ color: '#101828' }}>
-                        {e.modelo ?? '—'}
-                      </p>
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-xs font-semibold text-gray-500">
-                        Seguro
-                      </label>
-                      <p className="text-sm" style={{ color: '#101828' }}>
-                        {e.seguro ?? '—'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        <EmbarcacionesTab socioId={socio.id} embarcaciones={embarcaciones} />
       )}
 
       {/* Cuenta Corriente */}
@@ -1289,7 +1854,7 @@ export function SocioDetail({
           </div>
 
           {/* Metric cards */}
-          <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div className="flex items-center gap-4 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
               <div
                 className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl"
@@ -1299,10 +1864,26 @@ export function SocioDetail({
               </div>
               <div>
                 <p className="text-xs font-semibold tracking-wide text-gray-400 uppercase">
-                  Ingresos
+                  Ingresos por venta
                 </p>
                 <p className="text-[18px] font-bold" style={{ color: '#101828' }}>
                   {fmt(totalIngresos)}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+              <div
+                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl"
+                style={{ background: '#E6F8EC' }}
+              >
+                <DollarSign className="h-5 w-5" style={{ color: '#15803d' }} />
+              </div>
+              <div>
+                <p className="text-xs font-semibold tracking-wide text-gray-400 uppercase">
+                  Cobranzas
+                </p>
+                <p className="text-[18px] font-bold" style={{ color: '#101828' }}>
+                  {fmt(totalPagosACuenta)}
                 </p>
               </div>
             </div>
@@ -1315,7 +1896,7 @@ export function SocioDetail({
               </div>
               <div>
                 <p className="text-xs font-semibold tracking-wide text-gray-400 uppercase">
-                  Falta abonar
+                  Saldo cliente
                 </p>
                 <p className="text-[18px] font-bold" style={{ color: '#101828' }}>
                   {fmt(totalPendiente)}
@@ -1351,8 +1932,8 @@ export function SocioDetail({
                     <tr className="bg-gray-50 text-left text-xs font-semibold text-gray-500">
                       <th className="w-10 px-4 py-3"></th>
                       <th className="px-4 py-3">Fecha</th>
-                      <th className="px-4 py-3">Servicio</th>
-                      <th className="px-4 py-3">Concepto</th>
+                      <th className="px-4 py-3">Detalle</th>
+                      <th className="px-4 py-3">Nº factura</th>
                       <th className="px-4 py-3 text-right">Total</th>
                       <th className="px-4 py-3 text-right">Estado</th>
                     </tr>
@@ -1362,6 +1943,9 @@ export function SocioDetail({
                       const haber = parseFloat(m.haber ?? '0');
                       const debe = parseFloat(m.debe ?? '0');
                       const esPago = haber > 0 && debe === 0;
+                      const detalle = esPago
+                        ? m.concepto?.trim() || 'Pago a cuenta'
+                        : [m.servicioNombre, m.concepto?.trim()].filter(Boolean).join(' — ') || '—';
                       return (
                         <tr
                           key={m.id}
@@ -1381,9 +1965,9 @@ export function SocioDetail({
                           </td>
                           <td className="px-4 py-3 text-gray-500">{fmtDate(m.fecha)}</td>
                           <td className="px-4 py-3 font-medium" style={{ color: '#175861' }}>
-                            {esPago ? 'Pago a cuenta' : (m.servicioNombre ?? '—')}
+                            {detalle}
                           </td>
-                          <td className="px-4 py-3 text-gray-500">{m.concepto ?? '—'}</td>
+                          <td className="px-4 py-3 text-gray-500">{m.facturaCodigo ?? '—'}</td>
                           <td
                             className="px-4 py-3 text-right font-medium"
                             style={{ color: esPago ? '#1B9A5A' : '#101828' }}
@@ -1524,44 +2108,7 @@ export function SocioDetail({
 
       {/* Documentación */}
       {activeTab === 'documentacion' && (
-        <div className="rounded-2xl border border-gray-200 bg-white p-4 md:p-6">
-          {documentos.length === 0 ? (
-            <EmptyState
-              icon={<FileText className="h-7 w-7 opacity-40" />}
-              text="No hay documentos adjuntos."
-            />
-          ) : (
-            <div className="space-y-2">
-              {documentos.map((d) => (
-                <div
-                  key={d.id}
-                  className="flex items-center gap-3 rounded-[10px] border border-gray-200 bg-white px-4 py-3 hover:bg-gray-50"
-                >
-                  <FileText className="h-5 w-5 shrink-0 text-[#669E9D]" />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold text-[#101828]">{d.nombre}</p>
-                    <p className="text-xs text-gray-500">
-                      {d.tipo ? TIPO_DOC_LABEL[d.tipo] : 'Sin categoría'} ·{' '}
-                      {formatArgentinaDate(d.createdAt)}
-                    </p>
-                  </div>
-                  {d.signedUrl ? (
-                    <a
-                      href={d.signedUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="shrink-0 rounded-[8px] border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-[#175861] hover:bg-gray-50"
-                    >
-                      Ver
-                    </a>
-                  ) : (
-                    <span className="shrink-0 text-xs text-gray-400">Sin archivo</span>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        <DocumentacionTab socioId={socio.id} documentos={documentos} />
       )}
     </div>
   );

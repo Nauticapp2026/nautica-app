@@ -377,10 +377,13 @@ function CrearSocioModal({ open, onClose }: { open: boolean; onClose: () => void
                   <Paperclip className="h-4 w-4" />
                   <span>Seleccionar documentos</span>
                 </div>
-                <span className="text-xs text-gray-400">PDF, imágenes — varios archivos</span>
+                <span className="text-xs text-gray-400">
+                  PDF, Word, Excel, imágenes — varios archivos
+                </span>
                 <input
                   type="file"
                   multiple
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,image/*"
                   className="hidden"
                   onChange={(e) => {
                     addFiles(e.target.files);
