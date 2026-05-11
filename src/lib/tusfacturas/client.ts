@@ -27,7 +27,7 @@ export type TusFacturasCliente = {
   envia_por_mail: 'S' | 'N';
   reclama_deuda: 'S' | 'N';
   condicion_pago: string; // '201' contado, '211' 30 días, etc.
-  condicion_iva: string; // 'CF' | 'RI' | 'M' | 'EX' | 'E' | 'NC'
+  condicion_iva: string; // 'CF' | 'RI' | 'M' | 'E' | 'CDEX' | 'IVNA' | 'PDEX'
   condicion_iva_operacion: string; // '1' Gravada
 };
 
