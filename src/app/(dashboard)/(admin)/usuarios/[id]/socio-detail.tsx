@@ -15,6 +15,7 @@ import {
   Ship,
   TrendingUp,
   AlertTriangle,
+  Trash2,
   X,
 } from 'lucide-react';
 import {
@@ -23,7 +24,7 @@ import {
   informarPagoAction,
   marcarPagadasAction,
 } from '@/app/actions/movimientos';
-import { updateSocioAction } from '@/app/actions/socios';
+import { deleteSocioAction, updateSocioAction } from '@/app/actions/socios';
 import { formatArgentinaDate, formatArgentinaDateTime } from '@/lib/dates';
 import { EmptyState } from '@/components/shared/empty-state';
 
@@ -841,6 +842,7 @@ export function SocioDetail({
   const [editForm, setEditForm] = useState({
     nombre: socio.nombre ?? '',
     apellido: socio.apellido ?? '',
+    email: socio.email,
     telefono: socio.telefono ?? '',
     tipoDocumento: socio.tipoDocumento ?? '',
     numeroDocumento: socio.numeroDocumento ?? '',
@@ -850,6 +852,10 @@ export function SocioDetail({
   });
   const [editError, setEditError] = useState<string | null>(null);
   const [isSaving, startSaving] = useTransition();
+  const [confirmEliminar, setConfirmEliminar] = useState(false);
+  const [eliminarError, setEliminarError] = useState<string | null>(null);
+  const [isEliminando, startEliminando] = useTransition();
+  const router = useRouter();
 
   function setField(k: keyof typeof editForm) {
     return (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
@@ -860,6 +866,7 @@ export function SocioDetail({
     setEditForm({
       nombre: socio.nombre ?? '',
       apellido: socio.apellido ?? '',
+      email: socio.email,
       telefono: socio.telefono ?? '',
       tipoDocumento: socio.tipoDocumento ?? '',
       numeroDocumento: socio.numeroDocumento ?? '',
@@ -879,7 +886,20 @@ export function SocioDetail({
         setEditError(res.error);
       } else {
         setEditando(false);
+        router.refresh();
       }
+    });
+  }
+
+  function handleEliminar() {
+    setEliminarError(null);
+    startEliminando(async () => {
+      const res = await deleteSocioAction(socio.id);
+      if (res.error) {
+        setEliminarError(res.error);
+        return;
+      }
+      router.push('/usuarios');
     });
   }
 
@@ -1037,9 +1057,11 @@ export function SocioDetail({
               <div>
                 <label className="mb-1.5 block text-xs font-semibold text-gray-500">Email</label>
                 <input
-                  className={`${inputCls} cursor-not-allowed bg-gray-50 text-gray-400`}
-                  defaultValue={socio.email}
-                  readOnly
+                  type="email"
+                  className={inputCls}
+                  value={editForm.email}
+                  onChange={setField('email')}
+                  readOnly={!editando}
                 />
               </div>
               <div>
@@ -1122,7 +1144,68 @@ export function SocioDetail({
               </div>
             </div>
 
-            {editError && <p className="text-sm text-red-600">{editError}</p>}
+            {editError && (
+              <div className="rounded-[10px] border border-red-200 bg-red-50 p-3">
+                <p className="text-sm font-medium text-red-700">{editError}</p>
+              </div>
+            )}
+
+            {!editando && (
+              <div className="border-t border-gray-100 pt-4">
+                <button
+                  onClick={() => setConfirmEliminar(true)}
+                  className="inline-flex items-center gap-2 rounded-[10px] border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50 hover:text-red-700"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Eliminar socio
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {confirmEliminar && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="mb-4 flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-50">
+                <AlertTriangle className="h-5 w-5 text-red-600" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold" style={{ color: '#101828' }}>
+                  Eliminar socio
+                </h3>
+                <p className="mt-1 text-sm text-gray-600">
+                  ¿Estás seguro que querés eliminar a <strong>{nombre}</strong>? Va a desaparecer
+                  del listado, pero se conserva el historial de cuenta corriente y facturación.
+                </p>
+              </div>
+            </div>
+            {eliminarError && (
+              <div className="mb-3 rounded-[10px] border border-red-200 bg-red-50 p-3">
+                <p className="text-sm font-medium text-red-700">{eliminarError}</p>
+              </div>
+            )}
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setConfirmEliminar(false);
+                  setEliminarError(null);
+                }}
+                disabled={isEliminando}
+                className="flex-1 rounded-[10px] border border-[#d1d5dc] bg-white py-2.5 text-sm font-medium text-[#364153] transition hover:bg-gray-50 disabled:opacity-40"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleEliminar}
+                disabled={isEliminando}
+                className="flex-1 rounded-[10px] bg-red-600 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {isEliminando ? 'Eliminando...' : 'Eliminar'}
+              </button>
+            </div>
           </div>
         </div>
       )}
