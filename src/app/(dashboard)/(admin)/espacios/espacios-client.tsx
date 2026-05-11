@@ -466,7 +466,7 @@ export function EspaciosClient({
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-5">
           <div>
             <label className="mb-1 block text-xs font-semibold text-gray-600">
-              Eslora del barco ({searchUnidad === 'm' ? 'm' : 'pies'})
+              Eslora del barco
             </label>
             <input
               className={inputCls}
@@ -478,7 +478,7 @@ export function EspaciosClient({
           </div>
           <div>
             <label className="mb-1 block text-xs font-semibold text-gray-600">
-              Manga del barco ({searchUnidad === 'm' ? 'm' : 'pies'})
+              Manga del barco
             </label>
             <input
               className={inputCls}
