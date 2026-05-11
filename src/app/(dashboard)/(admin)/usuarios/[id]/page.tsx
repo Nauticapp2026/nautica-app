@@ -4,6 +4,9 @@ import { db } from '@/lib/db';
 import {
   documentos,
   embarcaciones,
+  facturacion,
+  facturacionItemMovimientos,
+  facturacionItems,
   invitados,
   memberships,
   movimientosCuentaCorriente,
@@ -11,7 +14,7 @@ import {
   profiles,
   servicios as serviciosTable,
 } from '@/lib/db/schema';
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, and, desc, inArray } from 'drizzle-orm';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { SocioDetail } from './socio-detail';
 
@@ -154,6 +157,29 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
       .orderBy(desc(porteria.createdAt)),
   ]);
 
+  // Para cada movimiento facturado, traer el código de la factura. Lo
+  // hacemos en una query separada para no duplicar filas con el JOIN M:N
+  // (facturacion_item_movimientos puede tener varios matches por movimiento).
+  const movimientoIds = movimientosList.map((m) => m.id);
+  const facturasPorMovimiento = new Map<string, string>();
+  if (movimientoIds.length > 0) {
+    const rows = await db
+      .selectDistinct({
+        movimientoId: facturacionItemMovimientos.movimientoId,
+        codigo: facturacion.codigo,
+      })
+      .from(facturacionItemMovimientos)
+      .innerJoin(
+        facturacionItems,
+        eq(facturacionItems.id, facturacionItemMovimientos.facturacionItemId),
+      )
+      .innerJoin(facturacion, eq(facturacion.id, facturacionItems.facturacionId))
+      .where(inArray(facturacionItemMovimientos.movimientoId, movimientoIds));
+    for (const r of rows) {
+      if (r.codigo) facturasPorMovimiento.set(r.movimientoId, r.codigo);
+    }
+  }
+
   // Resolver URL de cada documento. Soportamos dos formatos en
   // documento_url (histórico y nuevo):
   //  - URL completa ("https://…/storage/v1/object/…"): se usa tal cual.
@@ -195,6 +221,7 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
       movimientos={movimientosList.map((m) => ({
         ...m,
         fecha: m.fecha?.toISOString() ?? null,
+        facturaCodigo: facturasPorMovimiento.get(m.id) ?? null,
       }))}
       servicios={serviciosList}
       invitados={invitadosList.map((i) => ({
