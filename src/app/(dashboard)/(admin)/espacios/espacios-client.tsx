@@ -303,11 +303,16 @@ export function EspaciosClient({
         setMovingId(activeId);
         void reorderEspaciosAction(newOrder).then((res) => {
           setMovingId(null);
+          console.log('[reorderEspaciosAction result]', res);
           if (res.error) {
             console.error('[reorderEspaciosAction]', res.error);
             alert(`No se pudo reordenar: ${res.error}`);
+            return;
           }
-          router.refresh();
+          // Hard reload — router.refresh() a veces no invalida el cache de
+          // React-server. window.location.reload garantiza que se vea la
+          // data fresca despues del update.
+          window.location.reload();
         });
       } else {
         // Diferente contenedor: mover al contenedor del espacio target.
