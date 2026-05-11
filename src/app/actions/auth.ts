@@ -158,7 +158,11 @@ export async function getPostSignupAccess(): Promise<
   const active = await getActiveMarina();
   if (!active) return { kind: 'no_membership' };
 
-  if (active.profile.isSuperAdmin || active.activeMembership.rol === 'administrador_general') {
+  if (
+    active.profile.isSuperAdmin ||
+    active.activeMembership.rol === 'administrador_general' ||
+    active.activeMembership.rol === 'administrativo'
+  ) {
     return { kind: 'web', redirectTo: '/dashboard' };
   }
   if (active.activeMembership.rol === 'operario') {

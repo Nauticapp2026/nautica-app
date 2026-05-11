@@ -24,7 +24,8 @@ import {
 
 const ROL_LABELS: Record<string, string> = {
   super_admin: 'Super admin',
-  administrador_general: 'Administrador general',
+  administrador_general: 'Admin',
+  administrativo: 'Administrativo',
   operario: 'Operario',
   contable: 'Contable',
   mantenimiento: 'Mantenimiento',
@@ -33,7 +34,7 @@ const ROL_LABELS: Record<string, string> = {
   socio: 'Socio',
   invitado: 'Invitado',
   proveedor: 'Proveedor',
-  seguridad: 'Seguridad',
+  seguridad: 'Portería / Seguridad',
 };
 
 type SidebarItem = { href: string; label: string; icon: LucideIcon };

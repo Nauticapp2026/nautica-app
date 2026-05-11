@@ -21,6 +21,7 @@ import { relations, sql } from 'drizzle-orm';
 export const rolEnum = pgEnum('rol', [
   'super_admin',
   'administrador_general',
+  'administrativo',
   'operario',
   'contable',
   'mantenimiento',

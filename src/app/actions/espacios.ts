@@ -31,7 +31,11 @@ export type CreateAreaInput =
     };
 
 function isAdmin(ctx: NonNullable<Awaited<ReturnType<typeof getActiveMarina>>>): boolean {
-  return ctx.profile.isSuperAdmin || ctx.activeMembership.rol === 'administrador_general';
+  return (
+    ctx.profile.isSuperAdmin ||
+    ctx.activeMembership.rol === 'administrador_general' ||
+    ctx.activeMembership.rol === 'administrativo'
+  );
 }
 
 /**

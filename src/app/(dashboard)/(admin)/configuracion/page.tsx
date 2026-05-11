@@ -33,7 +33,10 @@ export default async function ConfiguracionPage({ searchParams }: Props) {
   const ctx = await getActiveMarina();
   if (!ctx) return null;
 
-  const isAdmin = ctx.profile.isSuperAdmin || ctx.activeMembership.rol === 'administrador_general';
+  const isAdmin =
+    ctx.profile.isSuperAdmin ||
+    ctx.activeMembership.rol === 'administrador_general' ||
+    ctx.activeMembership.rol === 'administrativo';
   if (!isAdmin) redirect('/dashboard');
 
   const guarderiaId = ctx.activeMembership.guarderiaId;

@@ -27,7 +27,10 @@ export default async function EspaciosPage() {
   const ctx = await getActiveMarina();
   if (!ctx) return null;
 
-  const isAdmin = ctx.profile.isSuperAdmin || ctx.activeMembership.rol === 'administrador_general';
+  const isAdmin =
+    ctx.profile.isSuperAdmin ||
+    ctx.activeMembership.rol === 'administrador_general' ||
+    ctx.activeMembership.rol === 'administrativo';
   if (!isAdmin) redirect('/dashboard');
 
   const guarderiaId = ctx.activeMembership.guarderiaId;
