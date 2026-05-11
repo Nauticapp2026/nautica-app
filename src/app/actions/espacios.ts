@@ -690,14 +690,23 @@ export async function reorderEspaciosAction(espacioIds: string[]): Promise<{ err
   }
 
   try {
-    // Actualiza la columna `orden` (antes era "offset" — palabra reservada
-    // de Postgres que daba problemas). Updates secuenciales para garantizar
-    // que cada uno se aplica.
-    await Promise.all(
+    console.log('[reorderEspaciosAction] updating', espacioIds.length, 'espacios:', espacioIds);
+    const results = await Promise.all(
       espacioIds.map((id, idx) =>
-        db.update(espacios).set({ orden: idx, updatedAt: new Date() }).where(eq(espacios.id, id)),
+        db
+          .update(espacios)
+          .set({ orden: idx, updatedAt: new Date() })
+          .where(eq(espacios.id, id))
+          .returning({ id: espacios.id, orden: espacios.orden }),
       ),
     );
+    const updated = results.flat();
+    console.log('[reorderEspaciosAction] updated rows:', updated);
+    if (updated.length !== espacioIds.length) {
+      return {
+        error: `Solo se actualizaron ${updated.length} de ${espacioIds.length} espacios.`,
+      };
+    }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('[reorderEspaciosAction] DB update failed:', msg);
