@@ -6,6 +6,7 @@ import { Anchor, Building2, Check, ChevronDown, Plus, Search, Trash2, X } from '
 import {
   DndContext,
   PointerSensor,
+  closestCenter,
   useDroppable,
   useSensor,
   useSensors,
@@ -296,7 +297,11 @@ export function EspaciosClient({
         setMovingId(activeId);
         void reorderEspaciosAction(newOrder).then((res) => {
           setMovingId(null);
-          if (!res.error) router.refresh();
+          if (res.error) {
+            console.error('[reorderEspaciosAction]', res.error);
+            alert(`No se pudo reordenar: ${res.error}`);
+          }
+          router.refresh();
         });
       } else {
         // Diferente contenedor: mover al contenedor del espacio target.
@@ -310,7 +315,11 @@ export function EspaciosClient({
           : moveEspacioToMarinaAction(activeId, targetContainerId);
         void promise.then((res) => {
           setMovingId(null);
-          if (!res.error) router.refresh();
+          if (res.error) {
+            console.error('[moveEspacio]', res.error);
+            alert(`No se pudo mover el espacio: ${res.error}`);
+          }
+          router.refresh();
         });
       }
       return;
@@ -328,7 +337,11 @@ export function EspaciosClient({
 
     void promise.then((res) => {
       setMovingId(null);
-      if (!res.error) router.refresh();
+      if (res.error) {
+        console.error('[moveEspacio]', res.error);
+        alert(`No se pudo mover el espacio: ${res.error}`);
+      }
+      router.refresh();
     });
   };
 
@@ -650,7 +663,7 @@ export function EspaciosClient({
           />
         </div>
       ) : (
-        <DndContext sensors={sensors} onDragEnd={onDragEnd}>
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
           <div className="space-y-4">
             {areasFiltradas.map((a) =>
               a.tipo === 'marina' ? (
