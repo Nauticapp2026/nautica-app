@@ -176,14 +176,10 @@ export default async function EspaciosPage() {
     }
   }
 
-  const byNum = (a: EspacioCell, b: EspacioCell) => {
-    const na = Number(a.nomenclatura);
-    const nb = Number(b.nomenclatura);
-    if (Number.isFinite(na) && Number.isFinite(nb)) return na - nb;
-    return a.nomenclatura.localeCompare(b.nomenclatura);
-  };
-  for (const arr of espaciosPorMarina.values()) arr.sort(byNum);
-  for (const arr of espaciosPorPiso.values()) arr.sort(byNum);
+  // No re-sort por nomenclatura — la query ya viene ordenada por
+  // `orden` ASC, `createdAt` ASC. Re-sortear acá pisaba el reorder
+  // manual del admin (drag-and-drop seteaba `orden` pero este sort
+  // lo ignoraba).
 
   // Armar vista por área
   const areasView: AreaView[] = areasRows.map((a) => {
