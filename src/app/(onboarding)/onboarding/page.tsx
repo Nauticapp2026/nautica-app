@@ -744,9 +744,9 @@ function Step4({
               >
                 <option value="">Rol</option>
                 <option value="administrador_general">Admin</option>
+                <option value="administrativo">Administrativo</option>
                 <option value="operario">Operario</option>
-                <option value="contable">Contable</option>
-                <option value="mantenimiento">Mantenimiento</option>
+                <option value="seguridad">Portería / Seguridad</option>
               </select>
               <Input
                 className="h-8 w-24 rounded-[10px] border-gray-200 px-2 text-xs"
