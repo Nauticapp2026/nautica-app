@@ -5,17 +5,29 @@ import { db } from '@/lib/db';
 import {
   alertas,
   comunicaciones,
+  documentos,
   embarcaciones,
   facturacion,
   memberships,
+  movimientosCuentaCorriente,
   porteria,
   profiles,
 } from '@/lib/db/schema';
-import { and, asc, count, desc, eq, gte, lte, sum } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gte, inArray, lte, sum } from 'drizzle-orm';
 
 import { AlertasOperativasList, type AlertaOperativa } from './alertas-operativas';
 import { EmptyState } from '@/components/shared/empty-state';
-import { Ship, Users, TrendingUp, Bell, Anchor, Plus, MessageSquare } from 'lucide-react';
+import {
+  AlertTriangle,
+  Anchor,
+  Bell,
+  FileText,
+  MessageSquare,
+  Plus,
+  Ship,
+  TrendingUp,
+  Users,
+} from 'lucide-react';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -58,11 +70,13 @@ function MetricCard({
   iconBg,
   value,
   label,
+  sublabel,
 }: {
   icon: React.ReactNode;
   iconBg: string;
   value: string;
   label: string;
+  sublabel?: string;
 }) {
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-5">
@@ -78,6 +92,7 @@ function MetricCard({
       <p className="mt-0.5 text-sm" style={{ color: '#669E9D' }}>
         {label}
       </p>
+      {sublabel && <p className="mt-1 text-xs text-gray-400">{sublabel}</p>}
     </div>
   );
 }
@@ -123,6 +138,9 @@ export default async function DashboardPage() {
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+  // Umbral de morosidad: socios con al menos un cargo no pagado anterior a
+  // esta fecha entran como "deuda 2+ meses".
+  const dosMesesAtras = new Date(now.getFullYear(), now.getMonth() - 2, now.getDate());
 
   const [
     [{ totalEmbarcaciones }],
@@ -131,6 +149,8 @@ export default async function DashboardPage() {
     operariosList,
     comunicacionesList,
     alertasOperativasRows,
+    morososRows,
+    docsRows,
   ] = await Promise.all([
     db
       .select({ totalEmbarcaciones: count() })
@@ -215,7 +235,80 @@ export default async function DashboardPage() {
       .where(and(eq(alertas.guarderiaId, gId), eq(alertas.estado, 'pendiente')))
       .orderBy(asc(alertas.tipo), desc(alertas.createdAt))
       .limit(500),
+
+    // Socios morosos (2+ meses): cualquier cargo no_pagado de >= 2 meses
+    // identifica al socio. Quedamos con sus IDs distintos.
+    db
+      .selectDistinct({ socioId: movimientosCuentaCorriente.socioId })
+      .from(movimientosCuentaCorriente)
+      .innerJoin(memberships, eq(memberships.userId, movimientosCuentaCorriente.socioId))
+      .where(
+        and(
+          eq(memberships.guarderiaId, gId),
+          eq(memberships.rol, 'socio'),
+          eq(memberships.status, 'active'),
+          eq(movimientosCuentaCorriente.estado, 'no_pagado'),
+          lte(movimientosCuentaCorriente.fecha, dosMesesAtras),
+        ),
+      ),
+
+    // Para calcular socios con documentación incompleta. Traemos cada
+    // (socioId, tipo de documento) y agrupamos en JS — un socio se considera
+    // completo si tiene al menos un documento de cada uno de los 3 tipos.
+    db
+      .select({
+        profileId: profiles.id,
+        tipo: documentos.tipo,
+      })
+      .from(memberships)
+      .innerJoin(profiles, eq(profiles.id, memberships.userId))
+      .leftJoin(documentos, eq(documentos.profileId, profiles.id))
+      .where(
+        and(
+          eq(memberships.guarderiaId, gId),
+          eq(memberships.rol, 'socio'),
+          eq(memberships.status, 'active'),
+        ),
+      ),
   ]);
+
+  // Socios con deuda 2+ meses + monto total a cobrar.
+  const morososIds = morososRows.map((r) => r.socioId);
+  let deudaTotal = '0';
+  if (morososIds.length > 0) {
+    const [{ totalDebe, totalHaber }] = await db
+      .select({
+        totalDebe: sum(movimientosCuentaCorriente.debe),
+        totalHaber: sum(movimientosCuentaCorriente.haber),
+      })
+      .from(movimientosCuentaCorriente)
+      .where(
+        and(
+          inArray(movimientosCuentaCorriente.socioId, morososIds),
+          eq(movimientosCuentaCorriente.estado, 'no_pagado'),
+        ),
+      );
+    // Saldo a cobrar = unpaid debes - haberes (pagos a cuenta no imputados).
+    // Si sale negativo (saldo a favor), devolvemos 0.
+    const debe = parseFloat(totalDebe ?? '0');
+    const haber = parseFloat(totalHaber ?? '0');
+    deudaTotal = String(Math.max(0, debe - haber));
+  }
+
+  // Socios con documentación incompleta: un socio se considera completo si
+  // tiene al menos un documento de cada uno de los 3 tipos.
+  const TIPOS_REQUERIDOS = new Set(['carnet_nautico', 'matricula', 'seguro']);
+  const tiposPorSocio = new Map<string, Set<string>>();
+  for (const r of docsRows) {
+    if (!tiposPorSocio.has(r.profileId)) tiposPorSocio.set(r.profileId, new Set());
+    if (r.tipo && TIPOS_REQUERIDOS.has(r.tipo)) {
+      tiposPorSocio.get(r.profileId)!.add(r.tipo);
+    }
+  }
+  let sociosDocsIncompletos = 0;
+  for (const tipos of tiposPorSocio.values()) {
+    if (tipos.size < TIPOS_REQUERIDOS.size) sociosDocsIncompletos++;
+  }
 
   const alertasOperativas: AlertaOperativa[] = alertasOperativasRows.map((r) => ({
     id: r.id,
@@ -243,7 +336,7 @@ export default async function DashboardPage() {
       </div>
 
       {/* Metric cards */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
         <MetricCard
           icon={<Ship className="h-5 w-5 text-white" />}
           iconBg="#175861"
@@ -261,6 +354,19 @@ export default async function DashboardPage() {
           iconBg="#ABC2B3"
           value={formatCurrency(totalIngresos)}
           label="Ingresos del mes"
+        />
+        <MetricCard
+          icon={<AlertTriangle className="h-5 w-5 text-white" />}
+          iconBg="#B42318"
+          value={String(morososIds.length)}
+          label="Socios con deuda 2+ meses"
+          sublabel={`${formatCurrency(deudaTotal)} a cobrar`}
+        />
+        <MetricCard
+          icon={<FileText className="h-5 w-5 text-white" />}
+          iconBg="#B54708"
+          value={String(sociosDocsIncompletos)}
+          label="Socios con documentación incompleta"
         />
       </div>
 

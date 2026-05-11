@@ -666,3 +666,39 @@ export async function moveEspacioToMarinaAction(
   revalidatePath('/espacios');
   return {};
 }
+
+// Reordena espacios dentro del mismo piso (nave) o peine (marina).
+// Setea espacios.offset = índice del array. La query del page ordena por
+// offset asc, así que el orden del array refleja exactamente lo que se ve.
+// Valida que todos los ids pertenezcan a la guardería activa.
+export async function reorderEspaciosAction(espacioIds: string[]): Promise<{ error?: string }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+  if (!isAdmin(ctx)) return { error: 'Solo administradores pueden reordenar espacios.' };
+
+  if (espacioIds.length === 0) return {};
+
+  const guarderiaId = ctx.activeMembership.guarderiaId;
+
+  // Validar pertenencia a la guardería en una sola query.
+  const found = await db
+    .select({ id: espacios.id })
+    .from(espacios)
+    .where(and(eq(espacios.guarderiaId, guarderiaId), inArray(espacios.id, espacioIds)));
+  if (found.length !== espacioIds.length) {
+    return { error: 'Alguno de los espacios no pertenece a esta guardería.' };
+  }
+
+  try {
+    await Promise.all(
+      espacioIds.map((id, idx) =>
+        db.update(espacios).set({ offset: idx, updatedAt: new Date() }).where(eq(espacios.id, id)),
+      ),
+    );
+  } catch {
+    return { error: 'Error al reordenar los espacios.' };
+  }
+
+  revalidatePath('/espacios');
+  return {};
+}

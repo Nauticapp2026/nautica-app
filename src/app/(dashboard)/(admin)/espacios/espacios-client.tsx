@@ -2,16 +2,17 @@
 
 import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Anchor, Building2, Check, ChevronDown, Plus, Trash2, X } from 'lucide-react';
+import { Anchor, Building2, Check, ChevronDown, Plus, Search, Trash2, X } from 'lucide-react';
 import {
   DndContext,
   PointerSensor,
-  useDraggable,
   useDroppable,
   useSensor,
   useSensors,
   type DragEndEvent,
 } from '@dnd-kit/core';
+import { SortableContext, arrayMove, rectSortingStrategy, useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 import {
   addEspacioToMarinaAction,
@@ -24,6 +25,7 @@ import {
   deletePisoAction,
   moveEspacioToMarinaAction,
   moveEspacioToPisoAction,
+  reorderEspaciosAction,
   updateEspacioAction,
   type CreateAreaInput,
 } from '@/app/actions/espacios';
@@ -124,6 +126,94 @@ export function EspaciosClient({
     lugar: LugarEspacio;
   } | null>(null);
 
+  // ─── Búsqueda de espacios para asignar a un cliente ─────────────────────────
+  const [searchEslora, setSearchEslora] = useState('');
+  const [searchManga, setSearchManga] = useState('');
+  const [searchNomenclatura, setSearchNomenclatura] = useState('');
+  const [searchTipoBusqueda, setSearchTipoBusqueda] = useState<'' | 'marina' | 'nave'>('');
+  const [searchSoloDisponibles, setSearchSoloDisponibles] = useState(true);
+
+  // Lista plana de todos los espacios con su contexto (área + lugar). Sirve
+  // de input al buscador de espacios.
+  const espaciosFlat = useMemo(() => {
+    const list: {
+      cell: EspacioCell;
+      areaNombre: string;
+      tipo: 'marina' | 'nave';
+      lugar: LugarEspacio;
+      lugarLabel: string;
+    }[] = [];
+    for (const a of areas) {
+      for (const p of a.peines) {
+        for (const e of p.espacios) {
+          list.push({
+            cell: e,
+            areaNombre: a.nombre,
+            tipo: 'marina',
+            lugar: { tipo: 'marina', peine: p.nombre },
+            lugarLabel: `${a.nombre} · ${p.nombre} · ${e.nomenclatura}`,
+          });
+        }
+      }
+      for (const l of a.lados) {
+        for (const pi of l.pisos) {
+          for (const e of pi.espacios) {
+            list.push({
+              cell: e,
+              areaNombre: a.nombre,
+              tipo: 'nave',
+              lugar: { tipo: 'nave', lado: l.nombre, piso: pi.nombre },
+              lugarLabel: `${a.nombre} · ${l.nombre} · ${pi.nombre} · ${e.nomenclatura}`,
+            });
+          }
+        }
+      }
+    }
+    return list;
+  }, [areas]);
+
+  const hayFiltroActivo =
+    searchEslora.trim() !== '' ||
+    searchManga.trim() !== '' ||
+    searchNomenclatura.trim() !== '' ||
+    searchTipoBusqueda !== '';
+
+  const searchResults = useMemo(() => {
+    if (!hayFiltroActivo) return [];
+    const esloraMin = parseFloat(searchEslora.replace(',', '.'));
+    const mangaMin = parseFloat(searchManga.replace(',', '.'));
+    const nomen = searchNomenclatura.trim().toLowerCase();
+
+    return espaciosFlat.filter((e) => {
+      if (searchTipoBusqueda && e.tipo !== searchTipoBusqueda) return false;
+      if (searchSoloDisponibles && e.cell.estado !== 'disponible') return false;
+      if (Number.isFinite(esloraMin)) {
+        if (e.cell.eslora == null || e.cell.eslora < esloraMin) return false;
+      }
+      if (Number.isFinite(mangaMin)) {
+        if (e.cell.manga == null || e.cell.manga < mangaMin) return false;
+      }
+      if (nomen && !e.cell.nomenclatura.toLowerCase().includes(nomen)) return false;
+      return true;
+    });
+  }, [
+    espaciosFlat,
+    hayFiltroActivo,
+    searchEslora,
+    searchManga,
+    searchNomenclatura,
+    searchTipoBusqueda,
+    searchSoloDisponibles,
+  ]);
+
+  function limpiarBusqueda() {
+    setSearchEslora('');
+    setSearchManga('');
+    setSearchNomenclatura('');
+    setSearchTipoBusqueda('');
+    setSearchSoloDisponibles(true);
+  }
+
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const toggleCollapsed = (areaId: string) =>
     setCollapsed((prev) => {
@@ -145,20 +235,88 @@ export function EspaciosClient({
 
   // Drag-and-drop global de espacios. Un único DndContext envuelve todas las
   // áreas para permitir mover entre áreas distintas (cross-area). El handler
-  // valida que el tipo coincida (nave→piso, marina→peine) y descarta el
-  // resto.
+  // distingue:
+  //  - Drop sobre otro espacio del mismo contenedor → reorder dentro del contenedor.
+  //  - Drop sobre otro espacio de otro contenedor → mover al contenedor del otro.
+  //  - Drop sobre el contenedor (piso/peine vacío o area gris) → mover al contenedor.
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
   const [movingId, setMovingId] = useState<string | null>(null);
 
+  // Mapas: espacioId → containerKey ("piso:xxx" o "peine:xxx") y containerKey
+  // → lista ordenada de espacioIds. Se calculan a partir de las areas.
+  const { espacioToContainer, containerToEspacios } = useMemo(() => {
+    const e2c = new Map<string, string>();
+    const c2e = new Map<string, string[]>();
+    for (const a of areas) {
+      for (const p of a.peines) {
+        const key = `peine:${p.marinaId}`;
+        c2e.set(
+          key,
+          p.espacios.map((e) => e.id),
+        );
+        for (const e of p.espacios) e2c.set(e.id, key);
+      }
+      for (const l of a.lados) {
+        for (const pi of l.pisos) {
+          const key = `piso:${pi.pisoId}`;
+          c2e.set(
+            key,
+            pi.espacios.map((e) => e.id),
+          );
+          for (const e of pi.espacios) e2c.set(e.id, key);
+        }
+      }
+    }
+    return { espacioToContainer: e2c, containerToEspacios: c2e };
+  }, [areas]);
+
   const onDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
-    if (!over) return;
+    if (!over || active.id === over.id) return;
     const activeParts = String(active.id).split(':');
     const overParts = String(over.id).split(':');
     if (activeParts.length !== 2 || overParts.length !== 2) return;
     const [activeTipo, activeId] = activeParts;
     const [overTipo, overId] = overParts;
 
+    // Caso A: drop sobre otro espacio (sortable).
+    if (overTipo === 'nave' || overTipo === 'marina') {
+      if (activeTipo !== overTipo) return;
+      const sourceKey = espacioToContainer.get(activeId);
+      const targetKey = espacioToContainer.get(overId);
+      if (!sourceKey || !targetKey) return;
+
+      if (sourceKey === targetKey) {
+        // Reorder dentro del mismo contenedor.
+        const items = containerToEspacios.get(sourceKey) ?? [];
+        const fromIdx = items.indexOf(activeId);
+        const toIdx = items.indexOf(overId);
+        if (fromIdx < 0 || toIdx < 0) return;
+        const newOrder = arrayMove(items, fromIdx, toIdx);
+        setMovingId(activeId);
+        void reorderEspaciosAction(newOrder).then((res) => {
+          setMovingId(null);
+          if (!res.error) router.refresh();
+        });
+      } else {
+        // Diferente contenedor: mover al contenedor del espacio target.
+        const [targetContainerTipo, targetContainerId] = targetKey.split(':');
+        const isNaveMove = activeTipo === 'nave' && targetContainerTipo === 'piso';
+        const isMarinaMove = activeTipo === 'marina' && targetContainerTipo === 'peine';
+        if (!isNaveMove && !isMarinaMove) return;
+        setMovingId(activeId);
+        const promise = isNaveMove
+          ? moveEspacioToPisoAction(activeId, targetContainerId)
+          : moveEspacioToMarinaAction(activeId, targetContainerId);
+        void promise.then((res) => {
+          setMovingId(null);
+          if (!res.error) router.refresh();
+        });
+      }
+      return;
+    }
+
+    // Caso B: drop sobre un contenedor (piso o peine).
     const isNaveMove = activeTipo === 'nave' && overTipo === 'piso';
     const isMarinaMove = activeTipo === 'marina' && overTipo === 'peine';
     if (!isNaveMove && !isMarinaMove) return;
@@ -267,6 +425,158 @@ export function EspaciosClient({
         <StatCard label="Reservados" value={totales.reservado} accent="#B54708" />
         <StatCard label="Disponibles" value={totales.disponible} accent="#039855" />
       </div>
+
+      {/* Buscador de espacios para asignar a un cliente */}
+      <section className="mb-6 rounded-2xl border border-gray-200 bg-white p-5">
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Search className="h-4 w-4" style={{ color: '#669E9D' }} />
+            <h2 className="text-base font-bold" style={{ color: '#101828' }}>
+              Buscar espacio
+            </h2>
+          </div>
+          {hayFiltroActivo && (
+            <button
+              type="button"
+              onClick={limpiarBusqueda}
+              className="text-xs font-semibold text-[#175861] hover:underline"
+            >
+              Limpiar
+            </button>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-5">
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-gray-600">
+              Eslora del barco (m)
+            </label>
+            <input
+              className={inputCls}
+              inputMode="decimal"
+              placeholder="Ej: 10"
+              value={searchEslora}
+              onChange={(e) => setSearchEslora(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-gray-600">
+              Manga del barco (m)
+            </label>
+            <input
+              className={inputCls}
+              inputMode="decimal"
+              placeholder="Opcional"
+              value={searchManga}
+              onChange={(e) => setSearchManga(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-gray-600">Tipo</label>
+            <select
+              className={inputCls}
+              value={searchTipoBusqueda}
+              onChange={(e) => setSearchTipoBusqueda(e.target.value as '' | 'marina' | 'nave')}
+            >
+              <option value="">Cualquiera</option>
+              <option value="marina">Marina</option>
+              <option value="nave">Nave</option>
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-gray-600">Nomenclatura</label>
+            <input
+              className={inputCls}
+              placeholder="Ej: A5"
+              value={searchNomenclatura}
+              onChange={(e) => setSearchNomenclatura(e.target.value)}
+            />
+          </div>
+          <div className="flex items-end">
+            <label className="flex h-11 cursor-pointer items-center gap-2 rounded-[10px] border border-gray-200 bg-white px-4 text-sm text-[#101828]">
+              <input
+                type="checkbox"
+                checked={searchSoloDisponibles}
+                onChange={(e) => setSearchSoloDisponibles(e.target.checked)}
+                className="h-4 w-4 accent-[#175861]"
+              />
+              Solo disponibles
+            </label>
+          </div>
+        </div>
+
+        {hayFiltroActivo && (
+          <div className="mt-5">
+            <p className="mb-2 text-xs text-gray-500">
+              {searchResults.length === 0
+                ? 'No se encontraron espacios que cumplan los criterios.'
+                : `${searchResults.length} espacio${searchResults.length === 1 ? '' : 's'} encontrado${searchResults.length === 1 ? '' : 's'}.`}
+            </p>
+            {searchResults.length > 0 && (
+              <div className="overflow-x-auto rounded-[10px] border border-gray-100">
+                <table className="w-full min-w-[640px] text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 text-left text-xs font-semibold text-gray-500">
+                      <th className="px-4 py-3">Ubicación</th>
+                      <th className="px-4 py-3 text-right">Eslora</th>
+                      <th className="px-4 py-3 text-right">Manga</th>
+                      <th className="px-4 py-3 text-center">Estado</th>
+                      <th className="px-4 py-3 text-right">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {searchResults.map((r) => (
+                      <tr key={r.cell.id} className="border-t border-gray-100 hover:bg-gray-50/50">
+                        <td className="px-4 py-3 font-medium" style={{ color: '#175861' }}>
+                          {r.lugarLabel}
+                        </td>
+                        <td className="px-4 py-3 text-right text-gray-600">
+                          {r.cell.eslora != null ? `${r.cell.eslora} m` : '—'}
+                        </td>
+                        <td className="px-4 py-3 text-right text-gray-600">
+                          {r.cell.manga != null ? `${r.cell.manga} m` : '—'}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <span
+                            className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${
+                              r.cell.estado === 'disponible'
+                                ? 'bg-green-100 text-green-700'
+                                : r.cell.estado === 'reservado'
+                                  ? 'bg-amber-100 text-amber-700'
+                                  : 'bg-red-100 text-red-700'
+                            }`}
+                          >
+                            {r.cell.estado === 'disponible'
+                              ? 'Disponible'
+                              : r.cell.estado === 'reservado'
+                                ? 'Reservado'
+                                : 'Ocupado'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setEditEspacio({
+                                cell: r.cell,
+                                areaNombre: r.areaNombre,
+                                lugar: r.lugar,
+                              })
+                            }
+                            className="inline-flex items-center gap-1 rounded-[8px] border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-[#175861] hover:bg-gray-50"
+                          >
+                            Editar / Asignar
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+      </section>
 
       <section className="mb-6 rounded-2xl border border-gray-200 bg-white p-5">
         <div className="mb-3 flex items-center gap-2">
@@ -771,16 +1081,21 @@ function DroppablePiso({
           {espacios.length === 0 ? (
             <p className="px-1 py-1 text-[11px] text-gray-400">Sin espacios.</p>
           ) : (
-            espacios.map((e) => (
-              <DraggableEspacio
-                key={e.id}
-                cell={e}
-                tipo="nave"
-                isMoving={movingId === e.id}
-                onEdit={() => onEditEspacio(e)}
-                onDelete={() => onDeleteEspacio(e)}
-              />
-            ))
+            <SortableContext
+              items={espacios.map((e) => `nave:${e.id}`)}
+              strategy={rectSortingStrategy}
+            >
+              {espacios.map((e) => (
+                <SortableEspacio
+                  key={e.id}
+                  cell={e}
+                  tipo="nave"
+                  isMoving={movingId === e.id}
+                  onEdit={() => onEditEspacio(e)}
+                  onDelete={() => onDeleteEspacio(e)}
+                />
+              ))}
+            </SortableContext>
           )}
           <AddEspacioButton onAdd={onAddEspacio} />
         </div>
@@ -816,16 +1131,21 @@ function DroppablePeine({
         {espacios.length === 0 ? (
           <p className="px-1 py-1 text-[11px] text-gray-400">Sin espacios.</p>
         ) : (
-          espacios.map((e) => (
-            <DraggableEspacio
-              key={e.id}
-              cell={e}
-              tipo="marina"
-              isMoving={movingId === e.id}
-              onEdit={() => onEditEspacio(e)}
-              onDelete={() => onDeleteEspacio(e)}
-            />
-          ))
+          <SortableContext
+            items={espacios.map((e) => `marina:${e.id}`)}
+            strategy={rectSortingStrategy}
+          >
+            {espacios.map((e) => (
+              <SortableEspacio
+                key={e.id}
+                cell={e}
+                tipo="marina"
+                isMoving={movingId === e.id}
+                onEdit={() => onEditEspacio(e)}
+                onDelete={() => onDeleteEspacio(e)}
+              />
+            ))}
+          </SortableContext>
         )}
         <AddEspacioButton onAdd={onAddEspacio} />
       </div>
@@ -833,7 +1153,7 @@ function DroppablePeine({
   );
 }
 
-function DraggableEspacio({
+function SortableEspacio({
   cell,
   tipo,
   isMoving,
@@ -847,13 +1167,14 @@ function DraggableEspacio({
   onDelete: () => void;
 }) {
   // Prefijo del id distingue origen para que el handler global del DndContext
-  // valide que se arrastra solo entre droppables del mismo tipo (nave→piso,
+  // valide que se arrastra solo entre containers del mismo tipo (nave→piso,
   // marina→peine). Cross-tipo se ignora.
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: `${tipo}:${cell.id}`,
   });
   const style: React.CSSProperties = {
-    transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
+    transform: CSS.Transform.toString(transform),
+    transition,
     opacity: isDragging || isMoving ? 0.5 : 1,
     zIndex: isDragging ? 10 : undefined,
   };
@@ -862,7 +1183,7 @@ function DraggableEspacio({
       <button
         type="button"
         onClick={onEdit}
-        title={`Editar espacio ${cell.nomenclatura} — arrastrá para mover`}
+        title={`Editar espacio ${cell.nomenclatura} — arrastrá para mover o reordenar`}
         className={`inline-flex h-7 min-w-[2.25rem] cursor-grab items-center justify-center rounded-[8px] border px-2 text-xs font-semibold transition-colors hover:brightness-95 active:cursor-grabbing ${ESTADO_CLS[cell.estado]}`}
         {...listeners}
         {...attributes}
@@ -1070,17 +1391,6 @@ function NuevaAreaModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
             </div>
           ) : (
             <div>
-              <div className="mb-2 flex items-center justify-end">
-                <button
-                  type="button"
-                  onClick={addLado}
-                  className="flex items-center gap-1 text-sm font-semibold text-[#175861] hover:underline"
-                >
-                  Agregar lado
-                  <Plus className="h-3.5 w-3.5" />
-                </button>
-              </div>
-
               <div className="space-y-3">
                 {lados.map((l, idx) => (
                   <div
@@ -1089,7 +1399,7 @@ function NuevaAreaModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
                   >
                     <div>
                       <label className="mb-1 block text-xs font-semibold text-gray-600">
-                        Cantidad de pisos
+                        Pisos
                       </label>
                       <input
                         className={inputCls}
@@ -1102,7 +1412,7 @@ function NuevaAreaModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
                     </div>
                     <div>
                       <label className="mb-1 block text-xs font-semibold text-gray-600">
-                        Cantidad de camas
+                        Camas
                       </label>
                       <input
                         className={inputCls}
@@ -1145,6 +1455,17 @@ function NuevaAreaModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
                     </button>
                   </div>
                 ))}
+              </div>
+
+              <div className="mt-3 flex items-center justify-end">
+                <button
+                  type="button"
+                  onClick={addLado}
+                  className="flex items-center gap-1 text-sm font-semibold text-[#175861] hover:underline"
+                >
+                  Agregar lado
+                  <Plus className="h-3.5 w-3.5" />
+                </button>
               </div>
             </div>
           )}
@@ -1488,7 +1809,9 @@ function EditarEspacioModal({
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-semibold text-gray-700">Nomenclatura</label>
+            <label className="mb-1 block text-sm font-semibold text-gray-700">
+              Nomenclatura <span className="font-normal text-gray-400">(Nombre del espacio)</span>
+            </label>
             <input
               className={inputCls}
               value={nomenclatura}
