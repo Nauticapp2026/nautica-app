@@ -130,9 +130,13 @@ export function EspaciosClient({
   // ─── Búsqueda de espacios para asignar a un cliente ─────────────────────────
   const [searchEslora, setSearchEslora] = useState('');
   const [searchManga, setSearchManga] = useState('');
-  const [searchNomenclatura, setSearchNomenclatura] = useState('');
+  const [searchUnidad, setSearchUnidad] = useState<'m' | 'ft'>('m');
   const [searchTipoBusqueda, setSearchTipoBusqueda] = useState<'' | 'marina' | 'nave'>('');
   const [searchSoloDisponibles, setSearchSoloDisponibles] = useState(true);
+
+  // Eslora/manga se guardan en metros en la DB. Si el admin busca en pies,
+  // convertimos a metros antes de comparar (1 ft = 0.3048 m).
+  const FT_TO_M = 0.3048;
 
   // Lista plana de todos los espacios con su contexto (área + lugar). Sirve
   // de input al buscador de espacios.
@@ -174,16 +178,16 @@ export function EspaciosClient({
   }, [areas]);
 
   const hayFiltroActivo =
-    searchEslora.trim() !== '' ||
-    searchManga.trim() !== '' ||
-    searchNomenclatura.trim() !== '' ||
-    searchTipoBusqueda !== '';
+    searchEslora.trim() !== '' || searchManga.trim() !== '' || searchTipoBusqueda !== '';
 
   const searchResults = useMemo(() => {
     if (!hayFiltroActivo) return [];
-    const esloraMin = parseFloat(searchEslora.replace(',', '.'));
-    const mangaMin = parseFloat(searchManga.replace(',', '.'));
-    const nomen = searchNomenclatura.trim().toLowerCase();
+    let esloraMin = parseFloat(searchEslora.replace(',', '.'));
+    let mangaMin = parseFloat(searchManga.replace(',', '.'));
+    if (searchUnidad === 'ft') {
+      if (Number.isFinite(esloraMin)) esloraMin = esloraMin * FT_TO_M;
+      if (Number.isFinite(mangaMin)) mangaMin = mangaMin * FT_TO_M;
+    }
 
     return espaciosFlat.filter((e) => {
       if (searchTipoBusqueda && e.tipo !== searchTipoBusqueda) return false;
@@ -194,7 +198,6 @@ export function EspaciosClient({
       if (Number.isFinite(mangaMin)) {
         if (e.cell.manga == null || e.cell.manga < mangaMin) return false;
       }
-      if (nomen && !e.cell.nomenclatura.toLowerCase().includes(nomen)) return false;
       return true;
     });
   }, [
@@ -202,7 +205,7 @@ export function EspaciosClient({
     hayFiltroActivo,
     searchEslora,
     searchManga,
-    searchNomenclatura,
+    searchUnidad,
     searchTipoBusqueda,
     searchSoloDisponibles,
   ]);
@@ -210,7 +213,7 @@ export function EspaciosClient({
   function limpiarBusqueda() {
     setSearchEslora('');
     setSearchManga('');
-    setSearchNomenclatura('');
+    setSearchUnidad('m');
     setSearchTipoBusqueda('');
     setSearchSoloDisponibles(true);
   }
@@ -463,19 +466,19 @@ export function EspaciosClient({
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-5">
           <div>
             <label className="mb-1 block text-xs font-semibold text-gray-600">
-              Eslora del barco (m)
+              Eslora del barco ({searchUnidad === 'm' ? 'm' : 'pies'})
             </label>
             <input
               className={inputCls}
               inputMode="decimal"
-              placeholder="Ej: 10"
+              placeholder={searchUnidad === 'm' ? 'Ej: 10' : 'Ej: 30'}
               value={searchEslora}
               onChange={(e) => setSearchEslora(e.target.value)}
             />
           </div>
           <div>
             <label className="mb-1 block text-xs font-semibold text-gray-600">
-              Manga del barco (m)
+              Manga del barco ({searchUnidad === 'm' ? 'm' : 'pies'})
             </label>
             <input
               className={inputCls}
@@ -484,6 +487,17 @@ export function EspaciosClient({
               value={searchManga}
               onChange={(e) => setSearchManga(e.target.value)}
             />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-gray-600">Unidad</label>
+            <select
+              className={inputCls}
+              value={searchUnidad}
+              onChange={(e) => setSearchUnidad(e.target.value as 'm' | 'ft')}
+            >
+              <option value="m">Metros</option>
+              <option value="ft">Pies</option>
+            </select>
           </div>
           <div>
             <label className="mb-1 block text-xs font-semibold text-gray-600">Tipo</label>
@@ -496,15 +510,6 @@ export function EspaciosClient({
               <option value="marina">Marina</option>
               <option value="nave">Nave</option>
             </select>
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-semibold text-gray-600">Nomenclatura</label>
-            <input
-              className={inputCls}
-              placeholder="Ej: A5"
-              value={searchNomenclatura}
-              onChange={(e) => setSearchNomenclatura(e.target.value)}
-            />
           </div>
           <div className="flex items-end">
             <label className="flex h-11 cursor-pointer items-center gap-2 rounded-[10px] border border-gray-200 bg-white px-4 text-sm text-[#101828]">
