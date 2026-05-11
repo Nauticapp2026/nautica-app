@@ -66,6 +66,7 @@ export type ServicioEspacio = {
   eslora: number | null;
   manga: number | null;
   puntual: number | null;
+  unidadMetraje: 'metros' | 'pies' | null;
 };
 
 type Filtro = 'marina' | 'nave';
@@ -134,9 +135,15 @@ export function EspaciosClient({
   const [searchTipoBusqueda, setSearchTipoBusqueda] = useState<'' | 'marina' | 'nave'>('');
   const [searchSoloDisponibles, setSearchSoloDisponibles] = useState(true);
 
-  // Eslora/manga se guardan en metros en la DB. Si el admin busca en pies,
-  // convertimos a metros antes de comparar (1 ft = 0.3048 m).
-  const FT_TO_M = 0.3048;
+  // Mapa: servicioId → unidad de medida ('metros' | 'pies' | null). Si una
+  // tarifa está cargada en pies, los espacios que la usan tienen su eslora
+  // / manga en pies. El filtro respeta esa unidad: si el admin busca en
+  // metros, solo aparecen espacios con tarifa en metros, sin conversión.
+  const unidadPorServicio = useMemo(() => {
+    const m = new Map<string, 'metros' | 'pies' | null>();
+    for (const s of serviciosEspacios) m.set(s.id, s.unidadMetraje);
+    return m;
+  }, [serviciosEspacios]);
 
   // Lista plana de todos los espacios con su contexto (área + lugar). Sirve
   // de input al buscador de espacios.
@@ -182,16 +189,17 @@ export function EspaciosClient({
 
   const searchResults = useMemo(() => {
     if (!hayFiltroActivo) return [];
-    let esloraMin = parseFloat(searchEslora.replace(',', '.'));
-    let mangaMin = parseFloat(searchManga.replace(',', '.'));
-    if (searchUnidad === 'ft') {
-      if (Number.isFinite(esloraMin)) esloraMin = esloraMin * FT_TO_M;
-      if (Number.isFinite(mangaMin)) mangaMin = mangaMin * FT_TO_M;
-    }
+    const esloraMin = parseFloat(searchEslora.replace(',', '.'));
+    const mangaMin = parseFloat(searchManga.replace(',', '.'));
+    const unidadBuscada: 'metros' | 'pies' = searchUnidad === 'm' ? 'metros' : 'pies';
 
     return espaciosFlat.filter((e) => {
       if (searchTipoBusqueda && e.tipo !== searchTipoBusqueda) return false;
       if (searchSoloDisponibles && e.cell.estado !== 'disponible') return false;
+      // El espacio debe tener tarifa asignada y la unidad de la tarifa
+      // tiene que matchear con la unidad seleccionada en el filtro.
+      const unidadEspacio = e.cell.servicioId ? unidadPorServicio.get(e.cell.servicioId) : null;
+      if (!unidadEspacio || unidadEspacio !== unidadBuscada) return false;
       if (Number.isFinite(esloraMin)) {
         if (e.cell.eslora == null || e.cell.eslora < esloraMin) return false;
       }
@@ -208,6 +216,7 @@ export function EspaciosClient({
     searchUnidad,
     searchTipoBusqueda,
     searchSoloDisponibles,
+    unidadPorServicio,
   ]);
 
   function limpiarBusqueda() {
@@ -550,10 +559,14 @@ export function EspaciosClient({
                           {r.lugarLabel}
                         </td>
                         <td className="px-4 py-3 text-right text-gray-600">
-                          {r.cell.eslora != null ? `${r.cell.eslora} m` : '—'}
+                          {r.cell.eslora != null
+                            ? `${r.cell.eslora} ${searchUnidad === 'm' ? 'm' : 'pies'}`
+                            : '—'}
                         </td>
                         <td className="px-4 py-3 text-right text-gray-600">
-                          {r.cell.manga != null ? `${r.cell.manga} m` : '—'}
+                          {r.cell.manga != null
+                            ? `${r.cell.manga} ${searchUnidad === 'm' ? 'm' : 'pies'}`
+                            : '—'}
                         </td>
                         <td className="px-4 py-3 text-center">
                           <span
