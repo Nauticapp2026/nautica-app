@@ -103,11 +103,76 @@ export async function marcarPagadasAction(data: MarcarPagadasData): Promise<{ er
     });
   }
 
+  // Para cheque/transferencia: si el importe pagado difiere de la suma de
+  // los items seleccionados, generamos un movimiento ajuste — saldo a favor
+  // (haber) si pagó de más, deuda pendiente (debe) si pagó de menos. Esto
+  // mantiene la cuenta corriente consistente.
+  let importePagado = 0;
+  if (data.formaDePago === 'cheque' && data.importeCheque) {
+    importePagado = parseFloat(data.importeCheque);
+  } else if (data.formaDePago === 'transferencia' && data.montoTransferencia) {
+    importePagado = parseFloat(data.montoTransferencia);
+  }
+
   try {
+    // 1. Marcar todos los items seleccionados como pagados.
     await db
       .update(movimientosCuentaCorriente)
       .set(setData as never)
       .where(inArray(movimientosCuentaCorriente.id, data.ids));
+
+    // 2. Si aplica (cheque o transferencia con importe), comparar contra
+    //    la suma de debes y generar movimiento ajuste si hay diferencia.
+    if (
+      (data.formaDePago === 'cheque' || data.formaDePago === 'transferencia') &&
+      importePagado > 0
+    ) {
+      const items = await db
+        .select({ debe: movimientosCuentaCorriente.debe })
+        .from(movimientosCuentaCorriente)
+        .where(inArray(movimientosCuentaCorriente.id, data.ids));
+      const totalDebe = items.reduce((acc, m) => acc + parseFloat(m.debe ?? '0'), 0);
+      const diff = importePagado - totalDebe;
+
+      if (Math.abs(diff) >= 0.01) {
+        const formaLabel = data.formaDePago === 'cheque' ? 'Cheque' : 'Transferencia';
+        const refExtra =
+          data.formaDePago === 'cheque' && data.numeroCheque
+            ? ` #${data.numeroCheque}`
+            : data.formaDePago === 'transferencia' && data.numeroOperacionTransferencia
+              ? ` Op. ${data.numeroOperacionTransferencia}`
+              : '';
+
+        if (diff > 0) {
+          // Saldo a favor — pagó de más.
+          const importe = diff.toFixed(2);
+          await db.insert(movimientosCuentaCorriente).values({
+            socioId: data.socioId,
+            concepto: `Saldo a favor — ${formaLabel}${refExtra}`,
+            tipo: 'otro',
+            estado: 'pagado',
+            debe: '0',
+            haber: importe,
+            importeSigned: `-${importe}`,
+            fecha: new Date(),
+          });
+        } else {
+          // Deuda pendiente — pagó de menos.
+          const importe = Math.abs(diff).toFixed(2);
+          await db.insert(movimientosCuentaCorriente).values({
+            socioId: data.socioId,
+            concepto: `Saldo pendiente — ${formaLabel}${refExtra} no cubre el total`,
+            tipo: 'otro',
+            estado: 'no_pagado',
+            debe: importe,
+            haber: '0',
+            importeSigned: importe,
+            fecha: new Date(),
+          });
+        }
+      }
+    }
+
     revalidatePath(`/usuarios/${data.socioId}`);
     return {};
   } catch {

@@ -1530,7 +1530,10 @@ export function SocioDetail({
   // todos los haber como "sin imputar". Cuando se implemente la imputacion,
   // filtrar por una columna `factura_id IS NULL`.
   const totalPagosACuenta = movimientos.reduce((sum, m) => sum + parseFloat(m.haber ?? '0'), 0);
-  const totalPendiente = Math.max(0, totalCargosPendientes - totalPagosACuenta);
+  // Saldo real del socio. Positivo = nos debe, negativo = saldo a favor.
+  const saldoBruto = totalCargosPendientes - totalPagosACuenta;
+  const totalPendiente = Math.max(0, saldoBruto);
+  const totalAFavor = saldoBruto < 0 ? Math.abs(saldoBruto) : 0;
 
   function toggleId(id: string) {
     setSelectedIds((prev) => {
@@ -1890,16 +1893,20 @@ export function SocioDetail({
             <div className="flex items-center gap-4 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
               <div
                 className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl"
-                style={{ background: '#FEF0E6' }}
+                style={{ background: totalAFavor > 0 ? '#E6F8EC' : '#FEF0E6' }}
               >
-                <AlertTriangle className="h-5 w-5" style={{ color: '#E87040' }} />
+                {totalAFavor > 0 ? (
+                  <DollarSign className="h-5 w-5" style={{ color: '#15803d' }} />
+                ) : (
+                  <AlertTriangle className="h-5 w-5" style={{ color: '#E87040' }} />
+                )}
               </div>
               <div>
                 <p className="text-xs font-semibold tracking-wide text-gray-400 uppercase">
-                  Saldo cliente
+                  {totalAFavor > 0 ? 'Saldo a favor' : 'Saldo cliente'}
                 </p>
                 <p className="text-[18px] font-bold" style={{ color: '#101828' }}>
-                  {fmt(totalPendiente)}
+                  {totalAFavor > 0 ? fmt(totalAFavor) : fmt(totalPendiente)}
                 </p>
               </div>
             </div>
