@@ -1,4 +1,8 @@
 import { redirect } from 'next/navigation';
+
+// Forzar dynamic rendering para que siempre traiga data fresca después de un
+// reorder de espacios (evita caches RSC).
+export const dynamic = 'force-dynamic';
 import { and, asc, eq } from 'drizzle-orm';
 
 import { getActiveMarina } from '@/lib/auth/session';

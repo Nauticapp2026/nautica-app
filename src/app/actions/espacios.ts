@@ -15,6 +15,7 @@ import {
   servicios,
 } from '@/lib/db/schema';
 import { getActiveMarina } from '@/lib/auth/session';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { calcularProporcionalMes, ensureMonthlyMovimiento } from '@/lib/movimientos-mensuales';
 
 export type CreateAreaInput =
@@ -691,20 +692,29 @@ export async function reorderEspaciosAction(espacioIds: string[]): Promise<{ err
 
   try {
     console.log('[reorderEspaciosAction] updating', espacioIds.length, 'espacios:', espacioIds);
-    const results = await Promise.all(
-      espacioIds.map((id, idx) =>
-        db
-          .update(espacios)
-          .set({ orden: idx, updatedAt: new Date() })
-          .where(eq(espacios.id, id))
-          .returning({ id: espacios.id, orden: espacios.orden }),
-      ),
-    );
-    const updated = results.flat();
-    console.log('[reorderEspaciosAction] updated rows:', updated);
-    if (updated.length !== espacioIds.length) {
+    // Usamos Supabase client (service_role) en lugar de Drizzle: bypassea
+    // el pooler de postgres-js que parece estar dando problemas con esta
+    // tabla específica.
+    const admin = createAdminClient();
+    let updated = 0;
+    for (let i = 0; i < espacioIds.length; i++) {
+      const id = espacioIds[i];
+      const { data, error: supaErr } = await admin
+        .from('espacios')
+        .update({ orden: i, updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .eq('guarderia_id', guarderiaId)
+        .select('id, orden');
+      if (supaErr) {
+        console.error('[reorderEspaciosAction] supabase error:', supaErr);
+        return { error: `Supabase: ${supaErr.message}` };
+      }
+      if (data && data.length > 0) updated++;
+      console.log('[reorderEspaciosAction] row', i, '→ id', id, '→', data);
+    }
+    if (updated !== espacioIds.length) {
       return {
-        error: `Solo se actualizaron ${updated.length} de ${espacioIds.length} espacios.`,
+        error: `Solo se actualizaron ${updated} de ${espacioIds.length} espacios.`,
       };
     }
   } catch (err) {
