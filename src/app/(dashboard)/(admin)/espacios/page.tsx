@@ -103,7 +103,8 @@ export default async function EspaciosPage() {
         puntual: espacios.puntual,
       })
       .from(espacios)
-      .where(eq(espacios.guarderiaId, guarderiaId)),
+      .where(eq(espacios.guarderiaId, guarderiaId))
+      .orderBy(asc(espacios.offset), asc(espacios.createdAt)),
 
     db
       .select({

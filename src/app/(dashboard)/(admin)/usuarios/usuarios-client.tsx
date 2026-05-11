@@ -3,7 +3,20 @@
 import { useState, useTransition, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Eye, FileText, Package, Paperclip, Plus, Search, UserPlus, Users, X } from 'lucide-react';
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  Eye,
+  FileText,
+  Package,
+  Paperclip,
+  Plus,
+  Search,
+  UserPlus,
+  Users,
+  X,
+} from 'lucide-react';
 import { createSocioAction, uploadSocioDocumentoAction } from '@/app/actions/socios';
 import { EmptyState } from '@/components/shared/empty-state';
 
@@ -19,7 +32,11 @@ type Socio = {
   deuda: string | null;
   estadoSocio: 'activo' | 'moroso' | null;
   embarcacion: string | null;
+  ubicacion: string | null;
 };
+
+type SortKey = 'socio' | 'embarcacion' | 'ubicacion' | 'deuda';
+type SortDir = 'asc' | 'desc';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -462,19 +479,109 @@ function CrearSocioModal({ open, onClose }: { open: boolean; onClose: () => void
 
 type Tab = 'socios' | 'invitados' | 'proveedores';
 
+function SortableTh({
+  label,
+  sortKey,
+  activeKey,
+  dir,
+  onClick,
+  align = 'left',
+}: {
+  label: string;
+  sortKey: SortKey;
+  activeKey: SortKey | null;
+  dir: SortDir;
+  onClick: () => void;
+  align?: 'left' | 'center' | 'right';
+}) {
+  const isActive = activeKey === sortKey;
+  const alignCls =
+    align === 'center' ? 'justify-center' : align === 'right' ? 'justify-end' : 'justify-start';
+  return (
+    <th
+      className={`px-4 py-3 ${
+        align === 'center' ? 'text-center' : align === 'right' ? 'text-right' : 'text-left'
+      }`}
+    >
+      <button
+        type="button"
+        onClick={onClick}
+        className={`inline-flex items-center gap-1 ${alignCls} text-xs font-semibold tracking-wide uppercase transition hover:text-[#175861] ${
+          isActive ? 'text-[#175861]' : 'text-gray-500'
+        }`}
+      >
+        {label}
+        {isActive ? (
+          dir === 'asc' ? (
+            <ArrowUp className="h-3 w-3" />
+          ) : (
+            <ArrowDown className="h-3 w-3" />
+          )
+        ) : (
+          <ArrowUpDown className="h-3 w-3 opacity-40" />
+        )}
+      </button>
+    </th>
+  );
+}
+
 export function UsuariosClient({ socios }: { socios: Socio[] }) {
   const [activeTab, setActiveTab] = useState<Tab>('socios');
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
+  const [sortKey, setSortKey] = useState<SortKey | null>(null);
+  const [sortDir, setSortDir] = useState<SortDir>('asc');
+
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      // Default por columna: deuda arranca descendente (más deudor primero),
+      // el resto ascendente alfabético.
+      setSortDir(key === 'deuda' ? 'desc' : 'asc');
+    }
+  }
 
   const filtered = useMemo(() => {
-    if (!search.trim()) return socios;
-    const q = search.toLowerCase();
-    return socios.filter((s) => {
-      const nombre = `${s.nombre ?? ''} ${s.apellido ?? ''}`.toLowerCase();
-      return nombre.includes(q) || s.email.toLowerCase().includes(q);
+    const q = search.trim().toLowerCase();
+    const base = q
+      ? socios.filter((s) => {
+          const nombre = `${s.nombre ?? ''} ${s.apellido ?? ''}`.toLowerCase();
+          return nombre.includes(q) || s.email.toLowerCase().includes(q);
+        })
+      : socios.slice();
+
+    if (!sortKey) return base;
+
+    const cmp = (a: Socio, b: Socio): number => {
+      if (sortKey === 'deuda') {
+        return parseFloat(a.deuda ?? '0') - parseFloat(b.deuda ?? '0');
+      }
+      const aStr =
+        sortKey === 'socio'
+          ? `${a.nombre ?? ''} ${a.apellido ?? ''}`.trim().toLowerCase() || a.email.toLowerCase()
+          : sortKey === 'embarcacion'
+            ? (a.embarcacion ?? '').toLowerCase()
+            : (a.ubicacion ?? '').toLowerCase();
+      const bStr =
+        sortKey === 'socio'
+          ? `${b.nombre ?? ''} ${b.apellido ?? ''}`.trim().toLowerCase() || b.email.toLowerCase()
+          : sortKey === 'embarcacion'
+            ? (b.embarcacion ?? '').toLowerCase()
+            : (b.ubicacion ?? '').toLowerCase();
+      // Filas con valor vacío siempre al final, sin importar la dirección.
+      if (aStr === '' && bStr !== '') return 1;
+      if (bStr === '' && aStr !== '') return -1;
+      return aStr.localeCompare(bStr, 'es');
+    };
+
+    base.sort((a, b) => {
+      const result = cmp(a, b);
+      return sortDir === 'asc' ? result : -result;
     });
-  }, [socios, search]);
+    return base;
+  }, [socios, search, sortKey, sortDir]);
 
   const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
     { id: 'socios', label: 'Socios', icon: <Users className="h-4 w-4" /> },
@@ -552,11 +659,36 @@ export function UsuariosClient({ socios }: { socios: Socio[] }) {
                 <table className="w-full min-w-[640px] text-sm">
                   <thead>
                     <tr className="bg-gray-50 text-left text-xs font-semibold text-gray-500">
-                      <th className="px-4 py-3">Socio</th>
-                      <th className="px-4 py-3">Embarcación</th>
-                      <th className="px-4 py-3">Ubicación</th>
+                      <SortableTh
+                        label="Socio"
+                        sortKey="socio"
+                        activeKey={sortKey}
+                        dir={sortDir}
+                        onClick={() => toggleSort('socio')}
+                      />
+                      <SortableTh
+                        label="Embarcación"
+                        sortKey="embarcacion"
+                        activeKey={sortKey}
+                        dir={sortDir}
+                        onClick={() => toggleSort('embarcacion')}
+                      />
+                      <SortableTh
+                        label="Ubicación"
+                        sortKey="ubicacion"
+                        activeKey={sortKey}
+                        dir={sortDir}
+                        onClick={() => toggleSort('ubicacion')}
+                      />
                       <th className="px-4 py-3 text-center">Estado</th>
-                      <th className="px-4 py-3 text-center">Deuda</th>
+                      <SortableTh
+                        label="Deuda"
+                        sortKey="deuda"
+                        activeKey={sortKey}
+                        dir={sortDir}
+                        onClick={() => toggleSort('deuda')}
+                        align="center"
+                      />
                       <th className="px-4 py-3 text-right">Acciones</th>
                     </tr>
                   </thead>
@@ -580,7 +712,7 @@ export function UsuariosClient({ socios }: { socios: Socio[] }) {
                             </p>
                           </td>
                           <td className="px-4 py-3 text-gray-500">{s.embarcacion ?? '—'}</td>
-                          <td className="px-4 py-3 text-gray-500">{s.direccion ?? '—'}</td>
+                          <td className="px-4 py-3 text-gray-500">{s.ubicacion ?? '—'}</td>
                           <td className="px-4 py-3 text-center">
                             <span
                               className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${
