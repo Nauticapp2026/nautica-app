@@ -273,6 +273,12 @@ export function EspaciosClient({
 
   const onDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
+    // Debug temporal: deja visible qué se intentó arrastrar y a dónde, para
+    // diagnosticar problemas de drop. Se puede sacar una vez que esté firme.
+    console.log('[espacios:onDragEnd]', {
+      active: String(active.id),
+      over: over ? String(over.id) : null,
+    });
     if (!over || active.id === over.id) return;
     const activeParts = String(active.id).split(':');
     const overParts = String(over.id).split(':');

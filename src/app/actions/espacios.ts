@@ -695,8 +695,10 @@ export async function reorderEspaciosAction(espacioIds: string[]): Promise<{ err
         db.update(espacios).set({ offset: idx, updatedAt: new Date() }).where(eq(espacios.id, id)),
       ),
     );
-  } catch {
-    return { error: 'Error al reordenar los espacios.' };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('[reorderEspaciosAction] DB update failed:', msg);
+    return { error: `Error al reordenar: ${msg}` };
   }
 
   revalidatePath('/espacios');
