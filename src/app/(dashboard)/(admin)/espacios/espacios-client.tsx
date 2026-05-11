@@ -273,12 +273,6 @@ export function EspaciosClient({
 
   const onDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
-    // Debug temporal: deja visible qué se intentó arrastrar y a dónde, para
-    // diagnosticar problemas de drop. Se puede sacar una vez que esté firme.
-    console.log('[espacios:onDragEnd]', {
-      active: String(active.id),
-      over: over ? String(over.id) : null,
-    });
     if (!over || active.id === over.id) return;
     const activeParts = String(active.id).split(':');
     const overParts = String(over.id).split(':');
@@ -303,16 +297,12 @@ export function EspaciosClient({
         setMovingId(activeId);
         void reorderEspaciosAction(newOrder).then((res) => {
           setMovingId(null);
-          console.log('[reorderEspaciosAction result]', res);
           if (res.error) {
             console.error('[reorderEspaciosAction]', res.error);
             alert(`No se pudo reordenar: ${res.error}`);
             return;
           }
-          // Hard reload — router.refresh() a veces no invalida el cache de
-          // React-server. window.location.reload garantiza que se vea la
-          // data fresca despues del update.
-          window.location.reload();
+          router.refresh();
         });
       } else {
         // Diferente contenedor: mover al contenedor del espacio target.

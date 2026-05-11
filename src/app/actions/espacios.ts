@@ -691,35 +691,22 @@ export async function reorderEspaciosAction(espacioIds: string[]): Promise<{ err
   }
 
   try {
-    console.log('[reorderEspaciosAction] updating', espacioIds.length, 'espacios:', espacioIds);
-    // Usamos Supabase client (service_role) en lugar de Drizzle: bypassea
-    // el pooler de postgres-js que parece estar dando problemas con esta
-    // tabla específica.
+    // Usamos Supabase client (service_role). En el camino de debug probamos
+    // con Drizzle y daba problemas raros (sin error pero sin persistir).
+    // Con el client REST de Supabase funciona consistente.
     const admin = createAdminClient();
-    let updated = 0;
     for (let i = 0; i < espacioIds.length; i++) {
-      const id = espacioIds[i];
-      const { data, error: supaErr } = await admin
+      const { error: supaErr } = await admin
         .from('espacios')
         .update({ orden: i, updated_at: new Date().toISOString() })
-        .eq('id', id)
-        .eq('guarderia_id', guarderiaId)
-        .select('id, orden');
+        .eq('id', espacioIds[i])
+        .eq('guarderia_id', guarderiaId);
       if (supaErr) {
-        console.error('[reorderEspaciosAction] supabase error:', supaErr);
-        return { error: `Supabase: ${supaErr.message}` };
+        return { error: `Error al reordenar: ${supaErr.message}` };
       }
-      if (data && data.length > 0) updated++;
-      console.log('[reorderEspaciosAction] row', i, '→ id', id, '→', data);
-    }
-    if (updated !== espacioIds.length) {
-      return {
-        error: `Solo se actualizaron ${updated} de ${espacioIds.length} espacios.`,
-      };
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error('[reorderEspaciosAction] DB update failed:', msg);
     return { error: `Error al reordenar: ${msg}` };
   }
 
