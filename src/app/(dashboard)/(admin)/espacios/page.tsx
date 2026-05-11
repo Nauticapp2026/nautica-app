@@ -104,7 +104,7 @@ export default async function EspaciosPage() {
       })
       .from(espacios)
       .where(eq(espacios.guarderiaId, guarderiaId))
-      .orderBy(asc(espacios.offset), asc(espacios.createdAt)),
+      .orderBy(asc(espacios.orden), asc(espacios.createdAt)),
 
     db
       .select({

@@ -555,7 +555,7 @@ export const espacios = pgTable(
     global: numeric('global', { precision: 12, scale: 2 }),
     puntual: numeric('puntual', { precision: 12, scale: 2 }),
     tarifa: numeric('tarifa', { precision: 12, scale: 2 }),
-    offset: integer('offset').default(0),
+    orden: integer('orden').notNull().default(0),
     observaciones: text('observaciones'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
