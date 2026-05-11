@@ -81,6 +81,8 @@ Si necesitás compartir constantes / types / enums entre el cliente y un server 
 - **Tipos**: schema de DB es la fuente de verdad. Inferir tipos desde Drizzle (`InferSelectModel`, `InferInsertModel`).
 - **UI**: componentes shadcn/ui en `src/components/ui/`, propios reusables en `src/components/shared/`.
 - **Uploads de archivos**: van por Server Action con `FormData`. El bodySizeLimit está seteado a 10 MB en `next.config.ts`. Si el archivo puede pasar de 10 MB, migrar a upload directo a Storage con Signed URL.
+- **Palabras reservadas en nombres de columna**: evitarlas. Postgres reserva `offset`, `order`, `user`, etc. — aunque Drizzle teóricamente las quotea, en la práctica el comportamiento es errático (caso real: `espacios.offset` se renombró a `espacios.orden` en mig `0025` porque el UPDATE silenciosamente no aplicaba). Convención del repo: usar `orden` para columnas de ordenamiento (ver `marinas.orden`, `pisos.orden`, `naves.orden`, `espacios.orden`).
+- **Debug de persistencia**: si un UPDATE devuelve éxito pero la UI no refleja el cambio (incluso después de refresh), **revisar primero todos los `.sort()` / `map` / `filter` en el page.tsx** antes de teorizar sobre Drizzle/RLS/cache. El caso típico es un sort post-query que pisa el orden de la query.
 
 ---
 

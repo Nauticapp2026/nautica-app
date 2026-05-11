@@ -45,9 +45,11 @@ guarderias                                         (la unidad de tenant)
 
 Definidos en `src/config/roles.ts`. Vive en `memberships.rol` (per-guardería, no global):
 
-- **administrador_general** — todo el dashboard web.
+- **administrador_general** (label "Admin") — todo el dashboard web.
+- **administrativo** — mismos permisos que `administrador_general`. Modelado como rol separado para distinguirlo en listados, pero todos los gates `isAdmin` los tratan igual. Si agregás un check de admin, **incluí ambos**.
 - **operario** — solo `/tareas` en la web.
-- **contable**, **mantenimiento**, **comunicaciones**, **restaurantes**, **seguridad** — staff específico (varios operan desde mobile).
+- **seguridad** (label "Portería / Seguridad") — opera desde mobile.
+- **contable**, **mantenimiento**, **comunicaciones**, **restaurantes** — roles legacy que existen para miembros antiguos. El selector de "Agregar miembro al equipo" ya no los ofrece (acotado a Admin / Administrativo / Operario / Portería-Seguridad).
 - **socio**, **invitado**, **proveedor** — usuarios finales del club, principalmente mobile.
 
 ### Enforcement
@@ -191,6 +193,7 @@ Mientras el producto no está lanzado al público, toda la web está protegida c
 - `drizzle/meta/` está en `.gitignore` por la misma razón.
 - RLS habilitado en cada tabla relevante; todas las policies viven en estas migraciones.
 - `supabase/migrations/` también contiene **triggers y funciones PL/pgSQL** (no solo policies). Ej. `0010_lavado_auto_tarea_trigger.sql` materializa una tarea automáticamente cuando mobile crea una solicitud de lavado.
+- **Nombres de columna**: evitar palabras reservadas de Postgres (`offset`, `order`, `user`, etc). Drizzle no las quotea consistentemente y los UPDATE pueden fallar silenciosamente. Convención: usar `orden` para columnas de ordenamiento (ver `marinas.orden`, `pisos.orden`, `naves.orden`, `espacios.orden`).
 
 ### Auditoría de cambios desde Drizzle (patrón GUC)
 
@@ -251,6 +254,16 @@ Componentes shadcn/ui en `src/components/ui/`:
 - Rama → PR → preview de Vercel → merge a `main` → deploy automático a prod. **Nunca pushear directo a `main`**.
 - Husky + lint-staged corren prettier + eslint en cada commit. Si un hook falla, arreglar la causa — no usar `--no-verify`.
 - Conventional commits en español: `feat(area): ...`, `fix(area): ...`.
+
+---
+
+## Espacios — reorden y búsqueda
+
+Cada `area` puede ser una `marina` (con `peines` y `amarras`) o una `nave` (con `lados → pisos → espacios`). Los espacios individuales (`espacios.id`) viven dentro de un peine (marina) o un piso (nave).
+
+- **Orden manual**: la columna `espacios.orden` (integer, default 0) guarda el orden en que el admin acomoda los espacios dentro de un peine/piso. La query del page tsx (`(admin)/espacios/page.tsx`) ordena por `orden ASC, created_at ASC` — el segundo es fallback cuando todos los `orden` empatan en 0 (espacios recién creados). **No agregar sorts adicionales** post-query — pisan el orden manual.
+- **Drag-and-drop**: implementado con `@dnd-kit/sortable` (`SortableContext` + `useSortable` por espacio) y `closestCenter` collision detection en el `DndContext`. Tres casos en `onDragEnd`: drop sobre espacio del mismo container → reorder (setea `orden = idx`); drop sobre espacio de otro container → mover; drop sobre container vacío → mover. Persistencia vía `reorderEspaciosAction` (usa Supabase admin client — Drizzle daba problemas raros con esa tabla).
+- **Buscador**: panel arriba del listado de áreas con filtros (eslora del barco, manga, tipo, nomenclatura, solo disponibles). Resultados en vivo con botón "Editar / Asignar" que abre el modal del espacio.
 
 ---
 
