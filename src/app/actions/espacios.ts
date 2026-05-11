@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { and, asc, desc, eq, inArray } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import {
@@ -690,11 +690,27 @@ export async function reorderEspaciosAction(espacioIds: string[]): Promise<{ err
   }
 
   try {
-    await Promise.all(
-      espacioIds.map((id, idx) =>
-        db.update(espacios).set({ offset: idx, updatedAt: new Date() }).where(eq(espacios.id, id)),
-      ),
-    );
+    // SQL raw para forzar quoting de "offset" (palabra reservada en Postgres).
+    // Hacemos updates secuenciales — son pocos espacios por contenedor y
+    // garantizamos que cada uno se aplica.
+    let updatedTotal = 0;
+    for (let i = 0; i < espacioIds.length; i++) {
+      const id = espacioIds[i];
+      const result = await db.execute(
+        sql`update espacios
+            set "offset" = ${i}, updated_at = now()
+            where id = ${id}`,
+      );
+      // postgres-js devuelve `count` con la cantidad de filas afectadas.
+      const count = (result as unknown as { count?: number }).count ?? 0;
+      updatedTotal += count;
+    }
+    console.log(`[reorderEspaciosAction] updated ${updatedTotal}/${espacioIds.length} rows`);
+    if (updatedTotal !== espacioIds.length) {
+      return {
+        error: `Solo se actualizaron ${updatedTotal} de ${espacioIds.length} espacios.`,
+      };
+    }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('[reorderEspaciosAction] DB update failed:', msg);
