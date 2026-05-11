@@ -266,6 +266,7 @@ export async function updateFeaturesStep(
 const TEAM_ROLES = [
   'super_admin',
   'administrador_general',
+  'administrativo',
   'operario',
   'contable',
   'mantenimiento',

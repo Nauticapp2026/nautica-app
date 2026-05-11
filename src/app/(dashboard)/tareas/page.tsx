@@ -12,7 +12,10 @@ export default async function TareasPage() {
   if (!ctx) return null;
 
   const gId = ctx.activeMembership.guarderiaId;
-  const isAdmin = ctx.profile.isSuperAdmin || ctx.activeMembership.rol === 'administrador_general';
+  const isAdmin =
+    ctx.profile.isSuperAdmin ||
+    ctx.activeMembership.rol === 'administrador_general' ||
+    ctx.activeMembership.rol === 'administrativo';
   const isOperario = ctx.activeMembership.rol === 'operario';
 
   // Alias para traer al socio dueño de la embarcación (profiles se usa dos veces:

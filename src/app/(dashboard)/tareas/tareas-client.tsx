@@ -629,10 +629,10 @@ export function TareasClient({
         <button
           type="button"
           onClick={limpiarFiltros}
-          title="Limpiar filtros"
-          className="flex h-11 w-11 items-center justify-center rounded-[10px] border border-gray-200 text-gray-500 hover:bg-gray-50"
+          className="inline-flex h-11 items-center justify-center gap-2 rounded-[10px] border border-gray-200 px-4 text-sm font-medium text-gray-600 hover:bg-gray-50"
         >
           <FilterX className="h-4 w-4" />
+          Limpiar filtros
         </button>
       </div>
 

@@ -50,7 +50,11 @@ export type UpdateGuarderiaGeneralData = {
 };
 
 function isAdmin(ctx: NonNullable<Awaited<ReturnType<typeof getActiveMarina>>>): boolean {
-  return ctx.profile.isSuperAdmin || ctx.activeMembership.rol === 'administrador_general';
+  return (
+    ctx.profile.isSuperAdmin ||
+    ctx.activeMembership.rol === 'administrador_general' ||
+    ctx.activeMembership.rol === 'administrativo'
+  );
 }
 
 export async function updateGuarderiaGeneralAction(
@@ -367,6 +371,7 @@ export async function solicitarCertificadoAfipAction(): Promise<{ error?: string
 const ROLES = [
   'super_admin',
   'administrador_general',
+  'administrativo',
   'operario',
   'contable',
   'mantenimiento',

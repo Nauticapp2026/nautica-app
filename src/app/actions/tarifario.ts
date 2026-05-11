@@ -90,7 +90,11 @@ export type AjusteMasivoData =
   | { tipo: 'monto'; valor: number };
 
 function isAdmin(ctx: NonNullable<Awaited<ReturnType<typeof getActiveMarina>>>): boolean {
-  return ctx.profile.isSuperAdmin || ctx.activeMembership.rol === 'administrador_general';
+  return (
+    ctx.profile.isSuperAdmin ||
+    ctx.activeMembership.rol === 'administrador_general' ||
+    ctx.activeMembership.rol === 'administrativo'
+  );
 }
 
 function validar(data: CreateTarifaData): string | null {

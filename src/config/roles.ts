@@ -1,6 +1,7 @@
 export const ROLES = {
   SUPER_ADMIN: 'super_admin',
   ADMINISTRADOR_GENERAL: 'administrador_general',
+  ADMINISTRATIVO: 'administrativo',
   OPERARIO: 'operario',
   CONTABLE: 'contable',
   MANTENIMIENTO: 'mantenimiento',
@@ -16,8 +17,14 @@ export type Rol = (typeof ROLES)[keyof typeof ROLES];
 
 export const ALL_ROLES: Rol[] = Object.values(ROLES);
 
-// Roles con acceso administrativo a la guardería
-export const ADMIN_ROLES: Rol[] = [ROLES.SUPER_ADMIN, ROLES.ADMINISTRADOR_GENERAL, ROLES.CONTABLE];
+// Roles con acceso administrativo a la guardería.
+// administrativo tiene exactamente los mismos permisos que administrador_general.
+export const ADMIN_ROLES: Rol[] = [
+  ROLES.SUPER_ADMIN,
+  ROLES.ADMINISTRADOR_GENERAL,
+  ROLES.ADMINISTRATIVO,
+  ROLES.CONTABLE,
+];
 
 // Roles de staff operativo
 export const STAFF_ROLES: Rol[] = [
@@ -32,6 +39,7 @@ export const STAFF_ROLES: Rol[] = [
 // admin. `super_admin` se modela aparte vía `profiles.is_super_admin`.
 export const MEMBERSHIP_ROLES = [
   ROLES.ADMINISTRADOR_GENERAL,
+  ROLES.ADMINISTRATIVO,
   ROLES.OPERARIO,
   ROLES.CONTABLE,
   ROLES.MANTENIMIENTO,
@@ -45,13 +53,14 @@ export const MEMBERSHIP_ROLES = [
 
 export const ROL_LABELS: Record<Rol, string> = {
   super_admin: 'Super admin',
-  administrador_general: 'Administrador general',
+  administrador_general: 'Admin',
+  administrativo: 'Administrativo',
   operario: 'Operario',
   contable: 'Contable',
   mantenimiento: 'Mantenimiento',
   comunicaciones: 'Comunicaciones',
   restaurantes: 'Restaurantes',
-  seguridad: 'Seguridad',
+  seguridad: 'Portería / Seguridad',
   socio: 'Socio',
   invitado: 'Invitado',
   proveedor: 'Proveedor',

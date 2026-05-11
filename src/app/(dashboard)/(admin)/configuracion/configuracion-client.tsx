@@ -82,7 +82,8 @@ export type MiembroEquipo = {
 
 const ROL_LABELS: Record<Rol, string> = {
   super_admin: 'Super Admin',
-  administrador_general: 'Administrador general',
+  administrador_general: 'Admin',
+  administrativo: 'Administrativo',
   operario: 'Operario',
   contable: 'Contable',
   mantenimiento: 'Mantenimiento',
@@ -91,13 +92,23 @@ const ROL_LABELS: Record<Rol, string> = {
   socio: 'Socio',
   invitado: 'Invitado',
   proveedor: 'Proveedor',
-  seguridad: 'Seguridad',
+  seguridad: 'Portería / Seguridad',
 };
 
 const ROL_OPTS = Object.entries(ROL_LABELS).map(([value, label]) => ({
   value: value as Rol,
   label,
 }));
+
+// Roles asignables al crear un miembro del equipo desde Configuración.
+// El filtro de búsqueda usa todos los roles (`ROL_OPTS`) para mostrar
+// miembros legacy con otros roles, pero el alta acota a estos 4.
+const ROL_OPTS_ALTA: { value: Rol; label: string }[] = [
+  { value: 'administrador_general', label: ROL_LABELS.administrador_general },
+  { value: 'administrativo', label: ROL_LABELS.administrativo },
+  { value: 'operario', label: ROL_LABELS.operario },
+  { value: 'seguridad', label: ROL_LABELS.seguridad },
+];
 
 const inputCls =
   'h-11 w-full rounded-[10px] border border-gray-200 bg-white px-4 text-sm text-[#101828] focus:border-[#175861] focus:outline-none focus:ring-1 focus:ring-[#175861]';
@@ -449,10 +460,10 @@ function EquipoTab({
         <button
           type="button"
           onClick={clearFilters}
-          title="Limpiar filtros"
-          className="flex h-11 w-11 items-center justify-center rounded-[10px] border border-gray-200 text-gray-500 hover:bg-gray-50"
+          className="inline-flex h-11 items-center justify-center gap-2 rounded-[10px] border border-gray-200 px-4 text-sm font-medium text-gray-600 hover:bg-gray-50"
         >
           <FilterX className="h-4 w-4" />
+          Limpiar filtros
         </button>
       </div>
 
@@ -631,7 +642,7 @@ function AltaEquipoModal({ open, onClose }: { open: boolean; onClose: () => void
                   value={form.rol}
                   onChange={(e) => set('rol', e.target.value as Rol)}
                 >
-                  {ROL_OPTS.map((opt) => (
+                  {ROL_OPTS_ALTA.map((opt) => (
                     <option key={opt.value} value={opt.value}>
                       {opt.label}
                     </option>

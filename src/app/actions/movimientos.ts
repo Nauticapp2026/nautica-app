@@ -7,7 +7,11 @@ import { getActiveMarina } from '@/lib/auth/session';
 import { and, eq, inArray } from 'drizzle-orm';
 
 function isAdmin(ctx: NonNullable<Awaited<ReturnType<typeof getActiveMarina>>>): boolean {
-  return ctx.profile.isSuperAdmin || ctx.activeMembership.rol === 'administrador_general';
+  return (
+    ctx.profile.isSuperAdmin ||
+    ctx.activeMembership.rol === 'administrador_general' ||
+    ctx.activeMembership.rol === 'administrativo'
+  );
 }
 
 export type AddMovimientoData = {
