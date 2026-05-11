@@ -32,11 +32,12 @@ const TIPO_DOC_OPTS = [
 ];
 
 const CONDICION_IVA_OPTS = [
+  { value: 'responsable_inscripto', label: 'IVA Responsable Inscripto' },
+  { value: 'exento', label: 'IVA Sujeto Exento' },
+  { value: 'monotributo', label: 'Responsable Monotributo' },
   { value: 'consumidor_final', label: 'Consumidor Final' },
-  { value: 'responsable_inscripto', label: 'Responsable Inscripto' },
-  { value: 'monotributo', label: 'Monotributista' },
-  { value: 'exento', label: 'Exento' },
-  { value: 'cliente_exterior', label: 'Cliente Exterior' },
+  { value: 'proveedor_exterior', label: 'Proveedor del Exterior' },
+  { value: 'cliente_exterior', label: 'Cliente del Exterior' },
   { value: 'iva_no_alcanzado', label: 'IVA No Alcanzado' },
 ];
 
@@ -96,7 +97,7 @@ function SectionHeader({ title }: { title: string }) {
 type TipoDocAdjunto = 'carnet_nautico' | 'matricula' | 'seguro';
 
 const TIPO_DOC_ADJUNTO_OPTS: { value: TipoDocAdjunto; label: string }[] = [
-  { value: 'carnet_nautico', label: 'Carnet náutico' },
+  { value: 'carnet_nautico', label: 'Certificado Náutico' },
   { value: 'matricula', label: 'Matrícula' },
   { value: 'seguro', label: 'Seguro' },
 ];
@@ -334,7 +335,9 @@ function CrearSocioModal({ open, onClose }: { open: boolean; onClose: () => void
                     className={inputCls}
                     placeholder="BA-1234"
                     value={form.matricula}
-                    onChange={set('matricula')}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, matricula: e.target.value.toUpperCase() }))
+                    }
                   />
                 </Field>
               </div>

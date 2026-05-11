@@ -19,13 +19,15 @@ export const TIPO_DOC_API: Record<string, string> = {
 };
 
 // condicion_frente_iva (db) → tusfacturas condicion_iva
+// Códigos según tabla de referencia de tusfacturas.app (developers.tusfacturas.app).
 export const CONDICION_IVA_API: Record<string, string> = {
   consumidor_final: 'CF',
   responsable_inscripto: 'RI',
   monotributo: 'M',
-  exento: 'EX',
-  cliente_exterior: 'E',
-  iva_no_alcanzado: 'NC',
+  exento: 'E',
+  cliente_exterior: 'CDEX',
+  iva_no_alcanzado: 'IVNA',
+  proveedor_exterior: 'PDEX',
 };
 
 // condicion_venta (db) → tusfacturas condicion_pago

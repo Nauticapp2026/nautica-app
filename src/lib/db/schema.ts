@@ -109,6 +109,7 @@ export const condicionFrenteIvaEnum = pgEnum('condicion_frente_iva', [
   'exento',
   'cliente_exterior',
   'iva_no_alcanzado',
+  'proveedor_exterior',
 ]);
 
 export const condicionVentaEnum = pgEnum('condicion_venta', [

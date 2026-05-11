@@ -86,11 +86,12 @@ type Invitado = {
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const CONDICION_IVA_OPTS = [
+  { value: 'responsable_inscripto', label: 'IVA Responsable Inscripto' },
+  { value: 'exento', label: 'IVA Sujeto Exento' },
+  { value: 'monotributo', label: 'Responsable Monotributo' },
   { value: 'consumidor_final', label: 'Consumidor Final' },
-  { value: 'responsable_inscripto', label: 'Responsable Inscripto' },
-  { value: 'monotributo', label: 'Monotributista' },
-  { value: 'exento', label: 'Exento' },
-  { value: 'cliente_exterior', label: 'Cliente Exterior' },
+  { value: 'proveedor_exterior', label: 'Proveedor del Exterior' },
+  { value: 'cliente_exterior', label: 'Cliente del Exterior' },
   { value: 'iva_no_alcanzado', label: 'IVA No Alcanzado' },
 ];
 
@@ -794,7 +795,7 @@ export type DocumentoItem = {
 };
 
 const TIPO_DOC_LABEL: Record<'carnet_nautico' | 'matricula' | 'seguro', string> = {
-  carnet_nautico: 'Carnet náutico',
+  carnet_nautico: 'Certificado Náutico',
   matricula: 'Matrícula',
   seguro: 'Seguro',
 };
