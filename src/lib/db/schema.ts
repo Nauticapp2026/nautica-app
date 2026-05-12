@@ -140,6 +140,8 @@ export const tipoServicioEnum = pgEnum('tipo_servicio', ['cuota_mensual', 'servi
 
 export const tipoComunicacionEnum = pgEnum('tipo_comunicacion', ['socios', 'publica']);
 
+export const tamanoPublicidadEnum = pgEnum('tamano_publicidad', ['350x300', '353x119']);
+
 export const categoriaComunicacionEnum = pgEnum('categoria_comunicacion', [
   'informacion',
   'anuncio',
@@ -1105,6 +1107,22 @@ export const platformComunicaciones = pgTable('platform_comunicaciones', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
+// Publicidades a nivel plataforma — banners que la app mobile muestra en sus
+// slots "PUBLICIDAD". Cada publi tiene un tamaño fijo (350x300 o 353x119) que
+// define en qué slot puede aparecer; la mobile filtra por `tamano`.
+export const platformPublicidades = pgTable('platform_publicidades', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  autorId: uuid('autor_id').references(() => profiles.id, { onDelete: 'set null' }),
+  titulo: text('titulo').notNull(),
+  texto: text('texto'),
+  tamano: tamanoPublicidadEnum('tamano').notNull(),
+  linkUrl: text('link_url'),
+  imagenUrls: text('imagen_urls').array(),
+  publicar: boolean('publicar').notNull().default(false),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
 // =============================================================================
 // RELACIONES
 // =============================================================================
@@ -1233,3 +1251,5 @@ export type NewPricingPlan = typeof pricingPlans.$inferInsert;
 export type PlatformSetting = typeof platformSettings.$inferSelect;
 export type PlatformComunicacion = typeof platformComunicaciones.$inferSelect;
 export type NewPlatformComunicacion = typeof platformComunicaciones.$inferInsert;
+export type PlatformPublicidad = typeof platformPublicidades.$inferSelect;
+export type NewPlatformPublicidad = typeof platformPublicidades.$inferInsert;
