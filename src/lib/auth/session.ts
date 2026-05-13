@@ -41,6 +41,7 @@ export async function getUserContext() {
         nombre: guarderias.nombre,
         slug: guarderias.slug,
         logoUrl: guarderias.logoUrl,
+        activa: guarderias.activa,
       },
     })
     .from(profiles)
