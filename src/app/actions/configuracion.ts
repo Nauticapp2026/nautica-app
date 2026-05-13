@@ -394,6 +394,127 @@ export type CreateMiembroEquipoData = {
   sede: string;
 };
 
+export type UpdateMiembroEquipoData = {
+  profileId: string;
+  nombre: string;
+  apellido: string;
+  rol: Rol;
+  dni: string;
+  telefono: string;
+  sede: string;
+};
+
+export async function updateMiembroEquipoAction(
+  data: UpdateMiembroEquipoData,
+): Promise<{ error?: string }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+  if (!isAdmin(ctx)) return { error: 'Solo administradores pueden editar miembros.' };
+
+  const nombre = data.nombre.trim();
+  const apellido = data.apellido.trim();
+  if (!nombre || !apellido) return { error: 'Nombre y apellido son obligatorios.' };
+  if (!ROLES.includes(data.rol)) return { error: 'Rol inválido.' };
+  // super_admin no se asigna desde el panel de la guardería — eso solo va
+  // por /super-admin/usuarios. Evita que un admin de club promueva a alguien
+  // a super admin de plataforma.
+  if (data.rol === 'super_admin') {
+    return { error: 'No se puede asignar el rol Super Admin desde Configuración.' };
+  }
+
+  const guarderiaId = ctx.activeMembership.guarderiaId;
+
+  // Validar que el miembro pertenezca a esta guardería antes de editarlo.
+  // Multi-tenancy: sin esto un admin podría editar miembros de otro club.
+  const [membership] = await db
+    .select({ id: memberships.id, rol: memberships.rol })
+    .from(memberships)
+    .where(
+      and(
+        eq(memberships.userId, data.profileId),
+        eq(memberships.guarderiaId, guarderiaId),
+        eq(memberships.status, 'active'),
+      ),
+    )
+    .limit(1);
+  if (!membership) return { error: 'El miembro no pertenece a esta guardería.' };
+
+  // Si el admin se está editando a sí mismo, no permitir cambiarse a un rol
+  // que no sea admin (queda afuera del panel).
+  const isSelf = data.profileId === ctx.profile.id;
+  if (isSelf && data.rol !== 'administrador_general' && data.rol !== 'administrativo') {
+    return { error: 'No te podés cambiar a un rol no administrativo (te quedarías sin acceso).' };
+  }
+
+  await db
+    .update(profiles)
+    .set({
+      nombre,
+      apellido,
+      telefono: data.telefono.trim() || null,
+      numeroDocumento: data.dni.trim() || null,
+      tipoDocumento: data.dni.trim() ? 'dni' : null,
+      sede: data.sede.trim() || null,
+    })
+    .where(eq(profiles.id, data.profileId));
+
+  if (membership.rol !== data.rol) {
+    await db
+      .update(memberships)
+      .set({ rol: data.rol, updatedAt: new Date() })
+      .where(eq(memberships.id, membership.id));
+  }
+
+  revalidatePath('/configuracion');
+  return {};
+}
+
+export async function deleteMiembroEquipoAction(profileId: string): Promise<{ error?: string }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+  if (!isAdmin(ctx)) return { error: 'Solo administradores pueden eliminar miembros.' };
+
+  if (profileId === ctx.profile.id) {
+    return { error: 'No te podés eliminar a vos mismo.' };
+  }
+
+  const guarderiaId = ctx.activeMembership.guarderiaId;
+
+  // Validar que el target pertenezca a esta guardería (multi-tenancy).
+  const [target] = await db
+    .select({
+      membershipId: memberships.id,
+      isSuperAdmin: profiles.isSuperAdmin,
+    })
+    .from(memberships)
+    .innerJoin(profiles, eq(profiles.id, memberships.userId))
+    .where(
+      and(
+        eq(memberships.userId, profileId),
+        eq(memberships.guarderiaId, guarderiaId),
+        eq(memberships.status, 'active'),
+      ),
+    )
+    .limit(1);
+  if (!target) return { error: 'El miembro no pertenece a esta guardería.' };
+  if (target.isSuperAdmin) {
+    return { error: 'No se puede eliminar a un Super Admin desde Configuración.' };
+  }
+
+  // Borrar la cuenta de auth: el cascade desde auth.users borra profiles +
+  // memberships en todas las guarderías + datos asociados. Es destructivo;
+  // la UI debe pedir confirm.
+  const admin = createAdminClient();
+  const { error: deleteErr } = await admin.auth.admin.deleteUser(profileId);
+  if (deleteErr) {
+    console.error('[deleteMiembroEquipoAction] deleteUser error', { profileId, deleteErr });
+    return { error: `No se pudo eliminar la cuenta: ${deleteErr.message}` };
+  }
+
+  revalidatePath('/configuracion');
+  return {};
+}
+
 export async function createMiembroEquipoAction(
   data: CreateMiembroEquipoData,
 ): Promise<{ error?: string; profileId?: string }> {

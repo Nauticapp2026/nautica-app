@@ -109,8 +109,11 @@ export default async function ConfiguracionPage({ searchParams }: Props) {
       apellido: profiles.apellido,
       email: profiles.email,
       telefono: profiles.telefono,
+      dni: profiles.numeroDocumento,
+      sede: profiles.sede,
       rol: memberships.rol,
       estadoMiembro: profiles.estadoMiembro,
+      isSuperAdmin: profiles.isSuperAdmin,
     })
     .from(memberships)
     .innerJoin(profiles, eq(profiles.id, memberships.userId))
@@ -123,8 +126,11 @@ export default async function ConfiguracionPage({ searchParams }: Props) {
     apellido: m.apellido,
     email: m.email,
     telefono: m.telefono,
+    dni: m.dni,
+    sede: m.sede,
     rol: m.rol,
     estadoMiembro: m.estadoMiembro,
+    isSuperAdmin: m.isSuperAdmin,
   }));
 
   const features: GuarderiaFeatures = {
@@ -148,6 +154,7 @@ export default async function ConfiguracionPage({ searchParams }: Props) {
     <ConfiguracionClient
       infoGeneral={infoGeneral}
       miembros={miembros}
+      currentUserId={ctx.profile.id}
       features={features}
       puntoVenta={puntoVenta}
       initialTab={initialTab}
