@@ -15,6 +15,8 @@ import {
 import { SortableContext, arrayMove, rectSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
+import { toast } from 'sonner';
+
 import {
   addEspacioToMarinaAction,
   addEspacioToPisoAction,
@@ -383,8 +385,11 @@ export function EspaciosClient({
     setDeleteEspacioError(null);
     startDeleteEspacio(async () => {
       const res = await deleteEspacioAction(confirmDeleteEspacio.id);
-      if (res.error) setDeleteEspacioError(res.error);
-      else {
+      if (res.error) {
+        setDeleteEspacioError(res.error);
+        toast.error(res.error);
+      } else {
+        toast.success('Espacio eliminado.');
         setConfirmDeleteEspacio(null);
         router.refresh();
       }
@@ -1838,8 +1843,13 @@ function EditarEspacioModal({
         manga: toNum(manga),
         puntual: toNum(puntual),
       });
-      if (res.error) setError(res.error);
-      else onSaved();
+      if (res.error) {
+        setError(res.error);
+        toast.error(res.error);
+      } else {
+        toast.success('Espacio actualizado.');
+        onSaved();
+      }
     });
   };
 
@@ -2047,8 +2057,13 @@ function CambiarUbicacionModal({
     }
     startTransition(async () => {
       const res = await moveOcupanteAction({ origenId: cell.id, destinoId });
-      if (res.error) setError(res.error);
-      else onSaved();
+      if (res.error) {
+        setError(res.error);
+        toast.error(res.error);
+      } else {
+        toast.success('Cliente mudado al nuevo espacio.');
+        onSaved();
+      }
     });
   };
 

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Bell, Building2, FilterX, Minus, Plus, Receipt, Users, X } from 'lucide-react';
+import { toast } from 'sonner';
 
 import {
   confirmarCertificadoAfipAction,
@@ -204,8 +205,13 @@ function InfoGeneralForm({ initial }: { initial: InfoGeneralData }) {
     setFeedback(null);
     startTransition(async () => {
       const res = await updateGuarderiaGeneralAction(data);
-      if (res.error) setFeedback({ type: 'error', msg: res.error });
-      else setFeedback({ type: 'success', msg: 'Cambios guardados.' });
+      if (res.error) {
+        setFeedback({ type: 'error', msg: res.error });
+        toast.error(res.error);
+      } else {
+        setFeedback({ type: 'success', msg: 'Cambios guardados.' });
+        toast.success('Cambios guardados.');
+      }
     });
   };
 
@@ -571,8 +577,11 @@ function AltaEquipoModal({ open, onClose }: { open: boolean; onClose: () => void
     setError(null);
     startTransition(async () => {
       const res = await createMiembroEquipoAction(form);
-      if (res.error) setError(res.error);
-      else {
+      if (res.error) {
+        setError(res.error);
+        toast.error(res.error);
+      } else {
+        toast.success('Miembro agregado.');
         handleClose();
         router.refresh();
       }
@@ -770,6 +779,9 @@ function NotificacionesTab({ initial }: { initial: GuarderiaFeatures }) {
       if (res.error) {
         setState(prev);
         setError(res.error);
+        toast.error(res.error);
+      } else {
+        toast.success('Notificación actualizada.');
       }
     });
   };
