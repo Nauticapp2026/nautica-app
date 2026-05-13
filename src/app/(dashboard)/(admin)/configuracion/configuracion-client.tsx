@@ -2,22 +2,36 @@
 
 import { useEffect, useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Bell, Building2, FilterX, Minus, Plus, Receipt, Users, X } from 'lucide-react';
+import {
+  Bell,
+  Building2,
+  Edit3,
+  FilterX,
+  Minus,
+  Plus,
+  Receipt,
+  Trash2,
+  Users,
+  X,
+} from 'lucide-react';
 import { toast } from 'sonner';
 
 import {
   confirmarCertificadoAfipAction,
   createMiembroEquipoAction,
+  deleteMiembroEquipoAction,
   savePuntoVentaAction,
   solicitarCertificadoAfipAction,
   updateGuarderiaFeaturesAction,
   updateGuarderiaGeneralAction,
+  updateMiembroEquipoAction,
   uploadGuarderiaImagenAction,
   type CreateMiembroEquipoData,
   type GuarderiaFeatures,
   type HorarioInput,
   type SavePuntoVentaData,
   type UpdateGuarderiaGeneralData,
+  type UpdateMiembroEquipoData,
 } from '@/app/actions/configuracion';
 import { EmptyState } from '@/components/shared/empty-state';
 import { ImagesUploader } from '@/components/shared/images-uploader';
@@ -77,8 +91,11 @@ export type MiembroEquipo = {
   apellido: string | null;
   email: string;
   telefono: string | null;
+  dni: string | null;
+  sede: string | null;
   rol: Rol;
   estadoMiembro: 'activo' | 'inactivo' | null;
+  isSuperAdmin: boolean;
 };
 
 const ROL_LABELS: Record<Rol, string> = {
@@ -117,6 +134,7 @@ const inputCls =
 export function ConfiguracionClient({
   infoGeneral,
   miembros,
+  currentUserId,
   features,
   puntoVenta,
   initialTab = 'info',
@@ -124,6 +142,7 @@ export function ConfiguracionClient({
 }: {
   infoGeneral: InfoGeneralData;
   miembros: MiembroEquipo[];
+  currentUserId: string;
   features: GuarderiaFeatures;
   puntoVenta: PuntoVentaData;
   initialTab?: TabKey;
@@ -172,7 +191,11 @@ export function ConfiguracionClient({
 
       {activeTab === 'info' && <InfoGeneralForm initial={infoGeneral} />}
       {activeTab === 'equipo' && (
-        <EquipoTab miembros={miembros} initialModalOpen={initialAltaEquipoOpen} />
+        <EquipoTab
+          miembros={miembros}
+          currentUserId={currentUserId}
+          initialModalOpen={initialAltaEquipoOpen}
+        />
       )}
       {activeTab === 'punto_venta' && <PuntoVentaTab initial={puntoVenta} />}
       {activeTab === 'notificaciones' && <NotificacionesTab initial={features} />}
@@ -389,15 +412,19 @@ function InfoGeneralForm({ initial }: { initial: InfoGeneralData }) {
 
 function EquipoTab({
   miembros,
+  currentUserId,
   initialModalOpen = false,
 }: {
   miembros: MiembroEquipo[];
+  currentUserId: string;
   initialModalOpen?: boolean;
 }) {
   const [modalOpen, setModalOpen] = useState(initialModalOpen);
   const [filterNombre, setFilterNombre] = useState('');
   const [filterEmail, setFilterEmail] = useState('');
   const [filterRol, setFilterRol] = useState<'' | Rol>('');
+  const [editTarget, setEditTarget] = useState<MiembroEquipo | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<MiembroEquipo | null>(null);
 
   const filtered = useMemo(() => {
     const nq = filterNombre.trim().toLowerCase();
@@ -485,12 +512,29 @@ function EquipoTab({
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {filtered.map((m) => (
-            <MiembroCard key={m.profileId} m={m} />
+            <MiembroCard
+              key={m.profileId}
+              m={m}
+              canEdit={!m.isSuperAdmin}
+              canDelete={m.profileId !== currentUserId && !m.isSuperAdmin}
+              onEdit={() => setEditTarget(m)}
+              onDelete={() => setDeleteTarget(m)}
+            />
           ))}
         </div>
       )}
 
       <AltaEquipoModal open={modalOpen} onClose={() => setModalOpen(false)} />
+      {editTarget && (
+        <EditarMiembroModal
+          miembro={editTarget}
+          isSelf={editTarget.profileId === currentUserId}
+          onClose={() => setEditTarget(null)}
+        />
+      )}
+      {deleteTarget && (
+        <ConfirmDeleteMiembroModal miembro={deleteTarget} onClose={() => setDeleteTarget(null)} />
+      )}
     </section>
   );
 }
@@ -503,7 +547,19 @@ function avatarColor(seed: string): string {
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
 }
 
-function MiembroCard({ m }: { m: MiembroEquipo }) {
+function MiembroCard({
+  m,
+  canEdit,
+  canDelete,
+  onEdit,
+  onDelete,
+}: {
+  m: MiembroEquipo;
+  canEdit: boolean;
+  canDelete: boolean;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
   const fullName =
     `${m.nombre ?? ''} ${m.apellido ?? ''}`.trim() || m.email.split('@')[0] || m.email;
   const initial = (m.nombre?.[0] ?? m.email[0] ?? '?').toUpperCase();
@@ -538,6 +594,30 @@ function MiembroCard({ m }: { m: MiembroEquipo }) {
           {m.telefono && <p className="mt-1 truncate text-xs text-gray-500">☎ {m.telefono}</p>}
         </div>
       </div>
+      {(canEdit || canDelete) && (
+        <div className="mt-3 flex justify-end gap-1 border-t border-gray-100 pt-2">
+          {canEdit && (
+            <button
+              type="button"
+              onClick={onEdit}
+              title="Editar miembro"
+              className="rounded-[8px] p-1.5 text-[#669E9D] hover:bg-gray-100"
+            >
+              <Edit3 className="h-4 w-4" />
+            </button>
+          )}
+          {canDelete && (
+            <button
+              type="button"
+              onClick={onDelete}
+              title="Eliminar miembro"
+              className="rounded-[8px] p-1.5 text-red-600 hover:bg-red-50"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -705,6 +785,257 @@ function AltaEquipoModal({ open, onClose }: { open: boolean; onClose: () => void
             className="rounded-[10px] bg-[#175861] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#0f4249] disabled:opacity-60"
           >
             {pending ? 'Guardando…' : 'Guardar miembro'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Roles que puede asignar el admin al editar (mismos que el alta + permitir
+// dejar el rol actual del miembro tal cual aunque sea legacy).
+const ROL_OPTS_EDIT = ROL_OPTS_ALTA;
+
+function EditarMiembroModal({
+  miembro,
+  isSelf,
+  onClose,
+}: {
+  miembro: MiembroEquipo;
+  isSelf: boolean;
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  const [form, setForm] = useState({
+    nombre: miembro.nombre ?? '',
+    apellido: miembro.apellido ?? '',
+    rol: miembro.rol,
+    dni: miembro.dni ?? '',
+    telefono: miembro.telefono ?? '',
+    sede: miembro.sede ?? '',
+  });
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  // Si el rol actual del miembro no está en las opciones del select (ej.
+  // legacy 'contable', 'comunicaciones', etc.), lo agrego al inicio así no
+  // se pierde al editar.
+  const rolOpts = useMemo(() => {
+    const baseValues = new Set(ROL_OPTS_EDIT.map((o) => o.value));
+    if (!baseValues.has(miembro.rol)) {
+      return [{ value: miembro.rol, label: ROL_LABELS[miembro.rol] }, ...ROL_OPTS_EDIT];
+    }
+    return ROL_OPTS_EDIT;
+  }, [miembro.rol]);
+
+  const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) =>
+    setForm((prev) => ({ ...prev, [key]: value }));
+
+  const handleSubmit = () => {
+    if (!form.nombre.trim() || !form.apellido.trim()) {
+      setError('Nombre y apellido son obligatorios.');
+      return;
+    }
+    setError(null);
+    const data: UpdateMiembroEquipoData = {
+      profileId: miembro.profileId,
+      nombre: form.nombre,
+      apellido: form.apellido,
+      rol: form.rol,
+      dni: form.dni,
+      telefono: form.telefono,
+      sede: form.sede,
+    };
+    startTransition(async () => {
+      const res = await updateMiembroEquipoAction(data);
+      if (res.error) {
+        setError(res.error);
+        toast.error(res.error);
+      } else {
+        toast.success('Miembro actualizado.');
+        onClose();
+        router.refresh();
+      }
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="flex w-full max-w-lg flex-col rounded-2xl bg-white shadow-2xl">
+        <div className="flex items-start justify-between p-6 pb-4">
+          <div>
+            <h2 className="text-lg font-bold" style={{ color: '#101828' }}>
+              Editar miembro
+            </h2>
+            <p className="mt-0.5 text-sm" style={{ color: '#669E9D' }}>
+              {miembro.email}
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="rounded-[8px] p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="border-t border-gray-200" />
+
+        <div className="max-h-[65vh] overflow-y-auto p-6">
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Field label="Nombre" required>
+                <input
+                  className={inputCls}
+                  value={form.nombre}
+                  onChange={(e) => set('nombre', e.target.value)}
+                />
+              </Field>
+              <Field label="Apellido" required>
+                <input
+                  className={inputCls}
+                  value={form.apellido}
+                  onChange={(e) => set('apellido', e.target.value)}
+                />
+              </Field>
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Field label="Email">
+                <input
+                  className={`${inputCls} cursor-not-allowed bg-gray-50 text-gray-500`}
+                  value={miembro.email}
+                  disabled
+                  readOnly
+                />
+              </Field>
+              <Field label="Rol" required>
+                <select
+                  className={inputCls}
+                  value={form.rol}
+                  onChange={(e) => set('rol', e.target.value as Rol)}
+                >
+                  {rolOpts.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            </div>
+            {isSelf && (
+              <p className="text-xs text-amber-700">
+                Estás editando tu propio miembro. No te podés cambiar a un rol no administrativo (te
+                quedarías sin acceso al panel).
+              </p>
+            )}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Field label="DNI">
+                <input
+                  className={inputCls}
+                  value={form.dni}
+                  onChange={(e) => set('dni', e.target.value)}
+                />
+              </Field>
+              <Field label="Teléfono">
+                <input
+                  className={inputCls}
+                  value={form.telefono}
+                  onChange={(e) => set('telefono', e.target.value)}
+                />
+              </Field>
+            </div>
+            <Field label="Sede">
+              <input
+                className={inputCls}
+                value={form.sede}
+                onChange={(e) => set('sede', e.target.value)}
+              />
+            </Field>
+            {error && <p className="text-sm text-red-600">{error}</p>}
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-3 border-t border-gray-200 p-6">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={pending}
+            className="rounded-[10px] border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-[#101828] hover:bg-gray-50 disabled:opacity-60"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={pending}
+            className="rounded-[10px] bg-[#175861] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#0f4249] disabled:opacity-60"
+          >
+            {pending ? 'Guardando…' : 'Guardar cambios'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ConfirmDeleteMiembroModal({
+  miembro,
+  onClose,
+}: {
+  miembro: MiembroEquipo;
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  const fullName = `${miembro.nombre ?? ''} ${miembro.apellido ?? ''}`.trim() || miembro.email;
+
+  const handleConfirm = () => {
+    setError(null);
+    startTransition(async () => {
+      const res = await deleteMiembroEquipoAction(miembro.profileId);
+      if (res.error) {
+        setError(res.error);
+        toast.error(res.error);
+      } else {
+        toast.success('Miembro eliminado.');
+        onClose();
+        router.refresh();
+      }
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="flex w-full max-w-md flex-col rounded-2xl bg-white shadow-2xl">
+        <div className="p-6 pb-4">
+          <h2 className="text-lg font-bold" style={{ color: '#101828' }}>
+            Eliminar miembro
+          </h2>
+          <p className="mt-2 text-sm text-gray-600">
+            Vas a eliminar la cuenta de <span className="font-semibold">{fullName}</span> de toda la
+            plataforma. Si el usuario pertenece a otros clubes, también va a perder acceso ahí. Esta
+            acción no se puede deshacer.
+          </p>
+          {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+        </div>
+        <div className="flex justify-end gap-3 border-t border-gray-200 p-6">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={pending}
+            className="rounded-[10px] border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-[#101828] hover:bg-gray-50 disabled:opacity-60"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={handleConfirm}
+            disabled={pending}
+            className="rounded-[10px] border border-red-200 bg-white px-5 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50 hover:text-red-700 disabled:opacity-60"
+          >
+            {pending ? 'Eliminando…' : 'Eliminar cuenta'}
           </button>
         </div>
       </div>
