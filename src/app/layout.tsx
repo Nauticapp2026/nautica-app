@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Montserrat } from 'next/font/google';
+import { Toaster } from 'sonner';
 import './globals.css';
 
 const montserrat = Montserrat({
@@ -15,7 +16,20 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="es" suppressHydrationWarning>
-      <body className={`${montserrat.variable} font-sans antialiased`}>{children}</body>
+      <body className={`${montserrat.variable} font-sans antialiased`}>
+        {children}
+        <Toaster
+          position="top-right"
+          richColors
+          closeButton
+          duration={4000}
+          toastOptions={{
+            classNames: {
+              toast: 'rounded-[10px] border',
+            },
+          }}
+        />
+      </body>
     </html>
   );
 }
