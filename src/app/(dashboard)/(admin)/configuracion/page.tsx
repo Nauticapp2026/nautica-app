@@ -3,7 +3,7 @@ import { eq, and, asc, desc } from 'drizzle-orm';
 
 import { getActiveMarina } from '@/lib/auth/session';
 import { db } from '@/lib/db';
-import { guarderias, horariosDia, memberships, profiles } from '@/lib/db/schema';
+import { guarderias, horariosDia, memberships, pricingPlans, profiles } from '@/lib/db/schema';
 
 import type { GuarderiaFeatures } from '@/app/actions/configuracion';
 
@@ -11,13 +11,14 @@ import {
   ConfiguracionClient,
   type InfoGeneralData,
   type MiembroEquipo,
+  type PlanInfo,
   type PuntoVentaData,
   type TabKey,
 } from './configuracion-client';
 
 const DIAS = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'] as const;
 
-const VALID_TABS: TabKey[] = ['info', 'equipo', 'punto_venta', 'notificaciones'];
+const VALID_TABS: TabKey[] = ['info', 'equipo', 'plan', 'punto_venta', 'notificaciones'];
 
 type Props = {
   searchParams: Promise<{ tab?: string; nuevo?: string }>;
@@ -65,10 +66,27 @@ export default async function ConfiguracionPage({ searchParams }: Props) {
       imagenes: guarderias.imagenes,
       diaFacturacion: guarderias.diaFacturacion,
       certificadoAfipOk: guarderias.certificadoAfipOk,
+      plan: guarderias.plan,
     })
     .from(guarderias)
     .where(eq(guarderias.id, guarderiaId))
     .limit(1);
+
+  const planesRows = await db
+    .select({
+      slug: pricingPlans.slug,
+      name: pricingPlans.name,
+      rate: pricingPlans.rate,
+      displayOrder: pricingPlans.displayOrder,
+    })
+    .from(pricingPlans)
+    .orderBy(asc(pricingPlans.displayOrder));
+
+  const planes: PlanInfo[] = planesRows.map((p) => ({
+    slug: p.slug,
+    name: p.name,
+    rate: p.rate,
+  }));
 
   const horariosRows = await db
     .select({
@@ -157,6 +175,8 @@ export default async function ConfiguracionPage({ searchParams }: Props) {
       currentUserId={ctx.profile.id}
       features={features}
       puntoVenta={puntoVenta}
+      planes={planes}
+      currentPlan={(guarderia?.plan ?? 'esencial') as PlanInfo['slug']}
       initialTab={initialTab}
       initialAltaEquipoOpen={initialAltaEquipoOpen}
     />
