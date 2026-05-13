@@ -154,6 +154,14 @@ export const publicidadSeccionEnum = pgEnum('publicidad_seccion', [
   'marketplace_propiedad',
 ]);
 
+export const notificacionAudienciaEnum = pgEnum('notificacion_audiencia', ['todas', 'guarderia']);
+
+export const notificacionEstadoEnum = pgEnum('notificacion_estado', [
+  'pendiente',
+  'enviada',
+  'fallida',
+]);
+
 export const categoriaComunicacionEnum = pgEnum('categoria_comunicacion', [
   'informacion',
   'anuncio',
@@ -1140,6 +1148,24 @@ export const platformPublicidades = pgTable('platform_publicidades', {
   linkUrl: text('link_url'),
   imagenUrls: text('imagen_urls').array(),
   publicar: boolean('publicar').notNull().default(false),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// Cola de notificaciones push a nivel plataforma. El super admin las compone
+// desde /super-admin/notificaciones; quedan en 'pendiente' hasta que el
+// consumidor mobile (a integrar con FCM/APNS) las despache.
+export const platformNotificaciones = pgTable('platform_notificaciones', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  autorId: uuid('autor_id').references(() => profiles.id, { onDelete: 'set null' }),
+  titulo: text('titulo').notNull(),
+  cuerpo: text('cuerpo').notNull(),
+  audiencia: notificacionAudienciaEnum('audiencia').notNull(),
+  // Solo se usa si audiencia = 'guarderia'.
+  guarderiaId: uuid('guarderia_id').references(() => guarderias.id, { onDelete: 'cascade' }),
+  estado: notificacionEstadoEnum('estado').notNull().default('pendiente'),
+  error: text('error'),
+  enviadoEn: timestamp('enviado_en', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
