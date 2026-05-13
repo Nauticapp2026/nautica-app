@@ -11,21 +11,55 @@ import { createAdminClient } from '@/lib/supabase/admin';
 
 const tamanoSchema = z.enum(['350x300', '353x119']);
 
-const inputSchema = z.object({
-  titulo: z.string().trim().min(1, 'El título es obligatorio.').max(200),
-  texto: z.string().trim().max(5000).optional().nullable(),
-  tamano: tamanoSchema,
-  linkUrl: z
-    .string()
-    .trim()
-    .url('El link debe ser una URL válida (https://…).')
-    .max(2000)
-    .optional()
-    .nullable()
-    .or(z.literal('')),
-  publicar: z.boolean(),
-  imagenUrls: z.array(z.string().url()).default([]),
-});
+const seccionSchema = z.enum([
+  'home',
+  'nautishop',
+  'mi_club',
+  'contactos',
+  'solicitud_lavado',
+  'acceso_externo',
+  'qr',
+  'marketplace_embarcacion',
+  'marketplace_propiedad',
+]);
+
+// Acepta '' o 'YYYY-MM-DD'. La validación lógica (inicio <= fin) se hace
+// abajo con .superRefine.
+const fechaSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha inválida.')
+  .or(z.literal(''))
+  .optional()
+  .nullable();
+
+const inputSchema = z
+  .object({
+    titulo: z.string().trim().min(1, 'El título es obligatorio.').max(200),
+    texto: z.string().trim().max(5000).optional().nullable(),
+    tamano: tamanoSchema,
+    seccion: seccionSchema.optional().nullable().or(z.literal('')),
+    fechaInicio: fechaSchema,
+    fechaFin: fechaSchema,
+    linkUrl: z
+      .string()
+      .trim()
+      .url('El link debe ser una URL válida (https://…).')
+      .max(2000)
+      .optional()
+      .nullable()
+      .or(z.literal('')),
+    publicar: z.boolean(),
+    imagenUrls: z.array(z.string().url()).default([]),
+  })
+  .superRefine((data, ctx) => {
+    if (data.fechaInicio && data.fechaFin && data.fechaInicio > data.fechaFin) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['fechaFin'],
+        message: 'La fecha de fin no puede ser anterior a la de inicio.',
+      });
+    }
+  });
 
 export type PlatformPublicidadInput = z.infer<typeof inputSchema>;
 
@@ -80,6 +114,9 @@ export async function createPlatformPublicidadAction(
   }
   const data = parsed.data;
   const linkUrl = data.linkUrl && data.linkUrl !== '' ? data.linkUrl : null;
+  const seccion = data.seccion ? data.seccion : null;
+  const fechaInicio = data.fechaInicio && data.fechaInicio !== '' ? data.fechaInicio : null;
+  const fechaFin = data.fechaFin && data.fechaFin !== '' ? data.fechaFin : null;
 
   const [row] = await db
     .insert(platformPublicidades)
@@ -88,6 +125,9 @@ export async function createPlatformPublicidadAction(
       titulo: data.titulo,
       texto: data.texto?.trim() || null,
       tamano: data.tamano,
+      seccion,
+      fechaInicio,
+      fechaFin,
       linkUrl,
       publicar: data.publicar,
       imagenUrls: data.imagenUrls.length > 0 ? data.imagenUrls : null,
@@ -110,6 +150,9 @@ export async function updatePlatformPublicidadAction(
   }
   const data = parsed.data;
   const linkUrl = data.linkUrl && data.linkUrl !== '' ? data.linkUrl : null;
+  const seccion = data.seccion ? data.seccion : null;
+  const fechaInicio = data.fechaInicio && data.fechaInicio !== '' ? data.fechaInicio : null;
+  const fechaFin = data.fechaFin && data.fechaFin !== '' ? data.fechaFin : null;
 
   const [current] = await db
     .select({ id: platformPublicidades.id })
@@ -125,6 +168,9 @@ export async function updatePlatformPublicidadAction(
       titulo: data.titulo,
       texto: data.texto?.trim() || null,
       tamano: data.tamano,
+      seccion,
+      fechaInicio,
+      fechaFin,
       linkUrl,
       publicar: data.publicar,
       imagenUrls: data.imagenUrls.length > 0 ? data.imagenUrls : null,

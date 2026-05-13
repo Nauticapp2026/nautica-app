@@ -28,11 +28,25 @@ import { EmptyState } from '@/components/shared/empty-state';
 
 export type TamanoPublicidad = '350x300' | '353x119';
 
+export type PublicidadSeccion =
+  | 'home'
+  | 'nautishop'
+  | 'mi_club'
+  | 'contactos'
+  | 'solicitud_lavado'
+  | 'acceso_externo'
+  | 'qr'
+  | 'marketplace_embarcacion'
+  | 'marketplace_propiedad';
+
 export type PlatformPublicidad = {
   id: string;
   titulo: string;
   texto: string | null;
   tamano: TamanoPublicidad;
+  seccion: PublicidadSeccion | null;
+  fechaInicio: string | null;
+  fechaFin: string | null;
   linkUrl: string | null;
   publicar: boolean;
   imagenUrls: string[];
@@ -44,6 +58,34 @@ const TAMANO_LABELS: Record<TamanoPublicidad, { label: string; cls: string }> = 
   '350x300': { label: 'Cuadrada · 350×300', cls: 'bg-blue-50 text-blue-700' },
   '353x119': { label: 'Horizontal · 353×119', cls: 'bg-purple-50 text-purple-700' },
 };
+
+const SECCION_LABELS: Record<PublicidadSeccion, string> = {
+  home: 'Home',
+  nautishop: 'NautiShop',
+  mi_club: 'Mi Club',
+  contactos: 'Contactos',
+  solicitud_lavado: 'Solicitud de Lavado',
+  acceso_externo: 'Acceso Externo',
+  qr: 'QR',
+  marketplace_embarcacion: 'Marketplace · Embarcación',
+  marketplace_propiedad: 'Marketplace · Propiedad',
+};
+
+const SECCION_OPCIONES: { value: PublicidadSeccion; label: string }[] = (
+  Object.keys(SECCION_LABELS) as PublicidadSeccion[]
+).map((value) => ({ value, label: SECCION_LABELS[value] }));
+
+function formatRangoFechas(inicio: string | null, fin: string | null): string | null {
+  if (!inicio && !fin) return null;
+  const fmt = (iso: string) => {
+    // 'YYYY-MM-DD' → mostrarlo sin TZ shenanigans
+    const [y, m, d] = iso.split('-');
+    return `${d}/${m}/${y}`;
+  };
+  if (inicio && fin) return `${fmt(inicio)} → ${fmt(fin)}`;
+  if (inicio) return `desde ${fmt(inicio)}`;
+  return `hasta ${fmt(fin!)}`;
+}
 
 const inputCls =
   'h-11 w-full rounded-[10px] border border-gray-200 bg-white px-4 text-sm text-[#101828] focus:border-[#175861] focus:outline-none focus:ring-1 focus:ring-[#175861]';
@@ -178,6 +220,7 @@ function StatCard({ icon, label, value }: { icon: React.ReactNode; label: string
 function PublicidadCard({ p, onEdit }: { p: PlatformPublicidad; onEdit: () => void }) {
   const tamano = TAMANO_LABELS[p.tamano];
   const cover = p.imagenUrls[0] ?? null;
+  const rangoFechas = formatRangoFechas(p.fechaInicio, p.fechaFin);
 
   return (
     <article className="rounded-2xl border border-gray-200 bg-white p-5">
@@ -213,6 +256,14 @@ function PublicidadCard({ p, onEdit }: { p: PlatformPublicidad; onEdit: () => vo
                 >
                   {tamano.label}
                 </span>
+                <span className="inline-block rounded-md bg-[#D9EBE9] px-2 py-0.5 text-xs font-semibold text-[#175861]">
+                  {p.seccion ? SECCION_LABELS[p.seccion] : 'Todas las secciones'}
+                </span>
+                {rangoFechas && (
+                  <span className="inline-block rounded-md bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700">
+                    {rangoFechas}
+                  </span>
+                )}
                 {!p.publicar && (
                   <span className="inline-block rounded-md bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-500">
                     Borrador
@@ -265,6 +316,9 @@ function PublicidadModal({
   const [titulo, setTitulo] = useState(initial?.titulo ?? '');
   const [texto, setTexto] = useState(initial?.texto ?? '');
   const [tamano, setTamano] = useState<'' | TamanoPublicidad>(initial?.tamano ?? '');
+  const [seccion, setSeccion] = useState<'' | PublicidadSeccion>(initial?.seccion ?? '');
+  const [fechaInicio, setFechaInicio] = useState<string>(initial?.fechaInicio ?? '');
+  const [fechaFin, setFechaFin] = useState<string>(initial?.fechaFin ?? '');
   const [linkUrl, setLinkUrl] = useState(initial?.linkUrl ?? '');
   const [imagenUrls, setImagenUrls] = useState<string[]>(initial?.imagenUrls ?? []);
   const [error, setError] = useState<string | null>(null);
@@ -285,10 +339,18 @@ function PublicidadModal({
       return;
     }
 
+    if (fechaInicio && fechaFin && fechaInicio > fechaFin) {
+      setError('La fecha de fin no puede ser anterior a la de inicio.');
+      return;
+    }
+
     const input: PlatformPublicidadInput = {
       titulo: titulo.trim(),
       texto,
       tamano,
+      seccion: seccion || null,
+      fechaInicio: fechaInicio || null,
+      fechaFin: fechaFin || null,
       linkUrl: linkUrl.trim() || null,
       publicar,
       imagenUrls,
@@ -375,6 +437,52 @@ function PublicidadModal({
               exactamente esas dimensiones.
             </p>
           </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-semibold text-gray-700">Sección</label>
+            <select
+              className={inputCls}
+              value={seccion}
+              onChange={(e) => setSeccion(e.target.value as '' | PublicidadSeccion)}
+            >
+              <option value="">Todas las secciones de su tamaño</option>
+              {SECCION_OPCIONES.map((s) => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-gray-500">
+              Pantalla de la app mobile donde se muestra. Vacío = todas las pantallas del tamaño
+              elegido.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm font-semibold text-gray-700">
+                Fecha de inicio
+              </label>
+              <input
+                className={inputCls}
+                type="date"
+                value={fechaInicio}
+                onChange={(e) => setFechaInicio(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-semibold text-gray-700">Fecha de fin</label>
+              <input
+                className={inputCls}
+                type="date"
+                value={fechaFin}
+                onChange={(e) => setFechaFin(e.target.value)}
+              />
+            </div>
+          </div>
+          <p className="-mt-2 text-xs text-gray-500">
+            Si dejás ambas vacías, la publicidad se muestra sin restricción de fechas.
+          </p>
 
           <div>
             <label className="mb-1 block text-sm font-semibold text-gray-700">
