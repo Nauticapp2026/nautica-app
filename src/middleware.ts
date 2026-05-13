@@ -32,8 +32,13 @@ export async function middleware(request: NextRequest) {
   // Webhooks y crons llamados desde fuera del browser tienen su propia
   // autenticación (CRON_SECRET, secret en query param). El gate de Basic
   // Auth no aplica para ellos — los rompería.
+  // /api/devices: endpoint que consume la app mobile para registrar/eliminar
+  // su Expo Push Token. Su propia auth es Bearer JWT de Supabase, no Basic.
   const { pathname } = request.nextUrl;
-  const isPublicAPI = pathname.startsWith('/api/cron') || pathname.startsWith('/api/webhooks');
+  const isPublicAPI =
+    pathname.startsWith('/api/cron') ||
+    pathname.startsWith('/api/webhooks') ||
+    pathname.startsWith('/api/devices');
 
   if (!isPublicAPI) {
     const gate = checkPrelaunchGate(request);
