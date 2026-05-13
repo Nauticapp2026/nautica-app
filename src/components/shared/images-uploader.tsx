@@ -4,6 +4,8 @@ import { useRef, useState } from 'react';
 import Image from 'next/image';
 import { ImagePlus, Loader2, X } from 'lucide-react';
 
+import { ImageCropperModal } from './image-cropper-modal';
+
 type UploadFn = (file: File) => Promise<{ error?: string; url?: string }>;
 
 export function ImagesUploader({
@@ -12,15 +14,25 @@ export function ImagesUploader({
   upload,
   onError,
   max = 10,
+  cropAspectRatio,
+  recommendedSize,
 }: {
   urls: string[];
   onChange: (next: string[]) => void;
   upload: UploadFn;
   onError?: (msg: string) => void;
   max?: number;
+  // Si está seteado, antes de subir cada imagen el usuario debe recortarla con
+  // este aspect ratio. La selección queda forzada a 1 archivo por vez.
+  cropAspectRatio?: number;
+  // Texto que se muestra debajo del uploader. Ej: "1200×675 px (16:9)".
+  recommendedSize?: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  const [pendingCrop, setPendingCrop] = useState<File | null>(null);
+
+  const cropEnabled = typeof cropAspectRatio === 'number' && cropAspectRatio > 0;
 
   const handleFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -28,9 +40,21 @@ export function ImagesUploader({
       onError?.(`Podés subir hasta ${max} imágenes.`);
       return;
     }
+    if (cropEnabled) {
+      // Sólo procesamos uno por vez (el input ya está en single-mode cuando
+      // cropEnabled). Después del recorte, el upload arranca.
+      setPendingCrop(files[0]);
+      if (inputRef.current) inputRef.current.value = '';
+      return;
+    }
+    await uploadFiles(Array.from(files));
+    if (inputRef.current) inputRef.current.value = '';
+  };
+
+  const uploadFiles = async (files: File[]) => {
     setUploading(true);
     const nuevas: string[] = [];
-    for (const file of Array.from(files)) {
+    for (const file of files) {
       const res = await upload(file);
       if (res.error) {
         onError?.(res.error);
@@ -40,7 +64,11 @@ export function ImagesUploader({
     }
     if (nuevas.length > 0) onChange([...urls, ...nuevas]);
     setUploading(false);
-    if (inputRef.current) inputRef.current.value = '';
+  };
+
+  const handleCropConfirm = async (cropped: File) => {
+    setPendingCrop(null);
+    await uploadFiles([cropped]);
   };
 
   const remove = (idx: number) => {
@@ -98,13 +126,28 @@ export function ImagesUploader({
         ref={inputRef}
         type="file"
         accept="image/jpeg,image/png,image/webp,image/gif"
-        multiple
+        multiple={!cropEnabled}
         className="hidden"
         onChange={(e) => void handleFiles(e.target.files)}
       />
       <p className="mt-2 text-xs text-gray-500">
+        {recommendedSize && (
+          <>
+            Tamaño recomendado: <span className="font-semibold">{recommendedSize}</span>.{' '}
+          </>
+        )}
         Hasta {max} imágenes. JPG, PNG, WebP o GIF (máx. 8 MB c/u).
       </p>
+
+      {pendingCrop && cropEnabled && (
+        <ImageCropperModal
+          file={pendingCrop}
+          aspect={cropAspectRatio!}
+          recommendedSize={recommendedSize}
+          onCancel={() => setPendingCrop(null)}
+          onConfirm={handleCropConfirm}
+        />
+      )}
     </div>
   );
 }
