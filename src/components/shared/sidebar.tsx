@@ -18,6 +18,7 @@ import {
   Menu,
   X,
   Building2,
+  Bell,
   MessageCircle,
   Megaphone,
   type LucideIcon,
@@ -64,6 +65,7 @@ const NAV_BY_VARIANT: Record<SidebarVariant, SidebarItem[]> = {
     { href: '/super-admin/usuarios', label: 'Usuarios', icon: Users },
     { href: '/super-admin/comunicaciones', label: 'Comunicaciones', icon: MessageSquare },
     { href: '/super-admin/publicidades', label: 'Publicidades', icon: Megaphone },
+    { href: '/super-admin/notificaciones', label: 'Notificaciones', icon: Bell },
     { href: '/super-admin/pricing', label: 'Pricing', icon: Tag },
   ],
 };
