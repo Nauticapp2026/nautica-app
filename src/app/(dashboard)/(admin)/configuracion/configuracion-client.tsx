@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import {
   Bell,
   Building2,
+  Check,
+  CreditCard,
   Edit3,
   FilterX,
   Minus,
@@ -24,6 +26,7 @@ import {
   solicitarCertificadoAfipAction,
   updateGuarderiaFeaturesAction,
   updateGuarderiaGeneralAction,
+  updateGuarderiaPlanAction,
   updateMiembroEquipoAction,
   uploadGuarderiaImagenAction,
   type CreateMiembroEquipoData,
@@ -36,11 +39,12 @@ import {
 import { EmptyState } from '@/components/shared/empty-state';
 import { ImagesUploader } from '@/components/shared/images-uploader';
 
-export type TabKey = 'info' | 'equipo' | 'punto_venta' | 'notificaciones';
+export type TabKey = 'info' | 'equipo' | 'plan' | 'punto_venta' | 'notificaciones';
 
 const TABS: { key: TabKey; label: string; icon: typeof Bell }[] = [
   { key: 'info', label: 'Información general', icon: Receipt },
   { key: 'equipo', label: 'Equipo', icon: Users },
+  { key: 'plan', label: 'Plan', icon: CreditCard },
   { key: 'punto_venta', label: 'Datos de facturación', icon: Building2 },
   { key: 'notificaciones', label: 'Notificaciones', icon: Bell },
 ];
@@ -98,6 +102,48 @@ export type MiembroEquipo = {
   isSuperAdmin: boolean;
 };
 
+export type PlanSlug = 'esencial' | 'club' | 'elite';
+
+export type PlanInfo = {
+  slug: PlanSlug;
+  name: string;
+  rate: number;
+};
+
+// Features por plan — viven en código (igual que en la landing). El admin
+// las ve para entender qué incluye cada plan. Si las cambiás, actualizá
+// también `src/components/landing/pricing-client.tsx` para mantener consistencia.
+const PLAN_FEATURES: Record<PlanSlug, string[]> = {
+  esencial: [
+    'Sistema de gestión',
+    'Sistema de ingreso',
+    '1 Comunicación a clientes en circuito cerrado',
+  ],
+  club: [
+    'Sistema de gestión',
+    'Sistema de ingreso',
+    '5 Comunicaciones a clientes en circuito cerrado',
+    'Primeras posiciones en búsqueda',
+    '2 publicaciones de espacios de guarda',
+  ],
+  elite: [
+    'Sistema de gestión',
+    'Sistema de ingreso',
+    '5 Comunicaciones a clientes en circuito cerrado',
+    'Primeras posiciones en búsqueda',
+    '5 publicaciones de espacios de guarda',
+    '5 Comunicaciones a toda la comunidad NauticApp',
+    'Blindaje de competidores',
+    'Shop integrado',
+  ],
+};
+
+const PLAN_ACCENT: Record<PlanSlug, string> = {
+  esencial: '#677B85',
+  club: '#669E9D',
+  elite: '#ABC2B3',
+};
+
 const ROL_LABELS: Record<Rol, string> = {
   super_admin: 'Super Admin',
   administrador_general: 'Admin',
@@ -137,6 +183,8 @@ export function ConfiguracionClient({
   currentUserId,
   features,
   puntoVenta,
+  planes,
+  currentPlan,
   initialTab = 'info',
   initialAltaEquipoOpen = false,
 }: {
@@ -145,6 +193,8 @@ export function ConfiguracionClient({
   currentUserId: string;
   features: GuarderiaFeatures;
   puntoVenta: PuntoVentaData;
+  planes: PlanInfo[];
+  currentPlan: PlanSlug;
   initialTab?: TabKey;
   initialAltaEquipoOpen?: boolean;
 }) {
@@ -197,6 +247,7 @@ export function ConfiguracionClient({
           initialModalOpen={initialAltaEquipoOpen}
         />
       )}
+      {activeTab === 'plan' && <PlanTab planes={planes} currentPlan={currentPlan} />}
       {activeTab === 'punto_venta' && <PuntoVentaTab initial={puntoVenta} />}
       {activeTab === 'notificaciones' && <NotificacionesTab initial={features} />}
     </div>
@@ -1169,6 +1220,148 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: () => void 
         }`}
       />
     </button>
+  );
+}
+
+function PlanTab({ planes, currentPlan }: { planes: PlanInfo[]; currentPlan: PlanSlug }) {
+  const router = useRouter();
+  const [confirmTarget, setConfirmTarget] = useState<PlanInfo | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  const handleChange = (target: PlanInfo) => {
+    if (target.slug === currentPlan) return;
+    startTransition(async () => {
+      const res = await updateGuarderiaPlanAction(target.slug);
+      if (res.error) {
+        toast.error(res.error);
+      } else {
+        toast.success(`Plan cambiado a ${target.name}.`);
+        setConfirmTarget(null);
+        router.refresh();
+      }
+    });
+  };
+
+  const currentName = planes.find((p) => p.slug === currentPlan)?.name ?? currentPlan;
+
+  return (
+    <section className="rounded-2xl border border-gray-200 bg-white p-4 md:p-8">
+      <div className="mb-6">
+        <h2 className="text-base font-bold" style={{ color: '#101828' }}>
+          Plan del club
+        </h2>
+        <p className="mt-1 text-sm" style={{ color: '#669E9D' }}>
+          Estás en el plan <span className="font-semibold text-[#175861]">{currentName}</span>.
+          Podés cambiar a otro plan en cualquier momento. Los precios son por lugar de guarda al
+          mes.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        {planes.map((plan) => (
+          <PlanCard
+            key={plan.slug}
+            plan={plan}
+            isCurrent={plan.slug === currentPlan}
+            onSelect={() => setConfirmTarget(plan)}
+          />
+        ))}
+      </div>
+
+      {confirmTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="flex w-full max-w-md flex-col rounded-2xl bg-white shadow-2xl">
+            <div className="p-6 pb-4">
+              <h3 className="text-lg font-bold" style={{ color: '#101828' }}>
+                Cambiar a plan {confirmTarget.name}
+              </h3>
+              <p className="mt-2 text-sm text-gray-600">
+                Vas a cambiar tu plan a <span className="font-semibold">{confirmTarget.name}</span>{' '}
+                ($
+                {confirmTarget.rate.toLocaleString('es-AR')} por lugar de guarda al mes). El cambio
+                se aplica de inmediato.
+              </p>
+            </div>
+            <div className="flex justify-end gap-3 border-t border-gray-200 p-6">
+              <button
+                type="button"
+                onClick={() => setConfirmTarget(null)}
+                disabled={pending}
+                className="rounded-[10px] border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-[#101828] hover:bg-gray-50 disabled:opacity-60"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => handleChange(confirmTarget)}
+                disabled={pending}
+                className="rounded-[10px] bg-[#175861] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#0f4249] disabled:opacity-60"
+              >
+                {pending ? 'Cambiando…' : 'Confirmar cambio'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function PlanCard({
+  plan,
+  isCurrent,
+  onSelect,
+}: {
+  plan: PlanInfo;
+  isCurrent: boolean;
+  onSelect: () => void;
+}) {
+  const accent = PLAN_ACCENT[plan.slug];
+  const features = PLAN_FEATURES[plan.slug];
+
+  return (
+    <div
+      className={`flex flex-col rounded-[14px] border bg-white p-5 ${
+        isCurrent ? 'border-[#175861] ring-1 ring-[#175861]' : 'border-gray-200'
+      }`}
+    >
+      <div className="flex items-center justify-between">
+        <h3 className="text-base font-bold tracking-wider" style={{ color: accent }}>
+          {plan.name}
+        </h3>
+        {isCurrent && (
+          <span className="rounded-full bg-[#D9EBE9] px-2 py-0.5 text-xs font-semibold text-[#175861]">
+            Plan actual
+          </span>
+        )}
+      </div>
+      <p className="mt-3 text-2xl font-bold" style={{ color: '#101828' }}>
+        ${plan.rate.toLocaleString('es-AR')}
+        <span className="ml-1 text-xs font-normal text-gray-500">/ lugar / mes</span>
+      </p>
+
+      <ul className="mt-4 flex-1 space-y-2">
+        {features.map((f) => (
+          <li key={f} className="flex items-start gap-2 text-sm text-gray-700">
+            <Check className="mt-0.5 h-4 w-4 shrink-0" style={{ color: accent }} />
+            <span>{f}</span>
+          </li>
+        ))}
+      </ul>
+
+      <button
+        type="button"
+        onClick={onSelect}
+        disabled={isCurrent}
+        className={`mt-5 rounded-[10px] px-4 py-2.5 text-sm font-semibold transition-colors ${
+          isCurrent
+            ? 'cursor-not-allowed bg-gray-100 text-gray-400'
+            : 'bg-[#175861] text-white hover:bg-[#0f4249]'
+        }`}
+      >
+        {isCurrent ? 'Tu plan actual' : `Cambiar a ${plan.name}`}
+      </button>
+    </div>
   );
 }
 

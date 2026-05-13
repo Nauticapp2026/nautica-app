@@ -394,6 +394,28 @@ export type CreateMiembroEquipoData = {
   sede: string;
 };
 
+// =============================================================================
+// PLAN DEL CLUB
+// =============================================================================
+
+const PLANES = ['esencial', 'club', 'elite'] as const;
+type Plan = (typeof PLANES)[number];
+
+export async function updateGuarderiaPlanAction(plan: Plan): Promise<{ error?: string }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+  if (!isAdmin(ctx)) return { error: 'Solo administradores pueden cambiar el plan.' };
+  if (!PLANES.includes(plan)) return { error: 'Plan inválido.' };
+
+  await db
+    .update(guarderias)
+    .set({ plan, updatedAt: new Date() })
+    .where(eq(guarderias.id, ctx.activeMembership.guarderiaId));
+
+  revalidatePath('/configuracion');
+  return {};
+}
+
 export type UpdateMiembroEquipoData = {
   profileId: string;
   nombre: string;
