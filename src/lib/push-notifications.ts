@@ -51,7 +51,16 @@ type ProcessResult = {
   }>;
 };
 
-export async function processPendingNotifications(): Promise<ProcessResult> {
+export async function processPendingNotifications(
+  opts: { notifId?: string } = {},
+): Promise<ProcessResult> {
+  const whereClause = opts.notifId
+    ? and(
+        eq(platformNotificaciones.id, opts.notifId),
+        eq(platformNotificaciones.estado, 'pendiente'),
+      )
+    : eq(platformNotificaciones.estado, 'pendiente');
+
   const pendientes = await db
     .select({
       id: platformNotificaciones.id,
@@ -61,7 +70,7 @@ export async function processPendingNotifications(): Promise<ProcessResult> {
       guarderiaId: platformNotificaciones.guarderiaId,
     })
     .from(platformNotificaciones)
-    .where(eq(platformNotificaciones.estado, 'pendiente'))
+    .where(whereClause)
     .limit(MAX_NOTIFICACIONES_PER_RUN);
 
   const result: ProcessResult = {
