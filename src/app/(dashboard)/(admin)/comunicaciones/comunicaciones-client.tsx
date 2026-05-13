@@ -362,6 +362,8 @@ function ComunicacionModal({
                 return uploadComunicacionImagenAction(fd);
               }}
               onError={setError}
+              cropAspectRatio={16 / 9}
+              recommendedSize="1200×675 px (16:9)"
             />
           </div>
 
