@@ -37,7 +37,7 @@ const inputSchema = z
     titulo: z.string().trim().min(1, 'El título es obligatorio.').max(200),
     texto: z.string().trim().max(5000).optional().nullable(),
     tamano: tamanoSchema,
-    seccion: seccionSchema.optional().nullable().or(z.literal('')),
+    secciones: z.array(seccionSchema).default([]),
     fechaInicio: fechaSchema,
     fechaFin: fechaSchema,
     linkUrl: z
@@ -114,7 +114,7 @@ export async function createPlatformPublicidadAction(
   }
   const data = parsed.data;
   const linkUrl = data.linkUrl && data.linkUrl !== '' ? data.linkUrl : null;
-  const seccion = data.seccion ? data.seccion : null;
+  const secciones = data.secciones.length > 0 ? data.secciones : null;
   const fechaInicio = data.fechaInicio && data.fechaInicio !== '' ? data.fechaInicio : null;
   const fechaFin = data.fechaFin && data.fechaFin !== '' ? data.fechaFin : null;
 
@@ -125,7 +125,7 @@ export async function createPlatformPublicidadAction(
       titulo: data.titulo,
       texto: data.texto?.trim() || null,
       tamano: data.tamano,
-      seccion,
+      secciones,
       fechaInicio,
       fechaFin,
       linkUrl,
@@ -150,7 +150,7 @@ export async function updatePlatformPublicidadAction(
   }
   const data = parsed.data;
   const linkUrl = data.linkUrl && data.linkUrl !== '' ? data.linkUrl : null;
-  const seccion = data.seccion ? data.seccion : null;
+  const secciones = data.secciones.length > 0 ? data.secciones : null;
   const fechaInicio = data.fechaInicio && data.fechaInicio !== '' ? data.fechaInicio : null;
   const fechaFin = data.fechaFin && data.fechaFin !== '' ? data.fechaFin : null;
 
@@ -168,7 +168,7 @@ export async function updatePlatformPublicidadAction(
       titulo: data.titulo,
       texto: data.texto?.trim() || null,
       tamano: data.tamano,
-      seccion,
+      secciones,
       fechaInicio,
       fechaFin,
       linkUrl,
