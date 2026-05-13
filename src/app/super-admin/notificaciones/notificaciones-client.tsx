@@ -103,16 +103,17 @@ export function PlatformNotificacionesClient({
         </button>
       </header>
 
-      <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+      <div className="mb-6 rounded-2xl border border-[#C2DCDA] bg-[#D9EBE9] p-4">
         <div className="flex gap-3">
-          <AlertTriangle className="h-5 w-5 shrink-0 text-amber-600" />
-          <div className="text-sm text-amber-800">
-            <p className="font-semibold">Integración mobile pendiente</p>
+          <Bell className="h-5 w-5 shrink-0 text-[#175861]" />
+          <div className="text-sm text-[#175861]">
+            <p className="font-semibold">Cómo funcionan</p>
             <p className="mt-0.5">
-              La app mobile todavía no está cableada a FCM/APNS. Las notificaciones que cargues
-              quedan en estado <span className="font-semibold">pendiente</span> hasta que se integre
-              el envío real. Cuando se haga, el consumidor mobile va a tomarlas de esta cola y
-              actualizar el estado.
+              Al apretar enviar, la notif sale en el momento a los usuarios de la audiencia que
+              tengan la app mobile instalada y hayan dado permiso de notificaciones. Si alguna queda
+              en <span className="font-semibold">pendiente</span> o{' '}
+              <span className="font-semibold">fallida</span>, hay un job que reintenta una vez por
+              día.
             </p>
           </div>
         </div>
@@ -444,7 +445,7 @@ function NotificacionModal({
             disabled={pending || !titulo.trim() || !cuerpo.trim()}
             className="rounded-[10px] bg-[#175861] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#0f4249] disabled:opacity-60"
           >
-            {pending ? 'Guardando…' : 'Encolar notificación'}
+            {pending ? 'Enviando…' : 'Enviar notificación'}
           </button>
         </div>
       </div>

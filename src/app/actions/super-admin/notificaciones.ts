@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { db } from '@/lib/db';
 import { guarderias, platformNotificaciones } from '@/lib/db/schema';
 import { requireSuperAdmin } from '@/lib/auth/session';
+import { processPendingNotifications } from '@/lib/push-notifications';
 
 const inputSchema = z
   .object({
@@ -59,6 +60,17 @@ export async function createPlatformNotificacionAction(
       guarderiaId,
     })
     .returning({ id: platformNotificaciones.id });
+
+  // Disparamos el envío inline: Vercel Hobby no permite crons sub-diarios, así
+  // que el envío real se gatilla acá. El cron diario sirve solo de fallback
+  // para reintentar pendientes que fallaron por algún issue transitorio.
+  // Errores se logean pero no rompen la creación — la notif queda en
+  // 'pendiente' y el cron del día siguiente la levanta.
+  try {
+    await processPendingNotifications({ notifId: row.id });
+  } catch (err) {
+    console.error('[notificaciones] inline send falló:', err);
+  }
 
   revalidatePath('/super-admin/notificaciones');
   return { id: row.id };
