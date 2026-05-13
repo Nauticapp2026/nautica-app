@@ -23,24 +23,44 @@ import {
 import { formatArgentinaDate } from '@/lib/dates';
 import { EmptyState } from '@/components/shared/empty-state';
 
-export type NotificacionAudiencia = 'todas' | 'guarderia';
+export type NotificacionAudiencia =
+  | 'todos'
+  | 'con_club'
+  | 'sin_club'
+  | 'plan_esencial'
+  | 'plan_club'
+  | 'plan_elite';
 export type NotificacionEstado = 'pendiente' | 'enviada' | 'fallida';
-
-export type GuarderiaOpt = { id: string; nombre: string };
 
 export type PlatformNotificacion = {
   id: string;
   titulo: string;
   cuerpo: string;
   audiencia: NotificacionAudiencia;
-  guarderiaId: string | null;
-  guarderiaNombre: string | null;
   estado: NotificacionEstado;
   error: string | null;
   enviadoEn: string | null;
   createdAt: string;
   autor: string | null;
 };
+
+const AUDIENCIA_LABELS: Record<NotificacionAudiencia, string> = {
+  todos: 'Todos los usuarios',
+  con_club: 'Solo los que tienen club',
+  sin_club: 'Solo los que usan la app sin club',
+  plan_esencial: 'Solo plan Esencial',
+  plan_club: 'Solo plan Club',
+  plan_elite: 'Solo plan Élite',
+};
+
+const AUDIENCIA_OPCIONES: NotificacionAudiencia[] = [
+  'todos',
+  'con_club',
+  'sin_club',
+  'plan_esencial',
+  'plan_club',
+  'plan_elite',
+];
 
 const ESTADO_LABELS: Record<NotificacionEstado, { label: string; cls: string }> = {
   pendiente: { label: 'Pendiente', cls: 'bg-amber-50 text-amber-700' },
@@ -55,10 +75,8 @@ type ModalState = { mode: 'create' } | null;
 
 export function PlatformNotificacionesClient({
   notificaciones,
-  guarderias,
 }: {
   notificaciones: PlatformNotificacion[];
-  guarderias: GuarderiaOpt[];
 }) {
   const router = useRouter();
   const [query, setQuery] = useState('');
@@ -80,7 +98,7 @@ export function PlatformNotificacionesClient({
       (n) =>
         n.titulo.toLowerCase().includes(q) ||
         n.cuerpo.toLowerCase().includes(q) ||
-        (n.guarderiaNombre ?? '').toLowerCase().includes(q),
+        AUDIENCIA_LABELS[n.audiencia].toLowerCase().includes(q),
     );
   }, [notificaciones, query]);
 
@@ -182,7 +200,6 @@ export function PlatformNotificacionesClient({
 
       {modal && (
         <NotificacionModal
-          guarderias={guarderias}
           onClose={() => setModal(null)}
           onSaved={() => {
             setModal(null);
@@ -231,8 +248,7 @@ function NotificacionCard({
     });
   };
 
-  const audienciaLabel =
-    n.audiencia === 'todas' ? 'Todas las guarderías' : `Guardería · ${n.guarderiaNombre ?? '—'}`;
+  const audienciaLabel = AUDIENCIA_LABELS[n.audiencia];
 
   return (
     <article
@@ -286,19 +302,10 @@ function NotificacionCard({
   );
 }
 
-function NotificacionModal({
-  guarderias,
-  onClose,
-  onSaved,
-}: {
-  guarderias: GuarderiaOpt[];
-  onClose: () => void;
-  onSaved: () => void;
-}) {
+function NotificacionModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
   const [titulo, setTitulo] = useState('');
   const [cuerpo, setCuerpo] = useState('');
-  const [audiencia, setAudiencia] = useState<NotificacionAudiencia>('todas');
-  const [guarderiaId, setGuarderiaId] = useState('');
+  const [audiencia, setAudiencia] = useState<NotificacionAudiencia>('todos');
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -312,16 +319,11 @@ function NotificacionModal({
       setError('El cuerpo es obligatorio.');
       return;
     }
-    if (audiencia === 'guarderia' && !guarderiaId) {
-      setError('Elegí la guardería destinataria.');
-      return;
-    }
 
     const input: PlatformNotificacionInput = {
       titulo: titulo.trim(),
       cuerpo: cuerpo.trim(),
       audiencia,
-      guarderiaId: audiencia === 'guarderia' ? guarderiaId : null,
     };
 
     startTransition(async () => {
@@ -374,58 +376,27 @@ function NotificacionModal({
           <div>
             <label className="mb-1 block text-sm font-semibold text-gray-700">Audiencia</label>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              <label
-                className={`flex cursor-pointer items-center gap-2 rounded-[10px] border px-3 py-2.5 text-sm ${
-                  audiencia === 'todas'
-                    ? 'border-[#175861] bg-[#D9EBE9] text-[#175861]'
-                    : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="audiencia"
-                  className="accent-[#175861]"
-                  checked={audiencia === 'todas'}
-                  onChange={() => setAudiencia('todas')}
-                />
-                Todas las guarderías
-              </label>
-              <label
-                className={`flex cursor-pointer items-center gap-2 rounded-[10px] border px-3 py-2.5 text-sm ${
-                  audiencia === 'guarderia'
-                    ? 'border-[#175861] bg-[#D9EBE9] text-[#175861]'
-                    : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="audiencia"
-                  className="accent-[#175861]"
-                  checked={audiencia === 'guarderia'}
-                  onChange={() => setAudiencia('guarderia')}
-                />
-                Una guardería específica
-              </label>
+              {AUDIENCIA_OPCIONES.map((a) => (
+                <label
+                  key={a}
+                  className={`flex cursor-pointer items-center gap-2 rounded-[10px] border px-3 py-2.5 text-sm ${
+                    audiencia === a
+                      ? 'border-[#175861] bg-[#D9EBE9] text-[#175861]'
+                      : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="audiencia"
+                    className="accent-[#175861]"
+                    checked={audiencia === a}
+                    onChange={() => setAudiencia(a)}
+                  />
+                  {AUDIENCIA_LABELS[a]}
+                </label>
+              ))}
             </div>
           </div>
-
-          {audiencia === 'guarderia' && (
-            <div>
-              <label className="mb-1 block text-sm font-semibold text-gray-700">Guardería</label>
-              <select
-                className={inputCls}
-                value={guarderiaId}
-                onChange={(e) => setGuarderiaId(e.target.value)}
-              >
-                <option value="">Seleccione una guardería…</option>
-                {guarderias.map((g) => (
-                  <option key={g.id} value={g.id}>
-                    {g.nombre}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
 
           {error && <p className="text-sm text-red-600">{error}</p>}
         </div>

@@ -1,7 +1,9 @@
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, notExists, sql } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
-import { deviceTokens, memberships, platformNotificaciones } from '@/lib/db/schema';
+import { deviceTokens, guarderias, memberships, platformNotificaciones } from '@/lib/db/schema';
+
+type Audiencia = 'todos' | 'con_club' | 'sin_club' | 'plan_esencial' | 'plan_club' | 'plan_elite';
 
 // =============================================================================
 // Expo Push Service
@@ -67,7 +69,6 @@ export async function processPendingNotifications(
       titulo: platformNotificaciones.titulo,
       cuerpo: platformNotificaciones.cuerpo,
       audiencia: platformNotificaciones.audiencia,
-      guarderiaId: platformNotificaciones.guarderiaId,
     })
     .from(platformNotificaciones)
     .where(whereClause)
@@ -83,7 +84,7 @@ export async function processPendingNotifications(
   };
 
   for (const notif of pendientes) {
-    const userIds = await resolveAudienceUserIds(notif.audiencia, notif.guarderiaId);
+    const userIds = await resolveAudienceUserIds(notif.audiencia);
 
     if (userIds.length === 0) {
       // No hay miembros que cumplan la audiencia. Marcamos como 'enviada' con
@@ -172,23 +173,56 @@ export async function processPendingNotifications(
   return result;
 }
 
-async function resolveAudienceUserIds(
-  audiencia: 'todas' | 'guarderia',
-  guarderiaId: string | null,
-): Promise<string[]> {
-  // Filtramos por miembros activos. Si la audiencia es 'todas' tomamos
-  // miembros de cualquier guardería (deduplicado); si es 'guarderia',
-  // miembros activos de esa guardería.
-  const baseConditions =
-    audiencia === 'guarderia' && guarderiaId
-      ? and(eq(memberships.guarderiaId, guarderiaId), eq(memberships.status, 'active'))
-      : eq(memberships.status, 'active');
+async function resolveAudienceUserIds(audiencia: Audiencia): Promise<string[]> {
+  // 'todos': cualquier user con device token registrado. No filtramos por
+  // membership porque sin_rol también está incluido.
+  if (audiencia === 'todos') {
+    const rows = await db.selectDistinct({ userId: deviceTokens.userId }).from(deviceTokens);
+    return rows.map((r) => r.userId);
+  }
 
+  // 'sin_club': users con device token pero sin ninguna membership activa.
+  if (audiencia === 'sin_club') {
+    const rows = await db
+      .selectDistinct({ userId: deviceTokens.userId })
+      .from(deviceTokens)
+      .where(
+        notExists(
+          db
+            .select({ one: sql`1` })
+            .from(memberships)
+            .where(
+              and(eq(memberships.userId, deviceTokens.userId), eq(memberships.status, 'active')),
+            ),
+        ),
+      );
+    return rows.map((r) => r.userId);
+  }
+
+  // 'con_club': cualquier user con al menos una membership activa.
+  if (audiencia === 'con_club') {
+    const rows = await db
+      .selectDistinct({ userId: memberships.userId })
+      .from(memberships)
+      .where(eq(memberships.status, 'active'));
+    return rows.map((r) => r.userId);
+  }
+
+  // 'plan_X': users con membership activa en guarderías de ese plan.
+  const planMap: Record<
+    'plan_esencial' | 'plan_club' | 'plan_elite',
+    'esencial' | 'club' | 'elite'
+  > = {
+    plan_esencial: 'esencial',
+    plan_club: 'club',
+    plan_elite: 'elite',
+  };
+  const plan = planMap[audiencia];
   const rows = await db
     .selectDistinct({ userId: memberships.userId })
     .from(memberships)
-    .where(baseConditions);
-
+    .innerJoin(guarderias, eq(guarderias.id, memberships.guarderiaId))
+    .where(and(eq(memberships.status, 'active'), eq(guarderias.plan, plan)));
   return rows.map((r) => r.userId);
 }
 
