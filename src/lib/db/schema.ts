@@ -154,7 +154,14 @@ export const publicidadSeccionEnum = pgEnum('publicidad_seccion', [
   'marketplace_propiedad',
 ]);
 
-export const notificacionAudienciaEnum = pgEnum('notificacion_audiencia', ['todas', 'guarderia']);
+export const notificacionAudienciaEnum = pgEnum('notificacion_audiencia', [
+  'todos',
+  'con_club',
+  'sin_club',
+  'plan_esencial',
+  'plan_club',
+  'plan_elite',
+]);
 
 export const notificacionEstadoEnum = pgEnum('notificacion_estado', [
   'pendiente',
@@ -1175,8 +1182,6 @@ export const platformNotificaciones = pgTable('platform_notificaciones', {
   titulo: text('titulo').notNull(),
   cuerpo: text('cuerpo').notNull(),
   audiencia: notificacionAudienciaEnum('audiencia').notNull(),
-  // Solo se usa si audiencia = 'guarderia'.
-  guarderiaId: uuid('guarderia_id').references(() => guarderias.id, { onDelete: 'cascade' }),
   estado: notificacionEstadoEnum('estado').notNull().default('pendiente'),
   error: text('error'),
   enviadoEn: timestamp('enviado_en', { withTimezone: true }),

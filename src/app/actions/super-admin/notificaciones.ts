@@ -5,26 +5,24 @@ import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 
 import { db } from '@/lib/db';
-import { guarderias, platformNotificaciones } from '@/lib/db/schema';
+import { platformNotificaciones } from '@/lib/db/schema';
 import { requireSuperAdmin } from '@/lib/auth/session';
 import { processPendingNotifications } from '@/lib/push-notifications';
 
-const inputSchema = z
-  .object({
-    titulo: z.string().trim().min(1, 'El título es obligatorio.').max(200),
-    cuerpo: z.string().trim().min(1, 'El cuerpo es obligatorio.').max(2000),
-    audiencia: z.enum(['todas', 'guarderia']),
-    guarderiaId: z.string().uuid().nullable().optional(),
-  })
-  .superRefine((data, ctx) => {
-    if (data.audiencia === 'guarderia' && !data.guarderiaId) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['guarderiaId'],
-        message: 'Elegí la guardería destinataria.',
-      });
-    }
-  });
+const audienciaSchema = z.enum([
+  'todos',
+  'con_club',
+  'sin_club',
+  'plan_esencial',
+  'plan_club',
+  'plan_elite',
+]);
+
+const inputSchema = z.object({
+  titulo: z.string().trim().min(1, 'El título es obligatorio.').max(200),
+  cuerpo: z.string().trim().min(1, 'El cuerpo es obligatorio.').max(2000),
+  audiencia: audienciaSchema,
+});
 
 export type PlatformNotificacionInput = z.infer<typeof inputSchema>;
 
@@ -39,17 +37,6 @@ export async function createPlatformNotificacionAction(
   }
   const data = parsed.data;
 
-  const guarderiaId = data.audiencia === 'guarderia' ? (data.guarderiaId ?? null) : null;
-
-  if (guarderiaId) {
-    const [g] = await db
-      .select({ id: guarderias.id })
-      .from(guarderias)
-      .where(eq(guarderias.id, guarderiaId))
-      .limit(1);
-    if (!g) return { error: 'La guardería seleccionada no existe.' };
-  }
-
   const [row] = await db
     .insert(platformNotificaciones)
     .values({
@@ -57,7 +44,6 @@ export async function createPlatformNotificacionAction(
       titulo: data.titulo,
       cuerpo: data.cuerpo,
       audiencia: data.audiencia,
-      guarderiaId,
     })
     .returning({ id: platformNotificaciones.id });
 
