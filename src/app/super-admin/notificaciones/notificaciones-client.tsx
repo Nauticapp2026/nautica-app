@@ -109,9 +109,9 @@ export function PlatformNotificacionesClient({
           <div className="text-sm text-[#175861]">
             <p className="font-semibold">Cómo funcionan</p>
             <p className="mt-0.5">
-              Al apretar enviar, la notif sale en el momento a los usuarios de la audiencia que
-              tengan la app mobile instalada y hayan dado permiso de notificaciones. Si alguna queda
-              en <span className="font-semibold">pendiente</span> o{' '}
+              Al apretar enviar, la notificación sale en el momento a los usuarios de la audiencia
+              que tengan la app mobile instalada y hayan dado permiso de notificaciones. Si alguna
+              queda en <span className="font-semibold">pendiente</span> o{' '}
               <span className="font-semibold">fallida</span>, hay un job que reintenta una vez por
               día.
             </p>
