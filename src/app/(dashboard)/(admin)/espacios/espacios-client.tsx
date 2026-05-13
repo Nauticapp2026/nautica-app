@@ -26,6 +26,7 @@ import {
   deletePisoAction,
   moveEspacioToMarinaAction,
   moveEspacioToPisoAction,
+  moveOcupanteAction,
   reorderEspaciosAction,
   updateEspacioAction,
   type CreateAreaInput,
@@ -126,6 +127,12 @@ export function EspaciosClient({
     cell: EspacioCell;
     areaNombre: string;
     lugar: LugarEspacio;
+  } | null>(null);
+
+  const [cambiarUbicacion, setCambiarUbicacion] = useState<{
+    cell: EspacioCell;
+    origenLabel: string;
+    ocupanteNombre: string;
   } | null>(null);
 
   // ─── Búsqueda de espacios para asignar a un cliente ─────────────────────────
@@ -805,6 +812,41 @@ export function EspaciosClient({
             setDeleteEspacioError(null);
             setConfirmDeleteEspacio(editEspacio.cell);
             setEditEspacio(null);
+          }}
+          onCambiarUbicacion={() => {
+            const lugar = editEspacio.lugar;
+            const breadcrumb =
+              lugar.tipo === 'marina'
+                ? `${editEspacio.areaNombre} · ${lugar.peine} · ${editEspacio.cell.nomenclatura}`
+                : `${editEspacio.areaNombre} · ${lugar.lado} · ${lugar.piso} · ${editEspacio.cell.nomenclatura}`;
+            const ocupante = socios.find((s) => s.id === editEspacio.cell.ocupanteId);
+            setCambiarUbicacion({
+              cell: editEspacio.cell,
+              origenLabel: breadcrumb,
+              ocupanteNombre: ocupante?.nombre ?? 'Cliente',
+            });
+            setEditEspacio(null);
+          }}
+        />
+      )}
+
+      {cambiarUbicacion && (
+        <CambiarUbicacionModal
+          cell={cambiarUbicacion.cell}
+          origenLabel={cambiarUbicacion.origenLabel}
+          ocupanteNombre={cambiarUbicacion.ocupanteNombre}
+          destinos={espaciosFlat
+            .filter(
+              (e) =>
+                e.cell.id !== cambiarUbicacion.cell.id &&
+                e.cell.estado === 'disponible' &&
+                !e.cell.ocupanteId,
+            )
+            .map((e) => ({ id: e.cell.id, label: e.lugarLabel }))}
+          onClose={() => setCambiarUbicacion(null)}
+          onSaved={() => {
+            setCambiarUbicacion(null);
+            router.refresh();
           }}
         />
       )}
@@ -1737,6 +1779,7 @@ function EditarEspacioModal({
   onClose,
   onSaved,
   onDelete,
+  onCambiarUbicacion,
 }: {
   cell: EspacioCell;
   areaNombre: string;
@@ -1746,6 +1789,7 @@ function EditarEspacioModal({
   onClose: () => void;
   onSaved: () => void;
   onDelete: () => void;
+  onCambiarUbicacion: () => void;
 }) {
   const breadcrumb =
     lugar.tipo === 'marina'
@@ -1928,6 +1972,18 @@ function EditarEspacioModal({
             </div>
           </div>
 
+          {cell.ocupanteId && (
+            <div className="text-center">
+              <button
+                type="button"
+                onClick={onCambiarUbicacion}
+                className="text-sm font-semibold text-[#175861] underline hover:text-[#0f4249]"
+              >
+                Cambiar ubicación
+              </button>
+            </div>
+          )}
+
           <div className="text-center">
             <button
               type="button"
@@ -1957,6 +2013,118 @@ function EditarEspacioModal({
             className="rounded-[10px] bg-[#175861] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#0f4249] disabled:opacity-60"
           >
             {pending ? 'Guardando…' : 'Guardar'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CambiarUbicacionModal({
+  cell,
+  origenLabel,
+  ocupanteNombre,
+  destinos,
+  onClose,
+  onSaved,
+}: {
+  cell: EspacioCell;
+  origenLabel: string;
+  ocupanteNombre: string;
+  destinos: { id: string; label: string }[];
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [destinoId, setDestinoId] = useState<string>('');
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  const submit = () => {
+    setError(null);
+    if (!destinoId) {
+      setError('Seleccioná un espacio destino.');
+      return;
+    }
+    startTransition(async () => {
+      const res = await moveOcupanteAction({ origenId: cell.id, destinoId });
+      if (res.error) setError(res.error);
+      else onSaved();
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="flex max-h-[92vh] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+        <div className="flex items-start justify-between p-6 pb-4">
+          <div>
+            <h2 className="text-lg font-bold" style={{ color: '#101828' }}>
+              Cambiar ubicación
+            </h2>
+            <p className="mt-0.5 text-sm" style={{ color: '#669E9D' }}>
+              {ocupanteNombre}
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="rounded-[8px] p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="border-t border-gray-200" />
+
+        <div className="flex-1 space-y-4 overflow-y-auto p-6">
+          <div>
+            <label className="mb-1 block text-sm font-semibold text-gray-700">
+              Ubicación actual
+            </label>
+            <p className="text-sm text-gray-600">{origenLabel}</p>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-semibold text-gray-700">
+              Nueva ubicación
+            </label>
+            {destinos.length === 0 ? (
+              <p className="text-sm text-gray-500">
+                No hay espacios disponibles para mudar al cliente.
+              </p>
+            ) : (
+              <select
+                className={inputCls}
+                value={destinoId}
+                onChange={(e) => setDestinoId(e.target.value)}
+              >
+                <option value="">Seleccione un espacio disponible…</option>
+                {destinos.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.label}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          {error && <p className="text-sm text-red-600">{error}</p>}
+        </div>
+
+        <div className="flex justify-end gap-3 border-t border-gray-200 p-6">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={pending}
+            className="rounded-[10px] border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-[#101828] hover:bg-gray-50 disabled:opacity-60"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={submit}
+            disabled={pending || destinos.length === 0}
+            className="rounded-[10px] bg-[#175861] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#0f4249] disabled:opacity-60"
+          >
+            {pending ? 'Mudando…' : 'Confirmar'}
           </button>
         </div>
       </div>
