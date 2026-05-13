@@ -88,7 +88,7 @@ type Data = {
   activarPagosOnline: boolean;
   activarMenuGastronomico: boolean;
   // step 7
-  plan: 'classic' | 'plus' | 'platinum';
+  plan: 'esencial' | 'club' | 'elite';
 };
 
 const DEFAULT_HORARIOS: Record<string, HorarioDia> = Object.fromEntries(
@@ -96,26 +96,26 @@ const DEFAULT_HORARIOS: Record<string, HorarioDia> = Object.fromEntries(
 );
 
 const PLAN_INFO = {
-  classic: {
-    label: 'CLASSIC',
+  esencial: {
+    label: 'ESENCIAL',
     precio: '$29.900/mes',
     features: ['Sistema de gestión', 'Control de accesos', 'Hasta 1 sede', 'Soporte por email'],
   },
-  plus: {
-    label: 'PLUS',
+  club: {
+    label: 'CLUB',
     precio: '$59.900/mes',
     features: [
-      'Todo lo de Classic',
+      'Todo lo de Esencial',
       'Facturación electrónica',
       'Comunicaciones a socios',
       'Hasta 3 sedes',
     ],
   },
-  platinum: {
-    label: 'PLATINUM',
+  elite: {
+    label: 'ÉLITE',
     precio: '$99.900/mes',
     features: [
-      'Todo lo de Plus',
+      'Todo lo de Club',
       'Módulo gastronómico',
       'API para integraciones',
       'Sedes ilimitadas',
@@ -948,10 +948,10 @@ function Step7({
   onBack,
 }: {
   data: Data;
-  onSelect: (plan: 'classic' | 'plus' | 'platinum') => void;
+  onSelect: (plan: 'esencial' | 'club' | 'elite') => void;
   onBack: () => void;
 }) {
-  const plans = ['classic', 'plus', 'platinum'] as const;
+  const plans = ['esencial', 'club', 'elite'] as const;
 
   return (
     <>
@@ -1147,7 +1147,7 @@ export default function OnboardingPage() {
     activarReservasOnline: true,
     activarPagosOnline: true,
     activarMenuGastronomico: false,
-    plan: 'classic',
+    plan: 'esencial',
   });
 
   // El wizard vive en useState, asi que un refresh perdia todo el progreso y
@@ -1322,7 +1322,7 @@ export default function OnboardingPage() {
     next();
   }
 
-  async function handleSelectPlan(plan: 'classic' | 'plus' | 'platinum') {
+  async function handleSelectPlan(plan: 'esencial' | 'club' | 'elite') {
     set('plan', plan);
     if (data.guarderiaId) {
       await selectPlanStep(data.guarderiaId, plan);

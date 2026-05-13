@@ -33,7 +33,7 @@ export const rolEnum = pgEnum('rol', [
   'seguridad',
 ]);
 
-export const planEnum = pgEnum('plan', ['classic', 'plus', 'platinum']);
+export const planEnum = pgEnum('plan', ['esencial', 'club', 'elite']);
 
 export const membershipStatusEnum = pgEnum('membership_status', ['active', 'suspended', 'removed']);
 
@@ -270,7 +270,7 @@ export const guarderias = pgTable(
     imagenes: text('imagenes').array(),
     facebook: text('facebook'),
     instagram: text('instagram'),
-    plan: planEnum('plan').default('classic'),
+    plan: planEnum('plan').default('esencial'),
     // Feature flags
     activarClimaYMareas: boolean('activar_clima_y_mareas').default(false),
     activarMenuGastronomico: boolean('activar_menu_gastronomico').default(false),

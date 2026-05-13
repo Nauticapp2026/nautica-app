@@ -4,9 +4,9 @@ import { PricingClient, type PricingPlanView } from './pricing-client';
 // Fallback si la DB todavía no tiene seed o hay un fallo de lectura — la home
 // no debería romper por una landing dinámica.
 const FALLBACK_PLANS: PricingPlanView[] = [
-  { slug: 'classic', name: 'CLASSIC', rate: 900 },
-  { slug: 'plus', name: 'PLUS', rate: 1200 },
-  { slug: 'platinum', name: 'PLATINIUM', rate: 1500 },
+  { slug: 'esencial', name: 'ESENCIAL', rate: 900 },
+  { slug: 'club', name: 'CLUB', rate: 1200 },
+  { slug: 'elite', name: 'ÉLITE', rate: 1500 },
 ];
 const FALLBACK_CAPACITIES = [200, 500, 700, 1000, 1500, 2000, 3000, 4000];
 

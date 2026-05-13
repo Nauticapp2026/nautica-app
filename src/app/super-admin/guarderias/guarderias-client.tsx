@@ -17,7 +17,7 @@ export type GuarderiaRow = {
   slug: string;
   ciudad: string | null;
   provincia: string | null;
-  plan: 'classic' | 'plus' | 'platinum' | null;
+  plan: 'esencial' | 'club' | 'elite' | null;
   activa: boolean;
   createdAt: string;
   usuarios: number;
@@ -212,9 +212,9 @@ function GuarderiaFila({
 function PlanBadge({ plan }: { plan: GuarderiaRow['plan'] }) {
   if (!plan) return <span className="text-muted-foreground text-xs">—</span>;
   const styles: Record<string, string> = {
-    classic: 'bg-gray-100 text-gray-700',
-    plus: 'bg-[#669E9D]/15 text-[#669E9D]',
-    platinum: 'bg-[#ABC2B3]/30 text-[#175861]',
+    esencial: 'bg-gray-100 text-gray-700',
+    club: 'bg-[#669E9D]/15 text-[#669E9D]',
+    elite: 'bg-[#ABC2B3]/30 text-[#175861]',
   };
   return (
     <span
