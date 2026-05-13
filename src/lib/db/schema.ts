@@ -142,6 +142,18 @@ export const tipoComunicacionEnum = pgEnum('tipo_comunicacion', ['socios', 'publ
 
 export const tamanoPublicidadEnum = pgEnum('tamano_publicidad', ['350x300', '353x119']);
 
+export const publicidadSeccionEnum = pgEnum('publicidad_seccion', [
+  'home',
+  'nautishop',
+  'mi_club',
+  'contactos',
+  'solicitud_lavado',
+  'acceso_externo',
+  'qr',
+  'marketplace_embarcacion',
+  'marketplace_propiedad',
+]);
+
 export const categoriaComunicacionEnum = pgEnum('categoria_comunicacion', [
   'informacion',
   'anuncio',
@@ -1120,6 +1132,11 @@ export const platformPublicidades = pgTable('platform_publicidades', {
   titulo: text('titulo').notNull(),
   texto: text('texto'),
   tamano: tamanoPublicidadEnum('tamano').notNull(),
+  // Sección de la mobile donde aparece. NULL = todas las secciones de su tamaño.
+  seccion: publicidadSeccionEnum('seccion'),
+  // Rango calendario de exhibición. NULL = sin restricción de fechas.
+  fechaInicio: date('fecha_inicio'),
+  fechaFin: date('fecha_fin'),
   linkUrl: text('link_url'),
   imagenUrls: text('imagen_urls').array(),
   publicar: boolean('publicar').notNull().default(false),
