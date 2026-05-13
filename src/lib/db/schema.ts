@@ -1152,9 +1152,21 @@ export const platformPublicidades = pgTable('platform_publicidades', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
+// Expo Push Tokens registrados por dispositivos mobile. El cron de
+// /api/cron/notificaciones-push lee esta tabla para resolver a qué tokens
+// le pega el Expo Push Service por cada notificación pendiente.
+export const deviceTokens = pgTable('device_tokens', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull(),
+  expoPushToken: text('expo_push_token').notNull().unique(),
+  platform: text('platform'),
+  lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).defaultNow().notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
 // Cola de notificaciones push a nivel plataforma. El super admin las compone
-// desde /super-admin/notificaciones; quedan en 'pendiente' hasta que el
-// consumidor mobile (a integrar con FCM/APNS) las despache.
+// desde /super-admin/notificaciones; el cron en /api/cron/notificaciones-push
+// las consume y dispara los pushes vía Expo Push Service.
 export const platformNotificaciones = pgTable('platform_notificaciones', {
   id: uuid('id').primaryKey().defaultRandom(),
   autorId: uuid('autor_id').references(() => profiles.id, { onDelete: 'set null' }),

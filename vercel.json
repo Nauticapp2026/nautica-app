@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/mensuales",
       "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/cron/notificaciones-push",
+      "schedule": "* * * * *"
     }
   ]
 }
