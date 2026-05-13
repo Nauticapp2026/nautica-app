@@ -6,6 +6,7 @@ import { and, asc, desc, eq, inArray } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import {
   areas,
+  embarcaciones,
   espacios,
   lados as ladosTable,
   marinas,
@@ -293,6 +294,87 @@ export async function updateEspacioAction(input: UpdateEspacioInput): Promise<{ 
       console.error('[ensureMonthlyMovimiento] error', err);
     }
   }
+
+  revalidatePath('/espacios');
+  return {};
+}
+
+/**
+ * Mueve el ocupante (y sus embarcaciones en este espacio) de un espacio
+ * "origen" a un espacio "destino" disponible. Preserva la fechaAsignacion
+ * del origen para no romper el día de cobro mensual del socio; la tarifa
+ * del destino se mantiene como esté configurada (próximo ciclo cobra con
+ * esa tarifa). No toca movimientos ya emitidos.
+ */
+export async function moveOcupanteAction(input: {
+  origenId: string;
+  destinoId: string;
+}): Promise<{ error?: string }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+  if (!isAdmin(ctx)) return { error: 'Solo administradores pueden cambiar la ubicación.' };
+  if (input.origenId === input.destinoId) {
+    return { error: 'El espacio destino debe ser distinto al de origen.' };
+  }
+
+  const guarderiaId = ctx.activeMembership.guarderiaId;
+
+  const [origen] = await db
+    .select({
+      id: espacios.id,
+      ocupanteId: espacios.ocupanteId,
+      fechaAsignacion: espacios.fechaAsignacion,
+    })
+    .from(espacios)
+    .where(and(eq(espacios.id, input.origenId), eq(espacios.guarderiaId, guarderiaId)))
+    .limit(1);
+  if (!origen) return { error: 'Espacio origen no encontrado.' };
+  if (!origen.ocupanteId) return { error: 'El espacio origen no tiene cliente asignado.' };
+
+  const [destino] = await db
+    .select({
+      id: espacios.id,
+      ocupanteId: espacios.ocupanteId,
+      estado: espacios.estado,
+    })
+    .from(espacios)
+    .where(and(eq(espacios.id, input.destinoId), eq(espacios.guarderiaId, guarderiaId)))
+    .limit(1);
+  if (!destino) return { error: 'Espacio destino no encontrado.' };
+  if (destino.ocupanteId || destino.estado === 'ocupado') {
+    return { error: 'El espacio destino debe estar disponible.' };
+  }
+
+  await db
+    .update(espacios)
+    .set({
+      ocupanteId: origen.ocupanteId,
+      fechaAsignacion: origen.fechaAsignacion,
+      estado: 'ocupado',
+      updatedAt: new Date(),
+    })
+    .where(eq(espacios.id, input.destinoId));
+
+  await db
+    .update(espacios)
+    .set({
+      ocupanteId: null,
+      fechaAsignacion: null,
+      estado: 'disponible',
+      updatedAt: new Date(),
+    })
+    .where(eq(espacios.id, input.origenId));
+
+  await db
+    .update(embarcaciones)
+    .set({ espacioId: input.destinoId, updatedAt: new Date() })
+    .where(
+      and(
+        eq(embarcaciones.guarderiaId, guarderiaId),
+        eq(embarcaciones.espacioId, input.origenId),
+        eq(embarcaciones.profileId, origen.ocupanteId),
+      ),
+    );
 
   revalidatePath('/espacios');
   return {};
