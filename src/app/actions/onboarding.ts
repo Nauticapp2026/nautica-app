@@ -368,7 +368,7 @@ export async function inviteTeamMembersStep(
 // Step 7 — plan
 export async function selectPlanStep(
   guarderiaId: string,
-  plan: 'classic' | 'plus' | 'platinum',
+  plan: 'esencial' | 'club' | 'elite',
 ): Promise<ActionResult> {
   await db.update(guarderias).set({ plan }).where(eq(guarderias.id, guarderiaId));
   return {};

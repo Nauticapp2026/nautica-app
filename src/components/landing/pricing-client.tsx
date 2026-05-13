@@ -18,7 +18,7 @@ const PLAN_PRESENTATION: Record<
     features: string[];
   }
 > = {
-  classic: {
+  esencial: {
     headerColor: '#677B85',
     buttonColor: '#677B85',
     iconColor: '#677B85',
@@ -29,7 +29,7 @@ const PLAN_PRESENTATION: Record<
       '1 Comunicación a clientes en circuito cerrado',
     ],
   },
-  plus: {
+  club: {
     headerColor: '#669E9D',
     buttonColor: '#669E9D',
     iconColor: '#669E9D',
@@ -43,7 +43,7 @@ const PLAN_PRESENTATION: Record<
       '2 publicaciones de espacios de guarda',
     ],
   },
-  platinum: {
+  elite: {
     headerColor: '#ABC2B3',
     buttonColor: '#ABC2B3',
     iconColor: '#ABC2B3',
@@ -194,7 +194,7 @@ export function PricingClient({ plans, capacities }: Props) {
 }
 
 function PlanCard({ plan, capacity }: { plan: PricingPlanView; capacity: number }) {
-  const presentation = PLAN_PRESENTATION[plan.slug] ?? PLAN_PRESENTATION.classic;
+  const presentation = PLAN_PRESENTATION[plan.slug] ?? PLAN_PRESENTATION.esencial;
   const price = `$${formatNumber(plan.rate * capacity)}`;
   const capacityLabel = formatNumber(capacity);
 
