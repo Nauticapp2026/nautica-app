@@ -44,7 +44,7 @@ export type PlatformPublicidad = {
   titulo: string;
   texto: string | null;
   tamano: TamanoPublicidad;
-  seccion: PublicidadSeccion | null;
+  secciones: PublicidadSeccion[];
   fechaInicio: string | null;
   fechaFin: string | null;
   linkUrl: string | null;
@@ -256,9 +256,20 @@ function PublicidadCard({ p, onEdit }: { p: PlatformPublicidad; onEdit: () => vo
                 >
                   {tamano.label}
                 </span>
-                <span className="inline-block rounded-md bg-[#D9EBE9] px-2 py-0.5 text-xs font-semibold text-[#175861]">
-                  {p.seccion ? SECCION_LABELS[p.seccion] : 'Todas las secciones'}
-                </span>
+                {p.secciones.length === 0 ? (
+                  <span className="inline-block rounded-md bg-[#D9EBE9] px-2 py-0.5 text-xs font-semibold text-[#175861]">
+                    Todas las secciones
+                  </span>
+                ) : (
+                  p.secciones.map((s) => (
+                    <span
+                      key={s}
+                      className="inline-block rounded-md bg-[#D9EBE9] px-2 py-0.5 text-xs font-semibold text-[#175861]"
+                    >
+                      {SECCION_LABELS[s]}
+                    </span>
+                  ))
+                )}
                 {rangoFechas && (
                   <span className="inline-block rounded-md bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700">
                     {rangoFechas}
@@ -316,11 +327,14 @@ function PublicidadModal({
   const [titulo, setTitulo] = useState(initial?.titulo ?? '');
   const [texto, setTexto] = useState(initial?.texto ?? '');
   const [tamano, setTamano] = useState<'' | TamanoPublicidad>(initial?.tamano ?? '');
-  const [seccion, setSeccion] = useState<'' | PublicidadSeccion>(initial?.seccion ?? '');
+  const [secciones, setSecciones] = useState<PublicidadSeccion[]>(initial?.secciones ?? []);
   const [fechaInicio, setFechaInicio] = useState<string>(initial?.fechaInicio ?? '');
   const [fechaFin, setFechaFin] = useState<string>(initial?.fechaFin ?? '');
   const [linkUrl, setLinkUrl] = useState(initial?.linkUrl ?? '');
   const [imagenUrls, setImagenUrls] = useState<string[]>(initial?.imagenUrls ?? []);
+
+  const toggleSeccion = (s: PublicidadSeccion) =>
+    setSecciones((prev) => (prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]));
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [deleting, startDelete] = useTransition();
@@ -348,7 +362,7 @@ function PublicidadModal({
       titulo: titulo.trim(),
       texto,
       tamano,
-      seccion: seccion || null,
+      secciones,
       fechaInicio: fechaInicio || null,
       fechaFin: fechaFin || null,
       linkUrl: linkUrl.trim() || null,
@@ -439,22 +453,33 @@ function PublicidadModal({
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-semibold text-gray-700">Sección</label>
-            <select
-              className={inputCls}
-              value={seccion}
-              onChange={(e) => setSeccion(e.target.value as '' | PublicidadSeccion)}
-            >
-              <option value="">Todas las secciones de su tamaño</option>
-              {SECCION_OPCIONES.map((s) => (
-                <option key={s.value} value={s.value}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
-            <p className="mt-1 text-xs text-gray-500">
-              Pantalla de la app mobile donde se muestra. Vacío = todas las pantallas del tamaño
-              elegido.
+            <label className="mb-1 block text-sm font-semibold text-gray-700">Secciones</label>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {SECCION_OPCIONES.map((s) => {
+                const checked = secciones.includes(s.value);
+                return (
+                  <label
+                    key={s.value}
+                    className={`flex cursor-pointer items-center gap-2 rounded-[10px] border px-3 py-2 text-sm ${
+                      checked
+                        ? 'border-[#175861] bg-[#D9EBE9] text-[#175861]'
+                        : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      className="accent-[#175861]"
+                      checked={checked}
+                      onChange={() => toggleSeccion(s.value)}
+                    />
+                    {s.label}
+                  </label>
+                );
+              })}
+            </div>
+            <p className="mt-2 text-xs text-gray-500">
+              Pantallas de la app mobile donde se muestra. Si no marcás ninguna, aparece en todas
+              las pantallas del tamaño elegido.
             </p>
           </div>
 

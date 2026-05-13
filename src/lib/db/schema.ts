@@ -1140,8 +1140,10 @@ export const platformPublicidades = pgTable('platform_publicidades', {
   titulo: text('titulo').notNull(),
   texto: text('texto'),
   tamano: tamanoPublicidadEnum('tamano').notNull(),
-  // Sección de la mobile donde aparece. NULL = todas las secciones de su tamaño.
-  seccion: publicidadSeccionEnum('seccion'),
+  // Secciones de la mobile donde aparece. NULL/empty = todas las secciones
+  // de su tamaño. Es un array para permitir targetear varias pantallas con
+  // la misma publi (mig 0034).
+  secciones: publicidadSeccionEnum('secciones').array(),
   // Rango calendario de exhibición. NULL = sin restricción de fechas.
   fechaInicio: date('fecha_inicio'),
   fechaFin: date('fecha_fin'),
