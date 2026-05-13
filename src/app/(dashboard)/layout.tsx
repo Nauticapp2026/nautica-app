@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getActiveMarina, getPostLoginRedirect } from '@/lib/auth/session';
 import { Sidebar } from '@/components/shared/sidebar';
+import { GuarderiaInactivaScreen } from '@/components/shared/guarderia-inactiva-screen';
 
 // Roles con acceso al dashboard web. El resto (socio, invitado, etc.)
 // se gestiona desde la app mobile.
@@ -21,6 +22,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
     profile.isSuperAdmin ||
     (WEB_DASHBOARD_ROLES as readonly string[]).includes(activeMembership.rol);
   if (!hasWebAccess) redirect('/no-access');
+
+  // Si la guardería todavía no fue activada por el super admin, los usuarios
+  // de esa guardería no pueden operar. El super admin sí pasa, para poder
+  // testear / configurar antes de habilitar.
+  if (!profile.isSuperAdmin && !activeGuarderia.activa) {
+    return <GuarderiaInactivaScreen guarderiaNombre={activeGuarderia.nombre} />;
+  }
 
   const userName = profile.nombre
     ? `${profile.nombre} ${profile.apellido ?? ''}`.trim()

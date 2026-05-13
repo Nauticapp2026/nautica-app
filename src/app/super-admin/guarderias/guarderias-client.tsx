@@ -6,7 +6,10 @@ import { Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
-import { deleteGuarderiaAction } from '@/app/actions/super-admin/guarderias';
+import {
+  deleteGuarderiaAction,
+  setGuarderiaActivaAction,
+} from '@/app/actions/super-admin/guarderias';
 
 export type GuarderiaRow = {
   id: string;
@@ -15,6 +18,7 @@ export type GuarderiaRow = {
   ciudad: string | null;
   provincia: string | null;
   plan: 'classic' | 'plus' | 'platinum' | null;
+  activa: boolean;
   createdAt: string;
   usuarios: number;
   espacios: number;
@@ -74,17 +78,18 @@ export function GuarderiasClient({ guarderias }: { guarderias: GuarderiaRow[] })
                 <th className="px-4 py-3">Guardería</th>
                 <th className="px-4 py-3">Ubicación</th>
                 <th className="px-4 py-3">Plan</th>
+                <th className="px-4 py-3">Estado</th>
                 <th className="px-4 py-3 text-right">Usuarios</th>
                 <th className="px-4 py-3 text-right">Espacios</th>
                 <th className="px-4 py-3 text-right">Embarcaciones</th>
-                <th className="px-4 py-3">Alta</th>
+                <th className="px-4 py-3">Fecha de creación</th>
                 <th className="px-4 py-3 text-right">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="text-muted-foreground px-4 py-6 text-center text-sm">
+                  <td colSpan={9} className="text-muted-foreground px-4 py-6 text-center text-sm">
                     Sin resultados.
                   </td>
                 </tr>
@@ -109,6 +114,7 @@ function GuarderiaFila({
   onError: (msg: string | null) => void;
 }) {
   const [pending, startTransition] = useTransition();
+  const [toggling, startToggle] = useTransition();
 
   function handleDelete() {
     if (
@@ -125,10 +131,33 @@ function GuarderiaFila({
     });
   }
 
+  function handleToggleActiva() {
+    const nuevaActiva = !guarderia.activa;
+    const verbo = nuevaActiva ? 'activar' : 'desactivar';
+    if (
+      !confirm(
+        nuevaActiva
+          ? `¿Activar la guardería "${guarderia.nombre}"?\n\nSus usuarios van a poder ingresar al dashboard.`
+          : `¿Desactivar la guardería "${guarderia.nombre}"?\n\nSus usuarios no van a poder ingresar al dashboard hasta que la vuelvas a activar.`,
+      )
+    ) {
+      return;
+    }
+    onError(null);
+    startToggle(async () => {
+      const res = await setGuarderiaActivaAction({
+        guarderiaId: guarderia.id,
+        activa: nuevaActiva,
+      });
+      if (res.error) onError(`No se pudo ${verbo}: ${res.error}`);
+    });
+  }
+
   const ubicacion = [guarderia.ciudad, guarderia.provincia].filter(Boolean).join(', ');
+  const filaPending = pending || toggling;
 
   return (
-    <tr className={pending ? 'opacity-50' : ''}>
+    <tr className={filaPending ? 'opacity-50' : ''}>
       <td className="px-4 py-3">
         <div className="font-semibold text-[#175861]">{guarderia.nombre}</div>
         <div className="text-muted-foreground text-xs">/{guarderia.slug}</div>
@@ -136,6 +165,28 @@ function GuarderiaFila({
       <td className="text-muted-foreground px-4 py-3 text-xs">{ubicacion || '—'}</td>
       <td className="px-4 py-3">
         <PlanBadge plan={guarderia.plan} />
+      </td>
+      <td className="px-4 py-3">
+        <button
+          type="button"
+          onClick={handleToggleActiva}
+          disabled={filaPending}
+          title={guarderia.activa ? 'Click para desactivar' : 'Click para activar'}
+          className={
+            guarderia.activa
+              ? 'inline-flex items-center gap-1 rounded-full bg-[#D9EBE9] px-2 py-0.5 text-xs font-semibold text-[#175861] transition-opacity hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-50'
+              : 'inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700 transition-opacity hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-50'
+          }
+        >
+          <span
+            className={
+              guarderia.activa
+                ? 'h-1.5 w-1.5 rounded-full bg-[#175861]'
+                : 'h-1.5 w-1.5 rounded-full bg-amber-600'
+            }
+          />
+          {guarderia.activa ? 'Activa' : 'Pendiente'}
+        </button>
       </td>
       <td className="px-4 py-3 text-right tabular-nums">{guarderia.usuarios}</td>
       <td className="px-4 py-3 text-right tabular-nums">{guarderia.espacios}</td>
@@ -147,7 +198,7 @@ function GuarderiaFila({
           variant="outline"
           size="xs"
           onClick={handleDelete}
-          disabled={pending}
+          disabled={filaPending}
           className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
         >
           <Trash2 />

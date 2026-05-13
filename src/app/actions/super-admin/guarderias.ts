@@ -26,3 +26,25 @@ export async function deleteGuarderiaAction(guarderiaId: string): Promise<{ erro
   revalidatePath('/super-admin');
   return {};
 }
+
+const setActivaSchema = z.object({
+  guarderiaId: z.string().uuid('ID inválido.'),
+  activa: z.boolean(),
+});
+
+export async function setGuarderiaActivaAction(
+  input: z.infer<typeof setActivaSchema>,
+): Promise<{ error?: string }> {
+  await requireSuperAdmin();
+
+  const parsed = setActivaSchema.safeParse(input);
+  if (!parsed.success) return { error: 'Datos inválidos.' };
+
+  await db
+    .update(guarderias)
+    .set({ activa: parsed.data.activa, updatedAt: new Date() })
+    .where(eq(guarderias.id, parsed.data.guarderiaId));
+
+  revalidatePath('/super-admin/guarderias');
+  return {};
+}

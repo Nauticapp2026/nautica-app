@@ -272,6 +272,10 @@ export const guarderias = pgTable(
     tusfacturasUsertoken: text('tusfacturas_usertoken'),
     // Certificado de enlace con AFIP — true = instalado y confirmado, puede facturar.
     certificadoAfipOk: boolean('certificado_afip_ok').default(false).notNull(),
+    // Activación a nivel plataforma. false = los usuarios de la guardería ven
+    // una pantalla "pendiente de activación" en lugar del dashboard. El super
+    // admin activa desde /super-admin/guarderias.
+    activa: boolean('activa').default(false).notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
