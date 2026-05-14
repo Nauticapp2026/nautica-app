@@ -33,10 +33,14 @@ function buildDeepLink(): string {
 }
 
 function ConfirmContent() {
-  const [deepLink, setDeepLink] = useState<string>('');
-  const [attempted, setAttempted] = useState(false);
+  // Calculado lazy: en server da '' (no hay window), en cliente el valor real
+  // se mantiene en este state desde el primer render post-hidratación.
+  const [deepLink] = useState<string>(() => {
+    if (typeof window === 'undefined') return '';
+    return buildDeepLink();
+  });
   // Si después de unos segundos el user sigue acá, sugerimos que la app no
-  // está instalada o que tape el botón manualmente.
+  // está instalada o que toque el botón manualmente.
   const [showFallback, setShowFallback] = useState(false);
 
   // El URLSearchParams del lado server (sin hash) — solo para detectar errors.
@@ -45,18 +49,13 @@ function ConfirmContent() {
   const supabaseErrorDesc = search.get('error_description');
 
   useEffect(() => {
-    const link = buildDeepLink();
-    setDeepLink(link);
-    if (!link || supabaseError) return;
-
+    if (!deepLink || supabaseError) return;
     // Auto-intento al montar. Puede fallar silenciosamente en Chrome moderno
     // sin user gesture — por eso siempre mostramos el botón abajo.
-    window.location.href = link;
-    setAttempted(true);
-
+    window.location.href = deepLink;
     const timer = window.setTimeout(() => setShowFallback(true), 1500);
     return () => window.clearTimeout(timer);
-  }, [supabaseError]);
+  }, [deepLink, supabaseError]);
 
   if (supabaseError) {
     return (
@@ -91,9 +90,7 @@ function ConfirmContent() {
       </div>
       <h1 className="mt-4 text-lg font-bold text-[#101828]">Abriendo NauticApp</h1>
       <p className="mt-2 text-sm text-gray-600">
-        {attempted
-          ? 'Si la app no se abrió automáticamente, tocá el botón.'
-          : 'Confirmando tu email…'}
+        Si la app no se abrió automáticamente, tocá el botón.
       </p>
 
       <a
