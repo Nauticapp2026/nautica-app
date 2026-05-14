@@ -1144,6 +1144,27 @@ export const pricingPlanFeatures = pgTable(
   (t) => [primaryKey({ columns: [t.planSlug, t.featureId] })],
 );
 
+// Snapshot del plan/rate/espacios cada vez que una guardería elige o cambia
+// de plan (en onboarding o desde el tab Plan del admin). El plan vigente se
+// sigue leyendo de `guarderias.plan`; este historial es solo auditoría.
+export const guarderiaPlanHistorial = pgTable(
+  'guarderia_plan_historial',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    guarderiaId: uuid('guarderia_id')
+      .notNull()
+      .references(() => guarderias.id, { onDelete: 'cascade' }),
+    planSlug: planEnum('plan_slug').notNull(),
+    rate: integer('rate').notNull(),
+    espacios: integer('espacios').notNull(),
+    montoMensual: integer('monto_mensual').notNull(),
+    efectivoDesde: timestamp('efectivo_desde', { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    createdBy: uuid('created_by').references(() => profiles.id, { onDelete: 'set null' }),
+  },
+  (t) => [index('guarderia_plan_historial_guarderia_idx').on(t.guarderiaId, t.efectivoDesde)],
+);
+
 // Tabla genérica key/value para settings globales de la plataforma. Hoy guarda
 // `pricing_capacities` (array de capacidades del slider de la landing).
 export const platformSettings = pgTable('platform_settings', {
@@ -1350,6 +1371,8 @@ export type PricingFeature = typeof pricingFeatures.$inferSelect;
 export type NewPricingFeature = typeof pricingFeatures.$inferInsert;
 export type PricingPlanFeature = typeof pricingPlanFeatures.$inferSelect;
 export type NewPricingPlanFeature = typeof pricingPlanFeatures.$inferInsert;
+export type GuarderiaPlanHistorial = typeof guarderiaPlanHistorial.$inferSelect;
+export type NewGuarderiaPlanHistorial = typeof guarderiaPlanHistorial.$inferInsert;
 export type PlatformSetting = typeof platformSettings.$inferSelect;
 export type PlatformComunicacion = typeof platformComunicaciones.$inferSelect;
 export type NewPlatformComunicacion = typeof platformComunicaciones.$inferInsert;

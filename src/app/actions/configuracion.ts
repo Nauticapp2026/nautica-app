@@ -9,6 +9,7 @@ import { getActiveMarina } from '@/lib/auth/session';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { translateInviteError } from '@/lib/auth/errors';
 import { geocodeAddress } from '@/lib/geocoding';
+import { recordPlanChange } from '@/lib/pricing/plan-historial';
 import {
   administrarPuntoVenta,
   solicitarCertificadoEnlace,
@@ -407,10 +408,18 @@ export async function updateGuarderiaPlanAction(plan: Plan): Promise<{ error?: s
   if (!isAdmin(ctx)) return { error: 'Solo administradores pueden cambiar el plan.' };
   if (!PLANES.includes(plan)) return { error: 'Plan inválido.' };
 
+  const guarderiaId = ctx.activeMembership.guarderiaId;
+
   await db
     .update(guarderias)
     .set({ plan, updatedAt: new Date() })
-    .where(eq(guarderias.id, ctx.activeMembership.guarderiaId));
+    .where(eq(guarderias.id, guarderiaId));
+
+  await recordPlanChange({
+    guarderiaId,
+    planSlug: plan,
+    createdBy: ctx.profile.id,
+  });
 
   revalidatePath('/configuracion');
   return {};

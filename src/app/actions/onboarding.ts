@@ -6,6 +6,7 @@ import { translateAuthError, translateInviteError } from '@/lib/auth/errors';
 import { db } from '@/lib/db';
 import { guarderias, memberships, horariosDia, profiles } from '@/lib/db/schema';
 import { geocodeAddress } from '@/lib/geocoding';
+import { recordPlanChange } from '@/lib/pricing/plan-historial';
 import { eq } from 'drizzle-orm';
 
 function toSlug(name: string) {
@@ -371,5 +372,6 @@ export async function selectPlanStep(
   plan: 'esencial' | 'club' | 'elite',
 ): Promise<ActionResult> {
   await db.update(guarderias).set({ plan }).where(eq(guarderias.id, guarderiaId));
+  await recordPlanChange({ guarderiaId, planSlug: plan });
   return {};
 }
