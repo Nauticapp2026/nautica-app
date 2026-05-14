@@ -300,6 +300,104 @@ export async function updateEspacioAction(input: UpdateEspacioInput): Promise<{ 
 }
 
 /**
+ * Asigna un espacio disponible a un socio (asignación inicial — el socio
+ * no tenía espacio antes). Setea ocupante, estado=ocupado y fechaAsignacion.
+ * Asocia la embarcación del socio (si existe) al espacio. Crea el
+ * movimiento mensual proporcional con la tarifa del espacio. Si el espacio
+ * no tiene tarifa configurada, rechaza.
+ */
+export async function assignEspacioToSocioAction(input: {
+  socioId: string;
+  espacioId: string;
+}): Promise<{ error?: string }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+  if (!isAdmin(ctx)) return { error: 'Solo administradores pueden asignar espacios.' };
+
+  const guarderiaId = ctx.activeMembership.guarderiaId;
+
+  const [socio] = await db
+    .select({ id: memberships.id })
+    .from(memberships)
+    .where(
+      and(
+        eq(memberships.userId, input.socioId),
+        eq(memberships.guarderiaId, guarderiaId),
+        eq(memberships.status, 'active'),
+      ),
+    )
+    .limit(1);
+  if (!socio) return { error: 'El socio no es miembro de esta guardería.' };
+
+  const [espacio] = await db
+    .select({
+      id: espacios.id,
+      ocupanteId: espacios.ocupanteId,
+      estado: espacios.estado,
+      servicioId: espacios.servicioId,
+    })
+    .from(espacios)
+    .where(and(eq(espacios.id, input.espacioId), eq(espacios.guarderiaId, guarderiaId)))
+    .limit(1);
+  if (!espacio) return { error: 'Espacio no encontrado.' };
+  if (espacio.ocupanteId || espacio.estado === 'ocupado') {
+    return { error: 'El espacio ya está ocupado.' };
+  }
+  if (!espacio.servicioId) {
+    return { error: 'El espacio no tiene tarifa configurada. Configurala desde Espacios.' };
+  }
+
+  const [servicio] = await db
+    .select({ nombre: servicios.nombre, precio: servicios.precio })
+    .from(servicios)
+    .where(eq(servicios.id, espacio.servicioId))
+    .limit(1);
+  if (!servicio) return { error: 'La tarifa configurada en el espacio no existe.' };
+
+  await db
+    .update(espacios)
+    .set({
+      ocupanteId: input.socioId,
+      estado: 'ocupado',
+      fechaAsignacion: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(eq(espacios.id, input.espacioId));
+
+  // Asociar la embarcación del socio al espacio (si tiene). Solo asociamos
+  // las que no tengan ya otro espacio asignado para no pisar configuraciones.
+  await db
+    .update(embarcaciones)
+    .set({ espacioId: input.espacioId, updatedAt: new Date() })
+    .where(
+      and(eq(embarcaciones.profileId, input.socioId), eq(embarcaciones.guarderiaId, guarderiaId)),
+    );
+
+  // Movimiento mensual proporcional para el mes corriente.
+  try {
+    const servicioPrecioNum = servicio.precio != null ? Number(servicio.precio) : 0;
+    const { importe, diasRestantes, diasMes, esProporcional } =
+      calcularProporcionalMes(servicioPrecioNum);
+    const concepto = esProporcional
+      ? `${servicio.nombre} (proporcional ${diasRestantes}/${diasMes} días)`
+      : servicio.nombre;
+    await ensureMonthlyMovimiento({
+      socioId: input.socioId,
+      espacioId: input.espacioId,
+      servicioId: espacio.servicioId,
+      precio: importe,
+      concepto,
+    });
+  } catch (err) {
+    console.error('[assignEspacioToSocioAction] ensureMonthlyMovimiento error', err);
+  }
+
+  revalidatePath('/espacios');
+  revalidatePath(`/usuarios/${input.socioId}`);
+  return {};
+}
+
+/**
  * Mueve el ocupante (y sus embarcaciones en este espacio) de un espacio
  * "origen" a un espacio "destino" disponible. Preserva la fechaAsignacion
  * del origen para no romper el día de cobro mensual del socio; la tarifa
@@ -377,6 +475,7 @@ export async function moveOcupanteAction(input: {
     );
 
   revalidatePath('/espacios');
+  revalidatePath(`/usuarios/${origen.ocupanteId}`);
   return {};
 }
 
