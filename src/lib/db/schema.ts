@@ -38,6 +38,12 @@ export const planEnum = pgEnum('plan', ['esencial', 'club', 'elite']);
 
 export const membershipStatusEnum = pgEnum('membership_status', ['active', 'suspended', 'removed']);
 
+export const estadoSolicitudMembershipEnum = pgEnum('estado_solicitud_membership', [
+  'pendiente',
+  'aprobada',
+  'rechazada',
+]);
+
 export const invitationStatusEnum = pgEnum('invitation_status', [
   'pending',
   'accepted',
@@ -356,6 +362,34 @@ export const memberships = pgTable(
     uniqueIndex('memberships_user_guarderia_idx').on(t.userId, t.guarderiaId),
     index('memberships_guarderia_idx').on(t.guarderiaId),
     index('memberships_user_idx').on(t.userId),
+  ],
+);
+
+// Pedido de un usuario para sumarse a una guardería como socio. Lo crea la app
+// mobile cuando un sin_rol busca un club y toca "Solicitar ingreso". El admin
+// del club lo aprueba o rechaza desde /solicitudes-socio en el panel web.
+// La aprobación dispara un trigger BEFORE UPDATE en la base que crea la
+// membership rol='socio' del solicitante en la guardería.
+// Tabla creada en mig mobile 0038; RLS en la misma mig.
+export const solicitudesMembership = pgTable(
+  'solicitudes_membership',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    solicitanteId: uuid('solicitante_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    guarderiaId: uuid('guarderia_id')
+      .notNull()
+      .references(() => guarderias.id, { onDelete: 'cascade' }),
+    estado: estadoSolicitudMembershipEnum('estado').notNull().default('pendiente'),
+    motivoRechazo: text('motivo_rechazo'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+    resolvedBy: uuid('resolved_by').references(() => profiles.id, { onDelete: 'set null' }),
+  },
+  (t) => [
+    index('solicitudes_membership_guarderia_idx').on(t.guarderiaId, t.estado),
+    index('solicitudes_membership_solicitante_idx').on(t.solicitanteId, t.createdAt),
   ],
 );
 
