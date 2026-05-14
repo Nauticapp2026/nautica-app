@@ -187,7 +187,6 @@ function PlanCard({
 }) {
   const presentation = PLAN_PRESENTATION[plan.slug] ?? PLAN_PRESENTATION.esencial;
   const price = `$${formatNumber(plan.rate * capacity)}`;
-  const capacityLabel = formatNumber(capacity);
 
   return (
     <div
@@ -201,9 +200,7 @@ function PlanCard({
         className="px-6 py-7 text-center text-white"
         style={{ backgroundColor: presentation.headerColor }}
       >
-        <p className="text-2xl font-semibold tracking-wider md:text-3xl">
-          {plan.name} <span className="font-bold">{capacityLabel}</span>
-        </p>
+        <p className="text-2xl font-semibold tracking-wider md:text-3xl">{plan.name}</p>
         <p className="mt-2 text-base">
           <span className="font-semibold">{price}</span> <span className="font-bold">/MES</span>
         </p>
