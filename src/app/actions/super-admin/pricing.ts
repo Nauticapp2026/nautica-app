@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { eq } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
-import { pricingPlans, platformSettings } from '@/lib/db/schema';
+import { platformSettings, pricingPlanFeatures, pricingPlans } from '@/lib/db/schema';
 import { requireSuperAdmin } from '@/lib/auth/session';
 
 const planSlugSchema = z.enum(['esencial', 'club', 'elite']);
@@ -35,6 +35,54 @@ export async function updatePricingPlanAction(input: UpdatePlanInput): Promise<{
 
   revalidatePath('/');
   revalidatePath('/super-admin/pricing');
+
+  return {};
+}
+
+const updatePlanFeatureSchema = z.object({
+  planSlug: planSlugSchema,
+  featureId: z.string().trim().min(1),
+  value: z.string().max(200),
+});
+
+export type UpdatePlanFeatureInput = z.infer<typeof updatePlanFeatureSchema>;
+
+export async function updatePlanFeatureAction(
+  input: UpdatePlanFeatureInput,
+): Promise<{ error?: string }> {
+  const { profile } = await requireSuperAdmin();
+
+  const parsed = updatePlanFeatureSchema.safeParse(input);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? 'Datos inválidos.' };
+  }
+
+  const { planSlug, featureId, value } = parsed.data;
+  const trimmed = value.trim();
+  // Vacío = no incluido. Lo guardamos como NULL para que sea visible en SQL.
+  const stored = trimmed === '' ? null : trimmed;
+
+  await db
+    .insert(pricingPlanFeatures)
+    .values({
+      planSlug,
+      featureId,
+      value: stored,
+      updatedBy: profile.id,
+    })
+    .onConflictDoUpdate({
+      target: [pricingPlanFeatures.planSlug, pricingPlanFeatures.featureId],
+      set: {
+        value: stored,
+        updatedAt: new Date(),
+        updatedBy: profile.id,
+      },
+    });
+
+  revalidatePath('/');
+  revalidatePath('/onboarding');
+  revalidatePath('/super-admin/pricing');
+  revalidatePath('/configuracion');
 
   return {};
 }

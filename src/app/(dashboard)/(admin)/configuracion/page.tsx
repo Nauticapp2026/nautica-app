@@ -4,6 +4,7 @@ import { eq, and, asc, desc } from 'drizzle-orm';
 import { getActiveMarina } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { guarderias, horariosDia, memberships, pricingPlans, profiles } from '@/lib/db/schema';
+import { getAllPlanFeatures } from '@/lib/pricing/config';
 
 import type { GuarderiaFeatures } from '@/app/actions/configuracion';
 
@@ -72,20 +73,24 @@ export default async function ConfiguracionPage({ searchParams }: Props) {
     .where(eq(guarderias.id, guarderiaId))
     .limit(1);
 
-  const planesRows = await db
-    .select({
-      slug: pricingPlans.slug,
-      name: pricingPlans.name,
-      rate: pricingPlans.rate,
-      displayOrder: pricingPlans.displayOrder,
-    })
-    .from(pricingPlans)
-    .orderBy(asc(pricingPlans.displayOrder));
+  const [planesRows, planFeatures] = await Promise.all([
+    db
+      .select({
+        slug: pricingPlans.slug,
+        name: pricingPlans.name,
+        rate: pricingPlans.rate,
+        displayOrder: pricingPlans.displayOrder,
+      })
+      .from(pricingPlans)
+      .orderBy(asc(pricingPlans.displayOrder)),
+    getAllPlanFeatures(),
+  ]);
 
   const planes: PlanInfo[] = planesRows.map((p) => ({
     slug: p.slug,
     name: p.name,
     rate: p.rate,
+    features: planFeatures[p.slug] ?? [],
   }));
 
   const horariosRows = await db

@@ -108,34 +108,7 @@ export type PlanInfo = {
   slug: PlanSlug;
   name: string;
   rate: number;
-};
-
-// Features por plan — viven en código (igual que en la landing). El admin
-// las ve para entender qué incluye cada plan. Si las cambiás, actualizá
-// también `src/components/landing/pricing-client.tsx` para mantener consistencia.
-const PLAN_FEATURES: Record<PlanSlug, string[]> = {
-  esencial: [
-    'Sistema de gestión',
-    'Sistema de ingreso',
-    '1 Comunicación a clientes en circuito cerrado',
-  ],
-  club: [
-    'Sistema de gestión',
-    'Sistema de ingreso',
-    '5 Comunicaciones a clientes en circuito cerrado',
-    'Primeras posiciones en búsqueda',
-    '2 publicaciones de espacios de guarda',
-  ],
-  elite: [
-    'Sistema de gestión',
-    'Sistema de ingreso',
-    '5 Comunicaciones a clientes en circuito cerrado',
-    'Primeras posiciones en búsqueda',
-    '5 publicaciones de espacios de guarda',
-    '5 Comunicaciones a toda la comunidad NauticApp',
-    'Blindaje de competidores',
-    'Shop integrado',
-  ],
+  features: string[];
 };
 
 const PLAN_ACCENT: Record<PlanSlug, string> = {
@@ -1317,7 +1290,7 @@ function PlanCard({
   onSelect: () => void;
 }) {
   const accent = PLAN_ACCENT[plan.slug];
-  const features = PLAN_FEATURES[plan.slug];
+  const features = plan.features;
 
   return (
     <div

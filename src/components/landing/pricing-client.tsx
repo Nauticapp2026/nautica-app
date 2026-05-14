@@ -5,8 +5,8 @@ import { Check } from 'lucide-react';
 import { useState } from 'react';
 
 // Presentación por plan (keyed por slug). Lo que cambia desde el panel super
-// admin (name, rate) viene por props; lo que es decisión de marketing/diseño
-// (colores, features, plan destacado) vive acá.
+// admin (name, rate, features) viene por props; lo que es decisión de
+// marketing/diseño (colores, plan destacado) vive acá.
 const PLAN_PRESENTATION: Record<
   string,
   {
@@ -15,7 +15,6 @@ const PLAN_PRESENTATION: Record<
     iconColor: string;
     iconBg: string;
     highlighted?: boolean;
-    features: string[];
   }
 > = {
   esencial: {
@@ -23,11 +22,6 @@ const PLAN_PRESENTATION: Record<
     buttonColor: '#677B85',
     iconColor: '#677B85',
     iconBg: 'rgba(103, 123, 133, 0.10)',
-    features: [
-      'Sistema de gestión',
-      'Sistema de ingreso',
-      '1 Comunicación a clientes en circuito cerrado',
-    ],
   },
   club: {
     headerColor: '#669E9D',
@@ -35,29 +29,12 @@ const PLAN_PRESENTATION: Record<
     iconColor: '#669E9D',
     iconBg: 'rgba(102, 158, 157, 0.10)',
     highlighted: true,
-    features: [
-      'Sistema de gestión',
-      'Sistema de ingreso',
-      '5 Comunicaciones a clientes en circuito cerrado',
-      'Primeras posiciones en búsqueda',
-      '2 publicaciones de espacios de guarda',
-    ],
   },
   elite: {
     headerColor: '#ABC2B3',
     buttonColor: '#ABC2B3',
     iconColor: '#ABC2B3',
     iconBg: 'rgba(171, 194, 179, 0.10)',
-    features: [
-      'Sistema de gestión',
-      'Sistema de ingreso',
-      '5 Comunicaciones a clientes en circuito cerrado',
-      'Primeras posiciones en búsqueda',
-      '5 publicaciones de espacios de guarda',
-      '5 Comunicaciones a toda la comunidad NauticApp',
-      'Blindaje de competidores',
-      'Shop integrado',
-    ],
   },
 };
 
@@ -70,13 +47,14 @@ export type PricingPlanView = {
 type Props = {
   plans: PricingPlanView[];
   capacities: number[];
+  featuresByPlan: Record<'esencial' | 'club' | 'elite', string[]>;
 };
 
 function formatNumber(value: number) {
   return value.toLocaleString('es-AR');
 }
 
-export function PricingClient({ plans, capacities }: Props) {
+export function PricingClient({ plans, capacities, featuresByPlan }: Props) {
   const STEP = 10;
   const [markers, setMarkers] = useState<number[]>(() => capacities);
 
@@ -174,7 +152,12 @@ export function PricingClient({ plans, capacities }: Props) {
 
         <div className="mt-16 grid gap-6 md:grid-cols-3 md:items-stretch">
           {plans.map((plan) => (
-            <PlanCard key={plan.slug} plan={plan} capacity={capacity} />
+            <PlanCard
+              key={plan.slug}
+              plan={plan}
+              capacity={capacity}
+              features={featuresByPlan[plan.slug as 'esencial' | 'club' | 'elite'] ?? []}
+            />
           ))}
         </div>
 
@@ -193,7 +176,15 @@ export function PricingClient({ plans, capacities }: Props) {
   );
 }
 
-function PlanCard({ plan, capacity }: { plan: PricingPlanView; capacity: number }) {
+function PlanCard({
+  plan,
+  capacity,
+  features,
+}: {
+  plan: PricingPlanView;
+  capacity: number;
+  features: string[];
+}) {
   const presentation = PLAN_PRESENTATION[plan.slug] ?? PLAN_PRESENTATION.esencial;
   const price = `$${formatNumber(plan.rate * capacity)}`;
   const capacityLabel = formatNumber(capacity);
@@ -220,7 +211,7 @@ function PlanCard({ plan, capacity }: { plan: PricingPlanView; capacity: number 
 
       <div className="flex flex-1 flex-col gap-6 p-8">
         <ul className="flex-1 space-y-4">
-          {presentation.features.map((feature) => (
+          {features.map((feature) => (
             <li key={feature} className="flex items-start gap-3">
               <span
                 className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full"
