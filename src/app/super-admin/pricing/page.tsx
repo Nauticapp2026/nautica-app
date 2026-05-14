@@ -1,10 +1,13 @@
-import { getPricingConfig } from '@/lib/pricing/config';
+import { getPricingConfig, getPricingFeaturesGrid } from '@/lib/pricing/config';
 import { PricingEditor } from './pricing-editor';
 
 export const dynamic = 'force-dynamic';
 
 export default async function SuperAdminPricingPage() {
-  const { plans, capacities } = await getPricingConfig();
+  const [{ plans, capacities }, featuresGrid] = await Promise.all([
+    getPricingConfig(),
+    getPricingFeaturesGrid(),
+  ]);
 
   return (
     <div className="space-y-8 p-4 md:p-8">
@@ -17,7 +20,7 @@ export default async function SuperAdminPricingPage() {
         </p>
       </div>
 
-      <PricingEditor plans={plans} capacities={capacities} />
+      <PricingEditor plans={plans} capacities={capacities} featuresGrid={featuresGrid} />
     </div>
   );
 }

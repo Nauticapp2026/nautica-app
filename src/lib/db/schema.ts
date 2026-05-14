@@ -9,6 +9,7 @@ import {
   timestamp,
   date,
   jsonb,
+  primaryKey,
   uniqueIndex,
   index,
 } from 'drizzle-orm/pg-core';
@@ -1112,6 +1113,37 @@ export const pricingPlans = pgTable('pricing_plans', {
   updatedBy: uuid('updated_by').references(() => profiles.id, { onDelete: 'set null' }),
 });
 
+// Listado canónico de features de los planes. group_label se usa solo en el
+// grid del super admin para agrupar visualmente (ej "BASE — INCLUIDO EN TODOS
+// LOS PLANES"); landing/onboarding/tab Plan del admin lo ignoran y muestran
+// lista plana.
+export const pricingFeatures = pgTable('pricing_features', {
+  id: text('id').primaryKey(),
+  groupLabel: text('group_label').notNull(),
+  label: text('label').notNull(),
+  displayOrder: integer('display_order').notNull().default(0),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedBy: uuid('updated_by').references(() => profiles.id, { onDelete: 'set null' }),
+});
+
+// Valor de cada (plan, feature). String libre, nullable:
+//   NULL/'' = feature no incluida en ese plan
+//   '✓'     = incluida sin valor extra (cards muestran solo el label)
+//   otro    = incluida con detalle (ej '2 / mes', '30 días gratis')
+export const pricingPlanFeatures = pgTable(
+  'pricing_plan_features',
+  {
+    planSlug: planEnum('plan_slug').notNull(),
+    featureId: text('feature_id')
+      .notNull()
+      .references(() => pricingFeatures.id, { onDelete: 'cascade' }),
+    value: text('value'),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedBy: uuid('updated_by').references(() => profiles.id, { onDelete: 'set null' }),
+  },
+  (t) => [primaryKey({ columns: [t.planSlug, t.featureId] })],
+);
+
 // Tabla genérica key/value para settings globales de la plataforma. Hoy guarda
 // `pricing_capacities` (array de capacidades del slider de la landing).
 export const platformSettings = pgTable('platform_settings', {
@@ -1314,6 +1346,10 @@ export type SolicitudLavado = typeof solicitudesLavado.$inferSelect;
 export type NewSolicitudLavado = typeof solicitudesLavado.$inferInsert;
 export type PricingPlan = typeof pricingPlans.$inferSelect;
 export type NewPricingPlan = typeof pricingPlans.$inferInsert;
+export type PricingFeature = typeof pricingFeatures.$inferSelect;
+export type NewPricingFeature = typeof pricingFeatures.$inferInsert;
+export type PricingPlanFeature = typeof pricingPlanFeatures.$inferSelect;
+export type NewPricingPlanFeature = typeof pricingPlanFeatures.$inferInsert;
 export type PlatformSetting = typeof platformSettings.$inferSelect;
 export type PlatformComunicacion = typeof platformComunicaciones.$inferSelect;
 export type NewPlatformComunicacion = typeof platformComunicaciones.$inferInsert;

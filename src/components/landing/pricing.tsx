@@ -1,4 +1,4 @@
-import { getPricingConfig } from '@/lib/pricing/config';
+import { getAllPlanFeatures, getPricingConfig } from '@/lib/pricing/config';
 import { PricingClient, type PricingPlanView } from './pricing-client';
 
 // Fallback si la DB todavía no tiene seed o hay un fallo de lectura — la home
@@ -13,18 +13,24 @@ const FALLBACK_CAPACITIES = [200, 500, 700, 1000, 1500, 2000, 3000, 4000];
 export async function Pricing() {
   let plans: PricingPlanView[] = FALLBACK_PLANS;
   let capacities: number[] = FALLBACK_CAPACITIES;
+  let featuresByPlan: Record<'esencial' | 'club' | 'elite', string[]> = {
+    esencial: [],
+    club: [],
+    elite: [],
+  };
 
   try {
-    const config = await getPricingConfig();
+    const [config, features] = await Promise.all([getPricingConfig(), getAllPlanFeatures()]);
     if (config.plans.length > 0) {
       plans = config.plans.map((p) => ({ slug: p.slug, name: p.name, rate: p.rate }));
     }
     if (config.capacities.length >= 2) {
       capacities = config.capacities;
     }
+    featuresByPlan = features;
   } catch {
     // dejamos los fallbacks; la landing es pública y no queremos romperla.
   }
 
-  return <PricingClient plans={plans} capacities={capacities} />;
+  return <PricingClient plans={plans} capacities={capacities} featuresByPlan={featuresByPlan} />;
 }
