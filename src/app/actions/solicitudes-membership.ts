@@ -21,7 +21,11 @@ async function ensureAdminDelClubDeLaSolicitud(
   const gId = ctx.activeMembership.guarderiaId;
 
   const [sol] = await db
-    .select({ id: solicitudesMembership.id, guarderiaId: solicitudesMembership.guarderiaId, estado: solicitudesMembership.estado })
+    .select({
+      id: solicitudesMembership.id,
+      guarderiaId: solicitudesMembership.guarderiaId,
+      estado: solicitudesMembership.estado,
+    })
     .from(solicitudesMembership)
     .where(eq(solicitudesMembership.id, solicitudId))
     .limit(1);

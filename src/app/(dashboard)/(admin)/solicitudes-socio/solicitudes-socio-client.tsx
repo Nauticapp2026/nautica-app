@@ -48,7 +48,8 @@ export function SolicitudesSocioClient({ solicitudes }: { solicitudes: Solicitud
 
   const onAprobar = (s: Solicitud) => {
     const fullname = nombreCompleto(s);
-    if (typeof window !== 'undefined' && !window.confirm(`¿Aprobar a ${fullname} como socio?`)) return;
+    if (typeof window !== 'undefined' && !window.confirm(`¿Aprobar a ${fullname} como socio?`))
+      return;
     setErrorBanner(null);
     setPendingId(s.id);
     startTransition(async () => {
@@ -162,9 +163,7 @@ function TabButton({
       type="button"
       onClick={onClick}
       className={`flex-1 rounded-[8px] px-4 py-2 text-sm font-medium transition-colors ${
-        active
-          ? 'bg-[#175861] text-white'
-          : 'text-[#4A5565] hover:bg-gray-50'
+        active ? 'bg-[#175861] text-white' : 'text-[#4A5565] hover:bg-gray-50'
       }`}
     >
       {label}
@@ -189,9 +188,7 @@ function SolicitudCard({
   return (
     <article className="rounded-[14px] border border-gray-200 bg-white p-4">
       <div className="flex items-start gap-3">
-        <div
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#175861] text-base font-bold text-white"
-        >
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#175861] text-base font-bold text-white">
           {initial}
         </div>
 
@@ -300,22 +297,19 @@ function RechazoModal({
         className="w-full max-w-md rounded-[16px] bg-white p-6"
         onClick={(e) => e.stopPropagation()}
       >
-        <h3 className="text-lg font-bold text-[#101828]">
-          Rechazar solicitud
-        </h3>
+        <h3 className="text-lg font-bold text-[#101828]">Rechazar solicitud</h3>
         <p className="mt-1 text-sm text-gray-600">
-          Vas a rechazar el pedido de {nombreCompleto(solicitud)}. Si querés, agregá un motivo que el usuario va a ver en la app.
+          Vas a rechazar el pedido de {nombreCompleto(solicitud)}. Si querés, agregá un motivo que
+          el usuario va a ver en la app.
         </p>
 
-        <label className="mt-4 block text-sm font-medium text-[#4A5565]">
-          Motivo (opcional)
-        </label>
+        <label className="mt-4 block text-sm font-medium text-[#4A5565]">Motivo (opcional)</label>
         <textarea
           value={motivo}
           onChange={(e) => setMotivo(e.target.value)}
           placeholder="Ej: No coincide con nuestros registros."
           rows={3}
-          className="mt-1.5 w-full rounded-[10px] border border-gray-200 bg-white p-3 text-sm text-[#101828] focus:border-[#175861] focus:outline-none focus:ring-1 focus:ring-[#175861]"
+          className="mt-1.5 w-full rounded-[10px] border border-gray-200 bg-white p-3 text-sm text-[#101828] focus:border-[#175861] focus:ring-1 focus:ring-[#175861] focus:outline-none"
         />
 
         <div className="mt-5 flex gap-2">
