@@ -2,7 +2,17 @@
 
 import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Anchor, Building2, Check, ChevronDown, Plus, Search, Trash2, X } from 'lucide-react';
+import {
+  Anchor,
+  Building2,
+  Check,
+  ChevronDown,
+  Loader2,
+  Plus,
+  Search,
+  Trash2,
+  X,
+} from 'lucide-react';
 import {
   DndContext,
   PointerSensor,
@@ -1254,7 +1264,7 @@ function SortableEspacio({
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging || isMoving ? 0.5 : 1,
+    opacity: isDragging ? 0.5 : 1,
     zIndex: isDragging ? 10 : undefined,
   };
   return (
@@ -1263,11 +1273,12 @@ function SortableEspacio({
         type="button"
         onClick={onEdit}
         title={`Editar espacio ${cell.nomenclatura} — arrastrá para mover o reordenar`}
-        className={`inline-flex h-7 min-w-[2.25rem] cursor-grab items-center justify-center rounded-[8px] border px-2 text-xs font-semibold transition-colors hover:brightness-95 active:cursor-grabbing ${ESTADO_CLS[cell.estado]}`}
+        disabled={isMoving}
+        className={`inline-flex h-7 min-w-[2.25rem] cursor-grab items-center justify-center rounded-[8px] border px-2 text-xs font-semibold transition-colors hover:brightness-95 active:cursor-grabbing disabled:cursor-wait ${ESTADO_CLS[cell.estado]}`}
         {...listeners}
         {...attributes}
       >
-        {cell.nomenclatura}
+        {isMoving ? <Loader2 className="h-3 w-3 animate-spin" /> : cell.nomenclatura}
       </button>
       <button
         type="button"
