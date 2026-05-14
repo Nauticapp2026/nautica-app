@@ -32,6 +32,8 @@ import {
   deleteEmbarcacionAction,
   updateEmbarcacionAction,
 } from '@/app/actions/embarcaciones';
+import { assignEspacioToSocioAction, moveOcupanteAction } from '@/app/actions/espacios';
+import { toast } from 'sonner';
 import {
   deleteSocioAction,
   deleteSocioDocumentoAction,
@@ -1377,6 +1379,8 @@ function DocumentacionTab({
   );
 }
 
+export type EspacioOption = { id: string; label: string };
+
 export function SocioDetail({
   socio,
   embarcaciones,
@@ -1385,6 +1389,8 @@ export function SocioDetail({
   invitados,
   documentos = [],
   salidas = [],
+  espacioActual,
+  espaciosDisponibles,
 }: {
   socio: SocioData;
   embarcaciones: Embarcacion[];
@@ -1393,6 +1399,8 @@ export function SocioDetail({
   invitados: Invitado[];
   documentos?: DocumentoItem[];
   salidas?: SalidaItem[];
+  espacioActual: EspacioOption | null;
+  espaciosDisponibles: EspacioOption[];
 }) {
   const [activeTab, setActiveTab] = useState<TabId>('generales');
   const [modalServicioOpen, setModalServicioOpen] = useState(false);
@@ -1778,7 +1786,14 @@ export function SocioDetail({
 
       {/* Embarcación */}
       {activeTab === 'embarcacion' && (
-        <EmbarcacionesTab socioId={socio.id} embarcaciones={embarcaciones} />
+        <div className="space-y-4">
+          <EmbarcacionesTab socioId={socio.id} embarcaciones={embarcaciones} />
+          <EspacioAsignadoCard
+            socioId={socio.id}
+            espacioActual={espacioActual}
+            espaciosDisponibles={espaciosDisponibles}
+          />
+        </div>
       )}
 
       {/* Cuenta Corriente */}
@@ -2067,6 +2082,97 @@ export function SocioDetail({
       {activeTab === 'documentacion' && (
         <DocumentacionTab socioId={socio.id} documentos={documentos} />
       )}
+    </div>
+  );
+}
+
+// ─── Espacio asignado card (dentro del tab Embarcación) ───────────────────────
+
+function EspacioAsignadoCard({
+  socioId,
+  espacioActual,
+  espaciosDisponibles,
+}: {
+  socioId: string;
+  espacioActual: EspacioOption | null;
+  espaciosDisponibles: EspacioOption[];
+}) {
+  const router = useRouter();
+  const [destinoId, setDestinoId] = useState('');
+  const [pending, startTransition] = useTransition();
+
+  const tieneActual = espacioActual != null;
+  const hayDisponibles = espaciosDisponibles.length > 0;
+
+  function submit() {
+    if (!destinoId) {
+      toast.error('Seleccioná un espacio.');
+      return;
+    }
+    startTransition(async () => {
+      const res = tieneActual
+        ? await moveOcupanteAction({ origenId: espacioActual!.id, destinoId })
+        : await assignEspacioToSocioAction({ socioId, espacioId: destinoId });
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+      toast.success(tieneActual ? 'Cliente mudado al nuevo espacio.' : 'Espacio asignado.');
+      setDestinoId('');
+      router.refresh();
+    });
+  }
+
+  return (
+    <div className="rounded-2xl border border-gray-200 bg-white p-4 md:p-6">
+      <h2 className="text-base font-bold" style={{ color: '#101828' }}>
+        Espacio asignado
+      </h2>
+
+      {tieneActual ? (
+        <div className="mt-2 mb-4 rounded-[10px] border border-[#CAE6E4] bg-[#ECFDF3] px-4 py-3 text-sm text-[#175861]">
+          Espacio actual: <span className="font-semibold">{espacioActual!.label}</span>
+        </div>
+      ) : (
+        <p className="mt-2 mb-4 text-sm text-gray-600">Este socio no tiene espacio asignado.</p>
+      )}
+
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <select
+          className={`${inputCls} flex-1`}
+          value={destinoId}
+          onChange={(e) => setDestinoId(e.target.value)}
+          disabled={pending || !hayDisponibles}
+        >
+          <option value="">
+            {hayDisponibles
+              ? tieneActual
+                ? 'Seleccione otro espacio disponible…'
+                : 'Seleccione un espacio disponible…'
+              : 'No hay espacios disponibles con tarifa configurada.'}
+          </option>
+          {espaciosDisponibles.map((e) => (
+            <option key={e.id} value={e.id}>
+              {e.label}
+            </option>
+          ))}
+        </select>
+
+        <button
+          type="button"
+          onClick={submit}
+          disabled={pending || !destinoId}
+          className="rounded-[10px] bg-[#175861] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#0f4249] disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {pending
+            ? tieneActual
+              ? 'Mudando…'
+              : 'Asignando…'
+            : tieneActual
+              ? 'Cambiar'
+              : 'Asignar'}
+        </button>
+      </div>
     </div>
   );
 }

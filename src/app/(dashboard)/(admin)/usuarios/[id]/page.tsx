@@ -2,19 +2,24 @@ import { redirect } from 'next/navigation';
 import { getActiveMarina } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import {
+  areas,
   documentos,
   embarcaciones,
+  espacios,
   facturacion,
   facturacionItemMovimientos,
   facturacionItems,
   invitados,
+  lados,
+  marinas,
   memberships,
   movimientosCuentaCorriente,
+  pisos,
   porteria,
   profiles,
   servicios as serviciosTable,
 } from '@/lib/db/schema';
-import { eq, and, desc, inArray } from 'drizzle-orm';
+import { eq, and, desc, inArray, isNotNull, isNull, asc } from 'drizzle-orm';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { SocioDetail } from './socio-detail';
 
@@ -64,6 +69,8 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
     invitadosList,
     documentosList,
     salidasList,
+    espacioActualRow,
+    espaciosDisponibles,
   ] = await Promise.all([
     db
       .select({
@@ -155,6 +162,51 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
         and(eq(porteria.socioId, id), eq(porteria.guarderiaId, gId), eq(porteria.tipo, 'salida')),
       )
       .orderBy(desc(porteria.createdAt)),
+
+    // Espacio actualmente asignado al socio (si tiene).
+    db
+      .select({
+        id: espacios.id,
+        nomenclatura: espacios.nomenclatura,
+        areaNombre: areas.nombre,
+        marinaNombre: marinas.nombre,
+        ladoNombre: lados.nombre,
+        pisoNombre: pisos.nombre,
+      })
+      .from(espacios)
+      .leftJoin(areas, eq(areas.id, espacios.areaId))
+      .leftJoin(marinas, eq(marinas.id, espacios.marinaId))
+      .leftJoin(lados, eq(lados.id, espacios.ladoId))
+      .leftJoin(pisos, eq(pisos.id, espacios.pisoId))
+      .where(and(eq(espacios.ocupanteId, id), eq(espacios.guarderiaId, gId)))
+      .limit(1),
+
+    // Espacios disponibles para asignar/cambiar — sólo los que tienen tarifa
+    // configurada (sino el alta no genera movimiento mensual).
+    db
+      .select({
+        id: espacios.id,
+        nomenclatura: espacios.nomenclatura,
+        areaNombre: areas.nombre,
+        marinaNombre: marinas.nombre,
+        ladoNombre: lados.nombre,
+        pisoNombre: pisos.nombre,
+        orden: espacios.orden,
+      })
+      .from(espacios)
+      .leftJoin(areas, eq(areas.id, espacios.areaId))
+      .leftJoin(marinas, eq(marinas.id, espacios.marinaId))
+      .leftJoin(lados, eq(lados.id, espacios.ladoId))
+      .leftJoin(pisos, eq(pisos.id, espacios.pisoId))
+      .where(
+        and(
+          eq(espacios.guarderiaId, gId),
+          eq(espacios.estado, 'disponible'),
+          isNull(espacios.ocupanteId),
+          isNotNull(espacios.servicioId),
+        ),
+      )
+      .orderBy(asc(areas.nombre), asc(espacios.orden)),
   ]);
 
   // Para cada movimiento facturado, traer el código de la factura. Lo
@@ -208,6 +260,31 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
     }),
   );
 
+  function labelEspacio(e: {
+    nomenclatura: string | null;
+    areaNombre: string | null;
+    marinaNombre: string | null;
+    ladoNombre: string | null;
+    pisoNombre: string | null;
+  }): string {
+    const partes: string[] = [];
+    if (e.areaNombre) partes.push(e.areaNombre);
+    if (e.marinaNombre) partes.push(e.marinaNombre);
+    if (e.ladoNombre) partes.push(e.ladoNombre);
+    if (e.pisoNombre) partes.push(e.pisoNombre);
+    if (e.nomenclatura) partes.push(e.nomenclatura);
+    return partes.join(' · ') || 'Espacio';
+  }
+
+  const espacioActual = espacioActualRow[0]
+    ? { id: espacioActualRow[0].id, label: labelEspacio(espacioActualRow[0]) }
+    : null;
+
+  const espaciosDisponiblesView = espaciosDisponibles.map((e) => ({
+    id: e.id,
+    label: labelEspacio(e),
+  }));
+
   return (
     <SocioDetail
       socio={{
@@ -218,6 +295,8 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
         estadoSocio: socio.estadoSocio ?? null,
       }}
       embarcaciones={embarcacionesList}
+      espacioActual={espacioActual}
+      espaciosDisponibles={espaciosDisponiblesView}
       movimientos={movimientosList.map((m) => ({
         ...m,
         fecha: m.fecha?.toISOString() ?? null,
