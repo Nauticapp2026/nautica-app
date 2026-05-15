@@ -2149,7 +2149,9 @@ function EspacioAsignadoCard({
               ? tieneActual
                 ? 'Seleccione otro espacio disponible…'
                 : 'Seleccione un espacio disponible…'
-              : 'No hay espacios disponibles con tarifa configurada.'}
+              : tieneActual
+                ? 'No hay espacios disponibles compatibles con la eslora del barco.'
+                : 'No hay espacios disponibles.'}
           </option>
           {espaciosDisponibles.map((e) => (
             <option key={e.id} value={e.id}>

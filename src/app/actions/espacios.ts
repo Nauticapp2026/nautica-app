@@ -274,11 +274,21 @@ export async function updateEspacioAction(input: UpdateEspacioInput): Promise<{ 
     .where(eq(espacios.id, input.id));
 
   // Si hay ocupante + servicio, garantizamos el movimiento mensual del mes
-  // corriente. Los movimientos históricos no se tocan (por decisión del usuario).
+  // corriente. La base del proporcional es la mayor entre `fechaAsignacion`
+  // y el inicio del mes corriente: si el socio entró al espacio este mes,
+  // se cobra desde ese día (aunque la tarifa se haya cargado más tarde);
+  // si entró en un mes anterior, se cobra el mes corriente completo (no
+  // hay retroactivo de meses pasados).
   if (input.ocupanteId && input.servicioId && servicioNombre) {
     try {
-      const { importe, diasRestantes, diasMes, esProporcional } =
-        calcularProporcionalMes(servicioPrecioNum);
+      const now = new Date();
+      const inicioMes = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0));
+      const fechaBase =
+        nuevaFechaAsignacion && nuevaFechaAsignacion > inicioMes ? nuevaFechaAsignacion : inicioMes;
+      const { importe, diasRestantes, diasMes, esProporcional } = calcularProporcionalMes(
+        servicioPrecioNum,
+        fechaBase,
+      );
       const concepto = esProporcional
         ? `${servicioNombre} (proporcional ${diasRestantes}/${diasMes} días)`
         : servicioNombre;
@@ -343,16 +353,6 @@ export async function assignEspacioToSocioAction(input: {
   if (espacio.ocupanteId || espacio.estado === 'ocupado') {
     return { error: 'El espacio ya está ocupado.' };
   }
-  if (!espacio.servicioId) {
-    return { error: 'El espacio no tiene tarifa configurada. Configurala desde Espacios.' };
-  }
-
-  const [servicio] = await db
-    .select({ nombre: servicios.nombre, precio: servicios.precio })
-    .from(servicios)
-    .where(eq(servicios.id, espacio.servicioId))
-    .limit(1);
-  if (!servicio) return { error: 'La tarifa configurada en el espacio no existe.' };
 
   await db
     .update(espacios)
@@ -373,23 +373,34 @@ export async function assignEspacioToSocioAction(input: {
       and(eq(embarcaciones.profileId, input.socioId), eq(embarcaciones.guarderiaId, guarderiaId)),
     );
 
-  // Movimiento mensual proporcional para el mes corriente.
-  try {
-    const servicioPrecioNum = servicio.precio != null ? Number(servicio.precio) : 0;
-    const { importe, diasRestantes, diasMes, esProporcional } =
-      calcularProporcionalMes(servicioPrecioNum);
-    const concepto = esProporcional
-      ? `${servicio.nombre} (proporcional ${diasRestantes}/${diasMes} días)`
-      : servicio.nombre;
-    await ensureMonthlyMovimiento({
-      socioId: input.socioId,
-      espacioId: input.espacioId,
-      servicioId: espacio.servicioId,
-      precio: importe,
-      concepto,
-    });
-  } catch (err) {
-    console.error('[assignEspacioToSocioAction] ensureMonthlyMovimiento error', err);
+  // Si el espacio tiene tarifa, generamos el movimiento mensual proporcional
+  // de este mes. Si todavía no tiene tarifa, el movimiento se crea cuando
+  // el admin cargue la tarifa después (updateEspacioAction lo dispara).
+  if (espacio.servicioId) {
+    try {
+      const [servicio] = await db
+        .select({ nombre: servicios.nombre, precio: servicios.precio })
+        .from(servicios)
+        .where(eq(servicios.id, espacio.servicioId))
+        .limit(1);
+      if (servicio) {
+        const servicioPrecioNum = servicio.precio != null ? Number(servicio.precio) : 0;
+        const { importe, diasRestantes, diasMes, esProporcional } =
+          calcularProporcionalMes(servicioPrecioNum);
+        const concepto = esProporcional
+          ? `${servicio.nombre} (proporcional ${diasRestantes}/${diasMes} días)`
+          : servicio.nombre;
+        await ensureMonthlyMovimiento({
+          socioId: input.socioId,
+          espacioId: input.espacioId,
+          servicioId: espacio.servicioId,
+          precio: importe,
+          concepto,
+        });
+      }
+    } catch (err) {
+      console.error('[assignEspacioToSocioAction] ensureMonthlyMovimiento error', err);
+    }
   }
 
   revalidatePath('/espacios');
@@ -434,13 +445,48 @@ export async function moveOcupanteAction(input: {
       id: espacios.id,
       ocupanteId: espacios.ocupanteId,
       estado: espacios.estado,
+      eslora: espacios.eslora,
+      unidadMetraje: servicios.unidadMetraje,
     })
     .from(espacios)
+    .leftJoin(servicios, eq(servicios.id, espacios.servicioId))
     .where(and(eq(espacios.id, input.destinoId), eq(espacios.guarderiaId, guarderiaId)))
     .limit(1);
   if (!destino) return { error: 'Espacio destino no encontrado.' };
   if (destino.ocupanteId || destino.estado === 'ocupado') {
     return { error: 'El espacio destino debe estar disponible.' };
+  }
+
+  // El barco no puede ser más grande que el espacio destino. Las
+  // embarcaciones siempre se guardan en metros (eslora_m); el espacio
+  // puede tener su eslora en metros o pies según la unidad de la tarifa
+  // asociada. Si el destino no tiene eslora cargada, no se valida (no
+  // tenemos base de comparación).
+  if (destino.eslora != null) {
+    const barcos = await db
+      .select({ esloraM: embarcaciones.esloraM })
+      .from(embarcaciones)
+      .where(
+        and(
+          eq(embarcaciones.profileId, origen.ocupanteId),
+          eq(embarcaciones.guarderiaId, guarderiaId),
+        ),
+      );
+    const esloraMaxM = barcos.reduce((max, b) => {
+      const v = b.esloraM != null ? Number(b.esloraM) : 0;
+      return v > max ? v : max;
+    }, 0);
+    if (esloraMaxM > 0) {
+      const esloraDestinoNum = Number(destino.eslora);
+      const esloraDestinoM =
+        destino.unidadMetraje === 'pies' ? esloraDestinoNum * 0.3048 : esloraDestinoNum;
+      // Margen de 1 cm para tolerar redondeos al convertir pies→metros.
+      if (esloraMaxM > esloraDestinoM + 0.01) {
+        return {
+          error: `El barco (${esloraMaxM.toFixed(2)} m) no entra en el espacio destino (${esloraDestinoM.toFixed(2)} m).`,
+        };
+      }
+    }
   }
 
   await db
