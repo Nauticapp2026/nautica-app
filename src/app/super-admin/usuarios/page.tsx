@@ -1,8 +1,14 @@
-import { asc, eq } from 'drizzle-orm';
+import { asc, desc, eq } from 'drizzle-orm';
 
 import { requireSuperAdmin } from '@/lib/auth/session';
 import { db } from '@/lib/db';
-import { memberships, profiles, guarderias } from '@/lib/db/schema';
+import {
+  memberships,
+  profiles,
+  guarderias,
+  terminosAceptaciones,
+  terminosVersiones,
+} from '@/lib/db/schema';
 import { UsuariosClient, type UsuarioRow } from './usuarios-client';
 
 export const dynamic = 'force-dynamic';
@@ -10,7 +16,7 @@ export const dynamic = 'force-dynamic';
 export default async function SuperAdminUsuariosPage() {
   const { profile: actor } = await requireSuperAdmin();
 
-  const [allProfiles, allMemberships] = await Promise.all([
+  const [allProfiles, allMemberships, aceptacionesRows, versionVigenteRow] = await Promise.all([
     db.select().from(profiles).orderBy(asc(profiles.email)),
     db
       .select({
@@ -23,7 +29,33 @@ export default async function SuperAdminUsuariosPage() {
       })
       .from(memberships)
       .innerJoin(guarderias, eq(guarderias.id, memberships.guarderiaId)),
+    db
+      .select({
+        userId: terminosAceptaciones.userId,
+        version: terminosAceptaciones.version,
+        aceptadoEn: terminosAceptaciones.aceptadoEn,
+      })
+      .from(terminosAceptaciones)
+      .orderBy(desc(terminosAceptaciones.aceptadoEn)),
+    db
+      .select({ version: terminosVersiones.version })
+      .from(terminosVersiones)
+      .orderBy(desc(terminosVersiones.version))
+      .limit(1),
   ]);
+
+  // Última aceptación por usuario. Como vienen ordenadas por aceptadoEn
+  // DESC, el primer hit por userId ya es la más reciente.
+  const ultimaPorUsuario = new Map<string, { version: number; aceptadoEn: string }>();
+  for (const a of aceptacionesRows) {
+    if (ultimaPorUsuario.has(a.userId)) continue;
+    ultimaPorUsuario.set(a.userId, {
+      version: a.version,
+      aceptadoEn: a.aceptadoEn.toISOString(),
+    });
+  }
+
+  const versionVigente = versionVigenteRow[0]?.version ?? null;
 
   const byUser = new Map<string, UsuarioRow['memberships']>();
   for (const m of allMemberships) {
@@ -45,6 +77,7 @@ export default async function SuperAdminUsuariosPage() {
     isSuperAdmin: p.isSuperAdmin,
     createdAt: p.createdAt.toISOString(),
     memberships: byUser.get(p.id) ?? [],
+    terminos: ultimaPorUsuario.get(p.id) ?? null,
   }));
 
   return (
@@ -56,7 +89,7 @@ export default async function SuperAdminUsuariosPage() {
         </p>
       </div>
 
-      <UsuariosClient usuarios={usuarios} actorId={actor.id} />
+      <UsuariosClient usuarios={usuarios} actorId={actor.id} versionVigente={versionVigente} />
     </div>
   );
 }
