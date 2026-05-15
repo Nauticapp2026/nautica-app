@@ -23,6 +23,7 @@ import {
 import { createSocioAction, uploadSocioDocumentoAction } from '@/app/actions/socios';
 import { EmptyState } from '@/components/shared/empty-state';
 import { ImportSociosModal } from './import-socios-modal';
+import { ImportEmbarcacionesModal } from './import-embarcaciones-modal';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -560,6 +561,7 @@ export function UsuariosClient({
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [importModalOpen, setImportModalOpen] = useState(false);
+  const [importEmbModalOpen, setImportEmbModalOpen] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [filtro, setFiltro] = useState<FiltroSocios | null>(initialFiltro);
@@ -636,6 +638,10 @@ export function UsuariosClient({
     <>
       <CrearSocioModal open={modalOpen} onClose={() => setModalOpen(false)} />
       <ImportSociosModal open={importModalOpen} onClose={() => setImportModalOpen(false)} />
+      <ImportEmbarcacionesModal
+        open={importEmbModalOpen}
+        onClose={() => setImportEmbModalOpen(false)}
+      />
 
       <div className="p-4 md:p-8">
         {/* Header */}
@@ -683,7 +689,14 @@ export function UsuariosClient({
                 className="flex shrink-0 items-center justify-center gap-2 rounded-[10px] border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
               >
                 <Upload className="h-4 w-4" />
-                Importar masivo
+                Importar socios
+              </button>
+              <button
+                onClick={() => setImportEmbModalOpen(true)}
+                className="flex shrink-0 items-center justify-center gap-2 rounded-[10px] border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+              >
+                <Upload className="h-4 w-4" />
+                Importar embarcaciones
               </button>
               <button
                 onClick={() => setModalOpen(true)}
