@@ -121,10 +121,12 @@ export function EspaciosClient({
   areas,
   socios,
   serviciosEspacios,
+  esloraMaxPorSocio,
 }: {
   areas: AreaView[];
   socios: SocioOpt[];
   serviciosEspacios: ServicioEspacio[];
+  esloraMaxPorSocio: Record<string, number>;
 }) {
   const router = useRouter();
   const [filtro, setFiltro] = useState<Filtro>('marina');
@@ -860,26 +862,47 @@ export function EspaciosClient({
         />
       )}
 
-      {cambiarUbicacion && (
-        <CambiarUbicacionModal
-          cell={cambiarUbicacion.cell}
-          origenLabel={cambiarUbicacion.origenLabel}
-          ocupanteNombre={cambiarUbicacion.ocupanteNombre}
-          destinos={espaciosFlat
-            .filter(
-              (e) =>
-                e.cell.id !== cambiarUbicacion.cell.id &&
-                e.cell.estado === 'disponible' &&
-                !e.cell.ocupanteId,
-            )
-            .map((e) => ({ id: e.cell.id, label: e.lugarLabel }))}
-          onClose={() => setCambiarUbicacion(null)}
-          onSaved={() => {
-            setCambiarUbicacion(null);
-            router.refresh();
-          }}
-        />
-      )}
+      {cambiarUbicacion &&
+        (() => {
+          const ocupanteId = cambiarUbicacion.cell.ocupanteId;
+          const esloraMaxM = ocupanteId ? (esloraMaxPorSocio[ocupanteId] ?? 0) : 0;
+          // Eslora del espacio destino expresada en metros. Si el espacio
+          // no tiene tarifa asignada (unidad desconocida), asumimos metros.
+          // Si no tiene eslora cargada, devuelve null (no se valida).
+          const esloraDestinoM = (cell: EspacioCell): number | null => {
+            if (cell.eslora == null) return null;
+            const unidad = cell.servicioId
+              ? (unidadPorServicio.get(cell.servicioId) ?? 'metros')
+              : 'metros';
+            return unidad === 'pies' ? cell.eslora * 0.3048 : cell.eslora;
+          };
+          return (
+            <CambiarUbicacionModal
+              cell={cambiarUbicacion.cell}
+              origenLabel={cambiarUbicacion.origenLabel}
+              ocupanteNombre={cambiarUbicacion.ocupanteNombre}
+              destinos={espaciosFlat
+                .filter(
+                  (e) =>
+                    e.cell.id !== cambiarUbicacion.cell.id &&
+                    e.cell.estado === 'disponible' &&
+                    !e.cell.ocupanteId,
+                )
+                .filter((e) => {
+                  if (esloraMaxM <= 0) return true;
+                  const m = esloraDestinoM(e.cell);
+                  if (m == null) return true;
+                  return m + 0.01 >= esloraMaxM;
+                })
+                .map((e) => ({ id: e.cell.id, label: e.lugarLabel }))}
+              onClose={() => setCambiarUbicacion(null)}
+              onSaved={() => {
+                setCambiarUbicacion(null);
+                router.refresh();
+              }}
+            />
+          );
+        })()}
     </div>
   );
 }

@@ -9,6 +9,7 @@ import { getActiveMarina } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import {
   areas,
+  embarcaciones,
   espacios,
   lados,
   marinas,
@@ -48,6 +49,7 @@ export default async function EspaciosPage() {
     espaciosRows,
     sociosRows,
     serviciosRows,
+    embarcacionesRows,
   ] = await Promise.all([
     db
       .select({ id: areas.id, nombre: areas.nombre })
@@ -147,6 +149,17 @@ export default async function EspaciosPage() {
         ),
       )
       .orderBy(asc(servicios.nombre)),
+
+    // Embarcaciones de la guardería (solo lo necesario para el filtro de
+    // tamaño en el modal "Cambiar ubicación"). El barco se guarda en
+    // metros vía eslora_m.
+    db
+      .select({
+        profileId: embarcaciones.profileId,
+        esloraM: embarcaciones.esloraM,
+      })
+      .from(embarcaciones)
+      .where(eq(embarcaciones.guarderiaId, guarderiaId)),
   ]);
 
   const toNum = (v: string | null) => (v != null ? Number(v) : null);
@@ -249,5 +262,23 @@ export default async function EspaciosPage() {
     unidadMetraje: s.unidadMetraje ?? null,
   }));
 
-  return <EspaciosClient areas={areasView} socios={socios} serviciosEspacios={serviciosEspacios} />;
+  // Mapa socioId → eslora máxima en metros entre sus embarcaciones. Se
+  // usa para validar tamaño al mudar a un ocupante en "Cambiar ubicación".
+  const esloraMaxPorSocio: Record<string, number> = {};
+  for (const e of embarcacionesRows) {
+    if (!e.profileId) continue;
+    const v = e.esloraM != null ? Number(e.esloraM) : 0;
+    if (v <= 0) continue;
+    const actual = esloraMaxPorSocio[e.profileId] ?? 0;
+    if (v > actual) esloraMaxPorSocio[e.profileId] = v;
+  }
+
+  return (
+    <EspaciosClient
+      areas={areasView}
+      socios={socios}
+      serviciosEspacios={serviciosEspacios}
+      esloraMaxPorSocio={esloraMaxPorSocio}
+    />
+  );
 }

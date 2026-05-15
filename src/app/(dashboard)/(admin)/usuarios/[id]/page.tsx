@@ -19,7 +19,7 @@ import {
   profiles,
   servicios as serviciosTable,
 } from '@/lib/db/schema';
-import { eq, and, desc, inArray, isNotNull, isNull, asc } from 'drizzle-orm';
+import { eq, and, desc, inArray, isNull, asc } from 'drizzle-orm';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { SocioDetail } from './socio-detail';
 
@@ -79,6 +79,7 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
         matricula: embarcaciones.matricula,
         modelo: embarcaciones.modelo,
         seguro: embarcaciones.seguro,
+        esloraM: embarcaciones.esloraM,
       })
       .from(embarcaciones)
       .where(and(eq(embarcaciones.profileId, id), eq(embarcaciones.guarderiaId, gId))),
@@ -181,8 +182,12 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
       .where(and(eq(espacios.ocupanteId, id), eq(espacios.guarderiaId, gId)))
       .limit(1),
 
-    // Espacios disponibles para asignar/cambiar — sólo los que tienen tarifa
-    // configurada (sino el alta no genera movimiento mensual).
+    // Espacios disponibles para asignar/cambiar. Ya no exigimos tarifa
+    // configurada: si el espacio no tiene tarifa, se asigna igual y el
+    // movimiento se genera cuando el admin cargue la tarifa después.
+    // Para validar tamaño en el cambio de espacio traemos también la
+    // eslora del espacio y la unidad de su tarifa (puede ser null si no
+    // tiene tarifa todavía).
     db
       .select({
         id: espacios.id,
@@ -192,18 +197,20 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
         ladoNombre: lados.nombre,
         pisoNombre: pisos.nombre,
         orden: espacios.orden,
+        eslora: espacios.eslora,
+        unidadMetraje: serviciosTable.unidadMetraje,
       })
       .from(espacios)
       .leftJoin(areas, eq(areas.id, espacios.areaId))
       .leftJoin(marinas, eq(marinas.id, espacios.marinaId))
       .leftJoin(lados, eq(lados.id, espacios.ladoId))
       .leftJoin(pisos, eq(pisos.id, espacios.pisoId))
+      .leftJoin(serviciosTable, eq(serviciosTable.id, espacios.servicioId))
       .where(
         and(
           eq(espacios.guarderiaId, gId),
           eq(espacios.estado, 'disponible'),
           isNull(espacios.ocupanteId),
-          isNotNull(espacios.servicioId),
         ),
       )
       .orderBy(asc(areas.nombre), asc(espacios.orden)),
@@ -280,7 +287,35 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
     ? { id: espacioActualRow[0].id, label: labelEspacio(espacioActualRow[0]) }
     : null;
 
-  const espaciosDisponiblesView = espaciosDisponibles.map((e) => ({
+  // Eslora máxima de las embarcaciones del socio (siempre en metros).
+  // Sirve para filtrar espacios destino cuando el socio ya tiene espacio
+  // (es una mudanza). El barco tiene que entrar — eslora del espacio
+  // tiene que ser ≥ eslora del barco más grande del socio.
+  const esloraMaxBarcoM = embarcacionesList.reduce((max, e) => {
+    const v = e.esloraM != null ? Number(e.esloraM) : 0;
+    return v > max ? v : max;
+  }, 0);
+
+  function espacioAceptaBarco(e: {
+    eslora: string | null;
+    unidadMetraje: 'metros' | 'pies' | null;
+  }): boolean {
+    if (e.eslora == null) return true; // sin eslora seteada → no se valida
+    const esloraNum = Number(e.eslora);
+    const esloraM = e.unidadMetraje === 'pies' ? esloraNum * 0.3048 : esloraNum;
+    return esloraM + 0.01 >= esloraMaxBarcoM;
+  }
+
+  // Solo filtramos por tamaño cuando es un cambio (el socio ya tiene
+  // espacio). En la asignación inicial no validamos — el admin elige
+  // libremente.
+  const esCambio = espacioActual != null;
+  const espaciosFiltrados =
+    esCambio && esloraMaxBarcoM > 0
+      ? espaciosDisponibles.filter(espacioAceptaBarco)
+      : espaciosDisponibles;
+
+  const espaciosDisponiblesView = espaciosFiltrados.map((e) => ({
     id: e.id,
     label: labelEspacio(e),
   }));
