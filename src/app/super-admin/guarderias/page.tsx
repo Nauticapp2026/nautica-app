@@ -1,10 +1,11 @@
-import { desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, isNotNull, sql } from 'drizzle-orm';
 
 import { requireSuperAdmin } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import {
   embarcaciones,
   espacios,
+  facturacion,
   guarderias,
   guarderiaPlanHistorial,
   memberships,
@@ -13,8 +14,18 @@ import { GuarderiasClient, type GuarderiaRow, type PlanHistorialEntry } from './
 
 export const dynamic = 'force-dynamic';
 
+// Primer día del mes corriente expresado en UTC para filtrar por TZ
+// Argentina (UTC-3, sin DST). 00:00 AR del día 1 = 03:00 UTC.
+function inicioDelMesArgentinoUTC(): Date {
+  const now = new Date();
+  const arNow = new Date(now.getTime() - 3 * 60 * 60 * 1000);
+  return new Date(Date.UTC(arNow.getUTCFullYear(), arNow.getUTCMonth(), 1, 3, 0, 0));
+}
+
 export default async function SuperAdminGuarderiasPage() {
   await requireSuperAdmin();
+
+  const inicioMes = inicioDelMesArgentinoUTC();
 
   // Queries separadas en vez de subqueries correlacionadas: más robustas y
   // fáciles de leer. count(*)::int devuelve int4, que postgres-js parsea
@@ -25,6 +36,7 @@ export default async function SuperAdminGuarderiasPage() {
     espaciosPorGuarderia,
     embarcacionesPorGuarderia,
     historialRows,
+    facturadoMesPorGuarderia,
   ] = await Promise.all([
     db
       .select({
@@ -76,11 +88,24 @@ export default async function SuperAdminGuarderiasPage() {
       })
       .from(guarderiaPlanHistorial)
       .orderBy(desc(guarderiaPlanHistorial.efectivoDesde)),
+
+    // Total facturado en el mes calendario corriente (TZ AR). Suma el
+    // importe de todas las facturas emitidas — sin importar si están
+    // cobradas o no. "Emitidas" = `emision IS NOT NULL`.
+    db
+      .select({
+        guarderiaId: facturacion.guarderiaId,
+        total: sql<string>`coalesce(sum(${facturacion.importe}), 0)`.mapWith(Number),
+      })
+      .from(facturacion)
+      .where(and(isNotNull(facturacion.emision), gte(facturacion.emision, inicioMes)))
+      .groupBy(facturacion.guarderiaId),
   ]);
 
   const usuariosMap = new Map(usuariosPorGuarderia.map((r) => [r.guarderiaId, r.count]));
   const espaciosMap = new Map(espaciosPorGuarderia.map((r) => [r.guarderiaId, r.count]));
   const embarcacionesMap = new Map(embarcacionesPorGuarderia.map((r) => [r.guarderiaId, r.count]));
+  const facturadoMesMap = new Map(facturadoMesPorGuarderia.map((r) => [r.guarderiaId, r.total]));
 
   const historialMap = new Map<string, PlanHistorialEntry[]>();
   for (const h of historialRows) {
@@ -111,6 +136,7 @@ export default async function SuperAdminGuarderiasPage() {
       espacios: espaciosMap.get(r.id) ?? 0,
       embarcaciones: embarcacionesMap.get(r.id) ?? 0,
       tarifaActual,
+      facturadoMes: facturadoMesMap.get(r.id) ?? 0,
       historial,
     };
   });

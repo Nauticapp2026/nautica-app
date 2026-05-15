@@ -32,6 +32,7 @@ export type GuarderiaRow = {
   espacios: number;
   embarcaciones: number;
   tarifaActual: number | null;
+  facturadoMes: number;
   historial: PlanHistorialEntry[];
 };
 
@@ -99,6 +100,7 @@ export function GuarderiasClient({ guarderias }: { guarderias: GuarderiaRow[] })
                 <th className="px-4 py-3 text-right">Espacios</th>
                 <th className="px-4 py-3 text-right">Embarcaciones</th>
                 <th className="px-4 py-3 text-right">Tarifa mensual</th>
+                <th className="px-4 py-3 text-right">Facturado este mes</th>
                 <th className="px-4 py-3">Fecha de creación</th>
                 <th className="px-4 py-3 text-right">Acciones</th>
               </tr>
@@ -106,7 +108,7 @@ export function GuarderiasClient({ guarderias }: { guarderias: GuarderiaRow[] })
             <tbody className="divide-y divide-gray-100">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="text-muted-foreground px-4 py-6 text-center text-sm">
+                  <td colSpan={12} className="text-muted-foreground px-4 py-6 text-center text-sm">
                     Sin resultados.
                   </td>
                 </tr>
@@ -225,6 +227,7 @@ function GuarderiaFila({
         <td className="px-4 py-3 text-right font-semibold text-[#175861] tabular-nums">
           {formatMonto(guarderia.tarifaActual)}
         </td>
+        <td className="px-4 py-3 text-right tabular-nums">{formatMonto(guarderia.facturadoMes)}</td>
         <td className="text-muted-foreground px-4 py-3 text-xs">
           {formatDate(guarderia.createdAt)}
         </td>
@@ -245,7 +248,7 @@ function GuarderiaFila({
       {open && hasHistorial && (
         <tr className="bg-gray-50">
           <td></td>
-          <td colSpan={10} className="px-4 py-4">
+          <td colSpan={11} className="px-4 py-4">
             <HistorialPanel historial={guarderia.historial} />
           </td>
         </tr>
