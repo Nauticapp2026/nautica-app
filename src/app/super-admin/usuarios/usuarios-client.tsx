@@ -29,12 +29,28 @@ export type UsuarioRow = {
   isSuperAdmin: boolean;
   createdAt: string;
   memberships: MembershipRow[];
+  // Última aceptación de T&C del usuario, o null si nunca aceptó.
+  terminos: { version: number; aceptadoEn: string } | null;
 };
 
 type Props = {
   usuarios: UsuarioRow[];
   actorId: string;
+  // Versión vigente de los T&C. null si todavía no hay nada publicado
+  // (caso de borde, la migración 0042 inserta la v1).
+  versionVigente: number | null;
 };
+
+const TZ_AR = 'America/Argentina/Buenos_Aires';
+
+function formatFechaCorta(iso: string) {
+  return new Date(iso).toLocaleDateString('es-AR', {
+    timeZone: TZ_AR,
+    day: '2-digit',
+    month: '2-digit',
+    year: '2-digit',
+  });
+}
 
 // Mismo estilo que un Input shadcn pero para <select> nativo. Mantiene los
 // tokens del design system (border-input, focus-visible:border-ring) y evita
@@ -42,7 +58,7 @@ type Props = {
 const selectCls =
   'border-input focus-visible:border-ring focus-visible:ring-ring/50 dark:bg-input/30 h-8 rounded-md border bg-transparent px-2 py-1 text-xs shadow-xs transition-[color,box-shadow] outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50';
 
-export function UsuariosClient({ usuarios, actorId }: Props) {
+export function UsuariosClient({ usuarios, actorId, versionVigente }: Props) {
   const [query, setQuery] = useState('');
   const [globalError, setGlobalError] = useState<string | null>(null);
 
@@ -84,13 +100,14 @@ export function UsuariosClient({ usuarios, actorId }: Props) {
                 <th className="px-4 py-3">Usuario</th>
                 <th className="px-4 py-3">Memberships</th>
                 <th className="px-4 py-3">Super admin</th>
+                <th className="px-4 py-3">Términos</th>
                 <th className="px-4 py-3 text-right">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="text-muted-foreground px-4 py-6 text-center text-sm">
+                  <td colSpan={5} className="text-muted-foreground px-4 py-6 text-center text-sm">
                     Sin resultados.
                   </td>
                 </tr>
@@ -100,6 +117,7 @@ export function UsuariosClient({ usuarios, actorId }: Props) {
                     key={u.id}
                     usuario={u}
                     isSelf={u.id === actorId}
+                    versionVigente={versionVigente}
                     onError={setGlobalError}
                   />
                 ))
@@ -115,10 +133,12 @@ export function UsuariosClient({ usuarios, actorId }: Props) {
 function UsuarioFila({
   usuario,
   isSelf,
+  versionVigente,
   onError,
 }: {
   usuario: UsuarioRow;
   isSelf: boolean;
+  versionVigente: number | null;
   onError: (msg: string | null) => void;
 }) {
   const [pending, startTransition] = useTransition();
@@ -193,6 +213,9 @@ function UsuarioFila({
           {usuario.isSuperAdmin ? 'Sí' : 'No'}
         </Button>
       </td>
+      <td className="px-4 py-3 align-top">
+        <TerminosCell terminos={usuario.terminos} versionVigente={versionVigente} />
+      </td>
       <td className="px-4 py-3 text-right align-top">
         <Button
           type="button"
@@ -208,6 +231,29 @@ function UsuarioFila({
         </Button>
       </td>
     </tr>
+  );
+}
+
+function TerminosCell({
+  terminos,
+  versionVigente,
+}: {
+  terminos: UsuarioRow['terminos'];
+  versionVigente: number | null;
+}) {
+  if (!terminos) {
+    return <span className="text-xs font-semibold text-red-600">—</span>;
+  }
+  const desactualizado = versionVigente != null && terminos.version < versionVigente;
+  return (
+    <span
+      className={`text-xs tabular-nums ${desactualizado ? 'text-amber-700' : 'text-[#175861]'}`}
+      title={
+        desactualizado ? `Aceptó v${terminos.version} (vigente: v${versionVigente})` : undefined
+      }
+    >
+      v{terminos.version} · {formatFechaCorta(terminos.aceptadoEn)}
+    </span>
   );
 }
 
