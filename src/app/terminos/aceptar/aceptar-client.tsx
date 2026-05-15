@@ -38,14 +38,22 @@ export function AceptarTerminosClient({
   function handleSubmit() {
     if (!acepta) return;
     startTransition(async () => {
-      const res = await aceptarTerminosAction({ version });
-      if (res.error) {
-        toast.error(res.error);
-        return;
+      try {
+        const res = await aceptarTerminosAction({ version });
+        if (res.error) {
+          toast.error(res.error);
+          return;
+        }
+        toast.success('Términos aceptados.');
+        router.push(next);
+        router.refresh();
+      } catch (err) {
+        // Si la server action lanza excepción (ej. error de red, error
+        // 500 del servidor) el cliente igual tiene que ver feedback en
+        // vez de quedar trabado en "Guardando…".
+        console.error('[aceptarTerminosAction] excepcion', err);
+        toast.error('No se pudo guardar la aceptación. Reintentá en unos segundos.');
       }
-      toast.success('Términos aceptados.');
-      router.push(next);
-      router.refresh();
     });
   }
 

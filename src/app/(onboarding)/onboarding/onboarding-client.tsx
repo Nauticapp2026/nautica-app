@@ -1388,13 +1388,20 @@ export function OnboardingClient({ planInfo, featuresByPlan, terminos }: Onboard
       return;
     }
     startTransition(async () => {
-      const res = await aceptarTerminosAction({ version: terminos.version });
-      if (res.error) {
-        setError(res.error);
-        toast.error(res.error);
-        return;
+      try {
+        const res = await aceptarTerminosAction({ version: terminos.version });
+        if (res.error) {
+          setError(res.error);
+          toast.error(res.error);
+          return;
+        }
+        next();
+      } catch (err) {
+        console.error('[onboarding step10 terminos] excepcion', err);
+        const msg = 'No se pudo guardar la aceptación. Reintentá en unos segundos.';
+        setError(msg);
+        toast.error(msg);
       }
-      next();
     });
   }
 
