@@ -17,7 +17,7 @@ export function GestionFeatures() {
   return (
     <section className="bg-white py-20">
       <div className="mx-auto grid max-w-6xl gap-10 px-4 md:grid-cols-2 md:px-8 lg:gap-16">
-        <div className="relative aspect-[5/6] w-full overflow-hidden rounded-2xl">
+        <div className="relative aspect-[5/6] w-full overflow-hidden">
           <Image
             src="/landing/2.png"
             alt="Panel de gestión administrativa"

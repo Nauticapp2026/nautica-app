@@ -111,6 +111,13 @@ export function PricingClient({ plans, capacities, featuresByPlan }: Props) {
               style={{ width: `${handlePercent}%` }}
             />
             <div
+              className="pointer-events-none absolute -top-12 -translate-x-1/2 rounded-md bg-[#175861] px-2.5 py-1 text-xs font-bold whitespace-nowrap text-white shadow-md after:absolute after:top-full after:left-1/2 after:-translate-x-1/2 after:border-4 after:border-transparent after:border-t-[#175861] after:content-['']"
+              style={{ left: `${handlePercent}%` }}
+              aria-hidden
+            >
+              {formatNumber(clampedCapacity)} lugares
+            </div>
+            <div
               className="pointer-events-none absolute -top-1 size-6 -translate-x-1/2 rounded-full border-2 border-white bg-[#175861] shadow-md"
               style={{ left: `${handlePercent}%` }}
             />
@@ -190,7 +197,7 @@ function PlanCard({
 
   return (
     <div
-      className={`flex flex-col overflow-hidden rounded-2xl bg-white shadow-md ${
+      className={`flex flex-col overflow-hidden rounded-2xl bg-white shadow-md transition-all duration-200 ease-out hover:scale-[1.02] hover:shadow-2xl hover:ring-2 hover:ring-[#669E9D] ${
         presentation.highlighted
           ? 'shadow-2xl ring-2 ring-[#669E9D] md:-my-4'
           : 'ring-1 ring-gray-200'

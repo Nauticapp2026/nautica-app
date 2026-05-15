@@ -31,7 +31,7 @@ export function PorQue() {
           </Link>
         </div>
 
-        <div className="relative aspect-[5/6] w-full overflow-hidden rounded-2xl md:order-last">
+        <div className="relative aspect-[5/6] w-full overflow-hidden md:order-last">
           <Image
             src="/landing/8.png"
             alt="App NauticApp en uso"
