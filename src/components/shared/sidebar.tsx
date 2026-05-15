@@ -22,6 +22,7 @@ import {
   Bell,
   MessageCircle,
   Megaphone,
+  Scale,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -69,6 +70,7 @@ const NAV_BY_VARIANT: Record<SidebarVariant, SidebarItem[]> = {
     { href: '/super-admin/publicidades', label: 'Publicidades', icon: Megaphone },
     { href: '/super-admin/notificaciones', label: 'Notificaciones', icon: Bell },
     { href: '/super-admin/pricing', label: 'Pricing', icon: Tag },
+    { href: '/super-admin/terminos', label: 'Términos', icon: Scale },
   ],
 };
 

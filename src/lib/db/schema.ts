@@ -1276,6 +1276,39 @@ export const platformNotificaciones = pgTable('platform_notificaciones', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
+// Versiones publicadas de los Términos y Condiciones. La vigente es la
+// fila con el mayor `version`. Texto en markdown.
+export const terminosVersiones = pgTable(
+  'terminos_versiones',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    version: integer('version').notNull().unique(),
+    contenido: text('contenido').notNull(),
+    publicadoEn: timestamp('publicado_en', { withTimezone: true }).defaultNow().notNull(),
+    publicadoPor: uuid('publicado_por').references(() => profiles.id, { onDelete: 'set null' }),
+  },
+  (t) => [index('terminos_versiones_version_desc_idx').on(t.version)],
+);
+
+// Histórico de aceptaciones de T&C por usuario. Una fila por cada vez que
+// el user acepta una versión (al registrarse o cuando cambia la versión
+// vigente y vuelve a aceptar). Inmutable.
+export const terminosAceptaciones = pgTable(
+  'terminos_aceptaciones',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    version: integer('version').notNull(),
+    aceptadoEn: timestamp('aceptado_en', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index('terminos_aceptaciones_user_idx').on(t.userId, t.aceptadoEn),
+    index('terminos_aceptaciones_user_version_idx').on(t.userId, t.version),
+  ],
+);
+
 // =============================================================================
 // RELACIONES
 // =============================================================================

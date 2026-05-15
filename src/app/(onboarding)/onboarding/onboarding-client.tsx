@@ -26,9 +26,12 @@ import {
   inviteTeamMembersStep,
   uploadGuarderiaFotoStep,
 } from '@/app/actions/onboarding';
+import { aceptarTerminosAction } from '@/app/actions/terminos';
+import { MarkdownView } from '@/components/shared/markdown-view';
+import { toast } from 'sonner';
 import { Check, Trash2, Plus, ChevronRight } from 'lucide-react';
 
-const TOTAL_STEPS = 10;
+const TOTAL_STEPS = 11;
 const STORAGE_KEY = 'onboarding-state-v1';
 
 const DIAS = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'] as const;
@@ -1066,7 +1069,61 @@ function Step9({ onNext, onBack }: { onNext: () => void; onBack: () => void }) {
   );
 }
 
-function Step10() {
+function Step10Terminos({
+  terminos,
+  onNext,
+  onBack,
+  pending,
+}: {
+  terminos: { version: number; contenido: string } | null;
+  onNext: () => void;
+  onBack: () => void;
+  pending: boolean;
+}) {
+  const [acepta, setAcepta] = useState(false);
+  return (
+    <>
+      <StepHeader
+        title="Términos y Condiciones"
+        subtitle={
+          terminos
+            ? `Versión ${terminos.version}. Para terminar la creación de tu cuenta necesitamos que aceptes los Términos.`
+            : 'No hay términos publicados.'
+        }
+      />
+      <div className="mb-4 max-h-[420px] overflow-y-auto rounded-md border border-gray-200 bg-white p-4">
+        {terminos ? (
+          <MarkdownView source={terminos.contenido} />
+        ) : (
+          <p className="text-muted-foreground text-sm">
+            Hay un error de configuración. Volvé al inicio y reintentá.
+          </p>
+        )}
+      </div>
+      <label className="mb-6 flex items-start gap-3 text-sm text-gray-700">
+        <Checkbox
+          checked={acepta}
+          onCheckedChange={(v) => setAcepta(v === true)}
+          disabled={pending || !terminos}
+          className="mt-0.5"
+        />
+        <span>
+          Leí y acepto los Términos y Condiciones de NauticApp
+          {terminos ? ` en su versión ${terminos.version}.` : '.'}
+        </span>
+      </label>
+      <NavButtons
+        onBack={onBack}
+        onNext={onNext}
+        disabled={!acepta || !terminos}
+        pending={pending}
+        nextLabel={pending ? 'Guardando…' : 'Aceptar y continuar'}
+      />
+    </>
+  );
+}
+
+function Step11Welcome() {
   const router = useRouter();
   return (
     <div className="flex flex-col items-center gap-4 py-4 text-center">
@@ -1106,9 +1163,10 @@ function Step10() {
 type OnboardingClientProps = {
   planInfo: PlanInfoMap;
   featuresByPlan: Record<'esencial' | 'club' | 'elite', string[]>;
+  terminos: { version: number; contenido: string } | null;
 };
 
-export function OnboardingClient({ planInfo, featuresByPlan }: OnboardingClientProps) {
+export function OnboardingClient({ planInfo, featuresByPlan, terminos }: OnboardingClientProps) {
   const [step, setStep] = useState(1);
   const [error, setError] = useState<string | undefined>();
   const [pending, startTransition] = useTransition();
@@ -1324,6 +1382,22 @@ export function OnboardingClient({ planInfo, featuresByPlan }: OnboardingClientP
     next();
   }
 
+  function handleStep10Terminos() {
+    if (!terminos) {
+      setError('No hay términos publicados. Contactá a soporte.');
+      return;
+    }
+    startTransition(async () => {
+      const res = await aceptarTerminosAction({ version: terminos.version });
+      if (res.error) {
+        setError(res.error);
+        toast.error(res.error);
+        return;
+      }
+      next();
+    });
+  }
+
   return (
     <Shell step={step}>
       {step === 1 && (
@@ -1408,7 +1482,15 @@ export function OnboardingClient({ planInfo, featuresByPlan }: OnboardingClientP
       )}
       {step === 8 && <Step8 data={data} planInfo={planInfo} onNext={next} onBack={back} />}
       {step === 9 && <Step9 onNext={next} onBack={back} />}
-      {step === 10 && <Step10 />}
+      {step === 10 && (
+        <Step10Terminos
+          terminos={terminos}
+          onNext={handleStep10Terminos}
+          onBack={back}
+          pending={pending}
+        />
+      )}
+      {step === 11 && <Step11Welcome />}
     </Shell>
   );
 }
