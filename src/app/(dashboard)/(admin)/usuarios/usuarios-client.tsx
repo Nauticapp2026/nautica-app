@@ -9,6 +9,8 @@ import {
   ArrowUpDown,
   Eye,
   FileText,
+  Mail,
+  MessageCircle,
   Package,
   Paperclip,
   Plus,
@@ -22,18 +24,37 @@ import { EmptyState } from '@/components/shared/empty-state';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
+export type FiltroSocios = 'morosos' | 'docs-incompletas';
+
 type Socio = {
   membresiaId: string;
   profileId: string;
   nombre: string | null;
   apellido: string | null;
   email: string;
+  telefono: string | null;
   direccion: string | null;
   deuda: string | null;
   estadoSocio: 'activo' | 'moroso' | null;
   embarcacion: string | null;
   ubicacion: string | null;
+  docsCompletos: boolean;
 };
+
+const FILTRO_LABEL: Record<FiltroSocios, string> = {
+  morosos: 'Socios con deuda 2+ meses',
+  'docs-incompletas': 'Socios con documentación incompleta',
+};
+
+function buildWhatsappUrl(telefono: string | null): string | null {
+  if (!telefono) return null;
+  const digits = telefono.replace(/\D/g, '');
+  if (!digits) return null;
+  // wa.me requiere número con código de país y sin '+'. Si no empieza con
+  // 54 (Argentina), asumimos número local y prepend.
+  const normalized = digits.startsWith('54') ? digits : `54${digits}`;
+  return `https://wa.me/${normalized}`;
+}
 
 type SortKey = 'socio' | 'embarcacion' | 'ubicacion' | 'deuda';
 type SortDir = 'asc' | 'desc';
@@ -525,12 +546,25 @@ function SortableTh({
   );
 }
 
-export function UsuariosClient({ socios }: { socios: Socio[] }) {
+export function UsuariosClient({
+  socios,
+  initialFiltro = null,
+}: {
+  socios: Socio[];
+  initialFiltro?: FiltroSocios | null;
+}) {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<Tab>('socios');
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>('asc');
+  const [filtro, setFiltro] = useState<FiltroSocios | null>(initialFiltro);
+
+  function clearFiltro() {
+    setFiltro(null);
+    router.replace('/usuarios');
+  }
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) {
@@ -545,12 +579,18 @@ export function UsuariosClient({ socios }: { socios: Socio[] }) {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const base = q
+    let base = q
       ? socios.filter((s) => {
           const nombre = `${s.nombre ?? ''} ${s.apellido ?? ''}`.toLowerCase();
           return nombre.includes(q) || s.email.toLowerCase().includes(q);
         })
       : socios.slice();
+
+    if (filtro === 'morosos') {
+      base = base.filter((s) => s.estadoSocio === 'moroso');
+    } else if (filtro === 'docs-incompletas') {
+      base = base.filter((s) => !s.docsCompletos);
+    }
 
     if (!sortKey) return base;
 
@@ -581,7 +621,7 @@ export function UsuariosClient({ socios }: { socios: Socio[] }) {
       return sortDir === 'asc' ? result : -result;
     });
     return base;
-  }, [socios, search, sortKey, sortDir]);
+  }, [socios, search, sortKey, sortDir, filtro]);
 
   const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
     { id: 'socios', label: 'Socios', icon: <Users className="h-4 w-4" /> },
@@ -643,6 +683,23 @@ export function UsuariosClient({ socios }: { socios: Socio[] }) {
                 Agregar socio
               </button>
             </div>
+
+            {filtro && (
+              <div className="flex items-center gap-2 border-b border-gray-100 bg-[#F9FAFB] px-4 py-2.5 text-xs">
+                <span className="text-gray-500">Filtrando:</span>
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-[#175861] px-3 py-1 font-medium text-white">
+                  {FILTRO_LABEL[filtro]}
+                  <button
+                    type="button"
+                    onClick={clearFiltro}
+                    aria-label="Quitar filtro"
+                    className="rounded-full p-0.5 transition hover:bg-white/15"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              </div>
+            )}
 
             {/* Table */}
             {filtered.length === 0 ? (
@@ -731,14 +788,47 @@ export function UsuariosClient({ socios }: { socios: Socio[] }) {
                             ${deuda.toLocaleString('es-AR')}
                           </td>
                           <td className="px-4 py-3 text-right">
-                            <Link
-                              href={`/usuarios/${s.profileId}`}
-                              className="inline-flex items-center gap-1.5 text-xs font-medium transition hover:opacity-70"
-                              style={{ color: '#669E9D' }}
-                            >
-                              <Eye className="h-3.5 w-3.5" />
-                              Ver
-                            </Link>
+                            <div className="inline-flex items-center gap-3">
+                              <a
+                                href={`mailto:${s.email}`}
+                                title={`Enviar email a ${s.email}`}
+                                aria-label={`Enviar email a ${nombre}`}
+                                className="text-gray-400 transition hover:text-[#175861]"
+                              >
+                                <Mail className="h-4 w-4" />
+                              </a>
+                              {(() => {
+                                const wa = buildWhatsappUrl(s.telefono);
+                                return wa ? (
+                                  <a
+                                    href={wa}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    title={`WhatsApp ${s.telefono}`}
+                                    aria-label={`Enviar WhatsApp a ${nombre}`}
+                                    className="text-gray-400 transition hover:text-[#25D366]"
+                                  >
+                                    <MessageCircle className="h-4 w-4" />
+                                  </a>
+                                ) : (
+                                  <span
+                                    title="Sin teléfono cargado"
+                                    className="text-gray-200"
+                                    aria-hidden
+                                  >
+                                    <MessageCircle className="h-4 w-4" />
+                                  </span>
+                                );
+                              })()}
+                              <Link
+                                href={`/usuarios/${s.profileId}`}
+                                className="inline-flex items-center gap-1.5 text-xs font-medium transition hover:opacity-70"
+                                style={{ color: '#669E9D' }}
+                              >
+                                <Eye className="h-3.5 w-3.5" />
+                                Ver
+                              </Link>
+                            </div>
                           </td>
                         </tr>
                       );
