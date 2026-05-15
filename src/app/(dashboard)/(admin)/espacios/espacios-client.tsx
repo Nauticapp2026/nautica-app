@@ -11,6 +11,7 @@ import {
   Plus,
   Search,
   Trash2,
+  Upload,
   X,
 } from 'lucide-react';
 import {
@@ -44,6 +45,7 @@ import {
   type CreateAreaInput,
 } from '@/app/actions/espacios';
 import { EmptyState } from '@/components/shared/empty-state';
+import { ImportAreasModal } from './import-areas-modal';
 
 export type EstadoEspacio = 'ocupado' | 'reservado' | 'disponible';
 
@@ -127,6 +129,7 @@ export function EspaciosClient({
   const router = useRouter();
   const [filtro, setFiltro] = useState<Filtro>('marina');
   const [modalOpen, setModalOpen] = useState(false);
+  const [importModalOpen, setImportModalOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<AreaView | null>(null);
   const [deleting, startDelete] = useTransition();
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -457,15 +460,27 @@ export function EspaciosClient({
             Creá áreas con peines y amarras, asigná clientes y embarcaciones
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => setModalOpen(true)}
-          className="flex shrink-0 items-center justify-center gap-2 rounded-[10px] bg-[#175861] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#0f4249]"
-        >
-          <Plus className="h-4 w-4" />
-          Nueva área
-        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setImportModalOpen(true)}
+            className="flex items-center justify-center gap-2 rounded-[10px] border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+          >
+            <Upload className="h-4 w-4" />
+            Importar áreas
+          </button>
+          <button
+            type="button"
+            onClick={() => setModalOpen(true)}
+            className="flex items-center justify-center gap-2 rounded-[10px] bg-[#175861] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#0f4249]"
+          >
+            <Plus className="h-4 w-4" />
+            Nueva área
+          </button>
+        </div>
       </header>
+
+      <ImportAreasModal open={importModalOpen} onClose={() => setImportModalOpen(false)} />
 
       <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard label="Total de espacios" value={totales.total} accent="#101828" />
