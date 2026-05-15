@@ -3,6 +3,7 @@ import { asc } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { pricingPlans } from '@/lib/db/schema';
 import { getAllPlanFeatures } from '@/lib/pricing/config';
+import { getVersionVigente } from '@/lib/auth/terminos';
 
 import { OnboardingClient } from './onboarding-client';
 
@@ -13,12 +14,13 @@ function formatRate(rate: number) {
 }
 
 export default async function OnboardingPage() {
-  const [plans, featuresByPlan] = await Promise.all([
+  const [plans, featuresByPlan, terminos] = await Promise.all([
     db
       .select({ slug: pricingPlans.slug, name: pricingPlans.name, rate: pricingPlans.rate })
       .from(pricingPlans)
       .orderBy(asc(pricingPlans.displayOrder)),
     getAllPlanFeatures(),
+    getVersionVigente(),
   ]);
 
   const planInfo = {
@@ -36,5 +38,11 @@ export default async function OnboardingPage() {
     }
   }
 
-  return <OnboardingClient planInfo={planInfo} featuresByPlan={featuresByPlan} />;
+  return (
+    <OnboardingClient
+      planInfo={planInfo}
+      featuresByPlan={featuresByPlan}
+      terminos={terminos ? { version: terminos.version, contenido: terminos.contenido } : null}
+    />
+  );
 }

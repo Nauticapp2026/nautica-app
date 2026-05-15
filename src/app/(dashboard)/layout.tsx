@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { getActiveMarina, getPostLoginRedirect } from '@/lib/auth/session';
+import { yaAceptoVersionVigente } from '@/lib/auth/terminos';
 import { Sidebar } from '@/components/shared/sidebar';
 import { GuarderiaInactivaScreen } from '@/components/shared/guarderia-inactiva-screen';
 
@@ -22,6 +23,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
     profile.isSuperAdmin ||
     (WEB_DASHBOARD_ROLES as readonly string[]).includes(activeMembership.rol);
   if (!hasWebAccess) redirect('/no-access');
+
+  // Gate de Términos y Condiciones. El super admin queda exento — es quien
+  // publica las nuevas versiones, sería raro que se trabe a sí mismo.
+  if (!profile.isSuperAdmin) {
+    const aceptado = await yaAceptoVersionVigente(profile.id);
+    if (!aceptado) redirect('/terminos/aceptar');
+  }
 
   // Si la guardería todavía no fue activada por el super admin, los usuarios
   // de esa guardería no pueden operar. El super admin sí pasa, para poder
