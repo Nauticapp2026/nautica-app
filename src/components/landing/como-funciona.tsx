@@ -1,4 +1,4 @@
-import { Settings, Smartphone } from 'lucide-react';
+import Image from 'next/image';
 
 export function ComoFunciona() {
   return (
@@ -15,12 +15,12 @@ export function ComoFunciona() {
 
         <div className="mt-12 grid gap-6 md:grid-cols-2">
           <FlowCard
-            icon={<Settings className="size-6 text-white" />}
+            iconSrc="/landing/como-funciona/1.png"
             title="El club gestiona todo automáticamente"
             description="El sistema sincroniza cuotas, accesos, facturación, camas y amarras, cuentas corrientes y comunicación interna."
           />
           <FlowCard
-            icon={<Smartphone className="size-6 text-white" />}
+            iconSrc="/landing/como-funciona/2.png"
             title="El socio usa la App"
             description="Informa su salida, accede con QR al club, invita gente, recibe notificaciones, consulta el clima y mareas, gestiona su embarcación y compra mediante Nautishop."
           />
@@ -31,18 +31,18 @@ export function ComoFunciona() {
 }
 
 function FlowCard({
-  icon,
+  iconSrc,
   title,
   description,
 }: {
-  icon: React.ReactNode;
+  iconSrc: string;
   title: string;
   description: string;
 }) {
   return (
     <div className="rounded-2xl border-2 border-gray-200 bg-gradient-to-br from-white via-[#ABC2B3]/20 to-[#175861]/30 p-8 text-center">
-      <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-[#175861]">
-        {icon}
+      <div className="relative mx-auto size-12">
+        <Image src={iconSrc} alt="" fill sizes="48px" className="object-contain" />
       </div>
       <h3 className="mt-6 text-lg font-bold text-[#175861]">{title}</h3>
       <p className="mt-3 text-sm font-bold text-[#175861]/90">{description}</p>
