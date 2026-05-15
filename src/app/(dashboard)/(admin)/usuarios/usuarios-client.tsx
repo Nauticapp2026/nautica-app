@@ -15,12 +15,14 @@ import {
   Paperclip,
   Plus,
   Search,
+  Upload,
   UserPlus,
   Users,
   X,
 } from 'lucide-react';
 import { createSocioAction, uploadSocioDocumentoAction } from '@/app/actions/socios';
 import { EmptyState } from '@/components/shared/empty-state';
+import { ImportSociosModal } from './import-socios-modal';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -557,6 +559,7 @@ export function UsuariosClient({
   const [activeTab, setActiveTab] = useState<Tab>('socios');
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
+  const [importModalOpen, setImportModalOpen] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [filtro, setFiltro] = useState<FiltroSocios | null>(initialFiltro);
@@ -632,6 +635,7 @@ export function UsuariosClient({
   return (
     <>
       <CrearSocioModal open={modalOpen} onClose={() => setModalOpen(false)} />
+      <ImportSociosModal open={importModalOpen} onClose={() => setImportModalOpen(false)} />
 
       <div className="p-4 md:p-8">
         {/* Header */}
@@ -674,6 +678,13 @@ export function UsuariosClient({
                   className="h-10 w-full rounded-[10px] border border-gray-200 bg-white pr-4 pl-10 text-sm focus:border-[#175861] focus:ring-1 focus:ring-[#175861] focus:outline-none"
                 />
               </div>
+              <button
+                onClick={() => setImportModalOpen(true)}
+                className="flex shrink-0 items-center justify-center gap-2 rounded-[10px] border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+              >
+                <Upload className="h-4 w-4" />
+                Importar masivo
+              </button>
               <button
                 onClick={() => setModalOpen(true)}
                 className="flex shrink-0 items-center justify-center gap-2 rounded-[10px] px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90"
