@@ -2,6 +2,7 @@ import { getActiveMarina } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import {
   areas,
+  documentos,
   embarcaciones,
   espacios,
   memberships,
@@ -9,9 +10,17 @@ import {
   profiles,
 } from '@/lib/db/schema';
 import { and, desc, eq, inArray } from 'drizzle-orm';
-import { UsuariosClient } from './usuarios-client';
+import { UsuariosClient, type FiltroSocios } from './usuarios-client';
 
-export default async function UsuariosPage() {
+export default async function UsuariosPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ filtro?: string }>;
+}) {
+  const { filtro } = await searchParams;
+  const initialFiltro: FiltroSocios | null =
+    filtro === 'morosos' || filtro === 'docs-incompletas' ? filtro : null;
+
   const ctx = await getActiveMarina();
   if (!ctx) return null;
 
@@ -24,6 +33,7 @@ export default async function UsuariosPage() {
       nombre: profiles.nombre,
       apellido: profiles.apellido,
       email: profiles.email,
+      telefono: profiles.telefono,
       direccion: profiles.direccion,
     })
     .from(memberships)
@@ -39,7 +49,7 @@ export default async function UsuariosPage() {
 
   const profileIds = socios.map((s) => s.profileId);
 
-  const [embarcacionesList, movimientosList, espaciosList] = await Promise.all([
+  const [embarcacionesList, movimientosList, espaciosList, docsList] = await Promise.all([
     profileIds.length > 0
       ? db
           .select({ profileId: embarcaciones.profileId, nombre: embarcaciones.nombre })
@@ -101,6 +111,16 @@ export default async function UsuariosPage() {
             areaNombre: string | null;
           }[],
         ),
+
+    // Documentos por socio. Un socio se considera completo si tiene al menos
+    // un documento de cada uno de los 3 tipos requeridos (mismo criterio que
+    // dashboard/page.tsx).
+    profileIds.length > 0
+      ? db
+          .select({ profileId: documentos.profileId, tipo: documentos.tipo })
+          .from(documentos)
+          .where(inArray(documentos.profileId, profileIds as string[]))
+      : Promise.resolve([] as { profileId: string; tipo: string | null }[]),
   ]);
 
   const embByProfile: Record<string, string> = {};
@@ -136,18 +156,30 @@ export default async function UsuariosPage() {
     haberBySocio.set(m.socioId, (haberBySocio.get(m.socioId) ?? 0) + haber);
   }
 
+  const TIPOS_REQUERIDOS = new Set(['carnet_nautico', 'matricula', 'seguro']);
+  const tiposPorSocio = new Map<string, Set<string>>();
+  for (const r of docsList) {
+    if (!tiposPorSocio.has(r.profileId)) tiposPorSocio.set(r.profileId, new Set());
+    if (r.tipo && TIPOS_REQUERIDOS.has(r.tipo)) {
+      tiposPorSocio.get(r.profileId)!.add(r.tipo);
+    }
+  }
+
   const sociosData = socios.map((s) => {
     const debe = debeBySocio.get(s.profileId) ?? 0;
     const haber = haberBySocio.get(s.profileId) ?? 0;
     const deuda = Math.max(0, debe - haber);
+    const tipos = tiposPorSocio.get(s.profileId);
+    const docsCompletos = (tipos?.size ?? 0) >= TIPOS_REQUERIDOS.size;
     return {
       ...s,
       deuda: deuda.toFixed(2),
       estadoSocio: (morososSet.has(s.profileId) ? 'moroso' : 'activo') as 'moroso' | 'activo',
       embarcacion: s.profileId ? (embByProfile[s.profileId] ?? null) : null,
       ubicacion: s.profileId ? (ubicacionByProfile[s.profileId] ?? null) : null,
+      docsCompletos,
     };
   });
 
-  return <UsuariosClient socios={sociosData} />;
+  return <UsuariosClient socios={sociosData} initialFiltro={initialFiltro} />;
 }

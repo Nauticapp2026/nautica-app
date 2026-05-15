@@ -71,15 +71,17 @@ function MetricCard({
   value,
   label,
   sublabel,
+  href,
 }: {
   icon: React.ReactNode;
   iconBg: string;
   value: string;
   label: string;
   sublabel?: string;
+  href?: string;
 }) {
-  return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-5">
+  const inner = (
+    <>
       <div
         className="mb-3 flex h-10 w-10 items-center justify-center rounded-[10px]"
         style={{ background: iconBg }}
@@ -93,8 +95,21 @@ function MetricCard({
         {label}
       </p>
       {sublabel && <p className="mt-1 text-xs text-gray-400">{sublabel}</p>}
-    </div>
+    </>
   );
+
+  if (href) {
+    return (
+      <Link
+        href={href}
+        className="block rounded-2xl border border-gray-200 bg-white p-5 transition hover:border-[#175861] hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[#175861]"
+      >
+        {inner}
+      </Link>
+    );
+  }
+
+  return <div className="rounded-2xl border border-gray-200 bg-white p-5">{inner}</div>;
 }
 
 const TIPO_LABEL: Record<string, string> = {
@@ -361,12 +376,14 @@ export default async function DashboardPage() {
           value={String(morososIds.length)}
           label="Socios con deuda 2+ meses"
           sublabel={`${formatCurrency(deudaTotal)} a cobrar`}
+          href="/usuarios?filtro=morosos"
         />
         <MetricCard
           icon={<FileText className="h-5 w-5 text-white" />}
           iconBg="#B54708"
           value={String(sociosDocsIncompletos)}
           label="Socios con documentación incompleta"
+          href="/usuarios?filtro=docs-incompletas"
         />
       </div>
 
