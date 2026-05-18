@@ -199,9 +199,6 @@ export const estadoAlertaEnum = pgEnum('estado_alerta', ['pendiente', 'resuelta'
 export const estadoSolicitudLavadoEnum = pgEnum('estado_solicitud_lavado', [
   'pendiente',
   'aceptada',
-  // 'en_proceso' queda como alias temporal hasta que app mobile esté
-  // deployada usando 'aceptada'. Una migración futura lo va a borrar.
-  'en_proceso',
   'lista',
   'cancelada',
 ]);
@@ -1131,7 +1128,7 @@ export const solicitudesLavado = pgTable(
     index('solicitudes_lavado_tarea_idx').on(t.tareaId),
     uniqueIndex('solicitudes_lavado_socio_activa_unique')
       .on(t.socioId)
-      .where(sql`${t.estado} in ('pendiente', 'aceptada', 'en_proceso')`),
+      .where(sql`${t.estado} in ('pendiente', 'aceptada')`),
   ],
 );
 

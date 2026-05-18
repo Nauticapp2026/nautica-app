@@ -109,7 +109,6 @@ export default async function TareasPage() {
     solicitudLavadoEstado: t.solicitudLavadoEstado as
       | 'pendiente'
       | 'aceptada'
-      | 'en_proceso'
       | 'lista'
       | 'cancelada'
       | null,
