@@ -8,7 +8,5 @@ export const ESTADOS_TAREA: EstadoTarea[] = [
   'lavado',
 ];
 
-// 'en_proceso' queda en el enum por compatibilidad con la app mobile mientras
-// se deploya; el código del web solo emite 'aceptada' a partir de ahora.
 export const ESTADOS_SOLICITUD_LAVADO = ['pendiente', 'aceptada', 'lista', 'cancelada'] as const;
-export type EstadoSolicitudLavado = (typeof ESTADOS_SOLICITUD_LAVADO)[number] | 'en_proceso';
+export type EstadoSolicitudLavado = (typeof ESTADOS_SOLICITUD_LAVADO)[number];

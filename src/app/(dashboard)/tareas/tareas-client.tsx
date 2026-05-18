@@ -23,7 +23,12 @@ import {
   updateTareaEstadoAction,
   updateTareaOperarioAction,
 } from '@/app/actions/tareas';
-import { ESTADOS_TAREA, type EstadoSolicitudLavado, type EstadoTarea } from './constants';
+import {
+  ESTADOS_SOLICITUD_LAVADO,
+  ESTADOS_TAREA,
+  type EstadoSolicitudLavado,
+  type EstadoTarea,
+} from './constants';
 
 // ─── Tipos ──────────────────────────────────────────────────────────────────
 
@@ -45,20 +50,9 @@ export type Tarea = {
 const ESTADO_SOLICITUD_LAVADO_LABEL: Record<EstadoSolicitudLavado, string> = {
   pendiente: 'Pendiente',
   aceptada: 'Aceptada',
-  // Alias legacy mientras la DB siga aceptando el valor viejo.
-  en_proceso: 'Aceptada',
   lista: 'Lista',
   cancelada: 'Cancelada',
 };
-
-// El admin elige entre estos 4 estados; 'en_proceso' no aparece como opción
-// en la UI (lo mantenemos en el tipo solo para tolerar rows residuales).
-const ESTADOS_LAVADO_ELEGIBLES: EstadoSolicitudLavado[] = [
-  'pendiente',
-  'aceptada',
-  'lista',
-  'cancelada',
-];
 
 type OperarioOpt = { id: string; nombre: string };
 type EmbarcacionOpt = { id: string; nombre: string };
@@ -290,17 +284,11 @@ function TareaCard({
         {tarea.estado === 'lavado' && tarea.solicitudLavadoEstado && (
           <select
             className="h-8 w-full rounded-[8px] border border-gray-200 bg-white px-2 text-xs text-[#175861] focus:border-[#175861] focus:outline-none"
-            value={
-              // 'en_proceso' (legacy) lo mostramos como si fuera 'aceptada'
-              // para que la opción quede seleccionada coherentemente.
-              tarea.solicitudLavadoEstado === 'en_proceso'
-                ? 'aceptada'
-                : tarea.solicitudLavadoEstado
-            }
+            value={tarea.solicitudLavadoEstado}
             onChange={(e) => changeEstadoLavado(e.target.value as EstadoSolicitudLavado)}
             disabled={pending}
           >
-            {ESTADOS_LAVADO_ELEGIBLES.map((e) => (
+            {ESTADOS_SOLICITUD_LAVADO.map((e) => (
               <option key={e} value={e}>
                 {ESTADO_SOLICITUD_LAVADO_LABEL[e]}
               </option>
