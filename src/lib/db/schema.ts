@@ -60,6 +60,7 @@ export const estadoMiembroEnum = pgEnum('estado_miembro', ['activo', 'inactivo']
 export const estadoInvitadoEnum = pgEnum('estado_invitado', ['activo', 'inactivo']);
 
 export const estadoTareaEnum = pgEnum('estado_tarea', [
+  'salida_programada',
   'preparar',
   'navegando',
   'guardada',
@@ -197,6 +198,9 @@ export const estadoAlertaEnum = pgEnum('estado_alerta', ['pendiente', 'resuelta'
 
 export const estadoSolicitudLavadoEnum = pgEnum('estado_solicitud_lavado', [
   'pendiente',
+  'aceptada',
+  // 'en_proceso' queda como alias temporal hasta que app mobile esté
+  // deployada usando 'aceptada'. Una migración futura lo va a borrar.
   'en_proceso',
   'lista',
   'cancelada',
@@ -1117,6 +1121,7 @@ export const solicitudesLavado = pgTable(
     diaUso: date('dia_uso').notNull(),
     estado: estadoSolicitudLavadoEnum('estado').default('pendiente').notNull(),
     tareaId: uuid('tarea_id').references(() => tareas.id, { onDelete: 'set null' }),
+    motivoCancelacion: text('motivo_cancelacion'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
@@ -1126,7 +1131,7 @@ export const solicitudesLavado = pgTable(
     index('solicitudes_lavado_tarea_idx').on(t.tareaId),
     uniqueIndex('solicitudes_lavado_socio_activa_unique')
       .on(t.socioId)
-      .where(sql`${t.estado} in ('pendiente', 'en_proceso')`),
+      .where(sql`${t.estado} in ('pendiente', 'aceptada', 'en_proceso')`),
   ],
 );
 

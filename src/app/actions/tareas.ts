@@ -4,8 +4,9 @@ import { revalidatePath } from 'next/cache';
 import { and, eq } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
-import { tareas, memberships, embarcaciones, solicitudesLavado } from '@/lib/db/schema';
+import { tareas, memberships, embarcaciones, guarderias, solicitudesLavado } from '@/lib/db/schema';
 import { getActiveMarina } from '@/lib/auth/session';
+import { sendPushToUser } from '@/lib/push-notifications';
 import {
   ESTADOS_SOLICITUD_LAVADO,
   ESTADOS_TAREA,
@@ -219,12 +220,18 @@ export async function updateTareaOperarioAction(
 export async function updateSolicitudLavadoEstadoAction(
   tareaId: string,
   estado: EstadoSolicitudLavado,
+  motivoCancelacion?: string | null,
 ): Promise<{ error?: string }> {
   const ctx = await getActiveMarina();
   if (!ctx) return { error: 'No autenticado' };
 
-  if (!ESTADOS_SOLICITUD_LAVADO.includes(estado)) {
+  if (!ESTADOS_SOLICITUD_LAVADO.includes(estado as (typeof ESTADOS_SOLICITUD_LAVADO)[number])) {
     return { error: 'Estado inválido.' };
+  }
+
+  const motivoLimpio = motivoCancelacion?.trim() || null;
+  if (estado === 'cancelada' && !motivoLimpio) {
+    return { error: 'Para cancelar una solicitud hay que indicar el motivo.' };
   }
 
   const gId = ctx.activeMembership.guarderiaId;
@@ -241,16 +248,65 @@ export async function updateSolicitudLavadoEstadoAction(
   if (!canMove) return { error: 'No tenés permiso para actualizar este lavado.' };
 
   const [solicitud] = await db
-    .select({ id: solicitudesLavado.id })
+    .select({
+      id: solicitudesLavado.id,
+      socioId: solicitudesLavado.socioId,
+      diaUso: solicitudesLavado.diaUso,
+    })
     .from(solicitudesLavado)
     .where(and(eq(solicitudesLavado.tareaId, tareaId), eq(solicitudesLavado.guarderiaId, gId)))
     .limit(1);
   if (!solicitud) return { error: 'Esta tarea no tiene una solicitud de lavado asociada.' };
 
+  // El motivo solo persiste cuando se cancela. Si se cambia a otro estado
+  // limpiamos el campo para no arrastrar texto viejo de una cancelación
+  // que después se revirtió.
   await db
     .update(solicitudesLavado)
-    .set({ estado, updatedAt: new Date() })
+    .set({
+      estado,
+      motivoCancelacion: estado === 'cancelada' ? motivoLimpio : null,
+      updatedAt: new Date(),
+    })
     .where(eq(solicitudesLavado.id, solicitud.id));
+
+  // Push al celular del socio. La row in-app la inserta el trigger
+  // `trg_notificar_solicitud_lavado`; acá solo armamos el copy del push.
+  // Fire-and-forget: si Expo falla, no rompemos la acción del admin.
+  const [club] = await db
+    .select({ nombre: guarderias.nombre })
+    .from(guarderias)
+    .where(eq(guarderias.id, gId))
+    .limit(1);
+  const clubNombre = club?.nombre ?? 'tu club';
+
+  let pushTitle: string | null = null;
+  let pushBody: string | null = null;
+  let pushTipo: string | null = null;
+  if (estado === 'aceptada') {
+    pushTipo = 'lavado_aceptada';
+    pushTitle = 'Solicitud de lavado aceptada';
+    pushBody = `${clubNombre} aceptó tu solicitud de lavado.`;
+  } else if (estado === 'lista') {
+    pushTipo = 'lavado_lista';
+    pushTitle = 'Tu lavado está listo';
+    pushBody = `${clubNombre} terminó el lavado de tu embarcación.`;
+  } else if (estado === 'cancelada') {
+    pushTipo = 'lavado_cancelada';
+    pushTitle = 'Solicitud de lavado cancelada';
+    pushBody = motivoLimpio
+      ? `${clubNombre} canceló tu solicitud. Motivo: ${motivoLimpio}`
+      : `${clubNombre} canceló tu solicitud de lavado.`;
+  }
+
+  if (pushTitle && pushBody && pushTipo) {
+    await sendPushToUser({
+      userId: solicitud.socioId,
+      title: pushTitle,
+      body: pushBody,
+      data: { tipo: pushTipo, solicitudId: solicitud.id },
+    });
+  }
 
   revalidatePath('/tareas');
   return {};

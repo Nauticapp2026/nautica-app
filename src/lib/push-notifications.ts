@@ -282,6 +282,67 @@ async function markFallida(id: string, errorMsg: string): Promise<void> {
     .where(eq(platformNotificaciones.id, id));
 }
 
+// =============================================================================
+// Push directo a un user (no broadcast)
+//
+// Para flujos transaccionales: el admin marca una solicitud de lavado como
+// 'aceptada' y queremos avisarle al socio inmediatamente. No pasa por
+// platform_notificaciones (eso es para campañas del super admin), va
+// directo al device del user.
+//
+// Fire-and-forget: si Expo falla, logueamos pero no rompemos la acción
+// que la disparó. El usuario igual ve el cambio cuando abre la app.
+// =============================================================================
+
+export async function sendPushToUser({
+  userId,
+  title,
+  body,
+  data,
+}: {
+  userId: string;
+  title: string;
+  body: string;
+  data?: Record<string, unknown>;
+}): Promise<void> {
+  const tokens = await db
+    .select({ expoPushToken: deviceTokens.expoPushToken })
+    .from(deviceTokens)
+    .where(eq(deviceTokens.userId, userId));
+
+  if (tokens.length === 0) return;
+
+  const messages: ExpoMessage[] = tokens.map((t) => ({
+    to: t.expoPushToken,
+    title,
+    body,
+    sound: 'default',
+    data,
+  }));
+
+  try {
+    const tickets = await sendExpoPushes(messages);
+    const tokensToDelete: string[] = [];
+    for (let i = 0; i < tickets.length; i++) {
+      const ticket = tickets[i];
+      if (
+        ticket.status === 'error' &&
+        ticket.details?.error === 'DeviceNotRegistered' &&
+        messages[i]
+      ) {
+        tokensToDelete.push(messages[i].to);
+      }
+    }
+    if (tokensToDelete.length > 0) {
+      await db.delete(deviceTokens).where(inArray(deviceTokens.expoPushToken, tokensToDelete));
+    }
+  } catch (err) {
+    // No queremos que un fallo del push tire la server action que lo
+    // disparó. Logueamos y seguimos.
+    console.error('[sendPushToUser] error enviando push', { userId, err });
+  }
+}
+
 export async function registerDeviceToken({
   userId,
   expoPushToken,
