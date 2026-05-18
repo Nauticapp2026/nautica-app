@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -31,7 +30,6 @@ export function AceptarTerminosClient({
   publicadoEn: string;
   next: string;
 }) {
-  const router = useRouter();
   const [acepta, setAcepta] = useState(false);
   const [pending, startTransition] = useTransition();
 
@@ -44,13 +42,13 @@ export function AceptarTerminosClient({
           toast.error(res.error);
           return;
         }
-        toast.success('Términos aceptados.');
-        router.push(next);
-        router.refresh();
+        // Hard nav: si usábamos router.push acá adentro de startTransition,
+        // el pending state quedaba atrapado hasta que /dashboard terminara
+        // de renderizar — y el botón seguía mostrando "Guardando…" sin que
+        // el usuario viera que ya se había aceptado. window.location.assign
+        // navega de inmediato y fuerza un render limpio del destino.
+        window.location.assign(next);
       } catch (err) {
-        // Si la server action lanza excepción (ej. error de red, error
-        // 500 del servidor) el cliente igual tiene que ver feedback en
-        // vez de quedar trabado en "Guardando…".
         console.error('[aceptarTerminosAction] excepcion', err);
         toast.error('No se pudo guardar la aceptación. Reintentá en unos segundos.');
       }
