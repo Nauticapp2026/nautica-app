@@ -8,15 +8,15 @@ import { useSearchParams } from 'next/navigation';
 // Flujo:
 //   1. La app mobile pasa emailRedirectTo = `${ADMIN_URL}/auth/confirm` al
 //      llamar a supabase.auth.signUp.
-//   2. Supabase manda mail con link a su /auth/v1/verify, que 302 redirige
-//      a esta URL con los tokens en el #fragment (flow implicit) o code en
-//      query (flow PKCE).
-//   3. Acá reconstruimos los tokens y armamos un deep link al custom scheme
-//      de la app: nauticaappmobile://confirm#<tokens>.
-//   4. Auto-disparamos window.location.href con ese deep link al montar.
-//      Chrome 90+ bloquea redirects automáticos a custom schemes sin user
-//      gesture, así que también ofrecemos un botón "Abrir NauticApp" que el
-//      user toca manualmente — ahí sí hay user gesture y el OS abre la app.
+//   2. Supabase manda mail con link a su /auth/v1/verify, que ya marca el
+//      email como confirmado y 302 redirige a esta URL con los tokens en el
+//      #fragment (flow implicit) o code en query (flow PKCE).
+//   3. En mobile: armamos un deep link al custom scheme nauticaappmobile://
+//      confirm#<tokens> y lo disparamos (auto + botón con user gesture,
+//      porque Chrome 90+ bloquea el auto-redirect a custom schemes).
+//   4. En desktop: el custom scheme no abre nada, pero el email ya quedó
+//      confirmado en el paso 2 — mostramos un cartel de éxito invitando a
+//      loguearse desde el celular.
 
 const APP_SCHEME = 'nauticaappmobile';
 const APP_DEEP_LINK_PATH = 'confirm';
@@ -32,6 +32,11 @@ function buildDeepLink(): string {
   return '';
 }
 
+function detectIsMobile(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+}
+
 function ConfirmContent() {
   // Calculado lazy: en server da '' (no hay window), en cliente el valor real
   // se mantiene en este state desde el primer render post-hidratación.
@@ -39,6 +44,7 @@ function ConfirmContent() {
     if (typeof window === 'undefined') return '';
     return buildDeepLink();
   });
+  const [isMobile] = useState<boolean>(() => detectIsMobile());
   // Si después de unos segundos el user sigue acá, sugerimos que la app no
   // está instalada o que toque el botón manualmente.
   const [showFallback, setShowFallback] = useState(false);
@@ -49,13 +55,13 @@ function ConfirmContent() {
   const supabaseErrorDesc = search.get('error_description');
 
   useEffect(() => {
-    if (!deepLink || supabaseError) return;
+    if (!deepLink || supabaseError || !isMobile) return;
     // Auto-intento al montar. Puede fallar silenciosamente en Chrome moderno
     // sin user gesture — por eso siempre mostramos el botón abajo.
     window.location.href = deepLink;
     const timer = window.setTimeout(() => setShowFallback(true), 1500);
     return () => window.clearTimeout(timer);
-  }, [deepLink, supabaseError]);
+  }, [deepLink, supabaseError, isMobile]);
 
   if (supabaseError) {
     return (
@@ -83,6 +89,25 @@ function ConfirmContent() {
     );
   }
 
+  if (!isMobile) {
+    // Llegó al link desde la compu: el email ya se confirmó al pasar por
+    // /auth/v1/verify, pero el custom scheme no abre nada acá. Mostramos
+    // éxito explícito para que no quede mirando un spinner que no avanza.
+    return (
+      <div className="rounded-2xl border border-green-200 bg-green-50 p-6 text-center shadow-sm">
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
+          <CheckIcon />
+        </div>
+        <h1 className="mt-4 text-lg font-bold text-green-800">¡Email confirmado!</h1>
+        <p className="mt-2 text-sm text-green-700">
+          Tu cuenta quedó verificada. Abrí la app NauticApp en tu celular e iniciá sesión con tu
+          mail y contraseña.
+        </p>
+        <p className="mt-4 text-xs text-gray-500">Ya podés cerrar esta pestaña.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-6 text-center shadow-sm">
       <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#E8F0F0]">
@@ -106,6 +131,25 @@ function ConfirmContent() {
         </p>
       ) : null}
     </div>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg
+      className="h-6 w-6 text-green-600"
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="M5 12.5l4.5 4.5L19 7"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }
 
