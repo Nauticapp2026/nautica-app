@@ -92,7 +92,12 @@ export default async function TareasPage() {
     id: t.id,
     descripcion: t.descripcion,
     nota: t.nota,
-    estado: (t.estado ?? 'preparar') as 'preparar' | 'navegando' | 'guardada' | 'lavado',
+    estado: (t.estado ?? 'preparar') as
+      | 'salida_programada'
+      | 'preparar'
+      | 'navegando'
+      | 'guardada'
+      | 'lavado',
     fechaHora: t.fechaHora ? t.fechaHora.toISOString() : null,
     createdAt: t.createdAt.toISOString(),
     operarioId: t.operarioId,
@@ -103,6 +108,7 @@ export default async function TareasPage() {
     socioNombre: [t.socioNombre, t.socioApellido].filter(Boolean).join(' ') || t.socioEmail || null,
     solicitudLavadoEstado: t.solicitudLavadoEstado as
       | 'pendiente'
+      | 'aceptada'
       | 'en_proceso'
       | 'lista'
       | 'cancelada'

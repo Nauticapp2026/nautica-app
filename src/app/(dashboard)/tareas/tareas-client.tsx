@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import {
   AlertCircle,
   Anchor,
+  CalendarClock,
   ClipboardList,
   Droplet,
   FilterX,
@@ -43,10 +44,21 @@ export type Tarea = {
 
 const ESTADO_SOLICITUD_LAVADO_LABEL: Record<EstadoSolicitudLavado, string> = {
   pendiente: 'Pendiente',
-  en_proceso: 'En proceso',
+  aceptada: 'Aceptada',
+  // Alias legacy mientras la DB siga aceptando el valor viejo.
+  en_proceso: 'Aceptada',
   lista: 'Lista',
   cancelada: 'Cancelada',
 };
+
+// El admin elige entre estos 4 estados; 'en_proceso' no aparece como opción
+// en la UI (lo mantenemos en el tipo solo para tolerar rows residuales).
+const ESTADOS_LAVADO_ELEGIBLES: EstadoSolicitudLavado[] = [
+  'pendiente',
+  'aceptada',
+  'lista',
+  'cancelada',
+];
 
 type OperarioOpt = { id: string; nombre: string };
 type EmbarcacionOpt = { id: string; nombre: string };
@@ -72,6 +84,13 @@ type ColumnDef = {
 };
 
 const COLUMNAS: ColumnDef[] = [
+  {
+    estado: 'salida_programada',
+    label: 'Salida programada',
+    icon: CalendarClock,
+    header: 'bg-[#F5A623]',
+    body: 'bg-[#FFF8E0]',
+  },
   {
     estado: 'preparar',
     label: 'Preparar',
@@ -103,6 +122,7 @@ const COLUMNAS: ColumnDef[] = [
 ];
 
 const ESTADO_LABEL: Record<EstadoTarea, string> = {
+  salida_programada: 'Salida programada',
   preparar: 'Preparar',
   navegando: 'Navegando',
   guardada: 'Guardada',
@@ -160,6 +180,9 @@ function TareaCard({
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [cancelando, setCancelando] = useState(false);
+  const [motivoCancel, setMotivoCancel] = useState('');
+  const [motivoError, setMotivoError] = useState<string | null>(null);
 
   const changeOperario = (opId: string) => {
     startTransition(async () => {
@@ -170,10 +193,37 @@ function TareaCard({
   };
 
   const changeEstadoLavado = (estado: EstadoSolicitudLavado) => {
+    // Para cancelar pedimos el motivo en un modal — sino el socio recibe
+    // un push genérico y no sabe por qué se canceló.
+    if (estado === 'cancelada') {
+      setMotivoCancel('');
+      setMotivoError(null);
+      setCancelando(true);
+      return;
+    }
     startTransition(async () => {
       const res = await updateSolicitudLavadoEstadoAction(tarea.id, estado);
       if (res.error) alert(res.error);
       else router.refresh();
+    });
+  };
+
+  const confirmarCancelacion = () => {
+    const motivo = motivoCancel.trim();
+    if (!motivo) {
+      setMotivoError('Indicá un motivo para que el socio sepa por qué se canceló.');
+      return;
+    }
+    setMotivoError(null);
+    startTransition(async () => {
+      const res = await updateSolicitudLavadoEstadoAction(tarea.id, 'cancelada', motivo);
+      if (res.error) {
+        setMotivoError(res.error);
+        return;
+      }
+      setCancelando(false);
+      setMotivoCancel('');
+      router.refresh();
     });
   };
 
@@ -240,11 +290,17 @@ function TareaCard({
         {tarea.estado === 'lavado' && tarea.solicitudLavadoEstado && (
           <select
             className="h-8 w-full rounded-[8px] border border-gray-200 bg-white px-2 text-xs text-[#175861] focus:border-[#175861] focus:outline-none"
-            value={tarea.solicitudLavadoEstado}
+            value={
+              // 'en_proceso' (legacy) lo mostramos como si fuera 'aceptada'
+              // para que la opción quede seleccionada coherentemente.
+              tarea.solicitudLavadoEstado === 'en_proceso'
+                ? 'aceptada'
+                : tarea.solicitudLavadoEstado
+            }
             onChange={(e) => changeEstadoLavado(e.target.value as EstadoSolicitudLavado)}
             disabled={pending}
           >
-            {(Object.keys(ESTADO_SOLICITUD_LAVADO_LABEL) as EstadoSolicitudLavado[]).map((e) => (
+            {ESTADOS_LAVADO_ELEGIBLES.map((e) => (
               <option key={e} value={e}>
                 {ESTADO_SOLICITUD_LAVADO_LABEL[e]}
               </option>
@@ -252,6 +308,60 @@ function TareaCard({
           </select>
         )}
       </div>
+
+      {cancelando && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (!pending) setCancelando(false);
+          }}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-base font-bold" style={{ color: '#101828' }}>
+              Cancelar solicitud de lavado
+            </h3>
+            <p className="mt-1 text-sm text-gray-600">
+              El socio va a recibir una notificación con este motivo.
+            </p>
+            <textarea
+              className={`${textareaCls} mt-4`}
+              rows={3}
+              value={motivoCancel}
+              onChange={(e) => setMotivoCancel(e.target.value)}
+              placeholder="Ej: No tenemos turno disponible para ese día"
+              autoFocus
+            />
+            {motivoError && (
+              <div className="mt-2 flex items-center gap-2 rounded-[10px] border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                {motivoError}
+              </div>
+            )}
+            <div className="mt-4 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setCancelando(false)}
+                disabled={pending}
+                className="rounded-[10px] px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-100"
+              >
+                Volver
+              </button>
+              <button
+                type="button"
+                onClick={confirmarCancelacion}
+                disabled={pending}
+                className="rounded-[10px] border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-100 disabled:opacity-50"
+              >
+                {pending ? 'Cancelando…' : 'Confirmar cancelación'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -492,21 +602,41 @@ export function TareasClient({
 
   const [filterOperario, setFilterOperario] = useState<string>('');
   const [filterEmbarcacion, setFilterEmbarcacion] = useState<string>('');
-  const [tab, setTab] = useState<'operativa' | 'lavado'>('operativa');
+  const [tab, setTab] = useState<'salidas' | 'operativa' | 'lavado'>('salidas');
 
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverState, setDragOverState] = useState<EstadoTarea | null>(null);
+
+  // Día actual en TZ Argentina (YYYY-MM-DD). Las tareas con estado
+  // 'salida_programada' se filtran por este día — las del futuro no se
+  // muestran hasta que llegue su fecha.
+  const hoyAr = useMemo(() => {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: TZ_AR }).format(new Date());
+  }, []);
+
+  const fechaArYmd = (iso: string | null): string | null => {
+    if (!iso) return null;
+    return new Intl.DateTimeFormat('en-CA', { timeZone: TZ_AR }).format(new Date(iso));
+  };
 
   const filtradas = useMemo(() => {
     return tareas.filter((t) => {
       if (filterOperario && t.operarioId !== filterOperario) return false;
       if (filterEmbarcacion && t.embarcacionId !== filterEmbarcacion) return false;
+      // Salidas programadas: solo se muestran las del día (TZ AR). Las del
+      // futuro quedan ocultas hasta su fecha; las sin fecha no aparecen
+      // (no tiene sentido sin hora de salida).
+      if (t.estado === 'salida_programada') {
+        const dia = fechaArYmd(t.fechaHora);
+        return dia === hoyAr;
+      }
       return true;
     });
-  }, [tareas, filterOperario, filterEmbarcacion]);
+  }, [tareas, filterOperario, filterEmbarcacion, hoyAr]);
 
   const agrupadas = useMemo(() => {
     const acc: Record<EstadoTarea, Tarea[]> = {
+      salida_programada: [],
       preparar: [],
       navegando: [],
       guardada: [],
@@ -580,7 +710,7 @@ export function TareasClient({
       </div>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
         {COLUMNAS.map((col) => {
           const Icon = col.icon;
           const count = agrupadas[col.estado].length;
@@ -647,6 +777,15 @@ export function TareasClient({
       <div className="flex w-fit gap-1 rounded-[12px] border border-gray-200 bg-white p-1">
         <button
           type="button"
+          onClick={() => setTab('salidas')}
+          className={`rounded-[8px] px-4 py-2 text-sm font-semibold transition-colors ${
+            tab === 'salidas' ? 'bg-[#175861] text-white' : 'text-gray-600 hover:bg-gray-50'
+          }`}
+        >
+          Salidas programadas ({agrupadas.salida_programada.length})
+        </button>
+        <button
+          type="button"
           onClick={() => setTab('operativa')}
           className={`rounded-[8px] px-4 py-2 text-sm font-semibold transition-colors ${
             tab === 'operativa' ? 'bg-[#175861] text-white' : 'text-gray-600 hover:bg-gray-50'
@@ -667,10 +806,13 @@ export function TareasClient({
 
       {/* Kanban */}
       {(() => {
-        const cols = COLUMNAS.filter((c) =>
-          tab === 'operativa' ? c.estado !== 'lavado' : c.estado === 'lavado',
-        );
-        const dndEnabled = tab === 'operativa';
+        const cols = COLUMNAS.filter((c) => {
+          if (tab === 'salidas') return c.estado === 'salida_programada';
+          if (tab === 'lavado') return c.estado === 'lavado';
+          // 'operativa': preparar / navegando / guardada
+          return c.estado === 'preparar' || c.estado === 'navegando' || c.estado === 'guardada';
+        });
+        const dndEnabled = tab === 'operativa' || tab === 'salidas';
         const gridCls =
           tab === 'operativa' ? 'grid grid-cols-1 gap-4 md:grid-cols-3' : 'grid grid-cols-1 gap-4';
         return (
