@@ -17,6 +17,10 @@ export default async function TareasPage() {
     ctx.activeMembership.rol === 'administrador_general' ||
     ctx.activeMembership.rol === 'administrativo';
   const isOperario = ctx.activeMembership.rol === 'operario';
+  // En /tareas, admin y operario operan al mismo nivel (decisión de
+  // producto). El flag fino `isOperario` queda solo por si alguna sección
+  // futura del módulo requiere distinguirlos.
+  const canManage = isAdmin || isOperario;
 
   // Alias para traer al socio dueño de la embarcación (profiles se usa dos veces:
   // una para el operario y otra para el socio).
@@ -129,8 +133,8 @@ export default async function TareasPage() {
       tareas={tareasRows}
       operarios={operarios}
       embarcaciones={embarcacionesOpts}
-      canCreate={isAdmin}
-      canEditAll={isAdmin}
+      canCreate={canManage}
+      canEditAll={canManage}
       currentUserId={ctx.user.id}
       isOperario={isOperario}
     />

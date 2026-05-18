@@ -33,6 +33,13 @@ function isAdmin(ctx: NonNullable<Awaited<ReturnType<typeof getActiveMarina>>>):
   );
 }
 
+// Quién puede gestionar el módulo /tareas (CRUD + asignar + mover): admin y
+// operario. Decisión de producto: el operario opera de igual a igual con el
+// admin en este módulo (no así en el resto del back-office).
+function canManageTareas(ctx: NonNullable<Awaited<ReturnType<typeof getActiveMarina>>>): boolean {
+  return isAdmin(ctx) || ctx.activeMembership.rol === 'operario';
+}
+
 async function validateOperarioBelongsToGuarderia(
   operarioId: string,
   guarderiaId: string,
@@ -70,7 +77,7 @@ export async function createTareaAction(
 ): Promise<{ error?: string; tareaId?: string }> {
   const ctx = await getActiveMarina();
   if (!ctx) return { error: 'No autenticado' };
-  if (!isAdmin(ctx)) return { error: 'Solo administradores pueden crear tareas.' };
+  if (!canManageTareas(ctx)) return { error: 'No tenés permiso para crear tareas.' };
 
   const descripcion = data.descripcion.trim();
   if (!descripcion) return { error: 'La descripción es obligatoria.' };
@@ -109,7 +116,7 @@ export async function createTareaAction(
 export async function updateTareaAction(data: UpdateTareaData): Promise<{ error?: string }> {
   const ctx = await getActiveMarina();
   if (!ctx) return { error: 'No autenticado' };
-  if (!isAdmin(ctx)) return { error: 'Solo administradores pueden editar tareas.' };
+  if (!canManageTareas(ctx)) return { error: 'No tenés permiso para editar tareas.' };
 
   const descripcion = data.descripcion.trim();
   if (!descripcion) return { error: 'La descripción es obligatoria.' };
@@ -149,7 +156,7 @@ export async function updateTareaAction(data: UpdateTareaData): Promise<{ error?
   return {};
 }
 
-// ─── Mover estado (admin u operario asignado) ───────────────────────────────
+// ─── Mover estado ───────────────────────────────────────────────────────────
 
 export async function updateTareaEstadoAction(
   tareaId: string,
@@ -157,21 +164,18 @@ export async function updateTareaEstadoAction(
 ): Promise<{ error?: string }> {
   const ctx = await getActiveMarina();
   if (!ctx) return { error: 'No autenticado' };
+  if (!canManageTareas(ctx)) return { error: 'No tenés permiso para mover esta tarea.' };
 
   if (!ESTADOS_TAREA.includes(estado)) return { error: 'Estado inválido.' };
 
   const gId = ctx.activeMembership.guarderiaId;
 
   const [current] = await db
-    .select({ id: tareas.id, operarioId: tareas.operarioId })
+    .select({ id: tareas.id })
     .from(tareas)
     .where(and(eq(tareas.id, tareaId), eq(tareas.guarderiaId, gId)))
     .limit(1);
   if (!current) return { error: 'Tarea no encontrada.' };
-
-  const canMove =
-    isAdmin(ctx) || (ctx.activeMembership.rol === 'operario' && current.operarioId === ctx.user.id);
-  if (!canMove) return { error: 'No tenés permiso para mover esta tarea.' };
 
   await db
     .update(tareas)
@@ -183,10 +187,6 @@ export async function updateTareaEstadoAction(
 }
 
 // ─── Cambiar operario asignado ──────────────────────────────────────────────
-//
-// Admin: reasigna libremente (incluso desasignar).
-// Operario: solo puede "tomar" tareas que estén sin asignar y solo se puede
-// asignar a sí mismo. No puede desasignar ni reasignar otras tareas.
 
 export async function updateTareaOperarioAction(
   tareaId: string,
@@ -194,30 +194,16 @@ export async function updateTareaOperarioAction(
 ): Promise<{ error?: string }> {
   const ctx = await getActiveMarina();
   if (!ctx) return { error: 'No autenticado' };
+  if (!canManageTareas(ctx)) return { error: 'No tenés permiso para asignar tareas.' };
 
   const gId = ctx.activeMembership.guarderiaId;
 
   const [current] = await db
-    .select({ id: tareas.id, operarioId: tareas.operarioId })
+    .select({ id: tareas.id })
     .from(tareas)
     .where(and(eq(tareas.id, tareaId), eq(tareas.guarderiaId, gId)))
     .limit(1);
   if (!current) return { error: 'Tarea no encontrada.' };
-
-  const userIsAdmin = isAdmin(ctx);
-  if (!userIsAdmin) {
-    if (ctx.activeMembership.rol !== 'operario') {
-      return { error: 'No tenés permiso para asignar tareas.' };
-    }
-    // Operario tomando una tarea: solo si está sin asignar y solo se asigna
-    // a sí mismo. No permitimos desasignar (operarioId=null) — eso es admin.
-    if (current.operarioId !== null) {
-      return { error: 'Esta tarea ya está asignada.' };
-    }
-    if (operarioId !== ctx.user.id) {
-      return { error: 'Solo podés tomar tareas para vos mismo.' };
-    }
-  }
 
   if (operarioId) {
     const ok = await validateOperarioBelongsToGuarderia(operarioId, gId);
@@ -233,7 +219,7 @@ export async function updateTareaOperarioAction(
   return {};
 }
 
-// ─── Cambiar estado de solicitud de lavado asociada (admin u operario asignado) ─
+// ─── Cambiar estado de solicitud de lavado asociada ─────────────────────────
 
 export async function updateSolicitudLavadoEstadoAction(
   tareaId: string,
@@ -242,6 +228,9 @@ export async function updateSolicitudLavadoEstadoAction(
 ): Promise<{ error?: string }> {
   const ctx = await getActiveMarina();
   if (!ctx) return { error: 'No autenticado' };
+  if (!canManageTareas(ctx)) {
+    return { error: 'No tenés permiso para actualizar este lavado.' };
+  }
 
   if (!ESTADOS_SOLICITUD_LAVADO.includes(estado as (typeof ESTADOS_SOLICITUD_LAVADO)[number])) {
     return { error: 'Estado inválido.' };
@@ -255,15 +244,11 @@ export async function updateSolicitudLavadoEstadoAction(
   const gId = ctx.activeMembership.guarderiaId;
 
   const [tarea] = await db
-    .select({ id: tareas.id, operarioId: tareas.operarioId })
+    .select({ id: tareas.id })
     .from(tareas)
     .where(and(eq(tareas.id, tareaId), eq(tareas.guarderiaId, gId)))
     .limit(1);
   if (!tarea) return { error: 'Tarea no encontrada.' };
-
-  const canMove =
-    isAdmin(ctx) || (ctx.activeMembership.rol === 'operario' && tarea.operarioId === ctx.user.id);
-  if (!canMove) return { error: 'No tenés permiso para actualizar este lavado.' };
 
   const [solicitud] = await db
     .select({
@@ -330,12 +315,12 @@ export async function updateSolicitudLavadoEstadoAction(
   return {};
 }
 
-// ─── Eliminar (admin) ───────────────────────────────────────────────────────
+// ─── Eliminar ───────────────────────────────────────────────────────────────
 
 export async function deleteTareaAction(tareaId: string): Promise<{ error?: string }> {
   const ctx = await getActiveMarina();
   if (!ctx) return { error: 'No autenticado' };
-  if (!isAdmin(ctx)) return { error: 'Solo administradores pueden eliminar tareas.' };
+  if (!canManageTareas(ctx)) return { error: 'No tenés permiso para eliminar tareas.' };
 
   const gId = ctx.activeMembership.guarderiaId;
   await db.delete(tareas).where(and(eq(tareas.id, tareaId), eq(tareas.guarderiaId, gId)));
