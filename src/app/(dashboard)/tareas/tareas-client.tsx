@@ -590,7 +590,7 @@ export function TareasClient({
 
   const [filterOperario, setFilterOperario] = useState<string>('');
   const [filterEmbarcacion, setFilterEmbarcacion] = useState<string>('');
-  const [tab, setTab] = useState<'salidas' | 'operativa' | 'lavado'>('salidas');
+  const [tab, setTab] = useState<'operativa' | 'lavado'>('operativa');
 
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverState, setDragOverState] = useState<EstadoTarea | null>(null);
@@ -765,15 +765,6 @@ export function TareasClient({
       <div className="flex w-fit gap-1 rounded-[12px] border border-gray-200 bg-white p-1">
         <button
           type="button"
-          onClick={() => setTab('salidas')}
-          className={`rounded-[8px] px-4 py-2 text-sm font-semibold transition-colors ${
-            tab === 'salidas' ? 'bg-[#175861] text-white' : 'text-gray-600 hover:bg-gray-50'
-          }`}
-        >
-          Salidas programadas ({agrupadas.salida_programada.length})
-        </button>
-        <button
-          type="button"
           onClick={() => setTab('operativa')}
           className={`rounded-[8px] px-4 py-2 text-sm font-semibold transition-colors ${
             tab === 'operativa' ? 'bg-[#175861] text-white' : 'text-gray-600 hover:bg-gray-50'
@@ -795,14 +786,13 @@ export function TareasClient({
       {/* Kanban */}
       {(() => {
         const cols = COLUMNAS.filter((c) => {
-          if (tab === 'salidas') return c.estado === 'salida_programada';
           if (tab === 'lavado') return c.estado === 'lavado';
-          // 'operativa': preparar / navegando / guardada
-          return c.estado === 'preparar' || c.estado === 'navegando' || c.estado === 'guardada';
+          // 'operativa': salida_programada / preparar / navegando / guardada
+          return c.estado !== 'lavado';
         });
-        const dndEnabled = tab === 'operativa' || tab === 'salidas';
+        const dndEnabled = tab === 'operativa';
         const gridCls =
-          tab === 'operativa' ? 'grid grid-cols-1 gap-4 md:grid-cols-3' : 'grid grid-cols-1 gap-4';
+          tab === 'operativa' ? 'grid grid-cols-1 gap-4 md:grid-cols-4' : 'grid grid-cols-1 gap-4';
         return (
           <div className={gridCls}>
             {cols.map((col) => {
