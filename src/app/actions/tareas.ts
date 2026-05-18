@@ -182,7 +182,11 @@ export async function updateTareaEstadoAction(
   return {};
 }
 
-// ─── Cambiar operario asignado (admin) ──────────────────────────────────────
+// ─── Cambiar operario asignado ──────────────────────────────────────────────
+//
+// Admin: reasigna libremente (incluso desasignar).
+// Operario: solo puede "tomar" tareas que estén sin asignar y solo se puede
+// asignar a sí mismo. No puede desasignar ni reasignar otras tareas.
 
 export async function updateTareaOperarioAction(
   tareaId: string,
@@ -190,16 +194,30 @@ export async function updateTareaOperarioAction(
 ): Promise<{ error?: string }> {
   const ctx = await getActiveMarina();
   if (!ctx) return { error: 'No autenticado' };
-  if (!isAdmin(ctx)) return { error: 'Solo administradores pueden reasignar tareas.' };
 
   const gId = ctx.activeMembership.guarderiaId;
 
   const [current] = await db
-    .select({ id: tareas.id })
+    .select({ id: tareas.id, operarioId: tareas.operarioId })
     .from(tareas)
     .where(and(eq(tareas.id, tareaId), eq(tareas.guarderiaId, gId)))
     .limit(1);
   if (!current) return { error: 'Tarea no encontrada.' };
+
+  const userIsAdmin = isAdmin(ctx);
+  if (!userIsAdmin) {
+    if (ctx.activeMembership.rol !== 'operario') {
+      return { error: 'No tenés permiso para asignar tareas.' };
+    }
+    // Operario tomando una tarea: solo si está sin asignar y solo se asigna
+    // a sí mismo. No permitimos desasignar (operarioId=null) — eso es admin.
+    if (current.operarioId !== null) {
+      return { error: 'Esta tarea ya está asignada.' };
+    }
+    if (operarioId !== ctx.user.id) {
+      return { error: 'Solo podés tomar tareas para vos mismo.' };
+    }
+  }
 
   if (operarioId) {
     const ok = await validateOperarioBelongsToGuarderia(operarioId, gId);

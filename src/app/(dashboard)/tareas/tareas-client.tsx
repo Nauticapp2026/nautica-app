@@ -154,6 +154,8 @@ function toDatetimeLocal(iso: string | null): string {
 function TareaCard({
   tarea,
   canEditAll,
+  currentUserId,
+  isOperario,
   dndEnabled,
   operarios,
   onEdit,
@@ -164,6 +166,8 @@ function TareaCard({
 }: {
   tarea: Tarea;
   canEditAll: boolean;
+  currentUserId: string;
+  isOperario: boolean;
   dndEnabled: boolean;
   operarios: OperarioOpt[];
   onEdit: (t: Tarea) => void;
@@ -221,15 +225,29 @@ function TareaCard({
     });
   };
 
-  const draggable = canEditAll && dndEnabled;
+  // Permisos por rol (alineados con server actions):
+  // - Admin: hace todo.
+  // - Operario: si la tarea es suya, puede mover estado y cambiar el estado
+  //   de lavado. Si está sin asignar y es operario, puede tomarla (asignarse
+  //   a sí mismo).
+  const esMia = !!tarea.operarioId && tarea.operarioId === currentUserId;
+  const sinAsignar = tarea.operarioId === null;
+  const puedeMoverEstado = canEditAll || (isOperario && esMia);
+  const puedeCambiarOperario = canEditAll || (isOperario && sinAsignar);
+  const puedeEditarLavado = canEditAll || (isOperario && esMia);
+
+  const draggable = puedeMoverEstado && dndEnabled;
 
   return (
     <div
       draggable={draggable}
       onDragStart={() => draggable && onDragStart(tarea)}
       onDragEnd={onDragEnd}
-      onClick={() => onEdit(tarea)}
-      className={`cursor-pointer rounded-[12px] border border-gray-200 bg-white p-3 shadow-sm transition-opacity hover:shadow-md ${busy ? 'opacity-60' : ''}`}
+      // Solo el admin edita la tarea desde el modal. El operario opera
+      // únicamente vía los selects del card (su rol no incluye editar
+      // descripción/nota/embarcación).
+      onClick={canEditAll ? () => onEdit(tarea) : undefined}
+      className={`${canEditAll ? 'cursor-pointer' : ''} rounded-[12px] border border-gray-200 bg-white p-3 shadow-sm transition-opacity ${canEditAll ? 'hover:shadow-md' : ''} ${busy ? 'opacity-60' : ''}`}
     >
       <div className="mb-1 flex items-start justify-between gap-2">
         <p className="truncate text-xs font-medium text-gray-600">{tarea.socioNombre ?? '—'}</p>
@@ -254,10 +272,11 @@ function TareaCard({
           className="h-8 w-full rounded-[8px] border border-gray-200 bg-white px-2 text-xs text-[#101828] focus:border-[#175861] focus:outline-none"
           value={tarea.operarioId ?? ''}
           onChange={(e) => changeOperario(e.target.value)}
-          disabled={!canEditAll || pending}
+          disabled={!puedeCambiarOperario || pending}
         >
           <option value="">Sin asignar</option>
-          {operarios.map((o) => (
+          {/* Admin ve a todos los operarios; operario solo se ve a sí mismo. */}
+          {(canEditAll ? operarios : operarios.filter((o) => o.id === currentUserId)).map((o) => (
             <option key={o.id} value={o.id}>
               {o.nombre}
             </option>
@@ -271,7 +290,7 @@ function TareaCard({
               const dest = e.target.value as EstadoTarea;
               if (dest) onMoveEstado(tarea, dest);
             }}
-            disabled={!canEditAll || pending}
+            disabled={!puedeMoverEstado || pending}
           >
             <option value="">Mover a…</option>
             {ESTADOS_TAREA.filter((e) => e !== tarea.estado).map((e) => (
@@ -286,7 +305,7 @@ function TareaCard({
             className="h-8 w-full rounded-[8px] border border-gray-200 bg-white px-2 text-xs text-[#175861] focus:border-[#175861] focus:outline-none"
             value={tarea.solicitudLavadoEstado}
             onChange={(e) => changeEstadoLavado(e.target.value as EstadoSolicitudLavado)}
-            disabled={pending}
+            disabled={!puedeEditarLavado || pending}
           >
             {ESTADOS_SOLICITUD_LAVADO.map((e) => (
               <option key={e} value={e}>
@@ -579,8 +598,8 @@ export function TareasClient({
   embarcaciones,
   canCreate,
   canEditAll,
-  currentUserId: _currentUserId,
-  isOperario: _isOperario,
+  currentUserId,
+  isOperario,
 }: Props) {
   const router = useRouter();
   const [modal, setModal] = useState<ModalMode | null>(null);
@@ -641,7 +660,10 @@ export function TareasClient({
 
   const moverTarea = (tarea: Tarea, destino: EstadoTarea) => {
     if (tarea.estado === destino) return;
-    if (!canEditAll) return;
+    // Admin mueve cualquier tarea; operario solo si está asignado a él.
+    // El server action revalida igual — esto es solo guarda de UI.
+    const puedeMover = canEditAll || (isOperario && tarea.operarioId === currentUserId);
+    if (!puedeMover) return;
 
     setGlobalError(null);
     setBusyId(tarea.id);
@@ -843,6 +865,8 @@ export function TareasClient({
                           key={t.id}
                           tarea={t}
                           canEditAll={canEditAll}
+                          currentUserId={currentUserId}
+                          isOperario={isOperario}
                           dndEnabled={dndEnabled}
                           operarios={operarios}
                           onEdit={(x) => setModal({ mode: 'edit', tarea: x })}
