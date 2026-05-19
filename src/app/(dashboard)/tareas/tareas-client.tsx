@@ -26,6 +26,7 @@ import {
 import {
   ESTADOS_SOLICITUD_LAVADO,
   ESTADOS_TAREA,
+  ESTADOS_TAREA_TERMINALES,
   type EstadoSolicitudLavado,
   type EstadoTarea,
 } from './constants';
@@ -232,7 +233,10 @@ function TareaCard({
   //   a sí mismo).
   const esMia = !!tarea.operarioId && tarea.operarioId === currentUserId;
   const sinAsignar = tarea.operarioId === null;
-  const puedeMoverEstado = canEditAll || (isOperario && esMia);
+  // Estados terminales (guardada/lavado) lockean el cambio de estado para
+  // todos, incluido admin. El server también lo valida.
+  const esTerminal = ESTADOS_TAREA_TERMINALES.includes(tarea.estado);
+  const puedeMoverEstado = !esTerminal && (canEditAll || (isOperario && esMia));
   const puedeCambiarOperario = canEditAll || (isOperario && sinAsignar);
   const puedeEditarLavado = canEditAll || (isOperario && esMia);
 
@@ -282,7 +286,7 @@ function TareaCard({
             </option>
           ))}
         </select>
-        {tarea.estado !== 'lavado' && (
+        {!esTerminal && (
           <select
             className="h-8 w-full rounded-[8px] border border-gray-200 bg-white px-2 text-xs text-[#175861] focus:border-[#175861] focus:outline-none"
             value=""
@@ -511,7 +515,15 @@ function TareaModal({
               <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
                 Estado
               </label>
-              <select className={inputCls} value={form.estado} onChange={set('estado')}>
+              <select
+                className={`${inputCls} disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500`}
+                value={form.estado}
+                onChange={set('estado')}
+                // Si la tarea ya está en estado terminal (guardada/lavado) no
+                // se puede cambiar más, ni desde el modal del admin. El
+                // server preserva el estado actual igual.
+                disabled={!!editing && ESTADOS_TAREA_TERMINALES.includes(editing.estado)}
+              >
                 {ESTADOS_TAREA.map((e) => (
                   <option key={e} value={e}>
                     {ESTADO_LABEL[e]}
@@ -660,6 +672,10 @@ export function TareasClient({
 
   const moverTarea = (tarea: Tarea, destino: EstadoTarea) => {
     if (tarea.estado === destino) return;
+    // Tareas en estado terminal (guardada/lavado) no se mueven. La card ya
+    // bloquea drag y oculta el select, pero por las dudas (drop sobre una
+    // columna con la card vieja en cache, p.ej.) reforzamos acá.
+    if (ESTADOS_TAREA_TERMINALES.includes(tarea.estado)) return;
     // Admin mueve cualquier tarea; operario solo si está asignado a él.
     // El server action revalida igual — esto es solo guarda de UI.
     const puedeMover = canEditAll || (isOperario && tarea.operarioId === currentUserId);

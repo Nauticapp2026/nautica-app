@@ -10,6 +10,7 @@ import { sendPushToUser } from '@/lib/push-notifications';
 import {
   ESTADOS_SOLICITUD_LAVADO,
   ESTADOS_TAREA,
+  ESTADOS_TAREA_TERMINALES,
   type EstadoSolicitudLavado,
   type EstadoTarea,
 } from '@/app/(dashboard)/tareas/constants';
@@ -124,7 +125,7 @@ export async function updateTareaAction(data: UpdateTareaData): Promise<{ error?
   const gId = ctx.activeMembership.guarderiaId;
 
   const [current] = await db
-    .select({ id: tareas.id })
+    .select({ id: tareas.id, estado: tareas.estado })
     .from(tareas)
     .where(and(eq(tareas.id, data.id), eq(tareas.guarderiaId, gId)))
     .limit(1);
@@ -140,6 +141,14 @@ export async function updateTareaAction(data: UpdateTareaData): Promise<{ error?
     return { error: 'La embarcación no pertenece a esta guardería.' };
   }
 
+  // Si la tarea ya está en un estado terminal, preservamos el estado actual
+  // y solo dejamos editar el resto de los campos (descripción, nota, etc).
+  // El cliente además oculta el select de estado en estos casos.
+  const estadoActual = current.estado as EstadoTarea;
+  const estadoFinal = ESTADOS_TAREA_TERMINALES.includes(estadoActual)
+    ? estadoActual
+    : ((data.estado ?? 'preparar') as EstadoTarea);
+
   await db
     .update(tareas)
     .set({
@@ -147,7 +156,7 @@ export async function updateTareaAction(data: UpdateTareaData): Promise<{ error?
       nota: data.nota?.trim() || null,
       operarioId: data.operarioId || null,
       embarcacionId: data.embarcacionId || null,
-      estado: (data.estado ?? 'preparar') as EstadoTarea,
+      estado: estadoFinal,
       fechaHora: data.fechaHora ? new Date(data.fechaHora) : null,
     })
     .where(and(eq(tareas.id, data.id), eq(tareas.guarderiaId, gId)));
@@ -171,11 +180,18 @@ export async function updateTareaEstadoAction(
   const gId = ctx.activeMembership.guarderiaId;
 
   const [current] = await db
-    .select({ id: tareas.id })
+    .select({ id: tareas.id, estado: tareas.estado })
     .from(tareas)
     .where(and(eq(tareas.id, tareaId), eq(tareas.guarderiaId, gId)))
     .limit(1);
   if (!current) return { error: 'Tarea no encontrada.' };
+
+  // Una vez que la tarea entra en un estado terminal (guardada/lavado) ya no
+  // se puede mover. Guard contra el cliente (UI lo oculta) y también contra
+  // race conditions si alguien tenía la pantalla vieja abierta.
+  if (ESTADOS_TAREA_TERMINALES.includes(current.estado as EstadoTarea)) {
+    return { error: 'Esta tarea ya está en un estado final y no se puede mover.' };
+  }
 
   await db
     .update(tareas)
