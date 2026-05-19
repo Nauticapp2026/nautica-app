@@ -34,11 +34,17 @@ export async function middleware(request: NextRequest) {
   // Auth no aplica para ellos — los rompería.
   // /api/devices: endpoint que consume la app mobile para registrar/eliminar
   // su Expo Push Token. Su propia auth es Bearer JWT de Supabase, no Basic.
+  // /auth/*: páginas puente que abre el mail de Supabase (confirm signup,
+  // callback OAuth/OTP/PKCE). El socio que se autorregistra desde mobile
+  // llega acá desde el mail — si lo bloqueamos con Basic Auth, no puede
+  // confirmar su cuenta. El propio link del mail ya está firmado por
+  // Supabase, no necesita gate adicional.
   const { pathname } = request.nextUrl;
   const isPublicAPI =
     pathname.startsWith('/api/cron') ||
     pathname.startsWith('/api/webhooks') ||
-    pathname.startsWith('/api/devices');
+    pathname.startsWith('/api/devices') ||
+    pathname.startsWith('/auth/');
 
   if (!isPublicAPI) {
     const gate = checkPrelaunchGate(request);

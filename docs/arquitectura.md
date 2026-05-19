@@ -180,8 +180,8 @@ Helpers principales en `src/lib/auth/session.ts`:
 Mientras el producto no está lanzado al público, toda la web está protegida con un muro de **HTTP Basic Auth** implementado en `src/middleware.ts`. El navegador muestra el prompt nativo no cerrable; cualquier request sin credencial válida recibe 401. Es **server-side** — no se puede bypasear desde el cliente.
 
 - **Activación por env vars**: `PRELAUNCH_GATE_USER` y `PRELAUNCH_GATE_PASSWORD` en Vercel. Con ambas seteadas, el muro está activo. Si falta alguna, el muro queda desactivado (kill switch sin redeploy: borrás las vars y el sitio se "destraba").
-- **Excluido del gate**: `/api/cron/*` (los crons de Vercel tienen su propia auth via `CRON_SECRET`). Si se agrega un endpoint público nuevo (webhook que viene de afuera del browser, ej. tusfacturas), excluirlo igual — sino queda inaccesible.
-- **No afecta al signup desde mobile**: la app mobile usa deep link (`nauticaappmobile://confirm`) en `emailRedirectTo`, así que los socios que se autorregistran nunca pasan por la web. Si alguna vez se vuelve a plantear "el muro rompe el confirm signup", verificar primero que la mobile siga usando el deep link.
+- **Excluido del gate**: `/api/cron/*` (los crons de Vercel tienen su propia auth via `CRON_SECRET`), `/api/webhooks/*`, `/api/devices` (Bearer JWT propio), y `/auth/*` (páginas puente del confirm signup / callback OAuth, llegan desde el mail firmado por Supabase). Si se agrega un endpoint público nuevo que viene de afuera del browser, excluirlo igual — sino queda inaccesible.
+- **Signup desde mobile**: el mail de Supabase abre `/auth/confirm` en la web, que actúa como puente al deep link `nauticaappmobile://confirm`. Está excluido del gate (ver arriba); si se vuelve a romper, verificar la exclusión en `middleware.ts` y que `NEXT_PUBLIC_APP_URL` siga con `www.` (sin redirect 307 que pierda el `#fragment` con los tokens).
 
 ---
 
