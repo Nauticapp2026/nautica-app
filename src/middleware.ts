@@ -34,6 +34,9 @@ export async function middleware(request: NextRequest) {
   // Auth no aplica para ellos — los rompería.
   // /api/devices: endpoint que consume la app mobile para registrar/eliminar
   // su Expo Push Token. Su propia auth es Bearer JWT de Supabase, no Basic.
+  // /api/mareas: endpoint que consume la app mobile para la pantalla Clima
+  // > Mareas. Devuelve datos publicos del SHN (no sensibles); no requiere
+  // auth y Basic Auth lo romperia.
   // /auth/*: páginas puente que abre el mail de Supabase (confirm signup,
   // callback OAuth/OTP/PKCE). El socio que se autorregistra desde mobile
   // llega acá desde el mail — si lo bloqueamos con Basic Auth, no puede
@@ -44,6 +47,7 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/api/cron') ||
     pathname.startsWith('/api/webhooks') ||
     pathname.startsWith('/api/devices') ||
+    pathname.startsWith('/api/mareas') ||
     pathname.startsWith('/auth/');
 
   if (!isPublicAPI) {
