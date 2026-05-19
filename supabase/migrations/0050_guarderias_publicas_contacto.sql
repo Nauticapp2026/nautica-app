@@ -13,6 +13,13 @@
 -- Idempotente: `create or replace view` no rompe nada si ya existe.
 -- =============================================================================
 
+-- IMPORTANTE: `create or replace view` no permite reordenar ni quitar columnas
+-- existentes (Postgres lo interpreta como rename). Por eso las columnas nuevas
+-- (`telefono`, `email`, `activa`) van AL FINAL, despues de `created_at`.
+--
+-- Mantenemos la vista SIN filtro WHERE para no cambiar el comportamiento de
+-- mig 0039 (la usa el signup mobile para listar clubes). Mobile filtra por
+-- `activa = true` en client (pantalla Espacios) usando la columna nueva.
 create or replace view public.guarderias_publicas
 with (security_invoker = false) as
   select
@@ -31,11 +38,11 @@ with (security_invoker = false) as
     imagenes,
     facebook,
     instagram,
+    created_at,
     telefono,
     email,
-    created_at
-  from public.guarderias
-  where activa = true;
+    activa
+  from public.guarderias;
 
 comment on view public.guarderias_publicas is
   'Proyeccion de guarderias activas con columnas seguras para descubrimiento (sin cuit ni datos operativos), ahora con telefono y email para CTAs de contacto en pantalla Espacios. SELECT abierto a authenticated y anon.';
