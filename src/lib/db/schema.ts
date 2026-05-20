@@ -34,7 +34,7 @@ export const rolEnum = pgEnum('rol', [
   'seguridad',
 ]);
 
-export const planEnum = pgEnum('plan', ['esencial', 'club', 'elite']);
+export const planEnum = pgEnum('plan', ['esencial', 'premium', 'elite']);
 
 export const membershipStatusEnum = pgEnum('membership_status', ['active', 'suspended', 'removed']);
 
@@ -167,7 +167,7 @@ export const notificacionAudienciaEnum = pgEnum('notificacion_audiencia', [
   'con_club',
   'sin_club',
   'plan_esencial',
-  'plan_club',
+  'plan_premium',
   'plan_elite',
 ]);
 

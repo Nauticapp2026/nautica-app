@@ -102,7 +102,7 @@ export type MiembroEquipo = {
   isSuperAdmin: boolean;
 };
 
-export type PlanSlug = 'esencial' | 'club' | 'elite';
+export type PlanSlug = 'esencial' | 'premium' | 'elite';
 
 export type PlanInfo = {
   slug: PlanSlug;
@@ -113,7 +113,7 @@ export type PlanInfo = {
 
 const PLAN_ACCENT: Record<PlanSlug, string> = {
   esencial: '#677B85',
-  club: '#669E9D',
+  premium: '#669E9D',
   elite: '#ABC2B3',
 };
 

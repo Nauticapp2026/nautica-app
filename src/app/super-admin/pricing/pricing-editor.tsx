@@ -15,7 +15,7 @@ import {
 import type { PricingPlan } from '@/lib/db/schema';
 import type { PricingFeatureRow } from '@/lib/pricing/config';
 
-type PlanSlug = 'esencial' | 'club' | 'elite';
+type PlanSlug = 'esencial' | 'premium' | 'elite';
 
 type Props = {
   plans: PricingPlan[];
@@ -204,7 +204,7 @@ function CapacitiesEditor({ capacities }: { capacities: number[] }) {
 
 const PLAN_COLS: { slug: PlanSlug; label: string }[] = [
   { slug: 'esencial', label: 'Esencial' },
-  { slug: 'club', label: 'Club' },
+  { slug: 'premium', label: 'Premium' },
   { slug: 'elite', label: 'Élite' },
 ];
 

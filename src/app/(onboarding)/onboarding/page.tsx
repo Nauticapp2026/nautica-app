@@ -25,13 +25,13 @@ export default async function OnboardingPage() {
 
   const planInfo = {
     esencial: { label: 'ESENCIAL', precio: '' },
-    club: { label: 'CLUB', precio: '' },
+    premium: { label: 'PREMIUM', precio: '' },
     elite: { label: 'ÉLITE', precio: '' },
   };
 
   for (const p of plans) {
     if (p.slug in planInfo) {
-      planInfo[p.slug as 'esencial' | 'club' | 'elite'] = {
+      planInfo[p.slug as 'esencial' | 'premium' | 'elite'] = {
         label: p.name,
         precio: formatRate(p.rate),
       };

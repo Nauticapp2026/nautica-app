@@ -8,7 +8,7 @@ import { db } from '@/lib/db';
 import { platformSettings, pricingPlanFeatures, pricingPlans } from '@/lib/db/schema';
 import { requireSuperAdmin } from '@/lib/auth/session';
 
-const planSlugSchema = z.enum(['esencial', 'club', 'elite']);
+const planSlugSchema = z.enum(['esencial', 'premium', 'elite']);
 
 const updatePlanSchema = z.object({
   slug: planSlugSchema,

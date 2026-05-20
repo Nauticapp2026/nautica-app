@@ -399,7 +399,7 @@ export type CreateMiembroEquipoData = {
 // PLAN DEL CLUB
 // =============================================================================
 
-const PLANES = ['esencial', 'club', 'elite'] as const;
+const PLANES = ['esencial', 'premium', 'elite'] as const;
 type Plan = (typeof PLANES)[number];
 
 export async function updateGuarderiaPlanAction(plan: Plan): Promise<{ error?: string }> {
