@@ -12,7 +12,7 @@ import {
 } from '@/app/actions/super-admin/guarderias';
 
 export type PlanHistorialEntry = {
-  planSlug: 'esencial' | 'club' | 'elite';
+  planSlug: 'esencial' | 'premium' | 'elite';
   rate: number;
   espacios: number;
   montoMensual: number;
@@ -25,7 +25,7 @@ export type GuarderiaRow = {
   slug: string;
   ciudad: string | null;
   provincia: string | null;
-  plan: 'esencial' | 'club' | 'elite' | null;
+  plan: 'esencial' | 'premium' | 'elite' | null;
   activa: boolean;
   createdAt: string;
   usuarios: number;

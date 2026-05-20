@@ -91,7 +91,7 @@ type Data = {
   activarPagosOnline: boolean;
   activarMenuGastronomico: boolean;
   // step 7
-  plan: 'esencial' | 'club' | 'elite';
+  plan: 'esencial' | 'premium' | 'elite';
 };
 
 const DEFAULT_HORARIOS: Record<string, HorarioDia> = Object.fromEntries(
@@ -99,7 +99,7 @@ const DEFAULT_HORARIOS: Record<string, HorarioDia> = Object.fromEntries(
 );
 
 type PlanInfoEntry = { label: string; precio: string };
-type PlanInfoMap = Record<'esencial' | 'club' | 'elite', PlanInfoEntry>;
+type PlanInfoMap = Record<'esencial' | 'premium' | 'elite', PlanInfoEntry>;
 
 // ─── Shell ──────────────────────────────────────────────────────────────────
 
@@ -928,11 +928,11 @@ function Step7({
 }: {
   data: Data;
   planInfo: PlanInfoMap;
-  featuresByPlan: Record<'esencial' | 'club' | 'elite', string[]>;
-  onSelect: (plan: 'esencial' | 'club' | 'elite') => void;
+  featuresByPlan: Record<'esencial' | 'premium' | 'elite', string[]>;
+  onSelect: (plan: 'esencial' | 'premium' | 'elite') => void;
   onBack: () => void;
 }) {
-  const plans = ['esencial', 'club', 'elite'] as const;
+  const plans = ['esencial', 'premium', 'elite'] as const;
 
   return (
     <>
@@ -1162,7 +1162,7 @@ function Step11Welcome() {
 
 type OnboardingClientProps = {
   planInfo: PlanInfoMap;
-  featuresByPlan: Record<'esencial' | 'club' | 'elite', string[]>;
+  featuresByPlan: Record<'esencial' | 'premium' | 'elite', string[]>;
   terminos: { version: number; contenido: string } | null;
 };
 
@@ -1374,7 +1374,7 @@ export function OnboardingClient({ planInfo, featuresByPlan, terminos }: Onboard
     next();
   }
 
-  async function handleSelectPlan(plan: 'esencial' | 'club' | 'elite') {
+  async function handleSelectPlan(plan: 'esencial' | 'premium' | 'elite') {
     set('plan', plan);
     if (data.guarderiaId) {
       await selectPlanStep(data.guarderiaId, plan);

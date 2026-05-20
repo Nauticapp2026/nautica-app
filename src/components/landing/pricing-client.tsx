@@ -47,7 +47,7 @@ export type PricingPlanView = {
 type Props = {
   plans: PricingPlanView[];
   capacities: number[];
-  featuresByPlan: Record<'esencial' | 'club' | 'elite', string[]>;
+  featuresByPlan: Record<'esencial' | 'premium' | 'elite', string[]>;
 };
 
 function formatNumber(value: number) {
@@ -163,7 +163,7 @@ export function PricingClient({ plans, capacities, featuresByPlan }: Props) {
               key={plan.slug}
               plan={plan}
               capacity={capacity}
-              features={featuresByPlan[plan.slug as 'esencial' | 'club' | 'elite'] ?? []}
+              features={featuresByPlan[plan.slug as 'esencial' | 'premium' | 'elite'] ?? []}
             />
           ))}
         </div>

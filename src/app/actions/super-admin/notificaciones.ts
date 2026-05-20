@@ -14,7 +14,7 @@ const audienciaSchema = z.enum([
   'con_club',
   'sin_club',
   'plan_esencial',
-  'plan_club',
+  'plan_premium',
   'plan_elite',
 ]);
 

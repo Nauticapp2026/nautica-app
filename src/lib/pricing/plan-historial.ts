@@ -3,7 +3,7 @@ import { and, eq, gte, lt, sql } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { espacios, guarderias, guarderiaPlanHistorial, pricingPlans } from '@/lib/db/schema';
 
-type PlanSlug = 'esencial' | 'club' | 'elite';
+type PlanSlug = 'esencial' | 'premium' | 'elite';
 
 // Inserta un row del historial con snapshot del rate vigente y la cantidad
 // de espacios actuales. Se llama tanto desde el onboarding (al elegir el

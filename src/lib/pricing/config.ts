@@ -37,7 +37,7 @@ function parseCapacities(value: unknown): number[] {
 export type PlanFeatureLine = string;
 
 export async function getPlanFeatures(
-  planSlug: 'esencial' | 'club' | 'elite',
+  planSlug: 'esencial' | 'premium' | 'elite',
 ): Promise<PlanFeatureLine[]> {
   const rows = await db
     .select({
@@ -59,14 +59,14 @@ export async function getPlanFeatures(
 }
 
 export async function getAllPlanFeatures(): Promise<
-  Record<'esencial' | 'club' | 'elite', PlanFeatureLine[]>
+  Record<'esencial' | 'premium' | 'elite', PlanFeatureLine[]>
 > {
-  const [esencial, club, elite] = await Promise.all([
+  const [esencial, premium, elite] = await Promise.all([
     getPlanFeatures('esencial'),
-    getPlanFeatures('club'),
+    getPlanFeatures('premium'),
     getPlanFeatures('elite'),
   ]);
-  return { esencial, club, elite };
+  return { esencial, premium, elite };
 }
 
 // Para el editor del super admin: grid completo (todas las features × todos
@@ -76,7 +76,7 @@ export type PricingFeatureRow = {
   groupLabel: string;
   label: string;
   displayOrder: number;
-  values: { esencial: string; club: string; elite: string };
+  values: { esencial: string; premium: string; elite: string };
 };
 
 export async function getPricingFeaturesGrid(): Promise<PricingFeatureRow[]> {
@@ -85,9 +85,9 @@ export async function getPricingFeaturesGrid(): Promise<PricingFeatureRow[]> {
     db.select().from(pricingPlanFeatures),
   ]);
 
-  const lookup = new Map<string, { esencial: string; club: string; elite: string }>();
+  const lookup = new Map<string, { esencial: string; premium: string; elite: string }>();
   for (const f of features) {
-    lookup.set(f.id, { esencial: '', club: '', elite: '' });
+    lookup.set(f.id, { esencial: '', premium: '', elite: '' });
   }
   for (const pf of planFeatures) {
     const row = lookup.get(pf.featureId);

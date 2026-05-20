@@ -5,7 +5,7 @@ import { PricingClient, type PricingPlanView } from './pricing-client';
 // no debería romper por una landing dinámica.
 const FALLBACK_PLANS: PricingPlanView[] = [
   { slug: 'esencial', name: 'ESENCIAL', rate: 900 },
-  { slug: 'club', name: 'CLUB', rate: 1200 },
+  { slug: 'premium', name: 'PREMIUM', rate: 1200 },
   { slug: 'elite', name: 'ÉLITE', rate: 1500 },
 ];
 const FALLBACK_CAPACITIES = [200, 500, 700, 1000, 1500, 2000, 3000, 4000];
@@ -13,9 +13,9 @@ const FALLBACK_CAPACITIES = [200, 500, 700, 1000, 1500, 2000, 3000, 4000];
 export async function Pricing() {
   let plans: PricingPlanView[] = FALLBACK_PLANS;
   let capacities: number[] = FALLBACK_CAPACITIES;
-  let featuresByPlan: Record<'esencial' | 'club' | 'elite', string[]> = {
+  let featuresByPlan: Record<'esencial' | 'premium' | 'elite', string[]> = {
     esencial: [],
-    club: [],
+    premium: [],
     elite: [],
   };
 

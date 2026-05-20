@@ -28,7 +28,7 @@ export type NotificacionAudiencia =
   | 'con_club'
   | 'sin_club'
   | 'plan_esencial'
-  | 'plan_club'
+  | 'plan_premium'
   | 'plan_elite';
 export type NotificacionEstado = 'pendiente' | 'enviada' | 'fallida';
 
@@ -49,7 +49,7 @@ const AUDIENCIA_LABELS: Record<NotificacionAudiencia, string> = {
   con_club: 'Solo los que tienen club',
   sin_club: 'Solo los que usan la app sin club',
   plan_esencial: 'Solo plan Esencial',
-  plan_club: 'Solo plan Club',
+  plan_premium: 'Solo plan Premium',
   plan_elite: 'Solo plan Élite',
 };
 
@@ -58,7 +58,7 @@ const AUDIENCIA_OPCIONES: NotificacionAudiencia[] = [
   'con_club',
   'sin_club',
   'plan_esencial',
-  'plan_club',
+  'plan_premium',
   'plan_elite',
 ];
 

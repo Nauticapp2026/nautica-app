@@ -3,7 +3,13 @@ import { and, eq, inArray, notExists, sql } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { deviceTokens, guarderias, memberships, platformNotificaciones } from '@/lib/db/schema';
 
-type Audiencia = 'todos' | 'con_club' | 'sin_club' | 'plan_esencial' | 'plan_club' | 'plan_elite';
+type Audiencia =
+  | 'todos'
+  | 'con_club'
+  | 'sin_club'
+  | 'plan_esencial'
+  | 'plan_premium'
+  | 'plan_elite';
 
 // =============================================================================
 // Expo Push Service
@@ -210,11 +216,11 @@ async function resolveAudienceUserIds(audiencia: Audiencia): Promise<string[]> {
 
   // 'plan_X': users con membership activa en guarderías de ese plan.
   const planMap: Record<
-    'plan_esencial' | 'plan_club' | 'plan_elite',
-    'esencial' | 'club' | 'elite'
+    'plan_esencial' | 'plan_premium' | 'plan_elite',
+    'esencial' | 'premium' | 'elite'
   > = {
     plan_esencial: 'esencial',
-    plan_club: 'club',
+    plan_premium: 'premium',
     plan_elite: 'elite',
   };
   const plan = planMap[audiencia];
