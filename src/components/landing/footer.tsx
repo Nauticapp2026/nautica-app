@@ -22,7 +22,7 @@ const columns = [
     title: 'Legal',
     links: [
       { label: 'Términos y condiciones', href: '#' },
-      { label: 'Política de privacidad', href: '#' },
+      { label: 'Política de privacidad', href: '/privacidad' },
       { label: 'Admin', href: '/login' },
       { label: 'Restaurantes', href: '#' },
     ],
