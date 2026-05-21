@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Check, Mail, Phone, UserCheck, UserX, X } from 'lucide-react';
+import { AlertTriangle, Check, Mail, Phone, UserCheck, UserX, X } from 'lucide-react';
 
 import {
   aprobarSolicitudAction,
@@ -23,6 +23,7 @@ type Solicitud = {
   apellido: string | null;
   email: string;
   telefono: string | null;
+  tieneEmbarcacion: boolean;
 };
 
 type Tab = 'pendientes' | 'resueltas';
@@ -47,6 +48,12 @@ export function SolicitudesSocioClient({ solicitudes }: { solicitudes: Solicitud
   const lista = tab === 'pendientes' ? pendientes : resueltas;
 
   const onAprobar = (s: Solicitud) => {
+    if (!s.tieneEmbarcacion) {
+      setErrorBanner(
+        'El solicitante todavía no cargó embarcación. Pedile que la registre en la app antes de aprobar.',
+      );
+      return;
+    }
     const fullname = nombreCompleto(s);
     if (typeof window !== 'undefined' && !window.confirm(`¿Aprobar a ${fullname} como socio?`))
       return;
@@ -224,6 +231,15 @@ function SolicitudCard({
               {solicitud.motivoRechazo}
             </p>
           ) : null}
+
+          {solicitud.estado === 'pendiente' && !solicitud.tieneEmbarcacion ? (
+            <p className="mt-2 flex items-start gap-2 rounded-[8px] bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <span>
+                No cargó embarcación en la app. Pedile que la registre antes de poder aprobarlo.
+              </span>
+            </p>
+          ) : null}
         </div>
       </div>
 
@@ -241,8 +257,13 @@ function SolicitudCard({
           <button
             type="button"
             onClick={onAprobar}
-            disabled={loading}
-            className="flex h-10 flex-1 items-center justify-center gap-1.5 rounded-[10px] bg-[#175861] text-sm font-semibold text-white transition-colors hover:bg-[#124850] disabled:opacity-50"
+            disabled={loading || !solicitud.tieneEmbarcacion}
+            title={
+              !solicitud.tieneEmbarcacion
+                ? 'El solicitante todavía no cargó embarcación.'
+                : undefined
+            }
+            className="flex h-10 flex-1 items-center justify-center gap-1.5 rounded-[10px] bg-[#175861] text-sm font-semibold text-white transition-colors hover:bg-[#124850] disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Check className="h-4 w-4" />
             {loading ? 'Aprobando…' : 'Aprobar'}

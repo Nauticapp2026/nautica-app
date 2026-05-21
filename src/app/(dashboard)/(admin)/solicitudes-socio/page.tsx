@@ -1,7 +1,7 @@
-import { desc, eq } from 'drizzle-orm';
+import { desc, eq, inArray } from 'drizzle-orm';
 import { getActiveMarina } from '@/lib/auth/session';
 import { db } from '@/lib/db';
-import { profiles, solicitudesMembership } from '@/lib/db/schema';
+import { embarcaciones, profiles, solicitudesMembership } from '@/lib/db/schema';
 import { SolicitudesSocioClient } from './solicitudes-socio-client';
 
 export default async function SolicitudesSocioPage() {
@@ -28,6 +28,20 @@ export default async function SolicitudesSocioPage() {
     .where(eq(solicitudesMembership.guarderiaId, gId))
     .orderBy(desc(solicitudesMembership.createdAt));
 
+  // Marcar qué solicitantes tienen al menos una embarcación cargada (en
+  // cualquier guardería). El admin no puede aprobar sin embarcación previa.
+  const solicitanteIds = Array.from(new Set(rows.map((r) => r.solicitanteId)));
+  const embarcacionesRows =
+    solicitanteIds.length > 0
+      ? await db
+          .select({ profileId: embarcaciones.profileId })
+          .from(embarcaciones)
+          .where(inArray(embarcaciones.profileId, solicitanteIds))
+      : [];
+  const solicitantesConEmbarcacion = new Set(
+    embarcacionesRows.map((e) => e.profileId).filter((id): id is string => id != null),
+  );
+
   const solicitudes = rows.map((r) => ({
     id: r.id,
     estado: r.estado,
@@ -39,6 +53,7 @@ export default async function SolicitudesSocioPage() {
     apellido: r.solicitanteApellido,
     email: r.solicitanteEmail,
     telefono: r.solicitanteTelefono,
+    tieneEmbarcacion: solicitantesConEmbarcacion.has(r.solicitanteId),
   }));
 
   return <SolicitudesSocioClient solicitudes={solicitudes} />;
