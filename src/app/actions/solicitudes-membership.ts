@@ -3,8 +3,10 @@
 import { revalidatePath } from 'next/cache';
 import { and, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
-import { embarcaciones, solicitudesMembership } from '@/lib/db/schema';
+import { embarcaciones, guarderias, profiles, solicitudesMembership } from '@/lib/db/schema';
 import { getActiveMarina } from '@/lib/auth/session';
+import { sendEmail } from '@/lib/email/resend';
+import { solicitudAprobadaEmail } from '@/lib/email/templates/solicitud-aprobada';
 
 // El trigger SQL `_on_solicitud_membership_resolved` (mig mobile 0038) se encarga
 // de crear la membership rol='socio' cuando la solicitud pasa a 'aprobada'. Acá
@@ -85,11 +87,42 @@ export async function aprobarSolicitudAction(solicitudId: string): Promise<Resul
 
     revalidatePath('/solicitudes-socio');
     revalidatePath('/usuarios');
-    return {};
   } catch (err) {
     console.error('[aprobarSolicitudAction]', err);
     return { error: 'No pudimos aprobar la solicitud. Intentá de nuevo.' };
   }
+
+  // Mail al solicitante avisando que fue aprobado. Si falla el envío NO
+  // revertimos la aprobación: la membership ya quedó creada y el admin no
+  // debería ver un error en la UI por un problema del proveedor de mail.
+  // El error queda logueado para diagnóstico.
+  try {
+    const [destinatario] = await db
+      .select({
+        email: profiles.email,
+        nombre: profiles.nombre,
+        nombreClub: guarderias.nombre,
+      })
+      .from(profiles)
+      .innerJoin(guarderias, eq(guarderias.id, check.gId))
+      .where(eq(profiles.id, check.solicitanteId))
+      .limit(1);
+
+    if (destinatario?.email) {
+      const { subject, html } = solicitudAprobadaEmail({
+        nombreSolicitante: destinatario.nombre,
+        nombreClub: destinatario.nombreClub,
+      });
+      const res = await sendEmail({ to: destinatario.email, subject, html });
+      if (!res.ok) {
+        console.error('[aprobarSolicitudAction] sendEmail error:', res.error);
+      }
+    }
+  } catch (err) {
+    console.error('[aprobarSolicitudAction] mail flow error:', err);
+  }
+
+  return {};
 }
 
 export async function rechazarSolicitudAction(
