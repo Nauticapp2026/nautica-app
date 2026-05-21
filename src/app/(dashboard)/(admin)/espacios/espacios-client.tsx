@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useTransition } from 'react';
+import { useCallback, useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Anchor,
@@ -18,9 +18,12 @@ import {
   DndContext,
   PointerSensor,
   closestCorners,
+  pointerWithin,
+  rectIntersection,
   useDroppable,
   useSensor,
   useSensors,
+  type CollisionDetection,
   type DragEndEvent,
 } from '@dnd-kit/core';
 import { SortableContext, arrayMove, rectSortingStrategy, useSortable } from '@dnd-kit/sortable';
@@ -278,6 +281,19 @@ export function EspaciosClient({
   //  - Drop sobre el contenedor (piso/peine vacío o area gris) → mover al contenedor.
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
   const [movingId, setMovingId] = useState<string | null>(null);
+
+  // Patrón recomendado por @dnd-kit para sortable multi-container con items
+  // chicos en flex-wrap: priorizar pointerWithin (el cursor está LITERALMENTE
+  // sobre un droppable) y caer a rectIntersection y closestCorners cuando
+  // el cursor queda en el gap entre items. closestCenter daba destinos
+  // adyacentes al apuntado porque medía al centro de items chicos en grilla.
+  const collisionDetection: CollisionDetection = useCallback((args) => {
+    const pointerCollisions = pointerWithin(args);
+    if (pointerCollisions.length > 0) return pointerCollisions;
+    const intersections = rectIntersection(args);
+    if (intersections.length > 0) return intersections;
+    return closestCorners(args);
+  }, []);
 
   // Mapas: espacioId → containerKey ("piso:xxx" o "peine:xxx") y containerKey
   // → lista ordenada de espacioIds. Se calculan a partir de las areas.
@@ -721,7 +737,7 @@ export function EspaciosClient({
           />
         </div>
       ) : (
-        <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={onDragEnd}>
+        <DndContext sensors={sensors} collisionDetection={collisionDetection} onDragEnd={onDragEnd}>
           <div className="space-y-4">
             {areasFiltradas.map((a) =>
               a.tipo === 'marina' ? (
