@@ -63,7 +63,9 @@ export async function createInvitation(
   });
 
   // TODO Fase 3: enviar email con Resend
-  const inviteUrl = `${process.env.NEXT_PUBLIC_APP_URL}/accept-invite?token=${token}`;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+  if (!appUrl) throw new Error('NEXT_PUBLIC_APP_URL no configurado');
+  const inviteUrl = `${appUrl}/accept-invite?token=${token}`;
 
   revalidatePath('/dashboard/team');
   return { success: { inviteUrl } };

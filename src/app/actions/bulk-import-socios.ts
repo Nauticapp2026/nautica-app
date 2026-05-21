@@ -61,14 +61,32 @@ const rowSchema = z.object({
 // =============================================================================
 // Helpers
 // =============================================================================
+function stripMailto(s: string): string {
+  return s.startsWith('mailto:') ? s.slice(7) : s;
+}
+
 function cellText(cell: ExcelJS.Cell | undefined): string {
   if (!cell) return '';
   const v = cell.value;
   if (v === null || v === undefined) return '';
-  if (typeof v === 'string') return v;
+  if (typeof v === 'string') return stripMailto(v);
   if (typeof v === 'number' || typeof v === 'boolean') return String(v);
   if (v instanceof Date) return v.toISOString();
-  if (typeof v === 'object' && 'text' in v && typeof v.text === 'string') return v.text;
+  if (typeof v === 'object' && 'text' in v) {
+    const t = (v as { text: unknown }).text;
+    if (typeof t === 'string') return stripMailto(t);
+    // CellHyperlinkValue donde text es a su vez un CellRichTextValue
+    if (
+      typeof t === 'object' &&
+      t !== null &&
+      'richText' in t &&
+      Array.isArray((t as { richText: unknown }).richText)
+    ) {
+      return (t as { richText: Array<{ text?: string }> }).richText
+        .map((rt) => rt.text ?? '')
+        .join('');
+    }
+  }
   if (typeof v === 'object' && 'richText' in v && Array.isArray(v.richText)) {
     return v.richText.map((rt) => rt.text).join('');
   }
@@ -303,7 +321,8 @@ export async function confirmImportSociosAction(input: ConfirmInput): Promise<Co
 
   const gId = ctx.activeMembership.guarderiaId;
   const admin = createAdminClient();
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+  if (!appUrl) throw new Error('NEXT_PUBLIC_APP_URL no configurado');
 
   let creados = 0;
   let vinculados = 0;

@@ -54,7 +54,8 @@ export async function createSocioAction(data: CreateSocioData): Promise<SocioRes
   }
 
   // 2. Create auth user and send invite email for password setup
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+  if (!appUrl) throw new Error('NEXT_PUBLIC_APP_URL no configurado');
   const { data: inviteData, error: inviteError } = await admin.auth.admin.inviteUserByEmail(
     emailLower,
     { redirectTo: `${appUrl}/auth/callback?next=/crear-cuenta` },
@@ -259,6 +260,7 @@ export async function deleteSocioAction(socioId: string): Promise<{ error?: stri
 const TIPOS_DOC_ADJUNTO = ['carnet_nautico', 'matricula', 'seguro'] as const;
 type TipoDocAdjunto = (typeof TIPOS_DOC_ADJUNTO)[number];
 const BUCKET_DOCUMENTOS = 'documentos';
+const TIPOS_MIME_DOC = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
 
 export type UploadDocumentoResult = { error?: string; id?: string };
 
@@ -283,6 +285,9 @@ export async function uploadSocioDocumentoAction(
   if (file.size === 0) return { error: 'El archivo está vacío.' };
   if (!TIPOS_DOC_ADJUNTO.includes(tipo as TipoDocAdjunto)) {
     return { error: 'Tipo de documento inválido.' };
+  }
+  if (!file.type || !TIPOS_MIME_DOC.includes(file.type)) {
+    return { error: 'Formato no soportado. Usá PDF, JPG, PNG o WebP.' };
   }
 
   // Validar que el socio pertenezca a la guardería activa.
