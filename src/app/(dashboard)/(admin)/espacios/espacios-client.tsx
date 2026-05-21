@@ -16,15 +16,16 @@ import {
 } from 'lucide-react';
 import {
   DndContext,
+  DragOverlay,
   PointerSensor,
   closestCorners,
   pointerWithin,
-  rectIntersection,
   useDroppable,
   useSensor,
   useSensors,
   type CollisionDetection,
   type DragEndEvent,
+  type DragStartEvent,
 } from '@dnd-kit/core';
 import { SortableContext, arrayMove, rectSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -279,27 +280,37 @@ export function EspaciosClient({
   //  - Drop sobre otro espacio del mismo contenedor → reorder dentro del contenedor.
   //  - Drop sobre otro espacio de otro contenedor → mover al contenedor del otro.
   //  - Drop sobre el contenedor (piso/peine vacío o area gris) → mover al contenedor.
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
   const [movingId, setMovingId] = useState<string | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(null);
 
-  // Patrón recomendado por @dnd-kit para sortable multi-container con items
-  // chicos en flex-wrap: priorizar pointerWithin (el cursor está LITERALMENTE
-  // sobre un droppable) y caer a rectIntersection y closestCorners cuando
-  // el cursor queda en el gap entre items. closestCenter daba destinos
-  // adyacentes al apuntado porque medía al centro de items chicos en grilla.
+  // Para sortable con items chicos en flex-wrap dentro de varios containers
+  // priorizamos colisiones con OTROS items por sobre el container droppable.
+  // Esto evita que al soltar cerca del padding del container el over.id sea
+  // el container y el reorder no se aplique. Fallback a closestCorners.
   const collisionDetection: CollisionDetection = useCallback((args) => {
-    const pointerCollisions = pointerWithin(args);
-    if (pointerCollisions.length > 0) return pointerCollisions;
-    const intersections = rectIntersection(args);
-    if (intersections.length > 0) return intersections;
-    return closestCorners(args);
+    const isItemId = (id: string | number) => {
+      const s = String(id);
+      return s.startsWith('nave:') || s.startsWith('marina:');
+    };
+
+    const pointer = pointerWithin(args);
+    const pointerItems = pointer.filter((c) => isItemId(c.id));
+    if (pointerItems.length > 0) return pointerItems;
+    if (pointer.length > 0) return pointer;
+
+    const closest = closestCorners(args);
+    const closestItems = closest.filter((c) => isItemId(c.id));
+    if (closestItems.length > 0) return closestItems;
+    return closest;
   }, []);
 
   // Mapas: espacioId → containerKey ("piso:xxx" o "peine:xxx") y containerKey
   // → lista ordenada de espacioIds. Se calculan a partir de las areas.
-  const { espacioToContainer, containerToEspacios } = useMemo(() => {
+  const { espacioToContainer, containerToEspacios, espacioById } = useMemo(() => {
     const e2c = new Map<string, string>();
     const c2e = new Map<string, string[]>();
+    const byId = new Map<string, EspacioCell>();
     for (const a of areas) {
       for (const p of a.peines) {
         const key = `peine:${p.marinaId}`;
@@ -307,7 +318,10 @@ export function EspaciosClient({
           key,
           p.espacios.map((e) => e.id),
         );
-        for (const e of p.espacios) e2c.set(e.id, key);
+        for (const e of p.espacios) {
+          e2c.set(e.id, key);
+          byId.set(e.id, e);
+        }
       }
       for (const l of a.lados) {
         for (const pi of l.pisos) {
@@ -316,37 +330,83 @@ export function EspaciosClient({
             key,
             pi.espacios.map((e) => e.id),
           );
-          for (const e of pi.espacios) e2c.set(e.id, key);
+          for (const e of pi.espacios) {
+            e2c.set(e.id, key);
+            byId.set(e.id, e);
+          }
         }
       }
     }
-    return { espacioToContainer: e2c, containerToEspacios: c2e };
+    return { espacioToContainer: e2c, containerToEspacios: c2e, espacioById: byId };
   }, [areas]);
 
+  const onDragStart = (event: DragStartEvent) => {
+    setActiveId(String(event.active.id));
+  };
+
+  const onDragCancel = () => {
+    setActiveId(null);
+  };
+
+  // Mueve a otro contenedor y, en el mismo viaje, reordena el container
+  // destino para que el espacio quede en la posición que el usuario apuntó.
+  // Sin esta segunda llamada el espacio cae en cualquier lado del nuevo
+  // contenedor (lo común: al final) porque el orden viejo es irrelevante.
+  const moveYReorder = (
+    activeEspId: string,
+    targetContainerTipo: 'piso' | 'peine',
+    targetContainerId: string,
+    newDestOrder: string[],
+  ) => {
+    setMovingId(activeEspId);
+    const movePromise =
+      targetContainerTipo === 'piso'
+        ? moveEspacioToPisoAction(activeEspId, targetContainerId)
+        : moveEspacioToMarinaAction(activeEspId, targetContainerId);
+
+    void movePromise.then(async (moveRes) => {
+      if (moveRes.error) {
+        setMovingId(null);
+        console.error('[moveEspacio]', moveRes.error);
+        alert(`No se pudo mover el espacio: ${moveRes.error}`);
+        return;
+      }
+      const reorderRes = await reorderEspaciosAction(newDestOrder);
+      setMovingId(null);
+      if (reorderRes.error) {
+        console.error('[reorderEspaciosAction]', reorderRes.error);
+        alert(`No se pudo reordenar tras mover: ${reorderRes.error}`);
+        return;
+      }
+      router.refresh();
+    });
+  };
+
   const onDragEnd = (event: DragEndEvent) => {
+    setActiveId(null);
     const { active, over } = event;
     if (!over || active.id === over.id) return;
     const activeParts = String(active.id).split(':');
     const overParts = String(over.id).split(':');
     if (activeParts.length !== 2 || overParts.length !== 2) return;
-    const [activeTipo, activeId] = activeParts;
+    const [activeTipo, activeEspId] = activeParts;
     const [overTipo, overId] = overParts;
 
     // Caso A: drop sobre otro espacio (sortable).
     if (overTipo === 'nave' || overTipo === 'marina') {
       if (activeTipo !== overTipo) return;
-      const sourceKey = espacioToContainer.get(activeId);
+      const sourceKey = espacioToContainer.get(activeEspId);
       const targetKey = espacioToContainer.get(overId);
       if (!sourceKey || !targetKey) return;
 
       if (sourceKey === targetKey) {
         // Reorder dentro del mismo contenedor.
         const items = containerToEspacios.get(sourceKey) ?? [];
-        const fromIdx = items.indexOf(activeId);
+        const fromIdx = items.indexOf(activeEspId);
         const toIdx = items.indexOf(overId);
         if (fromIdx < 0 || toIdx < 0) return;
         const newOrder = arrayMove(items, fromIdx, toIdx);
-        setMovingId(activeId);
+        setMovingId(activeEspId);
         void reorderEspaciosAction(newOrder).then((res) => {
           setMovingId(null);
           if (res.error) {
@@ -357,45 +417,41 @@ export function EspaciosClient({
           router.refresh();
         });
       } else {
-        // Diferente contenedor: mover al contenedor del espacio target.
+        // Cross-container: mover al container del espacio target y
+        // dejarlo INSERTADO en la posición de ese target (no al final).
         const [targetContainerTipo, targetContainerId] = targetKey.split(':');
         const isNaveMove = activeTipo === 'nave' && targetContainerTipo === 'piso';
         const isMarinaMove = activeTipo === 'marina' && targetContainerTipo === 'peine';
         if (!isNaveMove && !isMarinaMove) return;
-        setMovingId(activeId);
-        const promise = isNaveMove
-          ? moveEspacioToPisoAction(activeId, targetContainerId)
-          : moveEspacioToMarinaAction(activeId, targetContainerId);
-        void promise.then((res) => {
-          setMovingId(null);
-          if (res.error) {
-            console.error('[moveEspacio]', res.error);
-            alert(`No se pudo mover el espacio: ${res.error}`);
-          }
-          router.refresh();
-        });
+
+        const targetItems = containerToEspacios.get(targetKey) ?? [];
+        const targetIdx = targetItems.indexOf(overId);
+        const newDestOrder = [...targetItems];
+        if (targetIdx >= 0) newDestOrder.splice(targetIdx, 0, activeEspId);
+        else newDestOrder.push(activeEspId);
+
+        moveYReorder(
+          activeEspId,
+          targetContainerTipo as 'piso' | 'peine',
+          targetContainerId,
+          newDestOrder,
+        );
       }
       return;
     }
 
-    // Caso B: drop sobre un contenedor (piso o peine).
+    // Caso B: drop sobre un contenedor (piso o peine) — append al final.
     const isNaveMove = activeTipo === 'nave' && overTipo === 'piso';
     const isMarinaMove = activeTipo === 'marina' && overTipo === 'peine';
     if (!isNaveMove && !isMarinaMove) return;
 
-    setMovingId(activeId);
-    const promise = isNaveMove
-      ? moveEspacioToPisoAction(activeId, overId)
-      : moveEspacioToMarinaAction(activeId, overId);
+    const sourceKey = espacioToContainer.get(activeEspId);
+    const targetKey = `${overTipo}:${overId}`;
+    if (sourceKey === targetKey) return; // drop dentro del propio container, sin info de posición → noop
 
-    void promise.then((res) => {
-      setMovingId(null);
-      if (res.error) {
-        console.error('[moveEspacio]', res.error);
-        alert(`No se pudo mover el espacio: ${res.error}`);
-      }
-      router.refresh();
-    });
+    const targetItems = containerToEspacios.get(targetKey) ?? [];
+    const newDestOrder = [...targetItems, activeEspId];
+    moveYReorder(activeEspId, overTipo as 'piso' | 'peine', overId, newDestOrder);
   };
 
   const onDelete = () => {
@@ -737,7 +793,13 @@ export function EspaciosClient({
           />
         </div>
       ) : (
-        <DndContext sensors={sensors} collisionDetection={collisionDetection} onDragEnd={onDragEnd}>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={collisionDetection}
+          onDragStart={onDragStart}
+          onDragEnd={onDragEnd}
+          onDragCancel={onDragCancel}
+        >
           <div className="space-y-4">
             {areasFiltradas.map((a) =>
               a.tipo === 'marina' ? (
@@ -801,6 +863,25 @@ export function EspaciosClient({
               ),
             )}
           </div>
+          {/* Fantasma que sigue al cursor exacto durante el drag. Mejora la
+              precisión visual y la detección de colisión vs. mover el item
+              original (que con rectSortingStrategy se animaba "atrás" del
+              cursor). */}
+          <DragOverlay dropAnimation={null}>
+            {activeId
+              ? (() => {
+                  const cell = espacioById.get(activeId.split(':')[1] ?? '');
+                  if (!cell) return null;
+                  return (
+                    <div
+                      className={`inline-flex h-7 min-w-[2.25rem] cursor-grabbing items-center justify-center rounded-[8px] border px-2 text-xs font-semibold shadow-lg ${ESTADO_CLS[cell.estado]}`}
+                    >
+                      {cell.nomenclatura}
+                    </div>
+                  );
+                })()
+              : null}
+          </DragOverlay>
         </DndContext>
       )}
 
@@ -1318,7 +1399,9 @@ function SortableEspacio({
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : 1,
+    // Con DragOverlay el "fantasma" sigue al cursor, así que ocultamos el
+    // item original mientras se arrastra para no duplicar visualmente.
+    opacity: isDragging ? 0 : 1,
     zIndex: isDragging ? 10 : undefined,
   };
   return (
