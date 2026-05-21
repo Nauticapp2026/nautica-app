@@ -25,6 +25,7 @@ import {
   useSensors,
   type CollisionDetection,
   type DragEndEvent,
+  type DragOverEvent,
   type DragStartEvent,
 } from '@dnd-kit/core';
 import { SortableContext, arrayMove, rectSortingStrategy, useSortable } from '@dnd-kit/sortable';
@@ -99,6 +100,92 @@ const ESTADO_CLS: Record<EstadoEspacio, string> = {
   reservado: 'bg-amber-100 text-amber-700 border-amber-200',
   disponible: 'bg-[#D9EBE9] text-[#175861] border-[#C2DCDA]',
 };
+
+// Saca el espacio de su container actual y lo inserta en el target en
+// targetIndex (o al final si targetIndex < 0 o fuera de rango). Solo
+// usado en el preview optimista del DnD cross-container.
+function moveEspacioEnAreas(
+  areas: AreaView[],
+  espacioId: string,
+  targetKey: string,
+  targetIndex: number,
+): AreaView[] {
+  let espacio: EspacioCell | undefined;
+  const without = areas.map((a) => ({
+    ...a,
+    peines: a.peines.map((p) => {
+      const idx = p.espacios.findIndex((e) => e.id === espacioId);
+      if (idx < 0) return p;
+      espacio = p.espacios[idx];
+      return { ...p, espacios: p.espacios.filter((_, i) => i !== idx) };
+    }),
+    lados: a.lados.map((l) => ({
+      ...l,
+      pisos: l.pisos.map((pi) => {
+        const idx = pi.espacios.findIndex((e) => e.id === espacioId);
+        if (idx < 0) return pi;
+        espacio = pi.espacios[idx];
+        return { ...pi, espacios: pi.espacios.filter((_, i) => i !== idx) };
+      }),
+    })),
+  }));
+  if (!espacio) return areas;
+
+  const [targetTipo, targetId] = targetKey.split(':');
+  const insertarEn = (list: EspacioCell[]) => {
+    const out = [...list];
+    const idx = targetIndex < 0 || targetIndex > out.length ? out.length : targetIndex;
+    out.splice(idx, 0, espacio as EspacioCell);
+    return out;
+  };
+  return without.map((a) => ({
+    ...a,
+    peines: a.peines.map((p) =>
+      targetTipo === 'peine' && p.marinaId === targetId
+        ? { ...p, espacios: insertarEn(p.espacios) }
+        : p,
+    ),
+    lados: a.lados.map((l) => ({
+      ...l,
+      pisos: l.pisos.map((pi) =>
+        targetTipo === 'piso' && pi.pisoId === targetId
+          ? { ...pi, espacios: insertarEn(pi.espacios) }
+          : pi,
+      ),
+    })),
+  }));
+}
+
+// Reordena los espacios de un container según newOrder (array de ids).
+// Mantiene la referencia a los EspacioCell originales.
+function applyReorderEnAreas(
+  areas: AreaView[],
+  containerKey: string,
+  newOrder: string[],
+): AreaView[] {
+  const [tipo, id] = containerKey.split(':');
+  const reordered = (espacios: EspacioCell[]) => {
+    const byId = new Map(espacios.map((e) => [e.id, e]));
+    const out: EspacioCell[] = [];
+    for (const eid of newOrder) {
+      const e = byId.get(eid);
+      if (e) out.push(e);
+    }
+    return out;
+  };
+  return areas.map((a) => ({
+    ...a,
+    peines: a.peines.map((p) =>
+      tipo === 'peine' && p.marinaId === id ? { ...p, espacios: reordered(p.espacios) } : p,
+    ),
+    lados: a.lados.map((l) => ({
+      ...l,
+      pisos: l.pisos.map((pi) =>
+        tipo === 'piso' && pi.pisoId === id ? { ...pi, espacios: reordered(pi.espacios) } : pi,
+      ),
+    })),
+  }));
+}
 
 function countEspacios(a: AreaView): {
   total: number;
@@ -280,6 +367,19 @@ export function EspaciosClient({
   //  - Drop sobre otro espacio del mismo contenedor → reorder dentro del contenedor.
   //  - Drop sobre otro espacio de otro contenedor → mover al contenedor del otro.
   //  - Drop sobre el contenedor (piso/peine vacío o area gris) → mover al contenedor.
+  // Copia local de areas que el DnD muta optimistamente durante el drag
+  // (mover entre containers en onDragOver) para que el SortableContext del
+  // destino "vea" el espacio y abra el hueco visual. Se resyncroniza con
+  // los datos del server cuando el prop areas cambia (post-refresh) usando
+  // el patrón "store previous prop" recomendado por React docs en lugar
+  // de un useEffect, que dispara la regla react-hooks/set-state-in-effect.
+  const [localAreas, setLocalAreas] = useState<AreaView[]>(areas);
+  const [prevAreas, setPrevAreas] = useState<AreaView[]>(areas);
+  if (areas !== prevAreas) {
+    setPrevAreas(areas);
+    setLocalAreas(areas);
+  }
+
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
   const [movingId, setMovingId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -311,7 +411,7 @@ export function EspaciosClient({
     const e2c = new Map<string, string>();
     const c2e = new Map<string, string[]>();
     const byId = new Map<string, EspacioCell>();
-    for (const a of areas) {
+    for (const a of localAreas) {
       for (const p of a.peines) {
         const key = `peine:${p.marinaId}`;
         c2e.set(
@@ -338,120 +438,166 @@ export function EspaciosClient({
       }
     }
     return { espacioToContainer: e2c, containerToEspacios: c2e, espacioById: byId };
-  }, [areas]);
+  }, [localAreas]);
+
+  // Snapshot del origen del drag: qué espacio se está arrastrando y desde
+  // qué container salió. Lo usamos en onDragEnd para decidir si fue reorder
+  // intra-container o cross-container.
+  const [dragOrigin, setDragOrigin] = useState<{
+    activeEspId: string;
+    sourceKey: string;
+  } | null>(null);
 
   const onDragStart = (event: DragStartEvent) => {
-    setActiveId(String(event.active.id));
+    const id = String(event.active.id);
+    setActiveId(id);
+    const [, activeEspId] = id.split(':');
+    const sourceKey = espacioToContainer.get(activeEspId);
+    if (sourceKey) setDragOrigin({ activeEspId, sourceKey });
   };
 
   const onDragCancel = () => {
     setActiveId(null);
+    setDragOrigin(null);
+    setLocalAreas(areas); // revertir cualquier preview optimista
   };
 
-  // Mueve a otro contenedor y, en el mismo viaje, reordena el container
-  // destino para que el espacio quede en la posición que el usuario apuntó.
-  // Sin esta segunda llamada el espacio cae en cualquier lado del nuevo
-  // contenedor (lo común: al final) porque el orden viejo es irrelevante.
-  const moveYReorder = (
-    activeEspId: string,
-    targetContainerTipo: 'piso' | 'peine',
-    targetContainerId: string,
-    newDestOrder: string[],
-  ) => {
-    setMovingId(activeEspId);
+  // onDragOver: mueve el espacio en localAreas a su container destino para
+  // que el SortableContext del destino lo vea y abra el hueco visual. Sin
+  // esto el usuario no ve dónde va a caer el espacio al cambiar de
+  // peine/piso.
+  const onDragOver = (event: DragOverEvent) => {
+    const { active, over } = event;
+    if (!over) return;
+
+    const activeParts = String(active.id).split(':');
+    const overParts = String(over.id).split(':');
+    if (activeParts.length !== 2 || overParts.length !== 2) return;
+    const [activeTipo, activeEspId] = activeParts;
+    const [overTipo, overId] = overParts;
+    if (activeTipo !== 'nave' && activeTipo !== 'marina') return;
+
+    const sourceKey = espacioToContainer.get(activeEspId);
+    if (!sourceKey) return;
+
+    let targetKey: string;
+    let targetIndex: number;
+    if (overTipo === 'nave' || overTipo === 'marina') {
+      // Drop sobre otro espacio: insertar en su posición.
+      const k = espacioToContainer.get(overId);
+      if (!k) return;
+      targetKey = k;
+      const items = containerToEspacios.get(targetKey) ?? [];
+      targetIndex = items.indexOf(overId);
+    } else if (overTipo === 'piso' || overTipo === 'peine') {
+      // Drop sobre el container vacío o el padding: append al final.
+      targetKey = `${overTipo}:${overId}`;
+      targetIndex = -1;
+    } else {
+      return;
+    }
+
+    if (sourceKey === targetKey) return; // mismo container: lo maneja sortable
+
+    // Validar compatibilidad nave↔piso, marina↔peine.
+    const sourceContainerTipo = sourceKey.split(':')[0];
+    const targetContainerTipo = targetKey.split(':')[0];
+    if (sourceContainerTipo !== targetContainerTipo) return;
+
+    setLocalAreas((prev) => moveEspacioEnAreas(prev, activeEspId, targetKey, targetIndex));
+  };
+
+  const onDragEnd = (event: DragEndEvent) => {
+    setActiveId(null);
+    const origin = dragOrigin;
+    setDragOrigin(null);
+    if (!origin) return;
+
+    // Buscar el container actual del espacio en localAreas (refleja todos
+    // los onDragOver previos al drop).
+    let currentKey: string | null = null;
+    let currentItems: string[] = [];
+    outer: for (const a of localAreas) {
+      for (const p of a.peines) {
+        if (p.espacios.some((e) => e.id === origin.activeEspId)) {
+          currentKey = `peine:${p.marinaId}`;
+          currentItems = p.espacios.map((e) => e.id);
+          break outer;
+        }
+      }
+      for (const l of a.lados) {
+        for (const pi of l.pisos) {
+          if (pi.espacios.some((e) => e.id === origin.activeEspId)) {
+            currentKey = `piso:${pi.pisoId}`;
+            currentItems = pi.espacios.map((e) => e.id);
+            break outer;
+          }
+        }
+      }
+    }
+    if (!currentKey) return;
+
+    if (currentKey === origin.sourceKey) {
+      // Reorder intra-container. onDragOver no toca localAreas para mismo
+      // container, así que calculamos el nuevo orden con arrayMove sobre
+      // el over.id del drop.
+      const { over } = event;
+      if (!over || event.active.id === over.id) return;
+      const overParts = String(over.id).split(':');
+      if (overParts.length !== 2) return;
+      const [overTipo, overId] = overParts;
+      if (overTipo !== 'nave' && overTipo !== 'marina') return;
+
+      const fromIdx = currentItems.indexOf(origin.activeEspId);
+      const toIdx = currentItems.indexOf(overId);
+      if (fromIdx < 0 || toIdx < 0) return;
+      const newOrder = arrayMove(currentItems, fromIdx, toIdx);
+
+      // Mantener localAreas en sync con el orden persistido para que no
+      // haya parpadeo entre el drop y el refresh del server.
+      setLocalAreas((prev) => applyReorderEnAreas(prev, currentKey!, newOrder));
+
+      setMovingId(origin.activeEspId);
+      void reorderEspaciosAction(newOrder).then((res) => {
+        setMovingId(null);
+        if (res.error) {
+          console.error('[reorderEspaciosAction]', res.error);
+          alert(`No se pudo reordenar: ${res.error}`);
+          setLocalAreas(areas); // revert
+          return;
+        }
+        router.refresh();
+      });
+      return;
+    }
+
+    // Cross-container: localAreas ya tiene el espacio en el container
+    // destino y en la posición correcta. Persistir.
+    const [targetTipo, targetId] = currentKey.split(':');
+    setMovingId(origin.activeEspId);
     const movePromise =
-      targetContainerTipo === 'piso'
-        ? moveEspacioToPisoAction(activeEspId, targetContainerId)
-        : moveEspacioToMarinaAction(activeEspId, targetContainerId);
+      targetTipo === 'piso'
+        ? moveEspacioToPisoAction(origin.activeEspId, targetId)
+        : moveEspacioToMarinaAction(origin.activeEspId, targetId);
 
     void movePromise.then(async (moveRes) => {
       if (moveRes.error) {
         setMovingId(null);
         console.error('[moveEspacio]', moveRes.error);
         alert(`No se pudo mover el espacio: ${moveRes.error}`);
+        setLocalAreas(areas); // revert
         return;
       }
-      const reorderRes = await reorderEspaciosAction(newDestOrder);
+      const reorderRes = await reorderEspaciosAction(currentItems);
       setMovingId(null);
       if (reorderRes.error) {
         console.error('[reorderEspaciosAction]', reorderRes.error);
         alert(`No se pudo reordenar tras mover: ${reorderRes.error}`);
+        setLocalAreas(areas); // revert
         return;
       }
       router.refresh();
     });
-  };
-
-  const onDragEnd = (event: DragEndEvent) => {
-    setActiveId(null);
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    const activeParts = String(active.id).split(':');
-    const overParts = String(over.id).split(':');
-    if (activeParts.length !== 2 || overParts.length !== 2) return;
-    const [activeTipo, activeEspId] = activeParts;
-    const [overTipo, overId] = overParts;
-
-    // Caso A: drop sobre otro espacio (sortable).
-    if (overTipo === 'nave' || overTipo === 'marina') {
-      if (activeTipo !== overTipo) return;
-      const sourceKey = espacioToContainer.get(activeEspId);
-      const targetKey = espacioToContainer.get(overId);
-      if (!sourceKey || !targetKey) return;
-
-      if (sourceKey === targetKey) {
-        // Reorder dentro del mismo contenedor.
-        const items = containerToEspacios.get(sourceKey) ?? [];
-        const fromIdx = items.indexOf(activeEspId);
-        const toIdx = items.indexOf(overId);
-        if (fromIdx < 0 || toIdx < 0) return;
-        const newOrder = arrayMove(items, fromIdx, toIdx);
-        setMovingId(activeEspId);
-        void reorderEspaciosAction(newOrder).then((res) => {
-          setMovingId(null);
-          if (res.error) {
-            console.error('[reorderEspaciosAction]', res.error);
-            alert(`No se pudo reordenar: ${res.error}`);
-            return;
-          }
-          router.refresh();
-        });
-      } else {
-        // Cross-container: mover al container del espacio target y
-        // dejarlo INSERTADO en la posición de ese target (no al final).
-        const [targetContainerTipo, targetContainerId] = targetKey.split(':');
-        const isNaveMove = activeTipo === 'nave' && targetContainerTipo === 'piso';
-        const isMarinaMove = activeTipo === 'marina' && targetContainerTipo === 'peine';
-        if (!isNaveMove && !isMarinaMove) return;
-
-        const targetItems = containerToEspacios.get(targetKey) ?? [];
-        const targetIdx = targetItems.indexOf(overId);
-        const newDestOrder = [...targetItems];
-        if (targetIdx >= 0) newDestOrder.splice(targetIdx, 0, activeEspId);
-        else newDestOrder.push(activeEspId);
-
-        moveYReorder(
-          activeEspId,
-          targetContainerTipo as 'piso' | 'peine',
-          targetContainerId,
-          newDestOrder,
-        );
-      }
-      return;
-    }
-
-    // Caso B: drop sobre un contenedor (piso o peine) — append al final.
-    const isNaveMove = activeTipo === 'nave' && overTipo === 'piso';
-    const isMarinaMove = activeTipo === 'marina' && overTipo === 'peine';
-    if (!isNaveMove && !isMarinaMove) return;
-
-    const sourceKey = espacioToContainer.get(activeEspId);
-    const targetKey = `${overTipo}:${overId}`;
-    if (sourceKey === targetKey) return; // drop dentro del propio container, sin info de posición → noop
-
-    const targetItems = containerToEspacios.get(targetKey) ?? [];
-    const newDestOrder = [...targetItems, activeEspId];
-    moveYReorder(activeEspId, overTipo as 'piso' | 'peine', overId, newDestOrder);
   };
 
   const onDelete = () => {
@@ -511,7 +657,10 @@ export function EspaciosClient({
     return t;
   }, [areas]);
 
-  const areasFiltradas = useMemo(() => areas.filter((a) => a.tipo === filtro), [areas, filtro]);
+  const areasFiltradas = useMemo(
+    () => localAreas.filter((a) => a.tipo === filtro),
+    [localAreas, filtro],
+  );
 
   const totalesFiltrados = useMemo(() => {
     const t = { total: 0, ocupado: 0, reservado: 0, disponible: 0 };
@@ -797,6 +946,7 @@ export function EspaciosClient({
           sensors={sensors}
           collisionDetection={collisionDetection}
           onDragStart={onDragStart}
+          onDragOver={onDragOver}
           onDragEnd={onDragEnd}
           onDragCancel={onDragCancel}
         >
