@@ -294,7 +294,8 @@ export async function inviteTeamMembersStep(
   miembros: TeamMemberInput[],
 ): Promise<ActionResult & { creados?: number; errores?: string[] }> {
   const admin = createAdminClient();
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+  if (!appUrl) throw new Error('NEXT_PUBLIC_APP_URL no configurado');
   const errores: string[] = [];
   let creados = 0;
 

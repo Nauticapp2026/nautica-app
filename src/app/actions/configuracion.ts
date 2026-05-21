@@ -563,7 +563,8 @@ export async function createMiembroEquipoAction(
 
   const guarderiaId = ctx.activeMembership.guarderiaId;
   const admin = createAdminClient();
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+  if (!appUrl) throw new Error('NEXT_PUBLIC_APP_URL no configurado');
 
   const { data: inviteData, error: inviteError } = await admin.auth.admin.inviteUserByEmail(email, {
     redirectTo: `${appUrl}/auth/callback?next=/crear-cuenta`,

@@ -46,7 +46,7 @@ export async function uploadComunicacionImagenAction(
   if (!(file instanceof File)) return { error: 'Archivo inválido.' };
   if (file.size === 0) return { error: 'El archivo está vacío.' };
   if (file.size > MAX_IMAGEN_BYTES) return { error: 'La imagen supera el tamaño máximo (8 MB).' };
-  if (file.type && !TIPOS_IMAGEN_ACEPTADOS.includes(file.type)) {
+  if (!file.type || !TIPOS_IMAGEN_ACEPTADOS.includes(file.type)) {
     return { error: 'Formato no soportado. Usá JPG, PNG, WebP o GIF.' };
   }
 
