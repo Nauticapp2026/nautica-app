@@ -17,7 +17,7 @@ import {
 import {
   DndContext,
   PointerSensor,
-  closestCenter,
+  closestCorners,
   useDroppable,
   useSensor,
   useSensors,
@@ -721,7 +721,7 @@ export function EspaciosClient({
           />
         </div>
       ) : (
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+        <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={onDragEnd}>
           <div className="space-y-4">
             {areasFiltradas.map((a) =>
               a.tipo === 'marina' ? (
