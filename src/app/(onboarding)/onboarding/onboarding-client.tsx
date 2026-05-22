@@ -544,46 +544,48 @@ function Step3({
               Cambiar todos los horarios juntos
             </button>
           </div>
-          <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-            {DIAS.map((dia) => {
-              const h = data.horarios[dia];
-              return (
-                <div
-                  key={dia}
-                  className="flex items-center gap-2 rounded-[10px] border border-gray-200 p-2"
-                >
-                  <span
-                    className="w-20 shrink-0 text-xs font-semibold"
-                    style={{ color: '#175861' }}
+          <div className="-mx-2 overflow-x-auto px-2">
+            <div className="grid min-w-[340px] grid-cols-1 gap-2 md:grid-cols-2">
+              {DIAS.map((dia) => {
+                const h = data.horarios[dia];
+                return (
+                  <div
+                    key={dia}
+                    className="flex items-center gap-2 rounded-[10px] border border-gray-200 p-2"
                   >
-                    {DIAS_LABELS[dia]}
-                  </span>
-                  <input
-                    type="time"
-                    value={h.apertura}
-                    disabled={!h.activo}
-                    onChange={(e) => onChangeHorario(dia, 'apertura', e.target.value)}
-                    className="min-w-[76px] flex-1 rounded border border-gray-200 px-2 py-1 text-xs disabled:bg-gray-50 disabled:text-gray-400"
-                  />
-                  <span className="text-xs text-gray-400">-</span>
-                  <input
-                    type="time"
-                    value={h.cierre}
-                    disabled={!h.activo}
-                    onChange={(e) => onChangeHorario(dia, 'cierre', e.target.value)}
-                    className="min-w-[76px] flex-1 rounded border border-gray-200 px-2 py-1 text-xs disabled:bg-gray-50 disabled:text-gray-400"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => onChangeHorario(dia, 'activo', !h.activo)}
-                    title={h.activo ? 'Marcar cerrado' : 'Marcar abierto'}
-                    className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold transition ${h.activo ? 'bg-gray-200 text-gray-600 hover:bg-gray-300' : 'bg-red-100 text-red-600 hover:bg-red-200'}`}
-                  >
-                    {h.activo ? 'Abierto' : 'Cerrado'}
-                  </button>
-                </div>
-              );
-            })}
+                    <span
+                      className="w-16 shrink-0 text-xs font-semibold"
+                      style={{ color: '#175861' }}
+                    >
+                      {DIAS_LABELS[dia]}
+                    </span>
+                    <input
+                      type="time"
+                      value={h.apertura}
+                      disabled={!h.activo}
+                      onChange={(e) => onChangeHorario(dia, 'apertura', e.target.value)}
+                      className="w-[84px] shrink-0 rounded border border-gray-200 px-1.5 py-1 text-xs disabled:bg-gray-50 disabled:text-gray-400"
+                    />
+                    <span className="text-xs text-gray-400">-</span>
+                    <input
+                      type="time"
+                      value={h.cierre}
+                      disabled={!h.activo}
+                      onChange={(e) => onChangeHorario(dia, 'cierre', e.target.value)}
+                      className="w-[84px] shrink-0 rounded border border-gray-200 px-1.5 py-1 text-xs disabled:bg-gray-50 disabled:text-gray-400"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => onChangeHorario(dia, 'activo', !h.activo)}
+                      title={h.activo ? 'Marcar cerrado' : 'Marcar abierto'}
+                      className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold transition ${h.activo ? 'bg-gray-200 text-gray-600 hover:bg-gray-300' : 'bg-red-100 text-red-600 hover:bg-red-200'}`}
+                    >
+                      {h.activo ? 'Abierto' : 'Cerrado'}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
 
