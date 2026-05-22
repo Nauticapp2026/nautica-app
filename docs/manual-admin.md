@@ -1,0 +1,608 @@
+# Manual del Administrador — NauticApp
+
+Guía paso a paso para gestionar tu club o guardería náutica desde el panel web.
+
+---
+
+## Índice
+
+1. [Primeros pasos](#1-primeros-pasos)
+2. [Dashboard](#2-dashboard)
+3. [Usuarios — Socios](#3-usuarios--socios)
+4. [Usuarios — Carga masiva](#4-usuarios--carga-masiva)
+5. [Solicitudes de membresía](#5-solicitudes-de-membresía)
+6. [Tareas](#6-tareas)
+7. [Espacios](#7-espacios)
+8. [Publicaciones](#8-publicaciones)
+9. [Comunicaciones](#9-comunicaciones)
+10. [Facturación](#10-facturación)
+11. [Tarifario](#11-tarifario)
+12. [Configuración](#12-configuración)
+
+---
+
+## 1. Primeros pasos
+
+### Ingresar al panel
+
+1. Abrí el navegador y entrá a **www.nauticapp.club**.
+2. Ingresá con tu **email** y **contraseña**.
+3. Si es tu primera vez, revisá el email de invitación que recibiste y hacé clic en el enlace para activar tu cuenta.
+
+### Navegar por el panel
+
+El menú lateral izquierdo es la navegación principal. Desde ahí accedés a todas las secciones:
+
+- **Dashboard** — resumen operativo del día
+- **Usuarios** — socios, invitados y proveedores
+- **Solicitudes** — pedidos de nuevos socios desde la app mobile
+- **Tareas** — tablero operativo para el equipo
+- **Espacios** — amarras, camas y ubicaciones
+- **Comunicaciones** — anuncios y novedades para socios
+- **Facturación** — emisión y seguimiento de facturas
+- **Tarifario** — precios y servicios
+- **Configuración** — datos del club, equipo, plan y facturación
+
+En la parte inferior del menú encontrás el botón **¿Necesitás ayuda?** para contactar soporte por WhatsApp.
+
+---
+
+## 2. Dashboard
+
+El Dashboard es la pantalla de inicio. Muestra el estado operativo del club en tiempo real.
+
+### Qué muestra
+
+- **Embarcaciones en guardería** — cantidad de embarcaciones actualmente activas.
+- **Socios activos** — total de socios con estado activo.
+- **Ingresos del mes** — monto facturado en el mes en curso.
+- **Socios con deuda 2+ meses** — socios con movimientos pendientes de cobro desde hace más de dos meses.
+- **Socios con documentación incompleta** — socios a los que les falta subir documentación.
+
+### Alertas operativas
+
+Las alertas aparecen cuando hay embarcaciones que salieron y no confirmaron su regreso dentro del horario prometido.
+
+- **Críticas** — sin respuesta del socio (marcadas en rojo).
+- **Retorno próximo** — esperando confirmación de arribo.
+
+Cada alerta muestra el nombre del socio, la embarcación, la hora prometida y la demora acumulada.
+
+**Resolver una alerta:**
+
+1. En las alertas **críticas**, si el socio tiene teléfono cargado aparece el botón **Llamar**. Al tocarlo desde el celular abre el marcador directamente con el número del socio.
+2. Una vez resuelto el tema, hacé clic en **Marcar resuelta** para cerrar la alerta.
+
+---
+
+## 3. Usuarios — Socios
+
+Desde **Usuarios → Socios** gestionás el padrón de socios de tu club.
+
+### Ver la lista de socios
+
+La tabla muestra: nombre, email, embarcación asignada, ubicación, estado y deuda.
+
+- Usá la barra de búsqueda para filtrar por nombre o email.
+
+### Dar de alta un socio manualmente
+
+1. Hacé clic en **Agregar socio**.
+2. Completá los datos en el formulario (las secciones se van desplegando):
+
+   **Datos personales**
+   - Nombre y apellido
+   - Email _(requerido)_
+   - Teléfono
+
+   **Datos de facturación**
+   - Tipo de documento: DNI / CUIT / CUIL / Pasaporte / CDI
+   - Número de documento
+   - Razón social (si corresponde)
+   - Condición frente al IVA: Consumidor Final / Responsable Monotributo / IVA Responsable Inscripto / IVA Sujeto Exento / otros
+   - Dirección, ciudad, código postal
+
+   **Datos de embarcación** _(opcional al momento del alta)_
+   - Nombre de la embarcación
+   - Matrícula
+   - Modelo
+   - Eslora y manga
+
+   **Adjuntos** _(opcional)_
+   - Podés subir documentación desde esta sección o hacerlo después desde el perfil del socio.
+
+3. Hacé clic en **Guardar**.
+
+### Ver y editar el perfil de un socio
+
+Hacé clic en el nombre del socio en la tabla para abrir su perfil. El perfil tiene siete pestañas:
+
+#### Pestaña Generales
+
+Mostrá y editá los datos personales: nombre, apellido, email, teléfono, documento, dirección, razón social, condición IVA.
+
+#### Pestaña Embarcación
+
+Muestra las embarcaciones del socio. Podés editar o eliminar cada una.
+
+#### Pestaña Cuenta Corriente
+
+Muestra los movimientos del socio: facturas, cobros y saldo.
+
+- **Agregar servicio** — registrá un servicio o cargo adicional.
+- **Informar pago** — registrá un pago recibido sin emitir factura (el saldo queda como "saldo a favor" en la cuenta).
+- **Marcar como pagadas** — seleccioná una o más facturas con la casilla de verificación y hacé clic en este botón para registrarlas como cobradas. Te pedirá el medio de pago.
+
+#### Pestaña Facturación
+
+Vista similar a Cuenta Corriente con el historial de facturas emitidas.
+
+#### Pestaña Navegantes
+
+Lista de personas autorizadas a operar la embarcación del socio.
+
+#### Pestaña Salidas
+
+Historial de salidas y entradas de la embarcación.
+
+#### Pestaña Documentación
+
+- **Subir documento** — seleccioná el tipo de documento y adjuntá el archivo.
+- Los documentos subidos aparecen listados con tipo, fecha y enlace para verlos.
+- Podés eliminar documentos desde esta misma pestaña.
+
+---
+
+## 4. Usuarios — Carga masiva
+
+Si tenés muchos socios o embarcaciones para cargar, podés hacerlo importando un archivo Excel.
+
+### Importar socios desde Excel
+
+1. En **Usuarios → Socios**, hacé clic en **Importar socios**.
+2. Descargá la plantilla haciendo clic en **Descargar plantilla**. Abrí el archivo `.xlsx` y completá los datos de cada socio en una fila.
+3. Guardá el archivo y volvé al panel. Hacé clic en **Elegir archivo .xlsx** y seleccioná tu archivo.
+4. El sistema mostrará una vista previa con el resultado del análisis:
+   - **A crear** (verde) — socios nuevos que se van a agregar.
+   - **A vincular** (amarillo) — emails que ya existen en el sistema; el socio se va a vincular a tu club.
+   - **Se saltan** (amarillo) — filas duplicadas o que ya están vinculadas.
+   - **Con error** (rojo) — filas con datos inválidos; revisá el detalle para corregirlas.
+5. Si el resultado es correcto, hacé clic en **Confirmar importación**.
+6. Una vez completada, verás el resumen: Creados, Vinculados, Saltados.
+
+> Si quedaron filas con error, corregí esas filas en el Excel y volvé a importar solo las filas corregidas.
+
+### Importar embarcaciones desde Excel
+
+> Antes de importar embarcaciones, asegurate de que los socios dueños ya estén cargados en el sistema.
+
+1. Hacé clic en **Importar embarcaciones**.
+2. Descargá la plantilla y completá los datos. Cada embarcación debe tener el email del socio dueño.
+3. Subí el archivo y revisá la vista previa:
+   - **A crear** — embarcaciones nuevas.
+   - **Se saltan** — embarcaciones ya existentes.
+   - **Con error** — filas con datos inválidos o con email de socio no encontrado.
+4. Confirmá la importación. Las embarcaciones quedan vinculadas a sus dueños **sin amarra asignada**; podés asignarlas desde la sección Espacios.
+
+---
+
+## 5. Solicitudes de membresía
+
+Cuando un usuario pide unirse al club desde la **app mobile**, la solicitud aparece aquí.
+
+### Ver solicitudes pendientes
+
+1. Entrá a **Solicitudes** desde el menú lateral.
+2. La pestaña **Pendientes** muestra los pedidos sin resolver.
+3. Cada solicitud muestra: nombre, email, teléfono, fecha del pedido y si el solicitante ya cargó su embarcación en la app.
+
+> Si ves el aviso "No cargó embarcación en la app", pedile al solicitante que registre su embarcación en la app mobile antes de continuar. No es posible aprobar sin embarcación.
+
+### Aprobar una solicitud
+
+1. Verificá los datos del solicitante.
+2. Hacé clic en el botón con el tilde (**Aprobar**).
+3. El sistema crea automáticamente el perfil de socio con los datos que el usuario cargó en la app, y le envía un email de bienvenida.
+
+### Rechazar una solicitud
+
+1. Hacé clic en el botón con la **X** (**Rechazar**).
+2. Escribí un motivo (opcional) — el solicitante lo verá en la app.
+3. Hacé clic en **Rechazar** para confirmar.
+
+### Ver solicitudes resueltas
+
+La pestaña **Resueltas** muestra el historial de solicitudes aprobadas y rechazadas, con la fecha de resolución y el motivo de rechazo si corresponde.
+
+---
+
+## 6. Tareas
+
+El tablero de Tareas organiza el trabajo operativo del equipo en columnas por estado.
+
+### Estados del tablero
+
+| Columna           | Qué representa                       |
+| ----------------- | ------------------------------------ |
+| Salida programada | Embarcaciones con salida planificada |
+| Preparar          | Tareas en preparación                |
+| Navegando         | Embarcación actualmente en el agua   |
+| Guardada          | Embarcación de regreso y guardada    |
+| Lavado            | Solicitudes de lavado                |
+
+### Crear una tarea
+
+1. Hacé clic en el botón **+** de la columna correspondiente, o en **Nueva tarea** (si lo tiene el header).
+2. Completá el formulario:
+   - **Descripción** _(requerida)_ — qué hay que hacer.
+   - **Operario** — a quién se le asigna (opcional; el operario la verá en su lista).
+   - **Embarcación** — embarcación relacionada.
+   - **Estado** — columna inicial del tablero.
+   - **Fecha y hora** — cuándo debe realizarse.
+   - **Nota** — información adicional para el operario.
+3. Hacé clic en **Guardar**.
+
+### Mover una tarea de estado
+
+Desde la tarjeta de la tarea, usá el selector **Mover a...** para cambiar la columna.
+
+### Asignar o reasignar un operario
+
+En la tarjeta de la tarea, usá el selector **Operario** para asignar o cambiar la persona responsable.
+
+### Tareas de lavado
+
+Las solicitudes de lavado que llegan desde la app mobile aparecen en la columna **Lavado**.
+
+- La solicitud puede estar en estado: **Pendiente**, **Aceptada**, **Lista** o **Cancelada**.
+- Para cancelar una solicitud de lavado, hacé clic en la opción correspondiente e ingresá el motivo (ej. "No tenemos turno disponible para ese día").
+
+---
+
+## 7. Espacios
+
+Aquí gestionás la estructura física de tu club: amarras, camas y sus ocupantes.
+
+### Estructura de espacios
+
+- **Marina** → Peines → Amarras
+- **Nave** → Lados → Pisos → Camas
+
+### Buscar un espacio disponible
+
+En la parte superior de la pantalla podés filtrar espacios por:
+
+- **Eslora** y **Manga** del barco (con selector de unidad: Metros / Pies)
+- **Tipo**: Marina o Nave
+- **Solo disponibles** (casilla de verificación)
+
+Los espacios se muestran con colores:
+
+- **Teal** — disponible
+- **Rojo** — ocupado
+- **Amarillo** — reservado
+
+### Crear una nueva área
+
+1. Hacé clic en **Nueva área**.
+2. Seleccioná el tipo: **Marina** o **Nave**.
+3. Para **Marina**: ingresá el nombre, la cantidad de peines y la cantidad de amarras por peine.
+4. Para **Nave**: ingresá el nombre, los lados, los pisos por lado y la cantidad de camas por piso.
+5. Confirmá. Los espacios se crean automáticamente.
+
+### Asignar un espacio a un socio
+
+1. Hacé clic sobre el espacio disponible.
+2. Seleccioná el socio y la embarcación.
+3. Opcionalmente, asignale una tarifa.
+4. Confirmá la asignación.
+
+> Si el espacio tiene una tarifa con eslora/manga, el sistema valida que la embarcación sea compatible antes de confirmar un cambio de espacio. En el alta inicial no bloquea.
+
+### Mover un socio a otro espacio (mudanza)
+
+1. Hacé clic en el espacio ocupado y seleccioná **Cambiar ubicación**.
+2. Elegí el espacio destino (puede estar en otra marina o nave).
+3. Confirmá. El socio conserva su fecha de asignación original y sus embarcaciones se mueven con él.
+
+### Reordenar espacios
+
+Podés arrastrar los espacios dentro de un peine o piso para cambiar el orden de visualización. El nuevo orden se guarda automáticamente.
+
+### Carga masiva de áreas
+
+1. Hacé clic en **Importar áreas**.
+2. Descargá la plantilla y completá las áreas a crear (marinas con peines y amarras, o naves con lados, pisos y camas).
+3. Subí el archivo, revisá la vista previa y confirmá.
+4. Las áreas y sus espacios quedan creados listos para configurar tarifas y asignar ocupantes.
+
+---
+
+## 8. Publicaciones
+
+Desde esta sección publicás amarras y camas disponibles en tu club para que los usuarios de la app mobile las puedan ver. Las publicaciones **no están ligadas a un espacio en particular**: son avisos independientes con su propia foto, descripción y precio.
+
+### Límite según plan
+
+| Plan     | Publicaciones permitidas |
+| -------- | ------------------------ |
+| Esencial | 0 (no disponible)        |
+| Premium  | 2                        |
+| Elite    | 5                        |
+
+Si tu plan es Esencial, verás un aviso indicando que debés actualizar a Premium para usar esta sección.
+
+### Crear una publicación
+
+1. Hacé clic en **Nueva publicación**.
+2. Elegí el tipo: **Amarra** o **Cama**.
+3. Subí una o más fotos del espacio.
+4. Completá los campos:
+   - **Dirección / Ubicación** — dirección física o referencia del lugar (ej: "Av. del Puerto 123, Tigre").
+   - **Dimensiones** — eslora y manga. Usá el toggle **m / ft** para elegir la unidad (metros o pies); la unidad queda guardada junto con el número.
+   - **Precio / mes** y **Expensas / mes** — ambos opcionales.
+5. Seleccioná los servicios e instalaciones disponibles (podés elegir varios): Agua potable, Conexión 220V, Abierto 24 hs, Combustible, Seguridad 24 hs, Vestuarios, Confitería, Lavadero, Aire libre, Bajo techo, Sin arco.
+6. Elegí el estado:
+   - **Guardar borrador** — se guarda pero no aparece en la app mobile todavía.
+   - **Publicar** — queda visible en la app de inmediato.
+
+### Editar o eliminar una publicación
+
+1. Hacé clic en **EDITAR** en la tarjeta de la publicación.
+2. Modificá los campos que necesitás y hacé clic en **Publicar** o **Guardar borrador**.
+3. Para eliminarla, hacé clic en **Eliminar** al pie del formulario y confirmá.
+
+### Filtros y búsqueda
+
+Podés filtrar las publicaciones por tipo (Amarras / Camas), por estado (Publicadas / Borradores) y ordenarlas por fecha o precio. También podés buscar por dirección usando el campo de búsqueda.
+
+---
+
+## 9. Comunicaciones
+
+Desde esta sección enviás anuncios y novedades a los socios de tu club.
+
+### Ver comunicaciones existentes
+
+La pantalla muestra el listado de comunicaciones con título, fecha, categoría, tipo y estado (publicada o borrador).
+
+Podés buscar por título usando la barra de búsqueda.
+
+### Crear una comunicación
+
+1. Hacé clic en **Nueva comunicación**.
+2. Completá el formulario:
+   - **Título** — asunto del anuncio.
+   - **Contenido** — texto del mensaje.
+   - **Tipo**: **Socios** (solo los socios de tu club la ven en la app) o **Pública** (visible en la landing pública).
+   - **Categoría**: Información / Anuncio / Evento / Mantenimiento / Alerta.
+   - **Imágenes** _(opcional)_ — podés adjuntar imágenes en relación 16:9.
+3. Elegí una acción:
+   - **Guardar borrador** — queda guardada pero no se publica todavía.
+   - **Publicar** — se publica de inmediato y los socios la ven en la app.
+
+### Editar o despublicar
+
+Hacé clic en la comunicación en la lista para abrirla y editarla. Podés volver a guardarla como borrador si necesitás pausar su visibilidad.
+
+---
+
+## 10. Facturación
+
+Desde esta sección emitís y gestionás las facturas de tu club.
+
+> Para poder emitir facturas necesitás tener configurado el **Punto de Venta** y haber confirmado el **Certificado AFIP**. Podés hacerlo desde **Configuración → Punto de Venta**. Si la emisión está bloqueada, el panel muestra un aviso explicando qué falta.
+
+### Resumen de facturación
+
+Las tarjetas superiores muestran:
+
+- **Pendientes de cobro** — monto total de facturas sin cobrar.
+- **Pagadas este mes** — monto cobrado en el mes.
+- **Vencidas** — facturas que superaron su fecha de vencimiento sin cobro.
+- **Total facturado** — acumulado histórico.
+
+### Emitir una factura individual
+
+1. Hacé clic en **Nueva factura**.
+2. Seleccioná el **socio** en el campo Cliente.
+3. El sistema muestra automáticamente los **conceptos pendientes** del socio (movimientos mensuales sin facturar). Marcá los que querés incluir. Podés usar **Todos** o **Ninguno** para seleccionar rápido.
+4. Completá los campos:
+   - **Tipo de comprobante**: Factura C (Monotributo) / Factura B (Consumidor Final) / Factura A (Responsable Inscripto) — el sistema sugiere el tipo según la condición IVA del socio.
+   - **Condición de venta**: Contado, Transferencia bancaria, Tarjeta de crédito, Mercado Pago, etc.
+   - **Fecha** y **Vencimiento**.
+   - **Período desde / hasta**.
+5. Hacé clic en **Emitir factura**. La factura se envía a AFIP y queda registrada.
+
+### Facturación en lote
+
+Emití facturas para múltiples socios al mismo tiempo.
+
+1. Hacé clic en **Factura en lote**.
+2. El sistema lista los socios con conceptos pendientes. Seleccioná los que querés facturar.
+3. Revisá el resumen y confirmá.
+
+> La facturación mensual automática corre el día del mes que configuraste en **Configuración → Información general** (campo "Día de facturación"). Solo aplica a socios que ya tuvieron al menos una factura emitida.
+
+### Registrar un pago
+
+Una vez que un socio abona, marcá la factura como pagada:
+
+1. En la tabla de facturas, encontrá la factura correspondiente y hacé clic en la acción **Marcar como pagada** (o usá la casilla en el perfil del socio → Cuenta Corriente).
+2. Seleccioná el **medio de pago**.
+3. Confirmá.
+
+---
+
+## 11. Tarifario
+
+Desde aquí definís los precios de los servicios que ofrece tu club.
+
+### Ver las tarifas
+
+Las tarifas están agrupadas por categoría. Podés filtrar usando los botones:
+
+- **Todas** — muestra todo.
+- **Cuota mensual** — cuotas periódicas.
+- **Servicios** — servicios adicionales (lavado, amarre de pasada, etc.).
+- **Espacios** — tarifas para amarras o camas (por metro/pie de eslora o manga).
+
+### Crear una tarifa
+
+1. Hacé clic en **Nueva tarifa**.
+2. Seleccioná la **Categoría**:
+   - **Cuota mensual** — ingresá el concepto, la medida (rangos de eslora desde "Hasta 16" hasta "Hasta 105") y el precio.
+   - **Servicios** — ingresá el concepto y el precio.
+   - **Espacios** — seleccioná si es para Camas o Amarra, la unidad de metraje (Metros o Pies), la eslora, la manga y opcionalmente un valor puntual.
+
+3. Ingresá el **Precio**.
+4. Hacé clic en **Guardar**.
+
+### Editar una tarifa
+
+Hacé clic en el ícono de edición (lápiz) en la fila de la tarifa. Podés cambiar el precio, el concepto o desactivarla cambiando el **Estado** a "Inactivo".
+
+### Ajuste masivo de precios
+
+Si necesitás actualizar todos los precios a la vez:
+
+1. En la sección **Ajuste Masivo de Tarifas**, seleccioná:
+   - **Tipo**: Porcentaje o Monto fijo.
+   - **Dirección** (si es Porcentaje): Aumentar o Descontar.
+   - **Valor** — el porcentaje o monto a aplicar.
+2. Hacé clic en **Aplicar a todas**.
+
+### Historial de cambios
+
+Cada tarifa tiene un acordeón **Historial de cambios** donde podés ver los precios anteriores, la variación porcentual, la fecha del cambio, el origen (manual o ajuste masivo) y quién lo realizó.
+
+---
+
+## 12. Configuración
+
+Desde **Configuración** administrás los datos de tu club y las integraciones.
+
+### Pestaña: Información general
+
+Datos básicos del club visibles en la app y en los documentos de facturación.
+
+**Campos:**
+
+- **Nombre del club / guardería** _(requerido)_
+- **CUIT** _(requerido)_
+- **Tipo**: Club Náutico / Marina Privada / Guardería Náutica / Puerto Deportivo / Otro
+- **Dirección, Ciudad, Provincia, Código Postal** _(requeridos)_
+- **Teléfono operativo** _(requerido)_
+- **Email operativo** _(requerido)_
+- **Día de facturación** — día del mes (1 al 28) en que corre la facturación automática mensual.
+
+**Horarios de atención:**
+Para cada día de la semana podés configurar:
+
+- Horario de apertura y cierre.
+- Activar el toggle **Cerrado** si el club no abre ese día.
+
+**Fotos del club:**
+Podés subir fotos que se muestran en el perfil público del club.
+
+Hacé clic en **Guardar cambios** al terminar.
+
+---
+
+### Pestaña: Equipo
+
+Gestioná el personal del club que tiene acceso al panel web o a la app mobile.
+
+**Agregar un miembro del equipo:**
+
+1. Hacé clic en **Agregar miembro**.
+2. Completá los datos:
+   - **Nombre y Apellido** _(requeridos)_
+   - **Email** _(requerido)_ — será el usuario de acceso.
+   - **Rol** _(requerido)_:
+     - **Admin** — acceso total al panel web.
+     - **Administrativo** — mismos permisos que Admin.
+     - **Operario** — solo ve y resuelve las tareas asignadas.
+     - **Portería/Seguridad** — opera exclusivamente desde la app mobile (ingreso y egreso de embarcaciones).
+   - **DNI**, **Teléfono**, **Sede** _(opcionales)_
+3. Hacé clic en **Guardar**. El nuevo miembro recibe un email de invitación para activar su cuenta.
+
+**Editar o eliminar un miembro:**
+Usá los íconos de edición y eliminación en la tarjeta del miembro.
+
+> Eliminar un miembro del equipo lo desvincula de tu club pero no borra su cuenta (puede estar en otro club). Si necesitás revocar el acceso completamente, contactá a soporte.
+
+---
+
+### Pestaña: Plan
+
+Muestra tu plan actual y te permite cambiarlo.
+
+Los tres planes disponibles son **Esencial**, **Premium** y **Élite**. Cada uno incluye un conjunto diferente de funcionalidades.
+
+**Cambiar de plan:**
+
+1. Hacé clic en **Cambiar a [nombre del plan]** bajo el plan deseado.
+2. Confirmá el cambio en el modal.
+3. El cambio es inmediato. Las funcionalidades del nuevo plan se habilitan al instante.
+
+---
+
+### Pestaña: Punto de Venta
+
+Configuración necesaria para poder emitir facturas electrónicas a través de AFIP.
+
+**Paso 1 — Configurar el Punto de Venta:**
+
+1. Completá los datos:
+   - **Número de Punto de Venta** _(requerido)_
+   - **Condición frente al IVA** _(requerida)_ — la de tu club.
+   - **Rubro** _(requerido)_
+   - **Razón social** _(requerida)_
+   - **Fecha de inicio de actividades** _(requerida)_
+2. Hacé clic en **Guardar**.
+
+**Paso 2 — Certificado de enlace con AFIP:**
+
+El certificado permite que el sistema emita facturas directamente a AFIP en nombre de tu club.
+
+1. Hacé clic en **Solicitar certificado AFIP**. Vas a recibir instrucciones y el archivo de certificado por email.
+2. Instalá el certificado en el portal de AFIP siguiendo las instrucciones recibidas.
+3. Volvé al panel y hacé clic en **Confirmar instalación** para habilitar la emisión.
+
+> Hasta que no confirmes la instalación del certificado, el botón "Nueva factura" aparece deshabilitado.
+
+---
+
+### Pestaña: Notificaciones
+
+Activá o desactivá las notificaciones push que reciben los socios en la app mobile.
+
+Los toggles disponibles son:
+
+- **Activar notificaciones a socios** — habilita el sistema de notificaciones push.
+- **Activar clima y mareas** — los socios reciben alertas de condiciones climáticas y tablas de mareas.
+- **Activar reservas online** — habilita el módulo de reservas desde la app.
+- **Activar pagos online** — habilita el módulo de pagos desde la app.
+- **Activar menú gastronómico** — habilita el módulo de restaurante en la app.
+
+> La disponibilidad de algunas funcionalidades depende del plan contratado.
+
+---
+
+## Preguntas frecuentes
+
+**¿Cómo agrego una embarcación a un socio que ya existe?**
+Entrá al perfil del socio → pestaña **Embarcación** → hacé clic en el botón de agregar embarcación.
+
+**¿Qué pasa si importo socios con emails que ya están en el sistema?**
+El sistema los detecta como "A vincular" (no los duplica). Los vincula a tu club manteniendo su cuenta existente.
+
+**¿Puedo asignar un espacio sin tarifa?**
+Sí. La tarifa es opcional al momento de asignar. Podés cargarla después; cuando lo hagas, el sistema genera el movimiento mensual correspondiente con cálculo proporcional desde la fecha de asignación.
+
+**¿La facturación automática mensual aplica a todos los socios?**
+Solo a los socios que ya tuvieron al menos una factura emitida. Los socios nuevos sin factura previa hay que facturarlos la primera vez de forma manual.
+
+**¿Cómo contacto a soporte?**
+Desde el menú lateral, hacé clic en **¿Necesitás ayuda?** para abrir el chat de soporte por WhatsApp.
