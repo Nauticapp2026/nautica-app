@@ -6,7 +6,6 @@ import {
   Anchor,
   ArrowUpDown,
   BedDouble,
-  Calendar,
   Clock,
   Coffee,
   Droplets,
@@ -59,7 +58,7 @@ export type PublicacionItem = {
   ubicacion: string | null;
   eslora: string | null;
   manga: string | null;
-  puntual: string | null;
+  unidadMetraje: 'metros' | 'pies';
   expensas: string | null;
   precio: string | null;
   servicios: ServicioPublicacion[];
@@ -108,12 +107,12 @@ function fmtPrecio(v: string | null): string {
   return '$' + n.toLocaleString('es-AR', { maximumFractionDigits: 0 });
 }
 
-function fmtNum(v: string | null, unit = 'm'): string | null {
+function fmtNum(v: string | null, unit: 'metros' | 'pies' = 'metros'): string | null {
   if (!v) return null;
   const n = parseFloat(v);
   if (isNaN(n)) return null;
   const s = n % 1 === 0 ? String(n) : n.toFixed(2).replace(/\.?0+$/, '');
-  return `${s} ${unit}`;
+  return `${s} ${unit === 'pies' ? 'ft' : 'm'}`;
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
@@ -145,7 +144,6 @@ export function PublicacionesClient({ items, plan, limit }: Props) {
     } else if (sortFilter === 'precio_desc') {
       result.sort((a, b) => parseFloat(b.precio ?? '0') - parseFloat(a.precio ?? '0'));
     }
-    // 'recientes' ya viene ordenado desc por createdAt desde la query
 
     return result;
   }, [items, query, tipoFilter, estadoFilter, sortFilter]);
@@ -315,11 +313,11 @@ function Pill({
 function PublicacionCard({ item, onEdit }: { item: PublicacionItem; onEdit: () => void }) {
   const foto = item.imagenUrls[0];
   const esAmarra = item.tipo === 'amarra';
-  const eslora = fmtNum(item.eslora);
-  const manga = fmtNum(item.manga);
+  const eslora = fmtNum(item.eslora, item.unidadMetraje);
+  const manga = fmtNum(item.manga, item.unidadMetraje);
 
   return (
-    <article className="flex flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white">
+    <article className="flex flex-col overflow-hidden rounded-2xl bg-white shadow-md">
       {/* Foto */}
       <div className="relative aspect-[4/3] w-full overflow-hidden bg-gray-100">
         {foto ? (
@@ -336,7 +334,7 @@ function PublicacionCard({ item, onEdit }: { item: PublicacionItem; onEdit: () =
             {esAmarra ? 'Amarra' : 'Cama'}
           </span>
         </div>
-        {/* Badge estado */}
+        {/* Badge borrador */}
         {item.estado === 'borrador' && (
           <div className="absolute top-2 right-2">
             <span className="rounded-md bg-black/50 px-2 py-0.5 text-[10px] font-semibold text-white">
@@ -347,18 +345,18 @@ function PublicacionCard({ item, onEdit }: { item: PublicacionItem; onEdit: () =
       </div>
 
       {/* Info */}
-      <div className="flex flex-1 flex-col gap-1.5 p-3">
+      <div className="flex flex-1 flex-col gap-1.5 px-3 pt-3 pb-2">
         {/* Precio */}
         <p className="text-base font-bold text-[#101828]">
           {fmtPrecio(item.precio)}
-          {item.precio && <span className="text-xs font-normal text-gray-500">/mes</span>}
+          {item.precio && <span className="text-xs font-normal text-gray-500"> /mes</span>}
         </p>
 
         {/* Ubicación */}
         {item.ubicacion && (
-          <div className="flex items-center gap-1 text-xs text-gray-500">
-            <MapPin className="h-3 w-3 shrink-0" />
-            <span className="truncate">{item.ubicacion}</span>
+          <div className="flex items-start gap-1 text-xs text-gray-500">
+            <MapPin className="mt-px h-3 w-3 shrink-0" />
+            <span className="line-clamp-2 leading-snug">{item.ubicacion}</span>
           </div>
         )}
 
@@ -396,24 +394,15 @@ function PublicacionCard({ item, onEdit }: { item: PublicacionItem; onEdit: () =
         )}
       </div>
 
-      {/* Footer */}
-      <div className="flex items-center justify-between border-t border-gray-100 px-3 py-2">
-        <div className="flex items-center gap-1 text-[10px] text-gray-400">
-          <Calendar className="h-3 w-3" />
-          {new Date(item.createdAt).toLocaleDateString('es-AR', {
-            day: '2-digit',
-            month: '2-digit',
-            year: '2-digit',
-            timeZone: 'America/Argentina/Buenos_Aires',
-          })}
-        </div>
+      {/* Botón ver más — estilo mobile */}
+      <div className="px-3 pb-3">
         <button
           type="button"
           onClick={onEdit}
-          className="flex items-center gap-1 rounded-[8px] border border-[#175861] px-2.5 py-1 text-xs font-semibold text-[#175861] transition-colors hover:bg-[#F0F9FA]"
+          className="flex w-full items-center justify-center gap-1.5 rounded-[10px] bg-[#175861] py-2.5 text-xs font-bold tracking-wide text-white transition-colors hover:bg-[#0f4249]"
         >
-          <Edit3 className="h-3 w-3" />
-          Editar
+          <Edit3 className="h-3.5 w-3.5" />
+          EDITAR
         </button>
       </div>
     </article>
@@ -443,7 +432,9 @@ function PublicacionModal({
   const [ubicacion, setUbicacion] = useState(initial?.ubicacion ?? '');
   const [eslora, setEslora] = useState(initial?.eslora ?? '');
   const [manga, setManga] = useState(initial?.manga ?? '');
-  const [puntual, setPuntual] = useState(initial?.puntual ?? '');
+  const [unidadMetraje, setUnidadMetraje] = useState<'metros' | 'pies'>(
+    initial?.unidadMetraje ?? 'metros',
+  );
   const [expensas, setExpensas] = useState(initial?.expensas ?? '');
   const [precio, setPrecio] = useState(initial?.precio ?? '');
   const [servicios, setServicios] = useState<ServicioPublicacion[]>(initial?.servicios ?? []);
@@ -468,7 +459,7 @@ function PublicacionModal({
       ubicacion,
       eslora,
       manga,
-      puntual,
+      unidadMetraje,
       expensas,
       precio,
       servicios,
@@ -561,40 +552,66 @@ function PublicacionModal({
 
           {/* Ubicación */}
           <div>
-            <label className={labelCls}>Ubicación</label>
+            <label className={labelCls}>Dirección / Ubicación</label>
             <input
               className={inputCls}
-              placeholder="Ej: Marina Norte, Peine 3"
+              placeholder="Ej: Av. del Puerto 123, Tigre"
               value={ubicacion}
               onChange={(e) => setUbicacion(e.target.value)}
             />
           </div>
 
-          {/* Dimensiones */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={labelCls}>Eslora (m)</label>
-              <input
-                type="number"
-                min="0"
-                step="0.1"
-                className={inputCls}
-                placeholder="Ej: 10"
-                value={eslora}
-                onChange={(e) => setEslora(e.target.value)}
-              />
+          {/* Dimensiones + unidad */}
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <p className={labelCls + ' mb-0'}>Dimensiones</p>
+              {/* Toggle metros / pies */}
+              <div className="flex rounded-[8px] border border-gray-200 bg-gray-50 p-0.5 text-xs font-semibold">
+                {(['metros', 'pies'] as const).map((u) => (
+                  <button
+                    key={u}
+                    type="button"
+                    onClick={() => setUnidadMetraje(u)}
+                    className={`rounded-[6px] px-3 py-1 transition-colors ${
+                      unidadMetraje === u
+                        ? 'bg-[#175861] text-white'
+                        : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    {u === 'metros' ? 'm' : 'ft'}
+                  </button>
+                ))}
+              </div>
             </div>
-            <div>
-              <label className={labelCls}>Manga (m)</label>
-              <input
-                type="number"
-                min="0"
-                step="0.1"
-                className={inputCls}
-                placeholder="Ej: 3.5"
-                value={manga}
-                onChange={(e) => setManga(e.target.value)}
-              />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={labelCls}>
+                  Eslora ({unidadMetraje === 'metros' ? 'm' : 'ft'})
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  className={inputCls}
+                  placeholder="Ej: 10"
+                  value={eslora}
+                  onChange={(e) => setEslora(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className={labelCls}>
+                  Manga ({unidadMetraje === 'metros' ? 'm' : 'ft'})
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  className={inputCls}
+                  placeholder="Ej: 3.5"
+                  value={manga}
+                  onChange={(e) => setManga(e.target.value)}
+                />
+              </div>
             </div>
           </div>
 
@@ -624,19 +641,6 @@ function PublicacionModal({
                 onChange={(e) => setExpensas(e.target.value)}
               />
             </div>
-          </div>
-
-          <div>
-            <label className={labelCls}>Precio puntual (venta)</label>
-            <input
-              type="number"
-              min="0"
-              step="1"
-              className={inputCls}
-              placeholder="Solo si se vende el espacio (opcional)"
-              value={puntual}
-              onChange={(e) => setPuntual(e.target.value)}
-            />
           </div>
 
           {/* Servicios */}

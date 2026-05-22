@@ -52,7 +52,7 @@ export type PublicacionInput = {
   ubicacion: string;
   eslora: string;
   manga: string;
-  puntual: string;
+  unidadMetraje: 'metros' | 'pies';
   expensas: string;
   precio: string;
   servicios: Servicio[];
@@ -71,6 +71,7 @@ function isAdmin(ctx: NonNullable<Awaited<ReturnType<typeof getActiveMarina>>>):
 function validar(input: PublicacionInput): string | null {
   if (!TIPOS.includes(input.tipo)) return 'Tipo inválido.';
   if (!ESTADOS.includes(input.estado)) return 'Estado inválido.';
+  if (!['metros', 'pies'].includes(input.unidadMetraje)) return 'Unidad inválida.';
   if (input.precio && isNaN(parseFloat(input.precio))) return 'Precio inválido.';
   if (input.eslora && isNaN(parseFloat(input.eslora))) return 'Eslora inválida.';
   if (input.manga && isNaN(parseFloat(input.manga))) return 'Manga inválida.';
@@ -158,7 +159,7 @@ export async function createPublicacionAction(
       ubicacion: input.ubicacion.trim() || null,
       eslora: toNum(input.eslora),
       manga: toNum(input.manga),
-      puntual: toNum(input.puntual),
+      unidadMetraje: input.unidadMetraje,
       expensas: toNum(input.expensas),
       precio: toNum(input.precio),
       servicios: input.servicios.filter((s): s is Servicio => SERVICIOS.includes(s as Servicio)),
@@ -199,7 +200,7 @@ export async function updatePublicacionAction(
       ubicacion: input.ubicacion.trim() || null,
       eslora: toNum(input.eslora),
       manga: toNum(input.manga),
-      puntual: toNum(input.puntual),
+      unidadMetraje: input.unidadMetraje,
       expensas: toNum(input.expensas),
       precio: toNum(input.precio),
       servicios: input.servicios.filter((s): s is Servicio => SERVICIOS.includes(s as Servicio)),
