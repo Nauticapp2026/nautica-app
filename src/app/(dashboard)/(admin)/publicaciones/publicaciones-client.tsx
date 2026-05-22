@@ -16,7 +16,6 @@ import {
   MapPin,
   Plus,
   Ruler,
-  Search,
   ShieldCheck,
   Shirt,
   Sparkles,
@@ -123,19 +122,11 @@ export function PublicacionesClient({ items, plan, limit }: Props) {
   const [tipoFilter, setTipoFilter] = useState<TipoFilter>('todos');
   const [estadoFilter, setEstadoFilter] = useState<EstadoFilter>('todos');
   const [sortFilter, setSortFilter] = useState<SortFilter>('recientes');
-  const [query, setQuery] = useState('');
-
   const atLimit = limit > 0 && items.length >= limit;
 
   const filtered = useMemo(() => {
     let result = [...items];
 
-    const q = query.trim().toLowerCase();
-    if (q) {
-      result = result.filter(
-        (i) => (i.ubicacion ?? '').toLowerCase().includes(q) || i.tipo.toLowerCase().includes(q),
-      );
-    }
     if (tipoFilter !== 'todos') result = result.filter((i) => i.tipo === tipoFilter);
     if (estadoFilter !== 'todos') result = result.filter((i) => i.estado === estadoFilter);
 
@@ -146,7 +137,7 @@ export function PublicacionesClient({ items, plan, limit }: Props) {
     }
 
     return result;
-  }, [items, query, tipoFilter, estadoFilter, sortFilter]);
+  }, [items, tipoFilter, estadoFilter, sortFilter]);
 
   return (
     <div className="p-4 md:p-8">
@@ -181,22 +172,6 @@ export function PublicacionesClient({ items, plan, limit }: Props) {
           </button>
         )}
       </header>
-
-      {/* Buscador */}
-      <div className="mb-4 flex items-center gap-2 rounded-[10px] border border-gray-200 bg-white px-3">
-        <Search className="h-4 w-4 shrink-0 text-gray-400" />
-        <input
-          className="h-11 flex-1 bg-transparent text-sm text-[#101828] placeholder-gray-400 focus:outline-none"
-          placeholder="Buscar camas y amarras..."
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-        {query && (
-          <button type="button" onClick={() => setQuery('')}>
-            <X className="h-4 w-4 text-gray-400" />
-          </button>
-        )}
-      </div>
 
       {/* Filtros */}
       <div className="mb-6 flex flex-wrap gap-2">
