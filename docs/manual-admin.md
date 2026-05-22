@@ -339,7 +339,7 @@ Si tu plan es Esencial, verás un aviso indicando que debés actualizar a Premiu
 3. Subí una o más fotos del espacio.
 4. Completá los campos:
    - **Dirección / Ubicación** — dirección física o referencia del lugar (ej: "Av. del Puerto 123, Tigre").
-   - **Dimensiones** — eslora y manga. Usá el toggle **m / ft** para elegir la unidad (metros o pies); la unidad queda guardada junto con el número.
+   - **Dimensiones** — eslora y manga. Usá el toggle **m / pies** para elegir la unidad (metros o pies); la unidad queda guardada junto con el número.
    - **Precio / mes** y **Expensas / mes** — ambos opcionales.
 5. Seleccioná los servicios e instalaciones disponibles (podés elegir varios): Agua potable, Conexión 220V, Abierto 24 hs, Combustible, Seguridad 24 hs, Vestuarios, Confitería, Lavadero, Aire libre, Bajo techo, Sin arco.
 6. Elegí el estado:

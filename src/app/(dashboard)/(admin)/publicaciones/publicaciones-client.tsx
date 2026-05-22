@@ -112,7 +112,7 @@ function fmtNum(v: string | null, unit: 'metros' | 'pies' = 'metros'): string | 
   const n = parseFloat(v);
   if (isNaN(n)) return null;
   const s = n % 1 === 0 ? String(n) : n.toFixed(2).replace(/\.?0+$/, '');
-  return `${s} ${unit === 'pies' ? 'ft' : 'm'}`;
+  return `${s} ${unit === 'pies' ? 'pies' : 'm'}`;
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
@@ -578,7 +578,7 @@ function PublicacionModal({
                         : 'text-gray-500 hover:text-gray-700'
                     }`}
                   >
-                    {u === 'metros' ? 'm' : 'ft'}
+                    {u === 'metros' ? 'm' : 'pies'}
                   </button>
                 ))}
               </div>
@@ -586,7 +586,7 @@ function PublicacionModal({
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className={labelCls}>
-                  Eslora ({unidadMetraje === 'metros' ? 'm' : 'ft'})
+                  Eslora ({unidadMetraje === 'metros' ? 'm' : 'pies'})
                 </label>
                 <input
                   type="number"
@@ -600,7 +600,7 @@ function PublicacionModal({
               </div>
               <div>
                 <label className={labelCls}>
-                  Manga ({unidadMetraje === 'metros' ? 'm' : 'ft'})
+                  Manga ({unidadMetraje === 'metros' ? 'm' : 'pies'})
                 </label>
                 <input
                   type="number"
