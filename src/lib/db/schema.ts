@@ -1162,6 +1162,7 @@ export const publicaciones = pgTable(
     ubicacion: text('ubicacion'),
     eslora: numeric('eslora', { precision: 8, scale: 2 }),
     manga: numeric('manga', { precision: 8, scale: 2 }),
+    unidadMetraje: unidadMetrajeEnum('unidad_metraje').notNull().default('metros'),
     puntual: numeric('puntual', { precision: 12, scale: 2 }),
     expensas: numeric('expensas', { precision: 12, scale: 2 }),
     precio: numeric('precio', { precision: 12, scale: 2 }),
