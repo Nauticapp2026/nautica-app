@@ -18,10 +18,13 @@ Esta es la regla más importante. **Cada consulta, server action o route handler
 
 ### 2. Roles: admin vs operario
 
-- **Admin**: acceso total dentro de su guardería (dashboard, configuración, usuarios, espacios, tarifario, facturación, comunicaciones, tareas).
+- **Admin** (`administrador_general` o `administrativo`): acceso total dentro de su guardería (dashboard, configuración, usuarios, espacios, tarifario, facturación, comunicaciones, tareas).
 - **Operario**: tareas asignadas y operativa básica.
+- **Seguridad**: portería/acceso. Opera desde la app mobile únicamente — no tiene pantallas propias en este repo web.
 
-Roles definidos en `src/config/roles.ts`. Enforcement:
+**Importante**: los roles `administrador_general` y `administrativo` tienen exactamente los mismos permisos. Todo gate que chequea `isAdmin` debe aceptar ambos. Ver `src/config/roles.ts` para la lista completa y los grupos (`ADMIN_ROLES`, `STAFF_ROLES`).
+
+Enforcement:
 
 - `middleware.ts` redirige según rol.
 - Server actions verifican rol antes de mutar.
@@ -43,7 +46,7 @@ Todo lo que se muestre al usuario con hora/fecha tiene que estar en TZ `America/
 
 ### 5.1. Archivos `'use server'` solo exportan async functions
 
-Los archivos en `src/app/actions/` empiezan con `'use server'`. Next.js 15 con Turbopack solo permite **exportar async functions** desde esos archivos. Si exportás una const, un type, un objeto o cualquier valor no-async, el typecheck pasa pero **runtime crashea** con:
+Los archivos en `src/app/actions/` empiezan con `'use server'`. Next.js 16 con Turbopack solo permite **exportar async functions** desde esos archivos. Si exportás una const, un type, un objeto o cualquier valor no-async, el typecheck pasa pero **runtime crashea** con:
 
 > A "use server" file can only export async functions, found object.
 
@@ -80,9 +83,11 @@ Si necesitás compartir constantes / types / enums entre el cliente y un server 
 - **Errores**: usar los tipados de `src/lib/auth/errors.ts` cuando aplique.
 - **Tipos**: schema de DB es la fuente de verdad. Inferir tipos desde Drizzle (`InferSelectModel`, `InferInsertModel`).
 - **UI**: componentes shadcn/ui en `src/components/ui/`, propios reusables en `src/components/shared/`.
+- **Toasts**: usar `sonner` (`toast.success` / `toast.error`) después de cada server action. Mantener el inline para accesibilidad.
 - **Uploads de archivos**: van por Server Action con `FormData`. El bodySizeLimit está seteado a 10 MB en `next.config.ts`. Si el archivo puede pasar de 10 MB, migrar a upload directo a Storage con Signed URL.
 - **Palabras reservadas en nombres de columna**: evitarlas. Postgres reserva `offset`, `order`, `user`, etc. — aunque Drizzle teóricamente las quotea, en la práctica el comportamiento es errático (caso real: `espacios.offset` se renombró a `espacios.orden` en mig `0025` porque el UPDATE silenciosamente no aplicaba). Convención del repo: usar `orden` para columnas de ordenamiento (ver `marinas.orden`, `pisos.orden`, `naves.orden`, `espacios.orden`).
 - **Debug de persistencia**: si un UPDATE devuelve éxito pero la UI no refleja el cambio (incluso después de refresh), **revisar primero todos los `.sort()` / `map` / `filter` en el page.tsx** antes de teorizar sobre Drizzle/RLS/cache. El caso típico es un sort post-query que pisa el orden de la query.
+- **Auditoría desde Drizzle**: Drizzle usa el pooler de Supabase, que no propaga la sesión de auth. `auth.uid()` devuelve NULL en triggers si se llama desde Drizzle. Para pasar el user_id a triggers de auditoría, usar `set_config('app.current_user_id', id, true)` dentro de la misma transacción.
 
 ---
 
@@ -111,9 +116,12 @@ Husky + lint-staged corren prettier y eslint en cada commit. Si un hook falla, a
 ## Integraciones externas
 
 - **Supabase** — Auth, Postgres, RLS. Único proyecto (prod).
-- **App mobile** — repo separado pero **comparte la misma DB Supabase**. La comunicación entre web y mobile es vía tablas compartidas y triggers Postgres. Antes de cambiar una tabla compartida (`solicitudes_lavado`, `porteria_invitados`, `actividad_porteria`, `tareas`, etc.), pensar si rompe algo del lado mobile.
-- **tusfacturas.app** — emisión de facturas AFIP. Cliente y mappers en `src/lib/tusfacturas/`. Las credenciales `TUSFACTURAS_*` están en env vars.
-- **Vercel Cron** — `src/app/api/cron/mensuales` corre los movimientos mensuales. Si tocás ese código, considerar idempotencia (puede correrse dos veces).
+- **Resend** — Emails transaccionales (aprobación de socios, invitaciones, etc.). Cliente en `src/lib/email/resend.ts`. Los mails de Supabase Auth (confirmación, reset) son un canal aparte, configurado directo en el dashboard de Supabase.
+- **App mobile** — repo separado pero **comparte la misma DB Supabase**. La comunicación entre web y mobile es vía tablas compartidas y triggers Postgres. Antes de cambiar una tabla compartida (`solicitudes_lavado`, `porteria_invitados`, `actividad_porteria`, `tareas`, `notificaciones`, etc.), pensar si rompe algo del lado mobile.
+- **Expo Push** — notificaciones push a iOS/Android. Tokens en tabla `device_tokens`. Envío en `src/lib/push-notifications.ts`. Cron diario en `api/cron/notificaciones-push`.
+- **tusfacturas.app** — emisión de facturas AFIP. Cliente y mappers en `src/lib/tusfacturas/`. Las credenciales `TUSFACTURAS_*` son las master de NauticaApp (solo para el alta del POS); cada guardería factura con sus propias credenciales que TusFacturas devuelve al alta.
+- **Vercel Cron** — tres jobs: `api/cron/mensuales` (movimientos mensuales), `api/cron/notificaciones-push` (push diario), `api/cron/historial-plan-mensual`. Si tocás ese código, considerar idempotencia (pueden correrse dos veces).
+- **Pre-launch gate** — toda la web está detrás de Basic Auth hasta el lanzamiento. Se destraba borrando las env vars `PRELAUNCH_GATE_USER` y `PRELAUNCH_GATE_PASSWORD` en Vercel. Las rutas `/auth/*` y `/api/mareas` están excluidas del gate.
 
 ---
 
@@ -132,6 +140,6 @@ Husky + lint-staged corren prettier y eslint en cada commit. Si un hook falla, a
 pnpm dev              # desarrollo
 pnpm typecheck        # antes de pushear, idealmente
 pnpm lint
-pnpm db:generate      # tras cambios en schema.ts
+pnpm db:generate      # tras cambios en schema.ts (actualmente roto en Windows — las migraciones van a mano)
 pnpm db:studio        # inspeccionar la DB
 ```
