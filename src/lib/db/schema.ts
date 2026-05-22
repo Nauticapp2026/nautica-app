@@ -228,6 +228,24 @@ export const diaSemanaEnum = pgEnum('dia_semana', [
   'domingo',
 ]);
 
+export const tipoPublicacionEnum = pgEnum('tipo_publicacion', ['amarra', 'cama']);
+
+export const estadoPublicacionEnum = pgEnum('estado_publicacion', ['borrador', 'publicada']);
+
+export const servicioPublicacionEnum = pgEnum('servicio_publicacion', [
+  'agua_potable',
+  'conexion_220v',
+  'abierto_24hs',
+  'combustible',
+  'seguridad_24hs',
+  'vestuarios',
+  'confiteria',
+  'lavadero',
+  'aire_libre',
+  'bajo_techo',
+  'sin_arco',
+]);
+
 // Servicios de categoría "espacios": locación (dónde se aplica) y unidad de metraje.
 export const locacionServicioEnum = pgEnum('locacion_servicio', ['camas', 'amarra']);
 
@@ -1132,6 +1150,36 @@ export const solicitudesLavado = pgTable(
   ],
 );
 
+export const publicaciones = pgTable(
+  'publicaciones',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    guarderiaId: uuid('guarderia_id')
+      .notNull()
+      .references(() => guarderias.id, { onDelete: 'cascade' }),
+    autorId: uuid('autor_id').references(() => profiles.id, { onDelete: 'set null' }),
+    tipo: tipoPublicacionEnum('tipo').notNull(),
+    ubicacion: text('ubicacion'),
+    eslora: numeric('eslora', { precision: 8, scale: 2 }),
+    manga: numeric('manga', { precision: 8, scale: 2 }),
+    puntual: numeric('puntual', { precision: 12, scale: 2 }),
+    expensas: numeric('expensas', { precision: 12, scale: 2 }),
+    precio: numeric('precio', { precision: 12, scale: 2 }),
+    servicios: servicioPublicacionEnum('servicios')
+      .array()
+      .notNull()
+      .default(sql`'{}'`),
+    imagenUrls: text('imagen_urls')
+      .array()
+      .notNull()
+      .default(sql`'{}'`),
+    estado: estadoPublicacionEnum('estado').notNull().default('borrador'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [index('publicaciones_guarderia_idx').on(t.guarderiaId)],
+);
+
 // =============================================================================
 // PLATFORM (super admin) — config global, no scopeada por guardería
 // =============================================================================
@@ -1336,6 +1384,7 @@ export const guarderiaRelations = relations(guarderias, ({ many }) => ({
   proveedores: many(proveedores),
   restaurantes: many(restaurantes),
   solicitudesLavado: many(solicitudesLavado),
+  publicaciones: many(publicaciones),
 }));
 
 export const profileRelations = relations(profiles, ({ many, one }) => ({
@@ -1401,6 +1450,11 @@ export const alertasRelations = relations(alertas, ({ one }) => ({
   resolver: one(profiles, { fields: [alertas.resolvedBy], references: [profiles.id] }),
 }));
 
+export const publicacionesRelations = relations(publicaciones, ({ one }) => ({
+  guarderia: one(guarderias, { fields: [publicaciones.guarderiaId], references: [guarderias.id] }),
+  autor: one(profiles, { fields: [publicaciones.autorId], references: [profiles.id] }),
+}));
+
 export const solicitudesLavadoRelations = relations(solicitudesLavado, ({ one }) => ({
   guarderia: one(guarderias, {
     fields: [solicitudesLavado.guarderiaId],
@@ -1448,3 +1502,5 @@ export type PlatformComunicacion = typeof platformComunicaciones.$inferSelect;
 export type NewPlatformComunicacion = typeof platformComunicaciones.$inferInsert;
 export type PlatformPublicidad = typeof platformPublicidades.$inferSelect;
 export type NewPlatformPublicidad = typeof platformPublicidades.$inferInsert;
+export type Publicacion = typeof publicaciones.$inferSelect;
+export type NewPublicacion = typeof publicaciones.$inferInsert;
