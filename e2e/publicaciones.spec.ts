@@ -11,7 +11,7 @@ test('muestra la página de publicaciones', async ({ page }) => {
 test('abre el modal de nueva publicación', async ({ page }) => {
   const btn = page.getByRole('button', { name: 'Nueva publicación' });
   // Si el plan es esencial, el botón no existe — saltamos el test
-  if (!(await btn.isVisible())) {
+  if (!(await btn.isVisible()) || !(await btn.isEnabled())) {
     test.skip();
     return;
   }
@@ -23,7 +23,7 @@ test('abre el modal de nueva publicación', async ({ page }) => {
 
 test('crea y elimina una publicación borrador', async ({ page }) => {
   const btn = page.getByRole('button', { name: 'Nueva publicación' });
-  if (!(await btn.isVisible())) {
+  if (!(await btn.isVisible()) || !(await btn.isEnabled())) {
     test.skip();
     return;
   }

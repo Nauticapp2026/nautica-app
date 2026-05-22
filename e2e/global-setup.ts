@@ -23,8 +23,8 @@ export default async function globalSetup() {
   const page = await context.newPage();
 
   await page.goto(`${baseURL}/login`);
-  await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Contraseña').fill(password);
+  await page.locator('input[name="email"]').fill(email);
+  await page.locator('input[name="password"]').fill(password);
   await page.getByRole('button', { name: 'Ingresar' }).click();
 
   // Esperar a que redirija al dashboard
