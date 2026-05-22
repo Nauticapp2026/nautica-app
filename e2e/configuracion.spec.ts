@@ -23,11 +23,7 @@ test('pestaña Equipo muestra botón agregar miembro', async ({ page }) => {
 
 test('pestaña Plan muestra los planes disponibles', async ({ page }) => {
   await page.getByRole('button', { name: 'Plan' }).click();
-  // Verificar que al menos hay cards de planes (los nombres pueden variar)
-  await expect(
-    page
-      .locator('h3')
-      .filter({ hasText: /esencial|premium|elite|club/i })
-      .first(),
-  ).toBeVisible();
+  await expect(page.locator('h3').filter({ hasText: /esencial/i })).toBeVisible();
+  await expect(page.locator('h3').filter({ hasText: /premium/i })).toBeVisible();
+  await expect(page.locator('h3').filter({ hasText: /élite/i })).toBeVisible();
 });
