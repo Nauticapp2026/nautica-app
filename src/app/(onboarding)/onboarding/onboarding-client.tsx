@@ -21,7 +21,6 @@ import {
   signUpStep,
   createGuarderiaStep,
   updateDetallesStep,
-  updateFeaturesStep,
   selectPlanStep,
   inviteTeamMembersStep,
   uploadGuarderiaFotoStep,
@@ -31,7 +30,7 @@ import { MarkdownView } from '@/components/shared/markdown-view';
 import { toast } from 'sonner';
 import { Check, Trash2, Plus, ChevronRight } from 'lucide-react';
 
-const TOTAL_STEPS = 11;
+const TOTAL_STEPS = 10;
 const STORAGE_KEY = 'onboarding-state-v1';
 
 const DIAS = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'] as const;
@@ -100,6 +99,7 @@ const DEFAULT_HORARIOS: Record<string, HorarioDia> = Object.fromEntries(
 
 type PlanInfoEntry = { label: string; precio: string };
 type PlanInfoMap = Record<'esencial' | 'premium' | 'elite', PlanInfoEntry>;
+type PlanFeatureLine = { text: string; bold: boolean };
 
 // ─── Shell ──────────────────────────────────────────────────────────────────
 
@@ -181,7 +181,7 @@ function NavButtons({
           onClick={onBack}
           className="flex-1 rounded-[10px] border border-[#d1d5dc] bg-white py-3 text-sm font-medium text-[#364153] transition hover:bg-gray-50"
         >
-          Atras
+          Atrás
         </button>
       )}
       {extraButton}
@@ -563,7 +563,7 @@ function Step3({
                     value={h.apertura}
                     disabled={!h.activo}
                     onChange={(e) => onChangeHorario(dia, 'apertura', e.target.value)}
-                    className="min-w-0 flex-1 rounded border border-gray-200 px-2 py-1 text-xs disabled:bg-gray-50 disabled:text-gray-400"
+                    className="min-w-[76px] flex-1 rounded border border-gray-200 px-2 py-1 text-xs disabled:bg-gray-50 disabled:text-gray-400"
                   />
                   <span className="text-xs text-gray-400">-</span>
                   <input
@@ -571,7 +571,7 @@ function Step3({
                     value={h.cierre}
                     disabled={!h.activo}
                     onChange={(e) => onChangeHorario(dia, 'cierre', e.target.value)}
-                    className="min-w-0 flex-1 rounded border border-gray-200 px-2 py-1 text-xs disabled:bg-gray-50 disabled:text-gray-400"
+                    className="min-w-[76px] flex-1 rounded border border-gray-200 px-2 py-1 text-xs disabled:bg-gray-50 disabled:text-gray-400"
                   />
                   <button
                     type="button"
@@ -765,7 +765,7 @@ function Step4({
           disabled={pending}
           className="flex-1 rounded-[10px] border border-[#d1d5dc] bg-white py-3 text-sm font-medium text-[#364153] hover:bg-gray-50 disabled:opacity-40"
         >
-          Atras
+          Atrás
         </button>
         <button
           type="button"
@@ -928,7 +928,7 @@ function Step7({
 }: {
   data: Data;
   planInfo: PlanInfoMap;
-  featuresByPlan: Record<'esencial' | 'premium' | 'elite', string[]>;
+  featuresByPlan: Record<'esencial' | 'premium' | 'elite', PlanFeatureLine[]>;
   onSelect: (plan: 'esencial' | 'premium' | 'elite') => void;
   onBack: () => void;
 }) {
@@ -966,13 +966,16 @@ function Step7({
               <div className="flex flex-1 flex-col p-4">
                 <ul className="mb-4 flex-1 space-y-2">
                   {features.map((feat) => (
-                    <li key={feat} className="flex items-start gap-1.5">
+                    <li key={feat.text} className="flex items-start gap-1.5">
                       <Check
                         className="mt-0.5 h-3.5 w-3.5 shrink-0"
                         style={{ color: selected ? '#669E9D' : '#9CA3AF' }}
                       />
-                      <span className="text-xs" style={{ color: selected ? '#175861' : '#9CA3AF' }}>
-                        {feat}
+                      <span
+                        className={`text-xs ${feat.bold ? 'font-semibold' : ''}`}
+                        style={{ color: selected ? '#175861' : '#9CA3AF' }}
+                      >
+                        {feat.text}
                       </span>
                     </li>
                   ))}
@@ -995,7 +998,7 @@ function Step7({
         onClick={onBack}
         className="w-full rounded-[10px] border border-[#d1d5dc] bg-white py-3 text-sm font-medium text-[#364153] hover:bg-gray-50"
       >
-        Atras
+        Atrás
       </button>
     </>
   );
@@ -1162,7 +1165,7 @@ function Step11Welcome() {
 
 type OnboardingClientProps = {
   planInfo: PlanInfoMap;
-  featuresByPlan: Record<'esencial' | 'premium' | 'elite', string[]>;
+  featuresByPlan: Record<'esencial' | 'premium' | 'elite', PlanFeatureLine[]>;
   terminos: { version: number; contenido: string } | null;
 };
 
@@ -1361,19 +1364,6 @@ export function OnboardingClient({ planInfo, featuresByPlan, terminos }: Onboard
     });
   }
 
-  async function handleStep6() {
-    if (data.guarderiaId) {
-      await updateFeaturesStep(data.guarderiaId, {
-        activarNotificaciones: data.activarNotificaciones,
-        activarClimaYMareas: data.activarClimaYMareas,
-        activarReservasOnline: data.activarReservasOnline,
-        activarPagosOnline: data.activarPagosOnline,
-        activarMenuGastronomico: data.activarMenuGastronomico,
-      });
-    }
-    next();
-  }
-
   async function handleSelectPlan(plan: 'esencial' | 'premium' | 'elite') {
     set('plan', plan);
     if (data.guarderiaId) {
@@ -1476,9 +1466,6 @@ export function OnboardingClient({ planInfo, featuresByPlan, terminos }: Onboard
         <Step5 data={data} onChange={(k, v) => set(k, v)} onNext={next} onBack={back} />
       )}
       {step === 6 && (
-        <Step6 data={data} onToggle={(k, v) => set(k, v)} onNext={handleStep6} onBack={back} />
-      )}
-      {step === 7 && (
         <Step7
           data={data}
           planInfo={planInfo}
@@ -1487,9 +1474,9 @@ export function OnboardingClient({ planInfo, featuresByPlan, terminos }: Onboard
           onBack={back}
         />
       )}
-      {step === 8 && <Step8 data={data} planInfo={planInfo} onNext={next} onBack={back} />}
-      {step === 9 && <Step9 onNext={next} onBack={back} />}
-      {step === 10 && (
+      {step === 7 && <Step8 data={data} planInfo={planInfo} onNext={next} onBack={back} />}
+      {step === 8 && <Step9 onNext={next} onBack={back} />}
+      {step === 9 && (
         <Step10Terminos
           terminos={terminos}
           onNext={handleStep10Terminos}
@@ -1497,7 +1484,7 @@ export function OnboardingClient({ planInfo, featuresByPlan, terminos }: Onboard
           pending={pending}
         />
       )}
-      {step === 11 && <Step11Welcome />}
+      {step === 10 && <Step11Welcome />}
     </Shell>
   );
 }

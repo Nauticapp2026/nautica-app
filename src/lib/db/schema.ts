@@ -1174,6 +1174,7 @@ export const pricingPlanFeatures = pgTable(
       .notNull()
       .references(() => pricingFeatures.id, { onDelete: 'cascade' }),
     value: text('value'),
+    bold: boolean('bold').notNull().default(false),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
     updatedBy: uuid('updated_by').references(() => profiles.id, { onDelete: 'set null' }),
   },

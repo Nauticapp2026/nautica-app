@@ -10,7 +10,7 @@ import { OnboardingClient } from './onboarding-client';
 export const dynamic = 'force-dynamic';
 
 function formatRate(rate: number) {
-  return `$${rate.toLocaleString('es-AR')} / lugar / mes`;
+  return `$${rate.toLocaleString('es-AR')} / espacio / mes`;
 }
 
 export default async function OnboardingPage() {

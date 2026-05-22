@@ -104,11 +104,13 @@ export type MiembroEquipo = {
 
 export type PlanSlug = 'esencial' | 'premium' | 'elite';
 
+export type PlanFeatureLine = { text: string; bold: boolean };
+
 export type PlanInfo = {
   slug: PlanSlug;
   name: string;
   rate: number;
-  features: string[];
+  features: PlanFeatureLine[];
 };
 
 const PLAN_ACCENT: Record<PlanSlug, string> = {
@@ -1310,14 +1312,14 @@ function PlanCard({
       </div>
       <p className="mt-3 text-2xl font-bold" style={{ color: '#101828' }}>
         ${plan.rate.toLocaleString('es-AR')}
-        <span className="ml-1 text-xs font-normal text-gray-500">/ lugar / mes</span>
+        <span className="ml-1 text-xs font-normal text-gray-500">/ espacio / mes</span>
       </p>
 
       <ul className="mt-4 flex-1 space-y-2">
         {features.map((f) => (
-          <li key={f} className="flex items-start gap-2 text-sm text-gray-700">
+          <li key={f.text} className="flex items-start gap-2 text-sm text-gray-700">
             <Check className="mt-0.5 h-4 w-4 shrink-0" style={{ color: accent }} />
-            <span>{f}</span>
+            <span className={f.bold ? 'font-semibold' : undefined}>{f.text}</span>
           </li>
         ))}
       </ul>
