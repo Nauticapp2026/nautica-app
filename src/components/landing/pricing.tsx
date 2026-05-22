@@ -13,11 +13,8 @@ const FALLBACK_CAPACITIES = [200, 500, 700, 1000, 1500, 2000, 3000, 4000];
 export async function Pricing() {
   let plans: PricingPlanView[] = FALLBACK_PLANS;
   let capacities: number[] = FALLBACK_CAPACITIES;
-  let featuresByPlan: Record<'esencial' | 'premium' | 'elite', string[]> = {
-    esencial: [],
-    premium: [],
-    elite: [],
-  };
+  let featuresByPlan: Record<'esencial' | 'premium' | 'elite', { text: string; bold: boolean }[]> =
+    { esencial: [], premium: [], elite: [] };
 
   try {
     const [config, features] = await Promise.all([getPricingConfig(), getAllPlanFeatures()]);

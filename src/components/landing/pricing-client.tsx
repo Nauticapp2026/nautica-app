@@ -44,10 +44,12 @@ export type PricingPlanView = {
   rate: number;
 };
 
+type PlanFeatureLine = { text: string; bold: boolean };
+
 type Props = {
   plans: PricingPlanView[];
   capacities: number[];
-  featuresByPlan: Record<'esencial' | 'premium' | 'elite', string[]>;
+  featuresByPlan: Record<'esencial' | 'premium' | 'elite', PlanFeatureLine[]>;
 };
 
 function formatNumber(value: number) {
@@ -97,7 +99,7 @@ export function PricingClient({ plans, capacities, featuresByPlan }: Props) {
       <div className="mx-auto max-w-6xl px-4 md:px-8">
         <div className="text-center">
           <h2 className="text-3xl leading-tight font-bold text-[#175861] md:text-4xl">
-            ¿Cuántos lugares de guarda tiene tu club entre amarras y camas?
+            ¿Cuántos espacios de guarda tiene tu club entre amarras y camas?
           </h2>
           <p className="mt-3 text-xl font-semibold text-[#175861]">
             Planes autogestionables exclusivos para Clubes Náuticos
@@ -115,7 +117,7 @@ export function PricingClient({ plans, capacities, featuresByPlan }: Props) {
               style={{ left: `${handlePercent}%` }}
               aria-hidden
             >
-              {formatNumber(clampedCapacity)} lugares
+              {formatNumber(clampedCapacity)} espacios
             </div>
             <div
               className="pointer-events-none absolute -top-1 size-6 -translate-x-1/2 rounded-full border-2 border-white bg-[#175861] shadow-md"
@@ -128,7 +130,7 @@ export function PricingClient({ plans, capacities, featuresByPlan }: Props) {
               step={STEP}
               value={clampedCapacity}
               onChange={(e) => handleSlider(Number(e.target.value))}
-              aria-label="Cantidad de lugares"
+              aria-label="Cantidad de espacios"
               className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
             />
           </div>
@@ -190,7 +192,7 @@ function PlanCard({
 }: {
   plan: PricingPlanView;
   capacity: number;
-  features: string[];
+  features: PlanFeatureLine[];
 }) {
   const presentation = PLAN_PRESENTATION[plan.slug] ?? PLAN_PRESENTATION.esencial;
   const price = `$${formatNumber(plan.rate * capacity)}`;
@@ -216,7 +218,7 @@ function PlanCard({
       <div className="flex flex-1 flex-col gap-6 p-8">
         <ul className="flex-1 space-y-4">
           {features.map((feature) => (
-            <li key={feature} className="flex items-start gap-3">
+            <li key={feature.text} className="flex items-start gap-3">
               <span
                 className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full"
                 style={{ backgroundColor: presentation.iconBg }}
@@ -227,7 +229,11 @@ function PlanCard({
                   strokeWidth={3}
                 />
               </span>
-              <span className="text-base font-bold text-[#175861]">{feature}</span>
+              <span
+                className={`text-base text-[#175861] ${feature.bold ? 'font-bold' : 'font-normal'}`}
+              >
+                {feature.text}
+              </span>
             </li>
           ))}
         </ul>

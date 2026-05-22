@@ -29,12 +29,9 @@ function parseCapacities(value: unknown): number[] {
   return value.filter((v): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0);
 }
 
-// Strings listos para renderear como bullets en landing/onboarding/tab Plan.
-// Reglas:
-//   - value NULL/'' → feature no incluida → no aparece
-//   - value '✓'     → solo el label
-//   - otro          → '{label}: {value}' (ej "Comunicación cerrada: 2 / mes")
-export type PlanFeatureLine = string;
+// Bullet listo para renderear en landing/onboarding/tab Plan.
+// bold=true → feature destacada del plan (se muestra en negrita).
+export type PlanFeatureLine = { text: string; bold: boolean };
 
 export async function getPlanFeatures(
   planSlug: 'esencial' | 'premium' | 'elite',
@@ -44,6 +41,7 @@ export async function getPlanFeatures(
       label: pricingFeatures.label,
       displayOrder: pricingFeatures.displayOrder,
       value: pricingPlanFeatures.value,
+      bold: pricingPlanFeatures.bold,
     })
     .from(pricingFeatures)
     .innerJoin(pricingPlanFeatures, eq(pricingPlanFeatures.featureId, pricingFeatures.id))
@@ -54,7 +52,8 @@ export async function getPlanFeatures(
     .filter((r) => r.value != null && r.value.trim() !== '')
     .map((r) => {
       const v = r.value!.trim();
-      return v === '✓' ? r.label : `${r.label}: ${v}`;
+      const text = v === '✓' ? r.label : `${r.label}: ${v}`;
+      return { text, bold: r.bold };
     });
 }
 
