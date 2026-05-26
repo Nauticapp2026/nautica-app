@@ -7,6 +7,7 @@ import {
   Edit3,
   FilterX,
   Globe,
+  Lock,
   MessageSquare,
   Plus,
   Send,
@@ -43,6 +44,8 @@ export type Comunicacion = {
   publicar: boolean;
   fecha: string | null;
   imagenUrls: string[];
+  createdAt: string;
+  isEditable: boolean;
   autor: string | null;
 };
 
@@ -64,7 +67,21 @@ const inputCls =
 
 type ModalState = { mode: 'create' } | { mode: 'edit'; comunicacion: Comunicacion } | null;
 
-export function ComunicacionesClient({ comunicaciones }: { comunicaciones: Comunicacion[] }) {
+type Props = {
+  comunicaciones: Comunicacion[];
+  limitCerradas: number;
+  limitAbiertas: number;
+  usedCerradas: number;
+  usedAbiertas: number;
+};
+
+export function ComunicacionesClient({
+  comunicaciones,
+  limitCerradas,
+  limitAbiertas,
+  usedCerradas,
+  usedAbiertas,
+}: Props) {
   const router = useRouter();
   const [query, setQuery] = useState('');
   const [modal, setModal] = useState<ModalState>(null);
@@ -110,12 +127,19 @@ export function ComunicacionesClient({ comunicaciones }: { comunicaciones: Comun
       <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard icon={<MessageSquare className="h-5 w-5" />} label="Total" value={stats.total} />
         <StatCard icon={<Send className="h-5 w-5" />} label="Publicadas" value={stats.publicadas} />
-        <StatCard
+        <QuotaCard
           icon={<Users className="h-5 w-5" />}
           label="Solo Socios"
-          value={stats.soloSocios}
+          used={usedCerradas}
+          limit={limitCerradas}
         />
-        <StatCard icon={<Globe className="h-5 w-5" />} label="Públicas" value={stats.publicas} />
+        <QuotaCard
+          icon={<Globe className="h-5 w-5" />}
+          label="Públicas"
+          used={usedAbiertas}
+          limit={limitAbiertas}
+          zeroLabel="Solo Premium/Elite"
+        />
       </div>
 
       <div className="mb-6 flex items-center gap-3">
@@ -189,7 +213,54 @@ function StatCard({ icon, label, value }: { icon: React.ReactNode; label: string
   );
 }
 
+function QuotaCard({
+  icon,
+  label,
+  used,
+  limit,
+  zeroLabel,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  used: number;
+  limit: number;
+  zeroLabel?: string;
+}) {
+  if (limit === 0) {
+    return (
+      <div className="flex items-center gap-4 rounded-2xl border border-gray-200 bg-white p-4">
+        <div className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-gray-100 text-gray-300">
+          {icon}
+        </div>
+        <div>
+          <p className="text-xs font-medium text-amber-600">{zeroLabel ?? 'No incluido'}</p>
+          <p className="text-xs text-gray-400">{label}</p>
+        </div>
+      </div>
+    );
+  }
+  const atLimit = used >= limit;
+  return (
+    <div
+      className={`flex items-center gap-4 rounded-2xl border p-4 ${atLimit ? 'border-orange-200 bg-orange-50' : 'border-gray-200 bg-white'}`}
+    >
+      <div
+        className={`flex h-10 w-10 items-center justify-center rounded-[10px] ${atLimit ? 'bg-orange-100 text-orange-500' : 'bg-gray-100 text-[#669E9D]'}`}
+      >
+        {icon}
+      </div>
+      <div>
+        <p className="text-xl font-bold" style={{ color: '#101828' }}>
+          {used}/{limit}
+        </p>
+        <p className="text-xs text-gray-500">{label} · este mes</p>
+      </div>
+    </div>
+  );
+}
+
 function ComunicacionCard({ c, onEdit }: { c: Comunicacion; onEdit: () => void }) {
+  const canEdit = c.isEditable;
   const categoria = c.categoria ? CATEGORIA_LABELS[c.categoria] : null;
   const tipo = TIPO_LABELS[c.tipo];
 
@@ -231,14 +302,20 @@ function ComunicacionCard({ c, onEdit }: { c: Comunicacion; onEdit: () => void }
         <p className="text-xs" style={{ color: '#669E9D' }}>
           Por: {c.autor ?? '—'}
         </p>
-        <button
-          type="button"
-          onClick={onEdit}
-          title="Editar comunicación"
-          className="rounded-[8px] p-1.5 text-[#669E9D] hover:bg-gray-100"
-        >
-          <Edit3 className="h-4 w-4" />
-        </button>
+        {canEdit ? (
+          <button
+            type="button"
+            onClick={onEdit}
+            title="Editar comunicación"
+            className="rounded-[8px] p-1.5 text-[#669E9D] hover:bg-gray-100"
+          >
+            <Edit3 className="h-4 w-4" />
+          </button>
+        ) : (
+          <span title="El plazo de edición de 24 hs venció" className="p-1.5 text-gray-300">
+            <Lock className="h-4 w-4" />
+          </span>
+        )}
       </div>
     </article>
   );

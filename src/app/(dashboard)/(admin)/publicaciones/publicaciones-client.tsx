@@ -13,6 +13,7 @@ import {
   Flame,
   Home,
   Layers,
+  Lock,
   MapPin,
   Plus,
   Ruler,
@@ -64,6 +65,7 @@ export type PublicacionItem = {
   imagenUrls: string[];
   estado: 'borrador' | 'publicada';
   createdAt: string;
+  isEditable: boolean;
   autor: string | null;
 };
 
@@ -286,6 +288,7 @@ function Pill({
 // ─── Card ─────────────────────────────────────────────────────────────────────
 
 function PublicacionCard({ item, onEdit }: { item: PublicacionItem; onEdit: () => void }) {
+  const canEdit = item.isEditable;
   const foto = item.imagenUrls[0];
   const esAmarra = item.tipo === 'amarra';
   const eslora = fmtNum(item.eslora, item.unidadMetraje);
@@ -373,11 +376,13 @@ function PublicacionCard({ item, onEdit }: { item: PublicacionItem; onEdit: () =
       <div className="px-3 pb-3">
         <button
           type="button"
-          onClick={onEdit}
-          className="flex w-full items-center justify-center gap-1.5 rounded-[10px] bg-[#175861] py-2.5 text-xs font-bold tracking-wide text-white transition-colors hover:bg-[#0f4249]"
+          onClick={canEdit ? onEdit : undefined}
+          disabled={!canEdit}
+          title={canEdit ? undefined : 'El plazo de edición de 24 hs venció'}
+          className={`flex w-full items-center justify-center gap-1.5 rounded-[10px] py-2.5 text-xs font-bold tracking-wide text-white transition-colors ${canEdit ? 'bg-[#175861] hover:bg-[#0f4249]' : 'cursor-not-allowed bg-gray-300'}`}
         >
-          <Edit3 className="h-3.5 w-3.5" />
-          EDITAR
+          {canEdit ? <Edit3 className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}
+          {canEdit ? 'EDITAR' : 'BLOQUEADO'}
         </button>
       </div>
     </article>

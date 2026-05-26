@@ -4,15 +4,12 @@ import { revalidatePath } from 'next/cache';
 import { and, count as sqlCount, eq } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
-import { guarderias, publicaciones } from '@/lib/db/schema';
+import { publicaciones } from '@/lib/db/schema';
+import { getPlanFeatureLimits } from '@/lib/pricing/limits';
 import { getActiveMarina } from '@/lib/auth/session';
 import { createAdminClient } from '@/lib/supabase/admin';
 
-const PLAN_LIMITS: Record<string, number> = {
-  esencial: 0,
-  premium: 2,
-  elite: 5,
-};
+const EDIT_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 const TIPOS = ['amarra', 'cama'] as const;
 type Tipo = (typeof TIPOS)[number];
@@ -83,15 +80,6 @@ function toNum(v: string): string | null {
   return isNaN(n) ? null : String(n);
 }
 
-async function getPlanLimit(guarderiaId: string): Promise<number> {
-  const [g] = await db
-    .select({ plan: guarderias.plan })
-    .from(guarderias)
-    .where(eq(guarderias.id, guarderiaId))
-    .limit(1);
-  return PLAN_LIMITS[g?.plan ?? 'esencial'] ?? 0;
-}
-
 export async function uploadPublicacionImagenAction(
   formData: FormData,
 ): Promise<{ error?: string; url?: string }> {
@@ -134,7 +122,8 @@ export async function createPublicacionAction(
 
   const guarderiaId = ctx.activeMembership.guarderiaId;
 
-  const limit = await getPlanLimit(guarderiaId);
+  const limits = await getPlanFeatureLimits(guarderiaId, ['nautishop_publicaciones']);
+  const limit = limits['nautishop_publicaciones'];
   if (limit === 0) {
     return { error: 'Tu plan no incluye publicaciones. Actualizá a Premium o Elite.' };
   }
@@ -186,12 +175,16 @@ export async function updatePublicacionAction(
   const guarderiaId = ctx.activeMembership.guarderiaId;
 
   const [current] = await db
-    .select({ id: publicaciones.id })
+    .select({ id: publicaciones.id, createdAt: publicaciones.createdAt })
     .from(publicaciones)
     .where(and(eq(publicaciones.id, id), eq(publicaciones.guarderiaId, guarderiaId)))
     .limit(1);
 
   if (!current) return { error: 'Publicación no encontrada.' };
+
+  if (Date.now() - current.createdAt.getTime() > EDIT_WINDOW_MS) {
+    return { error: 'El plazo de edición de 24 horas ha vencido.' };
+  }
 
   await db
     .update(publicaciones)

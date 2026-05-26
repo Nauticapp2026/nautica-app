@@ -1,10 +1,11 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { and, eq } from 'drizzle-orm';
+import { and, count as sqlCount, eq, gte } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import { comunicaciones } from '@/lib/db/schema';
+import { getPlanFeatureLimits } from '@/lib/pricing/limits';
 import { getActiveMarina } from '@/lib/auth/session';
 import { createAdminClient } from '@/lib/supabase/admin';
 
@@ -13,6 +14,8 @@ type Tipo = (typeof TIPOS)[number];
 
 const CATEGORIAS = ['informacion', 'anuncio', 'evento', 'mantenimiento', 'alerta'] as const;
 type Categoria = (typeof CATEGORIAS)[number];
+
+const EDIT_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 const BUCKET_COMUNICACIONES = 'comunicaciones';
 const MAX_IMAGEN_BYTES = 8 * 1024 * 1024; // 8 MB
@@ -90,10 +93,42 @@ export async function createComunicacionAction(
   const err = validar(input);
   if (err) return { error: err };
 
+  const guarderiaId = ctx.activeMembership.guarderiaId;
+  const featureId = input.tipo === 'socios' ? 'com_cerrada' : 'com_abierta';
+  const limits = await getPlanFeatureLimits(guarderiaId, [featureId]);
+  const tipoLimit = limits[featureId];
+
+  if (tipoLimit === 0) {
+    return {
+      error:
+        input.tipo === 'publica'
+          ? 'Tu plan no incluye comunicaciones públicas. Actualizá a Premium o Elite.'
+          : 'Tu plan no incluye comunicaciones para socios.',
+    };
+  }
+
+  const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  const [{ used }] = await db
+    .select({ used: sqlCount() })
+    .from(comunicaciones)
+    .where(
+      and(
+        eq(comunicaciones.guarderiaId, guarderiaId),
+        eq(comunicaciones.tipo, input.tipo),
+        gte(comunicaciones.createdAt, startOfMonth),
+      ),
+    );
+
+  if (Number(used) >= tipoLimit) {
+    return {
+      error: `Alcanzaste el límite de ${tipoLimit} comunicación${tipoLimit !== 1 ? 'es' : ''} de este tipo para este mes.`,
+    };
+  }
+
   const [row] = await db
     .insert(comunicaciones)
     .values({
-      guarderiaId: ctx.activeMembership.guarderiaId,
+      guarderiaId,
       autorId: ctx.profile.id,
       titulo: input.titulo.trim(),
       texto: input.texto.trim() || null,
@@ -124,12 +159,16 @@ export async function updateComunicacionAction(
   const guarderiaId = ctx.activeMembership.guarderiaId;
 
   const [current] = await db
-    .select({ id: comunicaciones.id })
+    .select({ id: comunicaciones.id, createdAt: comunicaciones.createdAt })
     .from(comunicaciones)
     .where(and(eq(comunicaciones.id, id), eq(comunicaciones.guarderiaId, guarderiaId)))
     .limit(1);
 
   if (!current) return { error: 'Comunicación no encontrada.' };
+
+  if (Date.now() - current.createdAt.getTime() > EDIT_WINDOW_MS) {
+    return { error: 'El plazo de edición de 24 horas ha vencido.' };
+  }
 
   await db
     .update(comunicaciones)
