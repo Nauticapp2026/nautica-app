@@ -83,6 +83,8 @@ export async function updatePlanFeatureAction(
   revalidatePath('/onboarding');
   revalidatePath('/super-admin/pricing');
   revalidatePath('/configuracion');
+  revalidatePath('/publicaciones');
+  revalidatePath('/comunicaciones');
 
   return {};
 }
