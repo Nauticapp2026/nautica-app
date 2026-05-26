@@ -282,11 +282,13 @@ function FeatureCell({
   const [saved, setSaved] = useState(initialValue);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [justSaved, setJustSaved] = useState(false);
 
   const dirty = value !== saved;
 
   function persist(next: string) {
     setError(null);
+    setJustSaved(false);
     startTransition(async () => {
       const res = await updatePlanFeatureAction({ planSlug, featureId, value: next });
       if (res.error) {
@@ -294,6 +296,8 @@ function FeatureCell({
         return;
       }
       setSaved(next);
+      setJustSaved(true);
+      setTimeout(() => setJustSaved(false), 2000);
     });
   }
 
@@ -336,6 +340,7 @@ function FeatureCell({
         </button>
       </div>
       {error && <p className="text-destructive text-xs">{error}</p>}
+      {justSaved && !error && <p className="text-xs font-medium text-[#669E9D]">Guardado ✓</p>}
     </div>
   );
 }
