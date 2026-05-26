@@ -7,6 +7,7 @@ import {
   comunicaciones,
   documentos,
   embarcaciones,
+  espacios,
   facturacion,
   memberships,
   movimientosCuentaCorriente,
@@ -246,9 +247,10 @@ export default async function DashboardPage() {
       .from(alertas)
       .leftJoin(porteria, eq(porteria.id, alertas.porteriaId))
       .leftJoin(embarcaciones, eq(embarcaciones.id, porteria.embarcacionId))
+      .leftJoin(espacios, eq(espacios.id, embarcaciones.espacioId))
       .leftJoin(
         profiles,
-        sql`${profiles.id} = COALESCE(${alertas.socioId}, ${porteria.socioId}, ${embarcaciones.profileId})`,
+        sql`${profiles.id} = COALESCE(${alertas.socioId}, ${porteria.socioId}, ${embarcaciones.profileId}, ${espacios.ocupanteId})`,
       )
       .where(and(eq(alertas.guarderiaId, gId), eq(alertas.estado, 'pendiente')))
       .orderBy(asc(alertas.tipo), desc(alertas.createdAt))
