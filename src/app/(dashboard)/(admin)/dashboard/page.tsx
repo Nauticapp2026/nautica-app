@@ -13,7 +13,7 @@ import {
   porteria,
   profiles,
 } from '@/lib/db/schema';
-import { and, asc, count, desc, eq, gte, inArray, lte, sum } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gte, inArray, lte, sql, sum } from 'drizzle-orm';
 
 import { AlertasOperativasList, type AlertaOperativa } from './alertas-operativas';
 import { EmptyState } from '@/components/shared/empty-state';
@@ -245,7 +245,7 @@ export default async function DashboardPage() {
       })
       .from(alertas)
       .leftJoin(porteria, eq(porteria.id, alertas.porteriaId))
-      .leftJoin(profiles, eq(profiles.id, alertas.socioId))
+      .leftJoin(profiles, sql`${profiles.id} = COALESCE(${alertas.socioId}, ${porteria.socioId})`)
       .leftJoin(embarcaciones, eq(embarcaciones.id, porteria.embarcacionId))
       .where(and(eq(alertas.guarderiaId, gId), eq(alertas.estado, 'pendiente')))
       .orderBy(asc(alertas.tipo), desc(alertas.createdAt))
