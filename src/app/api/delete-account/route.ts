@@ -22,8 +22,17 @@ export async function DELETE(req: Request): Promise<Response> {
   }
 
   const admin = createAdminClient();
-  const { error } = await admin.auth.admin.deleteUser(userId);
-  if (error) {
+
+  // Borrar el profile primero para disparar los ON DELETE CASCADE de las tablas
+  // que lo referencian (memberships, documentos, solicitudesLavado, etc.).
+  // profiles.id no tiene FK a auth.users, así que la cascada no ocurre sola.
+  const { error: profileError } = await admin.from('profiles').delete().eq('id', userId);
+  if (profileError) {
+    return NextResponse.json({ error: 'Error al eliminar la cuenta.' }, { status: 500 });
+  }
+
+  const { error: authError } = await admin.auth.admin.deleteUser(userId);
+  if (authError) {
     return NextResponse.json({ error: 'Error al eliminar la cuenta.' }, { status: 500 });
   }
 
