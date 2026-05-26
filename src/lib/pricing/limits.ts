@@ -13,11 +13,12 @@ const FEATURE_DEFAULTS: Record<string, Record<string, number>> = {
 };
 
 // Parsea el primer entero del valor textual almacenado en pricing_plan_features.
-// '2 / mes' → 2, '2 publ.' → 2, '5 / mes' → 5, '✓' / '' / null → 0.
-function parseLimit(value: string | null | undefined): number {
-  if (!value || !value.trim()) return 0;
+// '2 / mes' → 2, '2 publ.' → 2, '5 / mes' → 5.
+// '✓' / '' / null → undefined (no hay número explícito; el llamador usa el fallback).
+function parseLimit(value: string | null | undefined): number | undefined {
+  if (!value || !value.trim()) return undefined;
   const n = parseInt(value, 10);
-  return isNaN(n) || n < 0 ? 0 : n;
+  return isNaN(n) || n < 0 ? undefined : n;
 }
 
 // Devuelve los límites numéricos de las features pedidas para la guardería.
@@ -56,9 +57,14 @@ export async function getPlanLimitsForSlug(
     featureIds.map((id) => [id, FEATURE_DEFAULTS[id]?.[planSlug] ?? 0]),
   );
 
-  // El valor del DB sobreescribe el default cuando la fila existe.
+  // El valor del DB sobreescribe el default solo si es un número explícito.
+  // '✓' o vacío conserva el fallback para que el admin pueda setear el label
+  // sin perder el límite numérico.
   for (const row of rows) {
-    result[row.featureId] = parseLimit(row.value);
+    const parsed = parseLimit(row.value);
+    if (parsed !== undefined) {
+      result[row.featureId] = parsed;
+    }
   }
 
   return result;
