@@ -1,17 +1,12 @@
 import { redirect } from 'next/navigation';
-import { desc, count as sqlCount, eq } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
 
 import { getActiveMarina } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { guarderias, publicaciones, profiles } from '@/lib/db/schema';
+import { getPlanLimitsForSlug } from '@/lib/pricing/limits';
 
 import { PublicacionesClient, type PublicacionItem } from './publicaciones-client';
-
-const PLAN_LIMITS: Record<string, number> = {
-  esencial: 0,
-  premium: 2,
-  elite: 5,
-};
 
 const EDIT_WINDOW_MS = 24 * 60 * 60 * 1000;
 
@@ -58,7 +53,8 @@ export default async function PublicacionesPage() {
   ]);
 
   const plan = guarderiaRow[0]?.plan ?? 'esencial';
-  const limit = PLAN_LIMITS[plan] ?? 0;
+  const limitsMap = await getPlanLimitsForSlug(plan, ['nautishop_publicaciones']);
+  const limit = limitsMap['nautishop_publicaciones'];
 
   const items: PublicacionItem[] = rows.map((r) => ({
     id: r.id,

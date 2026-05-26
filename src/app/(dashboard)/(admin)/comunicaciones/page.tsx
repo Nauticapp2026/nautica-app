@@ -3,17 +3,12 @@ import { redirect } from 'next/navigation';
 
 import { getActiveMarina } from '@/lib/auth/session';
 import { db } from '@/lib/db';
-import { comunicaciones, guarderias, profiles } from '@/lib/db/schema';
+import { comunicaciones, profiles } from '@/lib/db/schema';
+import { getPlanFeatureLimits } from '@/lib/pricing/limits';
 
 import { ComunicacionesClient, type Comunicacion } from './comunicaciones-client';
 
 const EDIT_WINDOW_MS = 24 * 60 * 60 * 1000;
-
-const COM_LIMITS: Record<string, { cerradas: number; abiertas: number }> = {
-  esencial: { cerradas: 2, abiertas: 0 },
-  premium: { cerradas: 2, abiertas: 2 },
-  elite: { cerradas: 5, abiertas: 5 },
-};
 
 export default async function ComunicacionesPage() {
   const ctx = await getActiveMarina();
@@ -28,12 +23,8 @@ export default async function ComunicacionesPage() {
   const guarderiaId = ctx.activeMembership.guarderiaId;
   const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 
-  const [guarderiaRow, rows, countRows] = await Promise.all([
-    db
-      .select({ plan: guarderias.plan })
-      .from(guarderias)
-      .where(eq(guarderias.id, guarderiaId))
-      .limit(1),
+  const [limitsMap, rows, countRows] = await Promise.all([
+    getPlanFeatureLimits(guarderiaId, ['com_cerrada', 'com_abierta']),
 
     db
       .select({
@@ -67,8 +58,6 @@ export default async function ComunicacionesPage() {
       .groupBy(comunicaciones.tipo),
   ]);
 
-  const plan = guarderiaRow[0]?.plan ?? 'esencial';
-  const limits = COM_LIMITS[plan] ?? COM_LIMITS.esencial;
   const usedCerradas = Number(countRows.find((r) => r.tipo === 'socios')?.total ?? 0);
   const usedAbiertas = Number(countRows.find((r) => r.tipo === 'publica')?.total ?? 0);
 
@@ -91,8 +80,8 @@ export default async function ComunicacionesPage() {
   return (
     <ComunicacionesClient
       comunicaciones={items}
-      limitCerradas={limits.cerradas}
-      limitAbiertas={limits.abiertas}
+      limitCerradas={limitsMap['com_cerrada']}
+      limitAbiertas={limitsMap['com_abierta']}
       usedCerradas={usedCerradas}
       usedAbiertas={usedAbiertas}
     />

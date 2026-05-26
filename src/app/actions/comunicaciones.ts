@@ -4,7 +4,8 @@ import { revalidatePath } from 'next/cache';
 import { and, count as sqlCount, eq, gte } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
-import { comunicaciones, guarderias } from '@/lib/db/schema';
+import { comunicaciones } from '@/lib/db/schema';
+import { getPlanFeatureLimits } from '@/lib/pricing/limits';
 import { getActiveMarina } from '@/lib/auth/session';
 import { createAdminClient } from '@/lib/supabase/admin';
 
@@ -14,26 +15,11 @@ type Tipo = (typeof TIPOS)[number];
 const CATEGORIAS = ['informacion', 'anuncio', 'evento', 'mantenimiento', 'alerta'] as const;
 type Categoria = (typeof CATEGORIAS)[number];
 
-const COM_LIMITS: Record<string, { cerradas: number; abiertas: number }> = {
-  esencial: { cerradas: 2, abiertas: 0 },
-  premium: { cerradas: 2, abiertas: 2 },
-  elite: { cerradas: 5, abiertas: 5 },
-};
-
 const EDIT_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 const BUCKET_COMUNICACIONES = 'comunicaciones';
 const MAX_IMAGEN_BYTES = 8 * 1024 * 1024; // 8 MB
 const TIPOS_IMAGEN_ACEPTADOS = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-
-async function getGuarderiaPlan(guarderiaId: string): Promise<string> {
-  const [g] = await db
-    .select({ plan: guarderias.plan })
-    .from(guarderias)
-    .where(eq(guarderias.id, guarderiaId))
-    .limit(1);
-  return g?.plan ?? 'esencial';
-}
 
 async function ensureBucket(admin: ReturnType<typeof createAdminClient>): Promise<void> {
   const { data: buckets } = await admin.storage.listBuckets();
@@ -108,9 +94,9 @@ export async function createComunicacionAction(
   if (err) return { error: err };
 
   const guarderiaId = ctx.activeMembership.guarderiaId;
-  const plan = await getGuarderiaPlan(guarderiaId);
-  const limits = COM_LIMITS[plan] ?? COM_LIMITS.esencial;
-  const tipoLimit = input.tipo === 'socios' ? limits.cerradas : limits.abiertas;
+  const featureId = input.tipo === 'socios' ? 'com_cerrada' : 'com_abierta';
+  const limits = await getPlanFeatureLimits(guarderiaId, [featureId]);
+  const tipoLimit = limits[featureId];
 
   if (tipoLimit === 0) {
     return {
