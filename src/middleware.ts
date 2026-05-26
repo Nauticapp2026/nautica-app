@@ -48,7 +48,10 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/api/webhooks') ||
     pathname.startsWith('/api/devices') ||
     pathname.startsWith('/api/mareas') ||
-    pathname.startsWith('/auth/');
+    pathname.startsWith('/auth/') ||
+    pathname.startsWith('/eliminar-cuenta') ||
+    pathname.startsWith('/privacidad') ||
+    pathname.startsWith('/terminos');
 
   if (!isPublicAPI) {
     const gate = checkPrelaunchGate(request);
