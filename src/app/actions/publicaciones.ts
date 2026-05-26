@@ -14,6 +14,8 @@ const PLAN_LIMITS: Record<string, number> = {
   elite: 5,
 };
 
+const EDIT_WINDOW_MS = 24 * 60 * 60 * 1000;
+
 const TIPOS = ['amarra', 'cama'] as const;
 type Tipo = (typeof TIPOS)[number];
 
@@ -186,12 +188,16 @@ export async function updatePublicacionAction(
   const guarderiaId = ctx.activeMembership.guarderiaId;
 
   const [current] = await db
-    .select({ id: publicaciones.id })
+    .select({ id: publicaciones.id, createdAt: publicaciones.createdAt })
     .from(publicaciones)
     .where(and(eq(publicaciones.id, id), eq(publicaciones.guarderiaId, guarderiaId)))
     .limit(1);
 
   if (!current) return { error: 'Publicación no encontrada.' };
+
+  if (Date.now() - current.createdAt.getTime() > EDIT_WINDOW_MS) {
+    return { error: 'El plazo de edición de 24 horas ha vencido.' };
+  }
 
   await db
     .update(publicaciones)

@@ -13,6 +13,8 @@ const PLAN_LIMITS: Record<string, number> = {
   elite: 5,
 };
 
+const EDIT_WINDOW_MS = 24 * 60 * 60 * 1000;
+
 export default async function PublicacionesPage() {
   const ctx = await getActiveMarina();
   if (!ctx) return null;
@@ -71,6 +73,8 @@ export default async function PublicacionesPage() {
     imagenUrls: r.imagenUrls ?? [],
     estado: r.estado,
     createdAt: r.createdAt.toISOString(),
+    // eslint-disable-next-line react-hooks/purity
+    isEditable: Date.now() - r.createdAt.getTime() <= EDIT_WINDOW_MS,
     autor:
       [r.autorNombre, r.autorApellido].filter(Boolean).join(' ').trim() || r.autorEmail || null,
   }));
