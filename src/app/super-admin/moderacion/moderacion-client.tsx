@@ -48,7 +48,6 @@ export type PublicacionClub = {
   unidadMetraje: string;
   precio: string | null;
   expensas: string | null;
-  puntual: string | null;
   servicios: string[];
   imagenUrls: string[];
   estado: string;
@@ -751,9 +750,6 @@ function PublicacionDetailModal({
         )}
         {formatPrecio(p.expensas) && (
           <DetailField label="Expensas" value={formatPrecio(p.expensas)!} />
-        )}
-        {formatPrecio(p.puntual) && (
-          <DetailField label="Puntual" value={formatPrecio(p.puntual)!} />
         )}
       </div>
 
