@@ -148,3 +148,25 @@ export async function updateComunicacionAction(
   revalidatePath('/dashboard');
   return {};
 }
+
+export async function deleteComunicacionAction(id: string): Promise<{ error?: string }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+  if (!isAdmin(ctx)) return { error: 'Solo administradores pueden eliminar comunicaciones.' };
+
+  const guarderiaId = ctx.activeMembership.guarderiaId;
+
+  const [current] = await db
+    .select({ id: comunicaciones.id })
+    .from(comunicaciones)
+    .where(and(eq(comunicaciones.id, id), eq(comunicaciones.guarderiaId, guarderiaId)))
+    .limit(1);
+
+  if (!current) return { error: 'Comunicación no encontrada.' };
+
+  await db.delete(comunicaciones).where(eq(comunicaciones.id, id));
+
+  revalidatePath('/comunicaciones');
+  revalidatePath('/dashboard');
+  return {};
+}

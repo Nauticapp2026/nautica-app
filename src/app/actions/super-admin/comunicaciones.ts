@@ -128,3 +128,20 @@ export async function updatePlatformComunicacionAction(
   revalidatePath('/super-admin/comunicaciones');
   return {};
 }
+
+export async function deletePlatformComunicacionAction(id: string): Promise<{ error?: string }> {
+  await requireSuperAdmin();
+
+  const [current] = await db
+    .select({ id: platformComunicaciones.id })
+    .from(platformComunicaciones)
+    .where(eq(platformComunicaciones.id, id))
+    .limit(1);
+
+  if (!current) return { error: 'Comunicación no encontrada.' };
+
+  await db.delete(platformComunicaciones).where(eq(platformComunicaciones.id, id));
+
+  revalidatePath('/super-admin/comunicaciones');
+  return {};
+}

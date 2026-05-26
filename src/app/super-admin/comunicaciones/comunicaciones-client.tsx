@@ -2,10 +2,22 @@
 
 import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Calendar, Edit3, FilterX, Globe, MessageSquare, Plus, Send, Users, X } from 'lucide-react';
+import {
+  Calendar,
+  Edit3,
+  FilterX,
+  Globe,
+  MessageSquare,
+  Plus,
+  Send,
+  Trash2,
+  Users,
+  X,
+} from 'lucide-react';
 
 import {
   createPlatformComunicacionAction,
+  deletePlatformComunicacionAction,
   updatePlatformComunicacionAction,
   uploadPlatformComunicacionImagenAction,
   type PlatformComunicacionInput,
@@ -60,6 +72,11 @@ export function PlatformComunicacionesClient({
   const router = useRouter();
   const [query, setQuery] = useState('');
   const [modal, setModal] = useState<ModalState>(null);
+
+  const handleDeleted = () => {
+    setModal(null);
+    router.refresh();
+  };
 
   const stats = useMemo(() => {
     const total = comunicaciones.length;
@@ -153,6 +170,7 @@ export function PlatformComunicacionesClient({
             setModal(null);
             router.refresh();
           }}
+          onDeleted={handleDeleted}
         />
       )}
     </div>
@@ -234,10 +252,12 @@ function ComunicacionModal({
   state,
   onClose,
   onSaved,
+  onDeleted,
 }: {
   state: NonNullable<ModalState>;
   onClose: () => void;
   onSaved: () => void;
+  onDeleted: () => void;
 }) {
   const isEdit = state.mode === 'edit';
   const initial = isEdit ? state.comunicacion : null;
@@ -249,6 +269,7 @@ function ComunicacionModal({
   const [imagenUrls, setImagenUrls] = useState<string[]>(initial?.imagenUrls ?? []);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const baseValido = Boolean(titulo.trim() && tipo && categoria);
 
@@ -374,23 +395,69 @@ function ComunicacionModal({
           {error && <p className="text-sm text-red-600">{error}</p>}
         </div>
 
-        <div className="flex flex-wrap justify-end gap-3 border-t border-gray-200 p-6">
-          <button
-            type="button"
-            onClick={() => submit(false)}
-            disabled={pending || !titulo.trim()}
-            className="rounded-[10px] border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-[#101828] hover:bg-gray-50 disabled:opacity-60"
-          >
-            {pending ? 'Guardando…' : 'Guardar borrador'}
-          </button>
-          <button
-            type="button"
-            onClick={() => submit(true)}
-            disabled={pending || !baseValido}
-            className="rounded-[10px] bg-[#175861] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#0f4249] disabled:opacity-60"
-          >
-            {pending ? 'Publicando…' : 'Publicar'}
-          </button>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-200 p-6">
+          <div>
+            {isEdit && !confirmDelete && (
+              <button
+                type="button"
+                onClick={() => setConfirmDelete(true)}
+                disabled={pending}
+                className="flex items-center gap-1.5 rounded-[10px] border border-red-200 px-4 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50 hover:text-red-700 disabled:opacity-60"
+              >
+                <Trash2 className="h-4 w-4" />
+                Eliminar
+              </button>
+            )}
+            {isEdit && confirmDelete && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-600">¿Eliminar comunicación?</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    startTransition(async () => {
+                      const res = await deletePlatformComunicacionAction(state.comunicacion.id);
+                      if (res.error) {
+                        setError(res.error);
+                        setConfirmDelete(false);
+                      } else {
+                        onDeleted();
+                      }
+                    });
+                  }}
+                  disabled={pending}
+                  className="rounded-[10px] bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+                >
+                  {pending ? 'Eliminando…' : 'Sí, eliminar'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmDelete(false)}
+                  disabled={pending}
+                  className="rounded-[10px] border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-60"
+                >
+                  Cancelar
+                </button>
+              </div>
+            )}
+          </div>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => submit(false)}
+              disabled={pending || !titulo.trim()}
+              className="rounded-[10px] border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-[#101828] hover:bg-gray-50 disabled:opacity-60"
+            >
+              {pending ? 'Guardando…' : 'Guardar borrador'}
+            </button>
+            <button
+              type="button"
+              onClick={() => submit(true)}
+              disabled={pending || !baseValido}
+              className="rounded-[10px] bg-[#175861] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#0f4249] disabled:opacity-60"
+            >
+              {pending ? 'Publicando…' : 'Publicar'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
