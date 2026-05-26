@@ -3,8 +3,17 @@ import { and, eq, inArray } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { guarderias, pricingPlanFeatures } from '@/lib/db/schema';
 
+// Fallback hardcodeado para cuando la fila no existe en pricing_plan_features.
+// Solo aplica si el DB no tiene el registro; si existe, el valor del DB tiene
+// prioridad (incluso si es 0).
+const FEATURE_DEFAULTS: Record<string, Record<string, number>> = {
+  com_cerrada: { esencial: 2, premium: 2, elite: 5 },
+  com_abierta: { esencial: 0, premium: 2, elite: 5 },
+  nautishop_publicaciones: { esencial: 0, premium: 2, elite: 5 },
+};
+
 // Parsea el primer entero del valor textual almacenado en pricing_plan_features.
-// '2 / mes' → 2, '5 / mes' → 5, '✓' / '' / null → 0.
+// '2 / mes' → 2, '2 publ.' → 2, '5 / mes' → 5, '✓' / '' / null → 0.
 function parseLimit(value: string | null | undefined): number {
   if (!value || !value.trim()) return 0;
   const n = parseInt(value, 10);
@@ -17,17 +26,13 @@ export async function getPlanFeatureLimits(
   guarderiaId: string,
   featureIds: string[],
 ): Promise<Record<string, number>> {
-  const defaults = Object.fromEntries(featureIds.map((id) => [id, 0]));
-
   const [guarderia] = await db
     .select({ plan: guarderias.plan })
     .from(guarderias)
     .where(eq(guarderias.id, guarderiaId))
     .limit(1);
 
-  if (!guarderia) return defaults;
-
-  return getPlanLimitsForSlug(guarderia.plan ?? 'esencial', featureIds);
+  return getPlanLimitsForSlug(guarderia?.plan ?? 'esencial', featureIds);
 }
 
 // Igual que getPlanFeatureLimits pero cuando el planSlug ya es conocido
@@ -36,8 +41,6 @@ export async function getPlanLimitsForSlug(
   planSlug: string,
   featureIds: string[],
 ): Promise<Record<string, number>> {
-  const defaults = Object.fromEntries(featureIds.map((id) => [id, 0]));
-
   const rows = await db
     .select({ featureId: pricingPlanFeatures.featureId, value: pricingPlanFeatures.value })
     .from(pricingPlanFeatures)
@@ -48,9 +51,15 @@ export async function getPlanLimitsForSlug(
       ),
     );
 
-  const result = { ...defaults };
+  // Arranca con los defaults hardcodeados para cubrir filas ausentes en el DB.
+  const result: Record<string, number> = Object.fromEntries(
+    featureIds.map((id) => [id, FEATURE_DEFAULTS[id]?.[planSlug] ?? 0]),
+  );
+
+  // El valor del DB sobreescribe el default cuando la fila existe.
   for (const row of rows) {
     result[row.featureId] = parseLimit(row.value);
   }
+
   return result;
 }
