@@ -73,6 +73,7 @@ type Props = {
   items: PublicacionItem[];
   plan: string;
   limit: number;
+  used: number;
 };
 
 type ModalState = { mode: 'create' } | { mode: 'edit'; item: PublicacionItem } | null;
@@ -118,13 +119,13 @@ function fmtNum(v: string | null, unit: 'metros' | 'pies' = 'metros'): string | 
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
-export function PublicacionesClient({ items, plan, limit }: Props) {
+export function PublicacionesClient({ items, plan, limit, used }: Props) {
   const router = useRouter();
   const [modal, setModal] = useState<ModalState>(null);
   const [tipoFilter, setTipoFilter] = useState<TipoFilter>('todos');
   const [estadoFilter, setEstadoFilter] = useState<EstadoFilter>('todos');
   const [sortFilter, setSortFilter] = useState<SortFilter>('recientes');
-  const atLimit = limit > 0 && items.length >= limit;
+  const atLimit = limit > 0 && used >= limit;
 
   const filtered = useMemo(() => {
     let result = [...items];
@@ -151,7 +152,7 @@ export function PublicacionesClient({ items, plan, limit }: Props) {
             Amarras y camas publicadas en la app
             {limit > 0 && (
               <span className="ml-2 text-xs font-medium text-gray-400">
-                {items.length}/{limit}
+                {used}/{limit} este mes
               </span>
             )}
           </p>
