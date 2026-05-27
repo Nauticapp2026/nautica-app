@@ -194,24 +194,14 @@ function EmptyState() {
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
-const TZ_AR = 'America/Argentina/Buenos_Aires';
-
 function fmtNaive(iso: string | null): string {
   if (!iso) return '—';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '—';
-  const date = d.toLocaleDateString('es-AR', {
-    timeZone: TZ_AR,
-    day: '2-digit',
-    month: '2-digit',
-  });
-  const time = d.toLocaleTimeString('es-AR', {
-    timeZone: TZ_AR,
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  });
-  return `${date} ${time}`;
+  // porteria.hasta se guarda como hora AR local sin offset (el mobile no envía TZ).
+  // Postgres lo almacena como UTC "naive", así que NO aplicar conversión TZ —
+  // extraer los componentes directamente del ISO string.
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+  if (!m) return '—';
+  return `${m[3]}/${m[2]} ${m[4]}:${m[5]}`;
 }
 
 function fmtRelative(iso: string): string {
