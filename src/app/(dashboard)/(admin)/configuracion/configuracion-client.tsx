@@ -138,9 +138,7 @@ const ROL_OPTS = Object.entries(ROL_LABELS).map(([value, label]) => ({
   label,
 }));
 
-// Roles asignables al crear un miembro del equipo desde Configuración.
-// El filtro de búsqueda usa todos los roles (`ROL_OPTS`) para mostrar
-// miembros legacy con otros roles, pero el alta acota a estos 4.
+// Roles del equipo: los mismos aplican al crear y al filtrar.
 const ROL_OPTS_ALTA: { value: Rol; label: string }[] = [
   { value: 'administrador_general', label: ROL_LABELS.administrador_general },
   { value: 'administrativo', label: ROL_LABELS.administrativo },
@@ -508,7 +506,7 @@ function EquipoTab({
           onChange={(e) => setFilterRol(e.target.value as '' | Rol)}
         >
           <option value="">Buscar por rol</option>
-          {ROL_OPTS.map((opt) => (
+          {ROL_OPTS_ALTA.map((opt) => (
             <option key={opt.value} value={opt.value}>
               {opt.label}
             </option>

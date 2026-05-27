@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { eq, and, asc, desc, notInArray } from 'drizzle-orm';
+import { eq, and, asc, desc, inArray } from 'drizzle-orm';
 
 import { getActiveMarina } from '@/lib/auth/session';
 import { db } from '@/lib/db';
@@ -144,7 +144,12 @@ export default async function ConfiguracionPage({ searchParams }: Props) {
       and(
         eq(memberships.guarderiaId, guarderiaId),
         eq(memberships.status, 'active'),
-        notInArray(memberships.rol, ['socio', 'invitado', 'proveedor']),
+        inArray(memberships.rol, [
+          'administrador_general',
+          'administrativo',
+          'operario',
+          'seguridad',
+        ]),
       ),
     )
     .orderBy(desc(memberships.createdAt));
