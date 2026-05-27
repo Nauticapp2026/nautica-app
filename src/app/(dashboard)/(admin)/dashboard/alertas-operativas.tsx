@@ -2,9 +2,9 @@
 
 import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { AlertTriangle, Check, Phone, Ship } from 'lucide-react';
+import { AlertTriangle, Check, Phone, Ship, X } from 'lucide-react';
 
-import { marcarAlertaResueltaAction } from '@/app/actions/alertas';
+import { cerrarPorteriaAction, marcarAlertaResueltaAction } from '@/app/actions/alertas';
 
 export type AlertaOperativa = {
   id: string;
@@ -29,6 +29,7 @@ export function AlertasOperativasList({ alertas }: { alertas: AlertaOperativa[] 
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [resolvingId, setResolvingId] = useState<string | null>(null);
+  const [closingId, setClosingId] = useState<string | null>(null);
 
   const { criticas, proximas } = useMemo(() => {
     const criticas: AlertaOperativa[] = [];
@@ -53,6 +54,19 @@ export function AlertasOperativasList({ alertas }: { alertas: AlertaOperativa[] 
     });
   };
 
+  const onCerrarPorteria = (porteriaId: string) => {
+    setClosingId(porteriaId);
+    startTransition(async () => {
+      const res = await cerrarPorteriaAction(porteriaId);
+      setClosingId(null);
+      if (!res.ok) {
+        alert(res.error ?? 'No se pudo cerrar la salida.');
+        return;
+      }
+      router.refresh();
+    });
+  };
+
   if (alertas.length === 0) return <EmptyState />;
 
   return (
@@ -66,7 +80,9 @@ export function AlertasOperativasList({ alertas }: { alertas: AlertaOperativa[] 
                 key={a.id}
                 alerta={a}
                 onResolver={onResolver}
+                onCerrarPorteria={onCerrarPorteria}
                 loading={pending && resolvingId === a.id}
+                closingPorteria={pending && closingId === a.porteriaId}
               />
             ))}
           </div>
@@ -82,7 +98,9 @@ export function AlertasOperativasList({ alertas }: { alertas: AlertaOperativa[] 
                 key={a.id}
                 alerta={a}
                 onResolver={onResolver}
+                onCerrarPorteria={onCerrarPorteria}
                 loading={pending && resolvingId === a.id}
+                closingPorteria={pending && closingId === a.porteriaId}
               />
             ))}
           </div>
@@ -103,11 +121,15 @@ function SectionTitle({ label, count }: { label: string; count: number }) {
 function AlertaCard({
   alerta,
   onResolver,
+  onCerrarPorteria,
   loading,
+  closingPorteria,
 }: {
   alerta: AlertaOperativa;
   onResolver: (id: string) => void;
+  onCerrarPorteria: (porteriaId: string) => void;
   loading: boolean;
+  closingPorteria: boolean;
 }) {
   const isCritica = alerta.tipo === 'sin_respuesta';
   const cardBorder = isCritica ? 'border-red-200' : 'border-amber-200';
@@ -154,9 +176,20 @@ function AlertaCard({
               Llamar
             </a>
           )}
+          {isCritica && (
+            <button
+              type="button"
+              disabled={closingPorteria || loading}
+              onClick={() => onCerrarPorteria(alerta.porteriaId)}
+              className="inline-flex items-center gap-1.5 rounded-[10px] border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 hover:text-red-700 disabled:opacity-60"
+            >
+              <X className="h-3.5 w-3.5" />
+              {closingPorteria ? 'Cerrando…' : 'Cerrar salida'}
+            </button>
+          )}
           <button
             type="button"
-            disabled={loading}
+            disabled={loading || closingPorteria}
             onClick={() => onResolver(alerta.id)}
             className="inline-flex items-center gap-1.5 rounded-[10px] bg-[#175861] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#124a52] disabled:opacity-60"
           >
