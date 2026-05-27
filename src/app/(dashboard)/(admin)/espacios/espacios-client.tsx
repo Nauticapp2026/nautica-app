@@ -1775,6 +1775,15 @@ function NuevaAreaModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
                     className="grid grid-cols-[1fr_1fr_auto_auto] items-end gap-2 sm:grid-cols-[1fr_1fr_1fr_auto_auto]"
                   >
                     <div>
+                      <label className="mb-1 block text-xs font-semibold text-gray-600">Lado</label>
+                      <input
+                        className={inputCls}
+                        placeholder="A"
+                        value={l.nombre}
+                        onChange={(e) => updateLado(idx, { nombre: e.target.value })}
+                      />
+                    </div>
+                    <div>
                       <label className="mb-1 block text-xs font-semibold text-gray-600">
                         Pisos
                       </label>
@@ -1798,15 +1807,6 @@ function NuevaAreaModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
                         placeholder="0"
                         value={l.cantidadCamas}
                         onChange={(e) => updateLado(idx, { cantidadCamas: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-xs font-semibold text-gray-600">Lado</label>
-                      <input
-                        className={inputCls}
-                        placeholder="A"
-                        value={l.nombre}
-                        onChange={(e) => updateLado(idx, { nombre: e.target.value })}
                       />
                     </div>
                     <button
