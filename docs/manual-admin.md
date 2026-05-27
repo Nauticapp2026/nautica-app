@@ -38,6 +38,7 @@ El menú lateral izquierdo es la navegación principal. Desde ahí accedés a to
 - **Solicitudes** — pedidos de nuevos socios desde la app mobile
 - **Tareas** — tablero operativo para el equipo
 - **Espacios** — amarras, camas y ubicaciones
+- **Publicaciones** — avisos de amarras y camas en NautiShop
 - **Comunicaciones** — anuncios y novedades para socios
 - **Facturación** — emisión y seguimiento de facturas
 - **Tarifario** — precios y servicios
@@ -77,6 +78,10 @@ Cada alerta muestra el nombre del socio, la embarcación, la hora prometida y la
 ---
 
 ## 3. Usuarios — Socios
+
+La sección Usuarios tiene tres pestañas: **Socios**, **Invitados** y **Proveedores**. Cada una muestra los miembros del club con ese rol y permite gestionarlos individualmente.
+
+### Usuarios — Socios
 
 Desde **Usuarios → Socios** gestionás el padrón de socios de tu club.
 
@@ -344,7 +349,7 @@ Si tu plan es Esencial, verás un aviso indicando que debés actualizar a Premiu
    - **Dirección / Ubicación** — dirección física o referencia del lugar (ej: "Av. del Puerto 123, Tigre").
    - **Dimensiones** — eslora y manga. Usá el toggle **m / pies** para elegir la unidad (metros o pies); la unidad queda guardada junto con el número.
    - **Precio / mes** y **Expensas / mes** — ambos opcionales.
-5. Seleccioná los servicios e instalaciones disponibles (podés elegir varios): Agua potable, Conexión 220V, Abierto 24 hs, Combustible, Seguridad 24 hs, Vestuarios, Confitería, Lavadero, Aire libre, Bajo techo, Sin arco.
+5. Seleccioná los servicios e instalaciones disponibles (podés elegir varios): Agua potable, Conexión 220V, Abierto 24 hs, Combustible, Seguridad 24 hs, Vestuarios, Confitería, Lavadero, Aire libre, Bajo techo, Con arco.
 6. Elegí el estado:
    - **Guardar borrador** — se guarda pero no aparece en la app mobile todavía.
    - **Publicar** — queda visible en la app de inmediato.
@@ -364,6 +369,18 @@ Podés filtrar las publicaciones por tipo (Amarras / Camas), por estado (Publica
 ## 9. Comunicaciones
 
 Desde esta sección enviás anuncios y novedades a los socios de tu club.
+
+### Límite según plan
+
+Las comunicaciones tienen un límite mensual según el plan y el tipo:
+
+| Plan     | A socios del club | Públicas (landing) |
+| -------- | ----------------- | ------------------ |
+| Esencial | 2 por mes         | 0 (no disponible)  |
+| Premium  | 2 por mes         | 2 por mes          |
+| Elite    | 5 por mes         | 5 por mes          |
+
+El contador en la parte superior de cada tipo muestra el uso del mes en curso.
 
 ### Ver comunicaciones existentes
 

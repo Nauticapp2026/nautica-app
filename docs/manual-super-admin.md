@@ -25,7 +25,7 @@ Guía paso a paso para gestionar la plataforma NauticApp desde el panel de super
 
 1. Ingresá a **www.nauticapp.club** con tu cuenta de super admin.
 2. El panel super admin se encuentra en **/super-admin**. Si tu cuenta tiene el flag de super admin activado, el sistema te redirige automáticamente.
-3. La navegación lateral muestra las secciones: Inicio, Guarderías, Usuarios, Comunicaciones, Publicidades, Moderación, Notificaciones, Pricing y Términos.
+3. La navegación lateral muestra las secciones: Inicio, Guarderías, Usuarios, Comunicaciones, Publicidades, Notificaciones, Moderación, Pricing y Términos.
 
 ---
 
