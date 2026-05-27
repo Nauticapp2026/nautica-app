@@ -405,6 +405,8 @@ Podés buscar por título usando la barra de búsqueda.
 
 Hacé clic en la comunicación en la lista para abrirla y editarla. Podés volver a guardarla como borrador si necesitás pausar su visibilidad.
 
+> Solo podés editar una comunicación dentro de las **24 horas** siguientes a su creación. Pasado ese tiempo el botón de edición desaparece.
+
 ---
 
 ## 10. Facturación
