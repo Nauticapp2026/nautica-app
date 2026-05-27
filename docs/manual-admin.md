@@ -360,6 +360,8 @@ Si tu plan es Esencial, verás un aviso indicando que debés actualizar a Premiu
 2. Modificá los campos que necesitás y hacé clic en **Publicar** o **Guardar borrador**.
 3. Para eliminarla, hacé clic en **Eliminar** al pie del formulario y confirmá.
 
+> Solo podés editar una publicación dentro de las **24 horas** siguientes a su creación. Pasado ese tiempo el botón de edición desaparece.
+
 ### Filtros y búsqueda
 
 Podés filtrar las publicaciones por tipo (Amarras / Camas), por estado (Publicadas / Borradores) y ordenarlas por fecha o precio. También podés buscar por dirección usando el campo de búsqueda.
