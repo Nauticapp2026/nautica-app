@@ -19,7 +19,7 @@ export function GestionFeatures() {
       <div className="mx-auto grid max-w-6xl gap-10 px-4 md:grid-cols-2 md:px-8 lg:gap-16">
         <div className="relative aspect-[5/6] w-full overflow-hidden">
           <Image
-            src="/landing/2.png"
+            src="/landing/gestion-features.png"
             alt="Panel de gestión administrativa"
             fill
             className="object-cover"
