@@ -14,9 +14,10 @@ Guía paso a paso para gestionar la plataforma NauticApp desde el panel de super
 4. [Usuarios](#4-usuarios)
 5. [Comunicaciones](#5-comunicaciones)
 6. [Publicidades](#6-publicidades)
-7. [Notificaciones push](#7-notificaciones-push)
-8. [Pricing](#8-pricing)
-9. [Términos y Condiciones](#9-términos-y-condiciones)
+7. [Moderación](#7-moderación)
+8. [Notificaciones push](#8-notificaciones-push)
+9. [Pricing](#9-pricing)
+10. [Términos y Condiciones](#10-términos-y-condiciones)
 
 ---
 
@@ -24,7 +25,7 @@ Guía paso a paso para gestionar la plataforma NauticApp desde el panel de super
 
 1. Ingresá a **www.nauticapp.club** con tu cuenta de super admin.
 2. El panel super admin se encuentra en **/super-admin**. Si tu cuenta tiene el flag de super admin activado, el sistema te redirige automáticamente.
-3. La navegación lateral muestra las secciones: Inicio, Guarderías, Usuarios, Comunicaciones, Publicidades, Notificaciones, Pricing y Términos.
+3. La navegación lateral muestra las secciones: Inicio, Guarderías, Usuarios, Comunicaciones, Publicidades, Moderación, Notificaciones, Pricing y Términos.
 
 ---
 
@@ -211,7 +212,45 @@ Las publicidades aparecen en tarjetas con: imagen en miniatura, título, texto, 
 
 ---
 
-## 7. Notificaciones push
+## 7. Moderación
+
+Revisá y eliminá contenido inapropiado creado por los clubes: comunicaciones y publicaciones de NautiShop.
+
+### Cómo funciona
+
+La pantalla tiene dos pestañas: **Comunicaciones** y **Publicaciones**. Cada una muestra el contenido de todos los clubes de la plataforma, con filtros para buscar y moderar de forma eficiente.
+
+### Filtrar contenido
+
+En ambas pestañas podés:
+
+- **Buscar por texto** — filtra por título o contenido (comunicaciones) o por dirección/ubicación (publicaciones).
+- **Filtrar por club** — el selector desplegable muestra solo los clubes que tienen contenido en esa pestaña.
+- **Limpiar filtros** — el botón con ícono de filtro los resetea.
+
+### Revisar una comunicación
+
+Cada tarjeta muestra: club, título, preview del texto, categoría, tipo (Socios / Pública), estado (publicada o borrador), imágenes adjuntas, fecha y autor.
+
+Hacé clic en **Ver** para abrir el modal de detalle con el contenido completo y las imágenes en tamaño real.
+
+### Revisar una publicación
+
+Cada tarjeta muestra: club, tipo (Amarra / Cama), estado, imágenes, ubicación, medidas y autor.
+
+Hacé clic en **Ver** para abrir el modal con eslora, manga, precio, expensas, servicios e imágenes completas.
+
+### Eliminar contenido
+
+1. En la tarjeta o dentro del modal de detalle, hacé clic en **Eliminar**.
+2. El sistema pide confirmación: "¿Eliminar?".
+3. Confirmá. El contenido se borra de inmediato y deja de ser visible en la app mobile.
+
+> Esta acción es **irreversible**. Solo eliminá contenido que incumpla las normas de la plataforma.
+
+---
+
+## 8. Notificaciones push
 
 Enviá notificaciones push a los usuarios de la app mobile de toda la plataforma, segmentadas por audiencia.
 
@@ -248,7 +287,7 @@ Hacé clic en el ícono de basura (rojo) en la tarjeta de la notificación. Esto
 
 ---
 
-## 8. Pricing
+## 9. Pricing
 
 Editor de planes y features que se muestra en la landing pública, en el onboarding y en el panel de cada club.
 
@@ -297,7 +336,7 @@ La tabla de features muestra todas las funcionalidades en filas agrupadas por ca
 
 ---
 
-## 9. Términos y Condiciones
+## 10. Términos y Condiciones
 
 Gestión del historial de versiones de los Términos y Condiciones de NauticApp.
 

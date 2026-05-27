@@ -71,7 +71,8 @@ Cada alerta muestra el nombre del socio, la embarcación, la hora prometida y la
 **Resolver una alerta:**
 
 1. En las alertas **críticas**, si el socio tiene teléfono cargado aparece el botón **Llamar**. Al tocarlo desde el celular abre el marcador directamente con el número del socio.
-2. Una vez resuelto el tema, hacé clic en **Marcar resuelta** para cerrar la alerta.
+2. Si el socio no responde y necesitás cerrar la salida manualmente, hacé clic en **Cerrar salida**. Esto registra el arribo en ese momento y desactiva la alerta de forma permanente.
+3. Una vez resuelto el tema, hacé clic en **Marcar resuelta** para cerrar la alerta sin registrar arribo.
 
 ---
 
@@ -324,11 +325,13 @@ Desde esta sección publicás amarras y camas disponibles en tu club para que lo
 
 ### Límite según plan
 
-| Plan     | Publicaciones permitidas |
-| -------- | ------------------------ |
-| Esencial | 0 (no disponible)        |
-| Premium  | 2                        |
-| Elite    | 5                        |
+| Plan     | Publicaciones permitidas por mes |
+| -------- | -------------------------------- |
+| Esencial | 0 (no disponible)                |
+| Premium  | 2 por mes                        |
+| Elite    | 5 por mes                        |
+
+El contador en la parte superior muestra cuántas publicaciones usaste del total disponible en el mes en curso. Al inicio de cada mes el conteo se reinicia.
 
 Si tu plan es Esencial, verás un aviso indicando que debés actualizar a Premium para usar esta sección.
 
@@ -573,20 +576,6 @@ El certificado permite que el sistema emita facturas directamente a AFIP en nomb
 > Hasta que no confirmes la instalación del certificado, el botón "Nueva factura" aparece deshabilitado.
 
 ---
-
-### Pestaña: Notificaciones
-
-Activá o desactivá las notificaciones push que reciben los socios en la app mobile.
-
-Los toggles disponibles son:
-
-- **Activar notificaciones a socios** — habilita el sistema de notificaciones push.
-- **Activar clima y mareas** — los socios reciben alertas de condiciones climáticas y tablas de mareas.
-- **Activar reservas online** — habilita el módulo de reservas desde la app.
-- **Activar pagos online** — habilita el módulo de pagos desde la app.
-- **Activar menú gastronómico** — habilita el módulo de restaurante en la app.
-
-> La disponibilidad de algunas funcionalidades depende del plan contratado.
 
 ---
 
