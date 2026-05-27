@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { desc, eq } from 'drizzle-orm';
+import { and, count as sqlCount, desc, eq, gte } from 'drizzle-orm';
 
 import { getActiveMarina } from '@/lib/auth/session';
 import { db } from '@/lib/db';
@@ -21,8 +21,9 @@ export default async function PublicacionesPage() {
   if (!isAdmin) redirect('/dashboard');
 
   const guarderiaId = ctx.activeMembership.guarderiaId;
+  const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 
-  const [guarderiaRow, rows] = await Promise.all([
+  const [guarderiaRow, rows, countRows] = await Promise.all([
     db
       .select({ plan: guarderias.plan })
       .from(guarderias)
@@ -50,11 +51,18 @@ export default async function PublicacionesPage() {
       .leftJoin(profiles, eq(profiles.id, publicaciones.autorId))
       .where(eq(publicaciones.guarderiaId, guarderiaId))
       .orderBy(desc(publicaciones.createdAt)),
+    db
+      .select({ total: sqlCount() })
+      .from(publicaciones)
+      .where(
+        and(eq(publicaciones.guarderiaId, guarderiaId), gte(publicaciones.createdAt, startOfMonth)),
+      ),
   ]);
 
   const plan = guarderiaRow[0]?.plan ?? 'esencial';
   const limitsMap = await getPlanLimitsForSlug(plan, ['nautishop_publicaciones']);
   const limit = limitsMap['nautishop_publicaciones'];
+  const used = Number(countRows[0]?.total ?? 0);
 
   const items: PublicacionItem[] = rows.map((r) => ({
     id: r.id,
@@ -75,5 +83,5 @@ export default async function PublicacionesPage() {
       [r.autorNombre, r.autorApellido].filter(Boolean).join(' ').trim() || r.autorEmail || null,
   }));
 
-  return <PublicacionesClient items={items} plan={plan} limit={limit} />;
+  return <PublicacionesClient items={items} plan={plan} limit={limit} used={used} />;
 }
