@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { eq, and, asc, desc } from 'drizzle-orm';
+import { eq, and, asc, desc, notInArray } from 'drizzle-orm';
 
 import { getActiveMarina } from '@/lib/auth/session';
 import { db } from '@/lib/db';
@@ -140,7 +140,13 @@ export default async function ConfiguracionPage({ searchParams }: Props) {
     })
     .from(memberships)
     .innerJoin(profiles, eq(profiles.id, memberships.userId))
-    .where(and(eq(memberships.guarderiaId, guarderiaId), eq(memberships.status, 'active')))
+    .where(
+      and(
+        eq(memberships.guarderiaId, guarderiaId),
+        eq(memberships.status, 'active'),
+        notInArray(memberships.rol, ['socio', 'invitado', 'proveedor']),
+      ),
+    )
     .orderBy(desc(memberships.createdAt));
 
   const miembros: MiembroEquipo[] = miembrosRows.map((m) => ({
