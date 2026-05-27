@@ -39,14 +39,13 @@ import {
 import { EmptyState } from '@/components/shared/empty-state';
 import { ImagesUploader } from '@/components/shared/images-uploader';
 
-export type TabKey = 'info' | 'equipo' | 'plan' | 'punto_venta' | 'notificaciones';
+export type TabKey = 'info' | 'equipo' | 'plan' | 'punto_venta';
 
 const TABS: { key: TabKey; label: string; icon: typeof Bell }[] = [
   { key: 'info', label: 'Información general', icon: Receipt },
   { key: 'equipo', label: 'Equipo', icon: Users },
   { key: 'plan', label: 'Plan', icon: CreditCard },
   { key: 'punto_venta', label: 'Datos de facturación', icon: Building2 },
-  { key: 'notificaciones', label: 'Notificaciones', icon: Bell },
 ];
 
 const TIPO_OPTS = [
@@ -224,7 +223,6 @@ export function ConfiguracionClient({
       )}
       {activeTab === 'plan' && <PlanTab planes={planes} currentPlan={currentPlan} />}
       {activeTab === 'punto_venta' && <PuntoVentaTab initial={puntoVenta} />}
-      {activeTab === 'notificaciones' && <NotificacionesTab initial={features} />}
     </div>
   );
 }

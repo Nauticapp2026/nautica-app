@@ -305,7 +305,7 @@ export const guarderias = pgTable(
     instagram: text('instagram'),
     plan: planEnum('plan').default('esencial'),
     // Feature flags
-    activarClimaYMareas: boolean('activar_clima_y_mareas').default(false),
+    activarClimaYMareas: boolean('activar_clima_y_mareas').default(true),
     activarMenuGastronomico: boolean('activar_menu_gastronomico').default(false),
     activarNotificaciones: boolean('activar_notificaciones').default(false),
     activarPagosOnline: boolean('activar_pagos_online').default(false),

@@ -19,7 +19,7 @@ import {
 
 const DIAS = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'] as const;
 
-const VALID_TABS: TabKey[] = ['info', 'equipo', 'plan', 'punto_venta', 'notificaciones'];
+const VALID_TABS: TabKey[] = ['info', 'equipo', 'plan', 'punto_venta'];
 
 type Props = {
   searchParams: Promise<{ tab?: string; nuevo?: string }>;
