@@ -6,6 +6,7 @@ import {
   Anchor,
   ArrowUpDown,
   BedDouble,
+  Waves,
   Clock,
   Coffee,
   Droplets,
@@ -492,10 +493,10 @@ function PublicacionModal({
             <div className="grid grid-cols-2 gap-3">
               {(
                 [
-                  { value: 'amarra', label: 'Amarra', src: '/icons/amarra.jpeg' },
-                  { value: 'cama', label: 'Cama', src: '/icons/cama.jpeg' },
+                  { value: 'amarra', label: 'Amarra', Icon: Waves },
+                  { value: 'cama', label: 'Cama', Icon: BedDouble },
                 ] as const
-              ).map(({ value, label, src }) => {
+              ).map(({ value, label, Icon }) => {
                 const selected = tipo === value;
                 return (
                   <button
@@ -508,12 +509,7 @@ function PublicacionModal({
                         : 'border-gray-200 bg-white text-gray-400 hover:border-gray-300 hover:bg-gray-50'
                     }`}
                   >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={src}
-                      alt={label}
-                      className={`h-10 w-10 object-contain mix-blend-multiply ${selected ? '' : 'grayscale'}`}
-                    />
+                    <Icon className="h-10 w-10" />
                     <span className="text-sm font-semibold">{label}</span>
                   </button>
                 );
