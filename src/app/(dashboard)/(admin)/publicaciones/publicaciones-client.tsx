@@ -95,7 +95,7 @@ const SERVICIO_CONFIG: Record<ServicioPublicacion, { label: string; icon: Lucide
   lavadero: { label: 'Lavadero', icon: Sparkles },
   aire_libre: { label: 'Aire libre', icon: Sun },
   bajo_techo: { label: 'Bajo techo', icon: Home },
-  sin_arco: { label: 'Sin arco', icon: ArrowUpDown },
+  sin_arco: { label: 'Con arco', icon: ArrowUpDown },
 };
 
 const SERVICIOS_LIST = Object.keys(SERVICIO_CONFIG) as ServicioPublicacion[];
