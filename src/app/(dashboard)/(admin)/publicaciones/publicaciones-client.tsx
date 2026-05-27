@@ -493,10 +493,10 @@ function PublicacionModal({
             <div className="grid grid-cols-2 gap-3">
               {(
                 [
-                  { value: 'amarra', label: 'Amarra', Icon: Waves },
-                  { value: 'cama', label: 'Cama', Icon: CamaIcon },
+                  { value: 'amarra', label: 'Amarra' },
+                  { value: 'cama', label: 'Cama' },
                 ] as const
-              ).map(({ value, label, Icon }) => {
+              ).map(({ value, label }) => {
                 const selected = tipo === value;
                 return (
                   <button
@@ -509,7 +509,11 @@ function PublicacionModal({
                         : 'border-gray-200 bg-white text-gray-400 hover:border-gray-300 hover:bg-gray-50'
                     }`}
                   >
-                    <Icon className="h-10 w-10" />
+                    {value === 'amarra' ? (
+                      <Waves className="h-10 w-10" strokeWidth={1} />
+                    ) : (
+                      <CamaIcon className="h-10 w-10" />
+                    )}
                     <span className="text-sm font-semibold">{label}</span>
                   </button>
                 );
