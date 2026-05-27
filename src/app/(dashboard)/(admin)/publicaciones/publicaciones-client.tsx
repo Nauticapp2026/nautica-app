@@ -509,7 +509,11 @@ function PublicacionModal({
                     }`}
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={src} alt={label} className="h-10 w-10 object-contain" />
+                    <img
+                      src={src}
+                      alt={label}
+                      className={`h-10 w-10 object-contain mix-blend-multiply ${selected ? '' : 'grayscale'}`}
+                    />
                     <span className="text-sm font-semibold">{label}</span>
                   </button>
                 );
