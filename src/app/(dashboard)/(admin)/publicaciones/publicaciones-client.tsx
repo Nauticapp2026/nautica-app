@@ -492,10 +492,10 @@ function PublicacionModal({
             <div className="grid grid-cols-2 gap-3">
               {(
                 [
-                  { value: 'amarra', label: 'Amarra', icon: Anchor },
-                  { value: 'cama', label: 'Cama', icon: BedDouble },
+                  { value: 'amarra', label: 'Amarra', src: '/icons/amarra.jpeg' },
+                  { value: 'cama', label: 'Cama', src: '/icons/cama.jpeg' },
                 ] as const
-              ).map(({ value, label, icon: Icon }) => {
+              ).map(({ value, label, src }) => {
                 const selected = tipo === value;
                 return (
                   <button
@@ -508,7 +508,8 @@ function PublicacionModal({
                         : 'border-gray-200 bg-white text-gray-400 hover:border-gray-300 hover:bg-gray-50'
                     }`}
                   >
-                    <Icon className="h-8 w-8" />
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={src} alt={label} className="h-10 w-10 object-contain" />
                     <span className="text-sm font-semibold">{label}</span>
                   </button>
                 );
