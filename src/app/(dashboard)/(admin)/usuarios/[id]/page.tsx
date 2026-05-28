@@ -240,20 +240,26 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
   }
 
   // Resolver URL de cada documento. Soportamos dos formatos en
-  // documento_url (histórico y nuevo):
-  //  - URL completa ("https://…/storage/v1/object/…"): se usa tal cual.
-  //  - Path relativo del bucket ("{socioId}/{filename}"): se genera signed URL.
+  // documento_url:
+  //  - Path relativo del bucket ("{socioId}/{filename}"): genera signed URL.
+  //  - URL pública de Supabase Storage (subidos desde mobile antes del fix):
+  //    extrae el path y genera signed URL igual.
+  //  - URL externa genuina (no Supabase): se usa tal cual.
   const admin = createAdminClient();
   const documentosConUrl = await Promise.all(
     documentosList.map(async (d) => {
       let signedUrl: string | null = null;
       if (d.documentoUrl) {
-        if (/^https?:\/\//i.test(d.documentoUrl)) {
-          signedUrl = d.documentoUrl;
+        let path = d.documentoUrl;
+        const supabasePublicMatch = path.match(
+          /\/object\/(?:public|sign)\/documentos\/(.+?)(?:\?|$)/,
+        );
+        if (supabasePublicMatch) path = decodeURIComponent(supabasePublicMatch[1]);
+
+        if (/^https?:\/\//i.test(path)) {
+          signedUrl = path;
         } else {
-          const { data } = await admin.storage
-            .from('documentos')
-            .createSignedUrl(d.documentoUrl, 60 * 60); // 1 hora
+          const { data } = await admin.storage.from('documentos').createSignedUrl(path, 60 * 60); // 1 hora
           signedUrl = data?.signedUrl ?? null;
         }
       }
