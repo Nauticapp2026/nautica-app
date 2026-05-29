@@ -46,10 +46,11 @@ guarderias                                         (la unidad de tenant)
 Definidos en `src/config/roles.ts`. Vive en `memberships.rol` (per-guardería, no global):
 
 - **administrador_general** (label "Admin") — todo el dashboard web.
-- **administrativo** — mismos permisos que `administrador_general`. Modelado como rol separado para distinguirlo en listados, pero todos los gates `isAdmin` los tratan igual. Si agregás un check de admin, **incluí ambos**.
+- **administrativo** — mismos permisos que `administrador_general`. Modelado como rol separado para distinguirlo en listados, pero todos los gates `isAdmin` los tratan igual.
+- **contable** — también en `ADMIN_ROLES`; tiene acceso admin idéntico. El selector de "Agregar miembro al equipo" ya no lo ofrece (es legacy), pero los miembros existentes con este rol siguen teniendo acceso completo. Si escribís un check de admin, **incluí los tres** (`administrador_general`, `administrativo`, `contable`).
 - **operario** — solo `/tareas` en la web.
 - **seguridad** (label "Portería / Seguridad") — opera desde mobile.
-- **contable**, **mantenimiento**, **comunicaciones**, **restaurantes** — roles legacy que existen para miembros antiguos. El selector de "Agregar miembro al equipo" ya no los ofrece (acotado a Admin / Administrativo / Operario / Portería-Seguridad).
+- **mantenimiento**, **comunicaciones**, **restaurantes** — roles legacy que existen para miembros antiguos. El selector ya no los ofrece.
 - **socio**, **invitado**, **proveedor** — usuarios finales del club, principalmente mobile.
 
 ### Enforcement
@@ -72,11 +73,16 @@ Excepción al modelo multi-tenant: el `super_admin` administra la **plataforma**
 - **Routing**: `src/app/super-admin/` (fuera del `(dashboard)`). Reusa el mismo `Sidebar` con `variant="super-admin"`. Si agregás una sección, sumá el item al nav en `src/components/shared/sidebar.tsx` (dentro del módulo `'use client'`, no como prop — los icons de lucide no cruzan el boundary server→client).
 - **Secciones actuales**:
   - **Inicio** — métricas globales (guarderías activas, cuentas, super admins, espacios, embarcaciones).
-  - **Guarderías** — listado con stats por club, eliminación cascade.
+  - **Guarderías** — listado con stats por club, toggle activa/inactiva, eliminación cascade.
   - **Usuarios** — listado cross-tenant: eliminar cuenta, toggle `is_super_admin`, cambiar rol por membership, quitar membership.
-  - **Pricing** — edita rate por plan (Classic/Plus/Platinum) y capacidades del slider de la landing. La landing pública lee de `pricing_plans` y `platform_settings`.
-- **Server actions**: en `src/app/actions/super-admin/{pricing,usuarios,guarderias}.ts`, todas validadas con Zod y empezando con `await requireSuperAdmin()`.
-- **Tablas globales (no scopeadas)**: `pricing_plans`, `platform_settings`. RLS: SELECT público (la landing es anónima) + INSERT/UPDATE/DELETE solo super admin.
+  - **Pricing** — edita rate por plan y capacidades del slider de la landing. La landing pública lee de `pricing_plans` y `platform_settings`.
+  - **Publicidades** — banners para la app mobile (`platform_publicidades`, dos tamaños: 350×300 y 353×119).
+  - **Comunicaciones** — novedades de plataforma que se distribuyen a todos los clubs.
+  - **Notificaciones** — push globales a toda la base de socios.
+  - **Términos** — publicación de versiones de T&C (`tc_versiones`). Cuando se publica una versión, todos los usuarios deben aceptarla antes de usar el dashboard.
+  - **Moderación** — elimina comunicaciones o publicaciones de clubs que violen políticas.
+- **Server actions**: en `src/app/actions/super-admin/{pricing,usuarios,guarderias,publicidades,comunicaciones,notificaciones,terminos,moderacion}.ts`, todas validadas con Zod y empezando con `await requireSuperAdmin()`.
+- **Tablas globales (no scopeadas)**: `pricing_plans`, `platform_settings`, `platform_publicidades`, `tc_versiones`. RLS: SELECT público (si la landing las lee) o solo super admin; INSERT/UPDATE/DELETE solo `is_super_admin()`.
 
 ---
 
@@ -283,11 +289,25 @@ La cuota mensual de un socio se genera **por espacio asignado con servicio**, no
 
 ---
 
+## Gate de Términos y Condiciones
+
+El gate que obliga a aceptar T&C vive en `src/app/(dashboard)/layout.tsx`, **no en middleware**. Esto es intencional: middleware corre en Edge Runtime y no puede consultar la DB (Drizzle + Postgres no son compatibles con Edge). El layout hace la query, y si el usuario tiene T&C pendientes lo redirige a `/terminos/aceptar`. El super admin está exento del gate.
+
+Si necesitás agregar un gate similar que requiera consultar la DB, hacerlo en el layout del grupo de rutas correspondiente.
+
+---
+
 ## Integraciones externas
 
-- **Supabase** — Auth, Postgres, RLS. Único proyecto (prod).
-- **tusfacturas.app** — emisión de facturas AFIP. Credenciales `TUSFACTURAS_*` en env vars.
-- **Vercel Cron** — `src/app/api/cron/mensuales` corre los movimientos mensuales (ver sección anterior). Es idempotente.
+- **Supabase** — Auth, Postgres, RLS, Storage. Único proyecto (prod).
+- **tusfacturas.app** — emisión de facturas AFIP. Credenciales `TUSFACTURAS_*` en env vars (master de NauticaApp para dar de alta el POS; cada guardería tiene sus propias creds que TusFacturas devuelve al alta).
+- **Resend** — emails transaccionales (aprobación de socios, invitaciones, etc.). Cliente en `src/lib/email/resend.ts`. Los mails de Supabase Auth (confirmación, reset) son un canal aparte configurado en el dashboard de Supabase.
+- **Expo Push** — notificaciones push a iOS/Android. Tokens en tabla `device_tokens`. Envío en `src/lib/push-notifications.ts`.
+- **SHN (Servicio Hidrográfico Naval)** — datos de mareas públicos. Route handler en `/api/mareas` consumido por la app mobile.
+- **Vercel Cron** — tres jobs:
+  - `/api/cron/mensuales` — movimientos mensuales (diario, idempotente).
+  - `/api/cron/notificaciones-push` — envío de push diario a socios.
+  - `/api/cron/historial-plan-mensual` — snapshot mensual del plan de cada guardería.
 
 ---
 

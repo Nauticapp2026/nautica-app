@@ -18,11 +18,11 @@ Esta es la regla más importante. **Cada consulta, server action o route handler
 
 ### 2. Roles: admin vs operario
 
-- **Admin** (`administrador_general` o `administrativo`): acceso total dentro de su guardería (dashboard, configuración, usuarios, espacios, tarifario, facturación, comunicaciones, tareas).
+- **Admin** (`administrador_general`, `administrativo` o `contable`): acceso total dentro de su guardería (dashboard, configuración, usuarios, espacios, tarifario, facturación, comunicaciones, tareas).
 - **Operario**: tareas asignadas y operativa básica.
 - **Seguridad**: portería/acceso. Opera desde la app mobile únicamente — no tiene pantallas propias en este repo web.
 
-**Importante**: los roles `administrador_general` y `administrativo` tienen exactamente los mismos permisos. Todo gate que chequea `isAdmin` debe aceptar ambos. Ver `src/config/roles.ts` para la lista completa y los grupos (`ADMIN_ROLES`, `STAFF_ROLES`).
+**Importante**: los roles `administrador_general`, `administrativo` y `contable` pertenecen al grupo `ADMIN_ROLES` y tienen exactamente los mismos permisos. Todo gate que chequea `isAdmin` debe aceptar los tres. Ver `src/config/roles.ts` para la lista completa y los grupos (`ADMIN_ROLES`, `STAFF_ROLES`).
 
 Enforcement:
 
@@ -60,8 +60,8 @@ Si necesitás compartir constantes / types / enums entre el cliente y un server 
 
 - Para gating en server: usar `requireSuperAdmin()` de `src/lib/auth/session.ts`. No exige `getActiveMarina` (un super admin no necesita estar en ninguna guardería).
 - Server actions del panel viven en `src/app/actions/super-admin/`, todas empiezan con `await requireSuperAdmin()` y validan con Zod.
-- Tablas globales (no scopeadas) — `pricing_plans`, `platform_settings`. Si agregás otra, sus policies son: SELECT público (si la lee la landing) o solo super admin, INSERT/UPDATE/DELETE solo `is_super_admin()`.
-- Routing: el panel está en `/super-admin/` (fuera del `(dashboard)`). Reusa el `Sidebar` con `variant="super-admin"`. Si querés agregar una sección, agregá item al nav en `src/components/shared/sidebar.tsx` (dentro del módulo, no como prop — los icons de lucide no cruzan el boundary server→client).
+- Tablas globales (no scopeadas) — `pricing_plans`, `platform_settings`, `platform_publicidades`, `tc_versiones`. Si agregás otra, sus policies son: SELECT público (si la lee la landing) o solo super admin, INSERT/UPDATE/DELETE solo `is_super_admin()`.
+- Routing: el panel está en `/super-admin/` (fuera del `(dashboard)`). Reusa el `Sidebar` con `variant="super-admin"`. Si querés agregar una sección, agregá item al nav en `src/components/shared/sidebar.tsx` (dentro del módulo, no como prop — los icons de lucide no cruzan el boundary server→client). Secciones actuales: Inicio, Guarderías, Usuarios, Comunicaciones, Publicidades, Pricing, Notificaciones, Términos, Moderación.
 
 ### 7. Design system — respetar tokens shadcn
 
@@ -88,6 +88,7 @@ Si necesitás compartir constantes / types / enums entre el cliente y un server 
 - **Palabras reservadas en nombres de columna**: evitarlas. Postgres reserva `offset`, `order`, `user`, etc. — aunque Drizzle teóricamente las quotea, en la práctica el comportamiento es errático (caso real: `espacios.offset` se renombró a `espacios.orden` en mig `0025` porque el UPDATE silenciosamente no aplicaba). Convención del repo: usar `orden` para columnas de ordenamiento (ver `marinas.orden`, `pisos.orden`, `naves.orden`, `espacios.orden`).
 - **Debug de persistencia**: si un UPDATE devuelve éxito pero la UI no refleja el cambio (incluso después de refresh), **revisar primero todos los `.sort()` / `map` / `filter` en el page.tsx** antes de teorizar sobre Drizzle/RLS/cache. El caso típico es un sort post-query que pisa el orden de la query.
 - **Auditoría desde Drizzle**: Drizzle usa el pooler de Supabase, que no propaga la sesión de auth. `auth.uid()` devuelve NULL en triggers si se llama desde Drizzle. Para pasar el user_id a triggers de auditoría, usar `set_config('app.current_user_id', id, true)` dentro de la misma transacción.
+- **Policies RLS de embarcaciones no están en git**: las policies de INSERT/UPDATE de la tabla `embarcaciones` viven solo en el dashboard de Supabase, no en `supabase/migrations/`. Si aparece un error de RLS en embarcaciones, revisar `pg_policies` directamente en el SQL Editor antes de buscar en el repo.
 
 ---
 
@@ -121,7 +122,8 @@ Husky + lint-staged corren prettier y eslint en cada commit. Si un hook falla, a
 - **Expo Push** — notificaciones push a iOS/Android. Tokens en tabla `device_tokens`. Envío en `src/lib/push-notifications.ts`. Cron diario en `api/cron/notificaciones-push`.
 - **tusfacturas.app** — emisión de facturas AFIP. Cliente y mappers en `src/lib/tusfacturas/`. Las credenciales `TUSFACTURAS_*` son las master de NauticaApp (solo para el alta del POS); cada guardería factura con sus propias credenciales que TusFacturas devuelve al alta.
 - **Vercel Cron** — tres jobs: `api/cron/mensuales` (movimientos mensuales), `api/cron/notificaciones-push` (push diario), `api/cron/historial-plan-mensual`. Si tocás ese código, considerar idempotencia (pueden correrse dos veces).
-- **Pre-launch gate** — toda la web está detrás de Basic Auth hasta el lanzamiento. Se destraba borrando las env vars `PRELAUNCH_GATE_USER` y `PRELAUNCH_GATE_PASSWORD` en Vercel. Las rutas `/auth/*` y `/api/mareas` están excluidas del gate.
+- **Pre-launch gate** — toda la web está detrás de Basic Auth hasta el lanzamiento. Se destraba borrando las env vars `PRELAUNCH_GATE_USER` y `PRELAUNCH_GATE_PASSWORD` en Vercel. Rutas excluidas del gate: `/auth/*`, `/api/cron/*`, `/api/webhooks/*`, `/api/devices/*`, `/api/mareas/*`, `/api/delete-account`, `/eliminar-cuenta`, `/privacidad`, `/terminos*`.
+- **Gate de Términos y Condiciones** — el gate que obliga a aceptar T&C vive en el layout de `(dashboard)`, no en middleware. Esto es intencional: middleware corre en Edge Runtime y no puede consultar la DB (Drizzle/Supabase no son compatibles con Edge). Si necesitás agregar un gate similar que requiera consultar la DB, hacerlo en el layout del grupo de rutas correspondiente, no en `middleware.ts`.
 
 ---
 
