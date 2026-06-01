@@ -40,7 +40,6 @@ type InvitadoItem = {
 type AccesoItem = {
   id: string;
   nombre: string | null;
-  desde: string | null;
 };
 
 type Socio = {
@@ -905,15 +904,9 @@ export function UsuariosClient({
                                   ) : (
                                     <div className="space-y-1.5">
                                       {s.accesosExternos.map((acc) => (
-                                        <div
-                                          key={acc.id}
-                                          className="flex items-center justify-between gap-2"
-                                        >
+                                        <div key={acc.id} className="flex items-center gap-2">
                                           <span className="text-xs text-gray-700">
                                             {acc.nombre ?? '—'}
-                                          </span>
-                                          <span className="text-xs text-gray-400">
-                                            {acc.desde ? formatArgentinaDate(acc.desde) : '—'}
                                           </span>
                                         </div>
                                       ))}

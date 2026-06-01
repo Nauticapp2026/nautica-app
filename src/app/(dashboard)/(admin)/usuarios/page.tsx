@@ -236,10 +236,7 @@ export default async function UsuariosPage({
     });
   }
 
-  const accesosBySocio = new Map<
-    string,
-    { id: string; nombre: string | null; desde: string | null }[]
-  >();
+  const accesosBySocio = new Map<string, { id: string; nombre: string | null }[]>();
   const accesosIdsSeen = new Set<string>();
   for (const acc of accesosList) {
     if (!acc.socioId || accesosIdsSeen.has(acc.id)) continue;
@@ -249,7 +246,7 @@ export default async function UsuariosPage({
     if (arr.length < 5) {
       const nombre =
         [acc.invitadoNombre, acc.invitadoApellido].filter(Boolean).join(' ') || acc.motivo || null;
-      arr.push({ id: acc.id, nombre, desde: acc.desde?.toISOString() ?? null });
+      arr.push({ id: acc.id, nombre });
     }
   }
 
