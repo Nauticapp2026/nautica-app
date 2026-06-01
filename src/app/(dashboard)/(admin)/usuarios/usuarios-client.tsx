@@ -1,26 +1,27 @@
 'use client';
 
-import { useState, useTransition, useMemo } from 'react';
+import { useState, useTransition, useMemo, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
+  ChevronDown,
+  ChevronRight,
   Eye,
   FileText,
   Mail,
   MessageCircle,
-  Package,
   Paperclip,
   Plus,
   Search,
   Upload,
-  UserPlus,
   Users,
   X,
 } from 'lucide-react';
 import { createSocioAction, uploadSocioDocumentoAction } from '@/app/actions/socios';
+import { formatArgentinaDate } from '@/lib/dates';
 import { EmptyState } from '@/components/shared/empty-state';
 import { ImportSociosModal } from './import-socios-modal';
 import { ImportEmbarcacionesModal } from './import-embarcaciones-modal';
@@ -28,6 +29,19 @@ import { ImportEmbarcacionesModal } from './import-embarcaciones-modal';
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export type FiltroSocios = 'morosos' | 'docs-incompletas';
+
+type InvitadoItem = {
+  id: string;
+  nombre: string;
+  apellido: string | null;
+  validoHasta: string | null;
+};
+
+type AccesoItem = {
+  id: string;
+  desde: string | null;
+  motivo: string | null;
+};
 
 type Socio = {
   membresiaId: string;
@@ -42,6 +56,8 @@ type Socio = {
   embarcacion: string | null;
   ubicacion: string | null;
   docsCompletos: boolean;
+  invitados: InvitadoItem[];
+  accesosExternos: AccesoItem[];
 };
 
 const FILTRO_LABEL: Record<FiltroSocios, string> = {
@@ -501,7 +517,7 @@ function CrearSocioModal({ open, onClose }: { open: boolean; onClose: () => void
 
 // ─── Main client component ───────────────────────────────────────────────────
 
-type Tab = 'socios' | 'invitados' | 'proveedores';
+type Tab = 'socios' | 'invitados';
 
 function SortableTh({
   label,
@@ -557,7 +573,6 @@ export function UsuariosClient({
   initialFiltro?: FiltroSocios | null;
 }) {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<Tab>('socios');
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [importModalOpen, setImportModalOpen] = useState(false);
@@ -565,6 +580,16 @@ export function UsuariosClient({
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [filtro, setFiltro] = useState<FiltroSocios | null>(initialFiltro);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+
+  function toggleExpand(id: string) {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   function clearFiltro() {
     setFiltro(null);
@@ -628,12 +653,6 @@ export function UsuariosClient({
     return base;
   }, [socios, search, sortKey, sortDir, filtro]);
 
-  const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
-    { id: 'socios', label: 'Socios', icon: <Users className="h-4 w-4" /> },
-    { id: 'invitados', label: 'Invitados', icon: <UserPlus className="h-4 w-4" /> },
-    { id: 'proveedores', label: 'Proveedores', icon: <Package className="h-4 w-4" /> },
-  ];
-
   return (
     <>
       <CrearSocioModal open={modalOpen} onClose={() => setModalOpen(false)} />
@@ -647,143 +666,137 @@ export function UsuariosClient({
         {/* Header */}
         <div className="mb-6">
           <h1 className="page-title">Usuarios</h1>
-          <p className="page-subtitle mt-1">Gestiona socios, invitados y proveedores</p>
+          <p className="page-subtitle mt-1">Gestiona socios del club</p>
         </div>
 
-        {/* Tabs */}
-        <div className="-mx-4 mb-6 overflow-x-auto border-b border-gray-200 md:mx-0">
-          <div className="flex min-w-max px-4 whitespace-nowrap md:px-0">
-            {TABS.map((t) => (
-              <button
-                key={t.id}
-                onClick={() => setActiveTab(t.id)}
-                className={`flex shrink-0 items-center gap-2 px-4 pb-3 text-sm font-medium transition ${
-                  activeTab === t.id
-                    ? 'border-b-2 border-[#175861] text-[#175861]'
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                {t.icon}
-                {t.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Content */}
-        {activeTab === 'socios' && (
-          <div className="rounded-2xl border border-gray-200 bg-white">
-            {/* Search + button */}
-            <div className="flex flex-col gap-3 border-b border-gray-100 p-4 sm:flex-row sm:items-center">
-              <div className="relative flex-1">
-                <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                <input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Buscar por nombre o email..."
-                  className="h-10 w-full rounded-[10px] border border-gray-200 bg-white pr-4 pl-10 text-sm focus:border-[#175861] focus:ring-1 focus:ring-[#175861] focus:outline-none"
-                />
-              </div>
-              <button
-                onClick={() => setImportModalOpen(true)}
-                className="flex shrink-0 items-center justify-center gap-2 rounded-[10px] border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
-              >
-                <Upload className="h-4 w-4" />
-                Importar socios
-              </button>
-              <button
-                onClick={() => setImportEmbModalOpen(true)}
-                className="flex shrink-0 items-center justify-center gap-2 rounded-[10px] border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
-              >
-                <Upload className="h-4 w-4" />
-                Importar embarcaciones
-              </button>
-              <button
-                onClick={() => setModalOpen(true)}
-                className="flex shrink-0 items-center justify-center gap-2 rounded-[10px] px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90"
-                style={{ background: '#175861' }}
-              >
-                <Plus className="h-4 w-4" />
-                Agregar socio
-              </button>
-            </div>
-
-            {filtro && (
-              <div className="flex items-center gap-2 border-b border-gray-100 bg-[#F9FAFB] px-4 py-2.5 text-xs">
-                <span className="text-gray-500">Filtrando:</span>
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-[#175861] px-3 py-1 font-medium text-white">
-                  {FILTRO_LABEL[filtro]}
-                  <button
-                    type="button"
-                    onClick={clearFiltro}
-                    aria-label="Quitar filtro"
-                    className="rounded-full p-0.5 transition hover:bg-white/15"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </span>
-              </div>
-            )}
-
-            {/* Table */}
-            {filtered.length === 0 ? (
-              <EmptyState
-                icon={<Users className="h-7 w-7 opacity-40" />}
-                text={
-                  search
-                    ? 'No se encontraron socios con ese criterio.'
-                    : 'No hay socios cargados aún.'
-                }
+        <div className="rounded-2xl border border-gray-200 bg-white">
+          {/* Search + button */}
+          <div className="flex flex-col gap-3 border-b border-gray-100 p-4 sm:flex-row sm:items-center">
+            <div className="relative flex-1">
+              <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Buscar por nombre o email..."
+                className="h-10 w-full rounded-[10px] border border-gray-200 bg-white pr-4 pl-10 text-sm focus:border-[#175861] focus:ring-1 focus:ring-[#175861] focus:outline-none"
               />
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[640px] text-sm">
-                  <thead>
-                    <tr className="bg-gray-50 text-left text-xs font-semibold text-gray-500">
-                      <SortableTh
-                        label="Socio"
-                        sortKey="socio"
-                        activeKey={sortKey}
-                        dir={sortDir}
-                        onClick={() => toggleSort('socio')}
-                      />
-                      <SortableTh
-                        label="Embarcación"
-                        sortKey="embarcacion"
-                        activeKey={sortKey}
-                        dir={sortDir}
-                        onClick={() => toggleSort('embarcacion')}
-                      />
-                      <SortableTh
-                        label="Ubicación"
-                        sortKey="ubicacion"
-                        activeKey={sortKey}
-                        dir={sortDir}
-                        onClick={() => toggleSort('ubicacion')}
-                      />
-                      <th className="px-4 py-3 text-center">Estado</th>
-                      <SortableTh
-                        label="Deuda"
-                        sortKey="deuda"
-                        activeKey={sortKey}
-                        dir={sortDir}
-                        onClick={() => toggleSort('deuda')}
-                        align="center"
-                      />
-                      <th className="px-4 py-3 text-right">Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filtered.map((s, i) => {
-                      const nombre = [s.nombre, s.apellido].filter(Boolean).join(' ') || '—';
-                      const deuda = parseFloat(s.deuda ?? '0');
-                      return (
+            </div>
+            <button
+              onClick={() => setImportModalOpen(true)}
+              className="flex shrink-0 items-center justify-center gap-2 rounded-[10px] border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+            >
+              <Upload className="h-4 w-4" />
+              Importar socios
+            </button>
+            <button
+              onClick={() => setImportEmbModalOpen(true)}
+              className="flex shrink-0 items-center justify-center gap-2 rounded-[10px] border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+            >
+              <Upload className="h-4 w-4" />
+              Importar embarcaciones
+            </button>
+            <button
+              onClick={() => setModalOpen(true)}
+              className="flex shrink-0 items-center justify-center gap-2 rounded-[10px] px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90"
+              style={{ background: '#175861' }}
+            >
+              <Plus className="h-4 w-4" />
+              Agregar socio
+            </button>
+          </div>
+
+          {filtro && (
+            <div className="flex items-center gap-2 border-b border-gray-100 bg-[#F9FAFB] px-4 py-2.5 text-xs">
+              <span className="text-gray-500">Filtrando:</span>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-[#175861] px-3 py-1 font-medium text-white">
+                {FILTRO_LABEL[filtro]}
+                <button
+                  type="button"
+                  onClick={clearFiltro}
+                  aria-label="Quitar filtro"
+                  className="rounded-full p-0.5 transition hover:bg-white/15"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            </div>
+          )}
+
+          {/* Table */}
+          {filtered.length === 0 ? (
+            <EmptyState
+              icon={<Users className="h-7 w-7 opacity-40" />}
+              text={
+                search
+                  ? 'No se encontraron socios con ese criterio.'
+                  : 'No hay socios cargados aún.'
+              }
+            />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[640px] text-sm">
+                <thead>
+                  <tr className="bg-gray-50 text-left text-xs font-semibold text-gray-500">
+                    <th className="w-10 px-4 py-3" />
+                    <SortableTh
+                      label="Socio"
+                      sortKey="socio"
+                      activeKey={sortKey}
+                      dir={sortDir}
+                      onClick={() => toggleSort('socio')}
+                    />
+                    <SortableTh
+                      label="Embarcación"
+                      sortKey="embarcacion"
+                      activeKey={sortKey}
+                      dir={sortDir}
+                      onClick={() => toggleSort('embarcacion')}
+                    />
+                    <SortableTh
+                      label="Ubicación"
+                      sortKey="ubicacion"
+                      activeKey={sortKey}
+                      dir={sortDir}
+                      onClick={() => toggleSort('ubicacion')}
+                    />
+                    <th className="px-4 py-3 text-center">Estado</th>
+                    <SortableTh
+                      label="Deuda"
+                      sortKey="deuda"
+                      activeKey={sortKey}
+                      dir={sortDir}
+                      onClick={() => toggleSort('deuda')}
+                      align="center"
+                    />
+                    <th className="px-4 py-3 text-right">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((s) => {
+                    const nombre = [s.nombre, s.apellido].filter(Boolean).join(' ') || '—';
+                    const deuda = parseFloat(s.deuda ?? '0');
+                    const isExpanded = expandedIds.has(s.profileId);
+                    return (
+                      <Fragment key={s.membresiaId}>
                         <tr
-                          key={s.membresiaId}
                           className={`border-t border-gray-100 transition hover:bg-gray-50/50 ${
-                            i === filtered.length - 1 ? '' : ''
+                            isExpanded ? 'bg-gray-50/40' : ''
                           }`}
                         >
+                          <td className="w-10 px-4 py-3">
+                            <button
+                              type="button"
+                              onClick={() => toggleExpand(s.profileId)}
+                              title={isExpanded ? 'Ocultar detalle' : 'Ver invitados y accesos'}
+                              className="text-gray-400 transition hover:text-[#175861]"
+                            >
+                              {isExpanded ? (
+                                <ChevronDown className="h-4 w-4" />
+                              ) : (
+                                <ChevronRight className="h-4 w-4" />
+                              )}
+                            </button>
+                          </td>
                           <td className="px-4 py-3">
                             <p className="font-medium" style={{ color: '#175861' }}>
                               {nombre}
@@ -855,32 +868,75 @@ export function UsuariosClient({
                             </div>
                           </td>
                         </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )}
 
-        {activeTab === 'invitados' && (
-          <div className="rounded-2xl border border-gray-200 bg-white">
-            <EmptyState
-              icon={<UserPlus className="h-7 w-7 opacity-40" />}
-              text="No hay invitados cargados aún."
-            />
-          </div>
-        )}
+                        {isExpanded && (
+                          <tr className="border-t border-gray-100 bg-gray-50/60">
+                            <td colSpan={7} className="px-6 pt-3 pb-4">
+                              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                                {/* Navegantes autorizados */}
+                                <div>
+                                  <p className="mb-2 text-xs font-semibold tracking-wide text-gray-400 uppercase">
+                                    Navegantes autorizados
+                                  </p>
+                                  {s.invitados.length === 0 ? (
+                                    <p className="text-xs text-gray-400">
+                                      Sin navegantes registrados
+                                    </p>
+                                  ) : (
+                                    <div className="space-y-1.5">
+                                      {s.invitados.map((inv) => (
+                                        <div
+                                          key={inv.id}
+                                          className="flex items-center justify-between gap-2"
+                                        >
+                                          <span className="text-xs text-gray-700">
+                                            {[inv.nombre, inv.apellido].filter(Boolean).join(' ')}
+                                          </span>
+                                          {inv.validoHasta && (
+                                            <span className="text-xs text-gray-400">
+                                              hasta {formatArgentinaDate(inv.validoHasta)}
+                                            </span>
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
 
-        {activeTab === 'proveedores' && (
-          <div className="rounded-2xl border border-gray-200 bg-white">
-            <EmptyState
-              icon={<Package className="h-7 w-7 opacity-40" />}
-              text="No hay proveedores cargados aún."
-            />
-          </div>
-        )}
+                                {/* Accesos externos recientes */}
+                                <div>
+                                  <p className="mb-2 text-xs font-semibold tracking-wide text-gray-400 uppercase">
+                                    Accesos externos recientes
+                                  </p>
+                                  {s.accesosExternos.length === 0 ? (
+                                    <p className="text-xs text-gray-400">Sin accesos registrados</p>
+                                  ) : (
+                                    <div className="space-y-1.5">
+                                      {s.accesosExternos.map((acc) => (
+                                        <div key={acc.id} className="flex items-center gap-3">
+                                          <span className="text-xs text-gray-400">
+                                            {acc.desde ? formatArgentinaDate(acc.desde) : '—'}
+                                          </span>
+                                          <span className="text-xs text-gray-700">
+                                            {acc.motivo ?? '—'}
+                                          </span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
     </>
   );

@@ -67,6 +67,7 @@ type Embarcacion = {
   matricula: string | null;
   modelo: string | null;
   seguro: string | null;
+  esloraM: string | null;
 };
 
 type Movimiento = {
@@ -862,7 +863,7 @@ function montoToNumberStr(input: string): string {
 
 // ─── Embarcaciones tab ───────────────────────────────────────────────────────
 
-const EMBARCACION_VACIA = { nombre: '', matricula: '', modelo: '', seguro: '' };
+const EMBARCACION_VACIA = { nombre: '', matricula: '', modelo: '', seguro: '', esloraM: '' };
 
 function EmbarcacionesTab({
   socioId,
@@ -888,6 +889,7 @@ function EmbarcacionesTab({
       matricula: e.matricula ?? '',
       modelo: e.modelo ?? '',
       seguro: e.seguro ?? '',
+      esloraM: e.esloraM ?? '',
     });
   }
 
@@ -1054,6 +1056,24 @@ function EmbarcacionesTab({
               ) : (
                 <p className="text-sm" style={{ color: '#101828' }}>
                   {embarcacion?.seguro ?? '—'}
+                </p>
+              )}
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold text-gray-500">Eslora (m)</label>
+              {editando || agregando ? (
+                <input
+                  className={inputCls}
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="ej: 9.50"
+                  value={form.esloraM}
+                  onChange={setField('esloraM')}
+                />
+              ) : (
+                <p className="text-sm" style={{ color: '#101828' }}>
+                  {embarcacion?.esloraM ? `${embarcacion.esloraM} m` : '—'}
                 </p>
               )}
             </div>

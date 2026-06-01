@@ -11,6 +11,7 @@ export type EmbarcacionInput = {
   matricula: string;
   modelo: string;
   seguro: string;
+  esloraM: string;
 };
 
 export type CreateEmbarcacionData = EmbarcacionInput & { socioId: string };
@@ -49,6 +50,7 @@ export async function createEmbarcacionAction(
         matricula: norm(data.matricula),
         modelo: norm(data.modelo),
         seguro: norm(data.seguro),
+        esloraM: norm(data.esloraM),
       })
       .returning({ id: embarcaciones.id });
     revalidatePath(`/usuarios/${data.socioId}`);
@@ -84,6 +86,7 @@ export async function updateEmbarcacionAction(
         matricula: norm(data.matricula),
         modelo: norm(data.modelo),
         seguro: norm(data.seguro),
+        esloraM: norm(data.esloraM),
       })
       .where(eq(embarcaciones.id, data.id));
     if (existing.profileId) revalidatePath(`/usuarios/${existing.profileId}`);

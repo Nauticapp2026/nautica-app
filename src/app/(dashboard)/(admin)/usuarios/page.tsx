@@ -5,8 +5,11 @@ import {
   documentos,
   embarcaciones,
   espacios,
+  invitados,
+  lados,
   memberships,
   movimientosCuentaCorriente,
+  porteria,
   profiles,
 } from '@/lib/db/schema';
 import { and, desc, eq, inArray } from 'drizzle-orm';
@@ -49,79 +52,134 @@ export default async function UsuariosPage({
 
   const profileIds = socios.map((s) => s.profileId);
 
-  const [embarcacionesList, movimientosList, espaciosList, docsList] = await Promise.all([
-    profileIds.length > 0
-      ? db
-          .select({ profileId: embarcaciones.profileId, nombre: embarcaciones.nombre })
-          .from(embarcaciones)
-          .where(inArray(embarcaciones.profileId, profileIds as string[]))
-      : Promise.resolve([] as { profileId: string | null; nombre: string }[]),
+  const [embarcacionesList, movimientosList, espaciosList, docsList, invitadosList, accesosList] =
+    await Promise.all([
+      profileIds.length > 0
+        ? db
+            .select({ profileId: embarcaciones.profileId, nombre: embarcaciones.nombre })
+            .from(embarcaciones)
+            .where(inArray(embarcaciones.profileId, profileIds as string[]))
+        : Promise.resolve([] as { profileId: string | null; nombre: string }[]),
 
-    // Deuda + estado moroso se calculan desde movimientos en lugar de leer
-    // profiles.deuda / profiles.estado_socio (esos campos están sin
-    // sincronización con movimientos y suelen estar stale).
-    profileIds.length > 0
-      ? db
-          .select({
-            socioId: movimientosCuentaCorriente.socioId,
-            estado: movimientosCuentaCorriente.estado,
-            debe: movimientosCuentaCorriente.debe,
-            haber: movimientosCuentaCorriente.haber,
-            fecha: movimientosCuentaCorriente.fecha,
-          })
-          .from(movimientosCuentaCorriente)
-          .where(inArray(movimientosCuentaCorriente.socioId, profileIds as string[]))
-      : Promise.resolve(
-          [] as {
-            socioId: string;
-            estado: 'pagado' | 'no_pagado' | 'facturado' | null;
-            debe: string | null;
-            haber: string | null;
-            fecha: Date | null;
-          }[],
-        ),
+      // Deuda + estado moroso se calculan desde movimientos en lugar de leer
+      // profiles.deuda / profiles.estado_socio (esos campos están sin
+      // sincronización con movimientos y suelen estar stale).
+      profileIds.length > 0
+        ? db
+            .select({
+              socioId: movimientosCuentaCorriente.socioId,
+              estado: movimientosCuentaCorriente.estado,
+              debe: movimientosCuentaCorriente.debe,
+              haber: movimientosCuentaCorriente.haber,
+              fecha: movimientosCuentaCorriente.fecha,
+            })
+            .from(movimientosCuentaCorriente)
+            .where(inArray(movimientosCuentaCorriente.socioId, profileIds as string[]))
+        : Promise.resolve(
+            [] as {
+              socioId: string;
+              estado: 'pagado' | 'no_pagado' | 'facturado' | null;
+              debe: string | null;
+              haber: string | null;
+              fecha: Date | null;
+            }[],
+          ),
 
-    // Ubicación asignada del socio: espacio que tiene a este profile como
-    // ocupante. Traemos también el nombre del área para mostrar "Marina /
-    // A5" o "Galpón / B3" según corresponda. Si el socio no tiene espacio
-    // asignado, la columna queda en —.
-    profileIds.length > 0
-      ? db
-          .select({
-            ocupanteId: espacios.ocupanteId,
-            nomenclatura: espacios.nomenclatura,
-            marinaId: espacios.marinaId,
-            pisoId: espacios.pisoId,
-            areaNombre: areas.nombre,
-          })
-          .from(espacios)
-          .leftJoin(areas, eq(areas.id, espacios.areaId))
-          .where(
-            and(
-              eq(espacios.guarderiaId, gId),
-              inArray(espacios.ocupanteId, profileIds as string[]),
-            ),
-          )
-      : Promise.resolve(
-          [] as {
-            ocupanteId: string | null;
-            nomenclatura: string | null;
-            marinaId: string | null;
-            pisoId: string | null;
-            areaNombre: string | null;
-          }[],
-        ),
+      // Ubicación asignada del socio: espacio que tiene a este profile como
+      // ocupante. Traemos también el nombre del área para mostrar "Marina /
+      // A5" o "Galpón / B3" según corresponda. Si el socio no tiene espacio
+      // asignado, la columna queda en —.
+      profileIds.length > 0
+        ? db
+            .select({
+              ocupanteId: espacios.ocupanteId,
+              nomenclatura: espacios.nomenclatura,
+              areaNombre: areas.nombre,
+              ladoNombre: lados.nombre,
+            })
+            .from(espacios)
+            .leftJoin(areas, eq(areas.id, espacios.areaId))
+            .leftJoin(lados, eq(lados.id, espacios.ladoId))
+            .where(
+              and(
+                eq(espacios.guarderiaId, gId),
+                inArray(espacios.ocupanteId, profileIds as string[]),
+              ),
+            )
+        : Promise.resolve(
+            [] as {
+              ocupanteId: string | null;
+              nomenclatura: string | null;
+              areaNombre: string | null;
+              ladoNombre: string | null;
+            }[],
+          ),
 
-    // Documentos por socio. Un socio se considera completo si tiene al menos
-    // un documento de cada uno de los 3 tipos requeridos (mismo criterio que
-    // dashboard/page.tsx).
-    profileIds.length > 0
-      ? db
-          .select({ profileId: documentos.profileId, tipo: documentos.tipo })
-          .from(documentos)
-          .where(inArray(documentos.profileId, profileIds as string[]))
-      : Promise.resolve([] as { profileId: string; tipo: string | null }[]),
-  ]);
+      // Documentos por socio. Un socio se considera completo si tiene al menos
+      // un documento de cada uno de los 3 tipos requeridos (mismo criterio que
+      // dashboard/page.tsx).
+      profileIds.length > 0
+        ? db
+            .select({ profileId: documentos.profileId, tipo: documentos.tipo })
+            .from(documentos)
+            .where(inArray(documentos.profileId, profileIds as string[]))
+        : Promise.resolve([] as { profileId: string; tipo: string | null }[]),
+
+      profileIds.length > 0
+        ? db
+            .select({
+              socioId: invitados.socioId,
+              id: invitados.id,
+              nombre: invitados.nombre,
+              apellido: invitados.apellido,
+              estado: invitados.estado,
+              validoHasta: invitados.validoHasta,
+            })
+            .from(invitados)
+            .where(
+              and(
+                inArray(invitados.socioId, profileIds as string[]),
+                eq(invitados.guarderiaId, gId),
+                eq(invitados.estado, 'activo'),
+              ),
+            )
+        : Promise.resolve(
+            [] as {
+              socioId: string | null;
+              id: string;
+              nombre: string;
+              apellido: string | null;
+              estado: 'activo' | 'inactivo' | null;
+              validoHasta: Date | null;
+            }[],
+          ),
+
+      profileIds.length > 0
+        ? db
+            .select({
+              socioId: porteria.socioId,
+              id: porteria.id,
+              desde: porteria.desde,
+              motivo: porteria.motivo,
+            })
+            .from(porteria)
+            .where(
+              and(
+                inArray(porteria.socioId, profileIds as string[]),
+                eq(porteria.guarderiaId, gId),
+                eq(porteria.tipo, 'acceso_externo'),
+              ),
+            )
+            .orderBy(desc(porteria.createdAt))
+        : Promise.resolve(
+            [] as {
+              socioId: string | null;
+              id: string;
+              desde: Date | null;
+              motivo: string | null;
+            }[],
+          ),
+    ]);
 
   const embByProfile: Record<string, string> = {};
   for (const e of embarcacionesList) {
@@ -134,7 +192,7 @@ export default async function UsuariosPage({
   const ubicacionByProfile: Record<string, string> = {};
   for (const e of espaciosList) {
     if (!e.ocupanteId || ubicacionByProfile[e.ocupanteId]) continue;
-    const partes = [e.areaNombre, e.nomenclatura].filter(Boolean);
+    const partes = [e.areaNombre, e.ladoNombre, e.nomenclatura].filter(Boolean);
     ubicacionByProfile[e.ocupanteId] = partes.join(' · ') || '—';
   }
 
@@ -154,6 +212,34 @@ export default async function UsuariosPage({
       if (m.fecha && m.fecha <= dosMesesAtras) morososSet.add(m.socioId);
     }
     haberBySocio.set(m.socioId, (haberBySocio.get(m.socioId) ?? 0) + haber);
+  }
+
+  const invitadosBySocio = new Map<
+    string,
+    { id: string; nombre: string; apellido: string | null; validoHasta: string | null }[]
+  >();
+  for (const inv of invitadosList) {
+    if (!inv.socioId) continue;
+    if (!invitadosBySocio.has(inv.socioId)) invitadosBySocio.set(inv.socioId, []);
+    invitadosBySocio.get(inv.socioId)!.push({
+      id: inv.id,
+      nombre: inv.nombre,
+      apellido: inv.apellido,
+      validoHasta: inv.validoHasta?.toISOString() ?? null,
+    });
+  }
+
+  const accesosBySocio = new Map<
+    string,
+    { id: string; desde: string | null; motivo: string | null }[]
+  >();
+  for (const acc of accesosList) {
+    if (!acc.socioId) continue;
+    if (!accesosBySocio.has(acc.socioId)) accesosBySocio.set(acc.socioId, []);
+    const arr = accesosBySocio.get(acc.socioId)!;
+    if (arr.length < 5) {
+      arr.push({ id: acc.id, desde: acc.desde?.toISOString() ?? null, motivo: acc.motivo });
+    }
   }
 
   const TIPOS_REQUERIDOS = new Set(['carnet_nautico', 'matricula', 'seguro']);
@@ -178,6 +264,8 @@ export default async function UsuariosPage({
       embarcacion: s.profileId ? (embByProfile[s.profileId] ?? null) : null,
       ubicacion: s.profileId ? (ubicacionByProfile[s.profileId] ?? null) : null,
       docsCompletos,
+      invitados: invitadosBySocio.get(s.profileId) ?? [],
+      accesosExternos: accesosBySocio.get(s.profileId) ?? [],
     };
   });
 
