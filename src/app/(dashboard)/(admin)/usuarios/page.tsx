@@ -10,6 +10,7 @@ import {
   memberships,
   movimientosCuentaCorriente,
   porteria,
+  porteriaInvitados,
   profiles,
 } from '@/lib/db/schema';
 import { and, desc, eq, inArray } from 'drizzle-orm';
@@ -161,8 +162,12 @@ export default async function UsuariosPage({
               id: porteria.id,
               desde: porteria.desde,
               motivo: porteria.motivo,
+              invitadoNombre: invitados.nombre,
+              invitadoApellido: invitados.apellido,
             })
             .from(porteria)
+            .leftJoin(porteriaInvitados, eq(porteriaInvitados.porteriaId, porteria.id))
+            .leftJoin(invitados, eq(invitados.id, porteriaInvitados.invitadoId))
             .where(
               and(
                 inArray(porteria.socioId, profileIds as string[]),
@@ -177,6 +182,8 @@ export default async function UsuariosPage({
               id: string;
               desde: Date | null;
               motivo: string | null;
+              invitadoNombre: string | null;
+              invitadoApellido: string | null;
             }[],
           ),
     ]);
@@ -231,14 +238,18 @@ export default async function UsuariosPage({
 
   const accesosBySocio = new Map<
     string,
-    { id: string; desde: string | null; motivo: string | null }[]
+    { id: string; nombre: string | null; desde: string | null }[]
   >();
+  const accesosIdsSeen = new Set<string>();
   for (const acc of accesosList) {
-    if (!acc.socioId) continue;
+    if (!acc.socioId || accesosIdsSeen.has(acc.id)) continue;
+    accesosIdsSeen.add(acc.id);
     if (!accesosBySocio.has(acc.socioId)) accesosBySocio.set(acc.socioId, []);
     const arr = accesosBySocio.get(acc.socioId)!;
     if (arr.length < 5) {
-      arr.push({ id: acc.id, desde: acc.desde?.toISOString() ?? null, motivo: acc.motivo });
+      const nombre =
+        [acc.invitadoNombre, acc.invitadoApellido].filter(Boolean).join(' ') || acc.motivo || null;
+      arr.push({ id: acc.id, nombre, desde: acc.desde?.toISOString() ?? null });
     }
   }
 

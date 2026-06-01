@@ -877,6 +877,7 @@ function EmbarcacionesTab({
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [agregando, setAgregando] = useState(false);
   const [form, setForm] = useState(EMBARCACION_VACIA);
+  const [esloraUnidad, setEsloraUnidad] = useState<'m' | 'ft'>('m');
   const [error, setError] = useState<string | null>(null);
   const [isSaving, startSaving] = useTransition();
 
@@ -884,6 +885,7 @@ function EmbarcacionesTab({
     setError(null);
     setEditandoId(e.id);
     setAgregando(false);
+    setEsloraUnidad('m');
     setForm({
       nombre: e.nombre,
       matricula: e.matricula ?? '',
@@ -897,6 +899,7 @@ function EmbarcacionesTab({
     setEditandoId(null);
     setAgregando(false);
     setForm(EMBARCACION_VACIA);
+    setEsloraUnidad('m');
     setError(null);
   }
 
@@ -904,6 +907,7 @@ function EmbarcacionesTab({
     setError(null);
     setEditandoId(null);
     setForm(EMBARCACION_VACIA);
+    setEsloraUnidad('m');
     setAgregando(true);
   }
 
@@ -915,10 +919,28 @@ function EmbarcacionesTab({
       }));
   }
 
+  function switchEsloraUnidad(nueva: 'm' | 'ft') {
+    if (nueva === esloraUnidad) return;
+    setForm((f) => {
+      const n = parseFloat(f.esloraM);
+      if (!f.esloraM || isNaN(n)) return f;
+      const converted = nueva === 'ft' ? n * 3.28084 : n * 0.3048;
+      return { ...f, esloraM: converted.toFixed(2) };
+    });
+    setEsloraUnidad(nueva);
+  }
+
+  function esloraParaGuardar(): string {
+    if (esloraUnidad === 'm') return form.esloraM;
+    const n = parseFloat(form.esloraM);
+    if (isNaN(n)) return '';
+    return (n * 0.3048).toFixed(2);
+  }
+
   function guardarEdicion(id: string) {
     setError(null);
     startSaving(async () => {
-      const res = await updateEmbarcacionAction({ id, ...form });
+      const res = await updateEmbarcacionAction({ id, ...form, esloraM: esloraParaGuardar() });
       if (res.error) {
         setError(res.error);
         return;
@@ -931,7 +953,11 @@ function EmbarcacionesTab({
   function guardarNueva() {
     setError(null);
     startSaving(async () => {
-      const res = await createEmbarcacionAction({ socioId, ...form });
+      const res = await createEmbarcacionAction({
+        socioId,
+        ...form,
+        esloraM: esloraParaGuardar(),
+      });
       if (res.error) {
         setError(res.error);
         return;
@@ -1060,17 +1086,43 @@ function EmbarcacionesTab({
               )}
             </div>
             <div>
-              <label className="mb-1.5 block text-xs font-semibold text-gray-500">Eslora (m)</label>
+              <label className="mb-1.5 block text-xs font-semibold text-gray-500">Eslora</label>
               {editando || agregando ? (
-                <input
-                  className={inputCls}
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="ej: 9.50"
-                  value={form.esloraM}
-                  onChange={setField('esloraM')}
-                />
+                <div className="flex gap-2">
+                  <input
+                    className={inputCls}
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder={esloraUnidad === 'm' ? 'ej: 9.50' : 'ej: 31.2'}
+                    value={form.esloraM}
+                    onChange={setField('esloraM')}
+                  />
+                  <div className="flex shrink-0 overflow-hidden rounded-[10px] border border-gray-200">
+                    <button
+                      type="button"
+                      onClick={() => switchEsloraUnidad('m')}
+                      className={`px-3 text-xs font-semibold transition ${
+                        esloraUnidad === 'm'
+                          ? 'bg-[#175861] text-white'
+                          : 'bg-white text-gray-500 hover:bg-gray-50'
+                      }`}
+                    >
+                      m
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => switchEsloraUnidad('ft')}
+                      className={`px-3 text-xs font-semibold transition ${
+                        esloraUnidad === 'ft'
+                          ? 'bg-[#175861] text-white'
+                          : 'bg-white text-gray-500 hover:bg-gray-50'
+                      }`}
+                    >
+                      ft
+                    </button>
+                  </div>
+                </div>
               ) : (
                 <p className="text-sm" style={{ color: '#101828' }}>
                   {embarcacion?.esloraM ? `${embarcacion.esloraM} m` : '—'}

@@ -39,8 +39,8 @@ type InvitadoItem = {
 
 type AccesoItem = {
   id: string;
+  nombre: string | null;
   desde: string | null;
-  motivo: string | null;
 };
 
 type Socio = {
@@ -885,18 +885,10 @@ export function UsuariosClient({
                                   ) : (
                                     <div className="space-y-1.5">
                                       {s.invitados.map((inv) => (
-                                        <div
-                                          key={inv.id}
-                                          className="flex items-center justify-between gap-2"
-                                        >
+                                        <div key={inv.id} className="flex items-center gap-2">
                                           <span className="text-xs text-gray-700">
                                             {[inv.nombre, inv.apellido].filter(Boolean).join(' ')}
                                           </span>
-                                          {inv.validoHasta && (
-                                            <span className="text-xs text-gray-400">
-                                              hasta {formatArgentinaDate(inv.validoHasta)}
-                                            </span>
-                                          )}
                                         </div>
                                       ))}
                                     </div>
@@ -913,12 +905,15 @@ export function UsuariosClient({
                                   ) : (
                                     <div className="space-y-1.5">
                                       {s.accesosExternos.map((acc) => (
-                                        <div key={acc.id} className="flex items-center gap-3">
+                                        <div
+                                          key={acc.id}
+                                          className="flex items-center justify-between gap-2"
+                                        >
+                                          <span className="text-xs text-gray-700">
+                                            {acc.nombre ?? '—'}
+                                          </span>
                                           <span className="text-xs text-gray-400">
                                             {acc.desde ? formatArgentinaDate(acc.desde) : '—'}
-                                          </span>
-                                          <span className="text-xs text-gray-700">
-                                            {acc.motivo ?? '—'}
                                           </span>
                                         </div>
                                       ))}
