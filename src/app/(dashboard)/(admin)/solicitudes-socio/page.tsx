@@ -34,13 +34,22 @@ export default async function SolicitudesSocioPage() {
   const embarcacionesRows =
     solicitanteIds.length > 0
       ? await db
-          .select({ profileId: embarcaciones.profileId })
+          .select({
+            profileId: embarcaciones.profileId,
+            modelo: embarcaciones.modelo,
+            esloraM: embarcaciones.esloraM,
+          })
           .from(embarcaciones)
           .where(inArray(embarcaciones.profileId, solicitanteIds))
       : [];
-  const solicitantesConEmbarcacion = new Set(
-    embarcacionesRows.map((e) => e.profileId).filter((id): id is string => id != null),
-  );
+
+  // Primera embarcación por socio (la más relevante para mostrar)
+  const embarcacionPorSocio = new Map<string, { modelo: string | null; esloraM: string | null }>();
+  for (const e of embarcacionesRows) {
+    if (e.profileId && !embarcacionPorSocio.has(e.profileId)) {
+      embarcacionPorSocio.set(e.profileId, { modelo: e.modelo, esloraM: e.esloraM });
+    }
+  }
 
   const solicitudes = rows.map((r) => ({
     id: r.id,
@@ -53,7 +62,8 @@ export default async function SolicitudesSocioPage() {
     apellido: r.solicitanteApellido,
     email: r.solicitanteEmail,
     telefono: r.solicitanteTelefono,
-    tieneEmbarcacion: solicitantesConEmbarcacion.has(r.solicitanteId),
+    tieneEmbarcacion: embarcacionPorSocio.has(r.solicitanteId),
+    embarcacion: embarcacionPorSocio.get(r.solicitanteId) ?? null,
   }));
 
   return <SolicitudesSocioClient solicitudes={solicitudes} />;

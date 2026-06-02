@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { AlertTriangle, Check, Mail, Phone, UserCheck, UserX, X } from 'lucide-react';
+import { AlertTriangle, Anchor, Check, Mail, Phone, UserCheck, UserX, X } from 'lucide-react';
 
 import {
   aprobarSolicitudAction,
@@ -24,6 +24,7 @@ type Solicitud = {
   email: string;
   telefono: string | null;
   tieneEmbarcacion: boolean;
+  embarcacion: { modelo: string | null; esloraM: string | null } | null;
 };
 
 type Tab = 'pendientes' | 'resueltas';
@@ -214,6 +215,21 @@ function SolicitudCard({
               <p className="flex items-center gap-2">
                 <Phone className="h-3.5 w-3.5 shrink-0 text-gray-400" />
                 <span className="truncate">{solicitud.telefono}</span>
+              </p>
+            ) : null}
+            {solicitud.embarcacion ? (
+              <p className="flex items-center gap-2">
+                <Anchor className="h-3.5 w-3.5 shrink-0 text-gray-400" />
+                <span className="truncate">
+                  {[
+                    solicitud.embarcacion.modelo,
+                    solicitud.embarcacion.esloraM
+                      ? `${parseFloat(solicitud.embarcacion.esloraM).toFixed(1)} m`
+                      : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ') || 'Embarcación sin datos'}
+                </span>
               </p>
             ) : null}
           </div>
