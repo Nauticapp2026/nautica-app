@@ -134,7 +134,7 @@ const TABS = [
   { id: 'generales', label: 'Generales', icon: User },
   { id: 'embarcacion', label: 'Embarcación', icon: Anchor },
   { id: 'cuenta-corriente', label: 'Cuenta Corriente', icon: CreditCard },
-  { id: 'facturacion', label: 'Facturación', icon: DollarSign },
+  { id: 'facturacion', label: 'Comprobantes', icon: DollarSign },
   { id: 'navegantes', label: 'Navegantes', icon: Users },
   { id: 'salidas', label: 'Salidas', icon: Clock },
   { id: 'documentacion', label: 'Documentación', icon: FileText },
@@ -548,7 +548,7 @@ function AgregarServicioModal({
         <div className="flex items-start justify-between p-6 pb-4">
           <div>
             <h2 className="text-[18px] font-bold" style={{ color: '#101828' }}>
-              Agregar servicio
+              Cargar consumo
             </h2>
             <p className="mt-0.5 text-sm" style={{ color: '#669E9D' }}>
               Registre el servicio consumido por {socioNombre}
@@ -634,7 +634,7 @@ function AgregarServicioModal({
               className="flex-1 rounded-[10px] py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
               style={{ background: '#175861' }}
             >
-              {isPending ? 'Guardando...' : 'Agregar servicio'}
+              {isPending ? 'Guardando...' : 'Cargar consumo'}
             </button>
           </div>
         </div>
@@ -699,7 +699,7 @@ function InformarPagoModal({
         <div className="flex items-start justify-between p-6 pb-4">
           <div>
             <h2 className="text-[18px] font-bold" style={{ color: '#101828' }}>
-              Informar pago
+              Registrar pago
             </h2>
             <p className="mt-0.5 text-sm" style={{ color: '#669E9D' }}>
               Registre un pago a cuenta de {socioNombre}
@@ -1881,14 +1881,14 @@ export function SocioDetail({
                 onClick={() => setModalInformarPagoOpen(true)}
                 className="shrink-0 justify-center rounded-[10px] border border-[#d1d5dc] px-4 py-2 text-sm font-medium text-[#364153] transition hover:bg-gray-50"
               >
-                Informar pago
+                Registrar pago
               </button>
               <button
                 onClick={() => setModalServicioOpen(true)}
                 className="shrink-0 justify-center rounded-[10px] px-4 py-2 text-sm font-medium text-white transition hover:opacity-90"
                 style={{ background: '#175861' }}
               >
-                Agregar servicio
+                Cargar consumo
               </button>
             </div>
           </div>
@@ -2124,9 +2124,16 @@ export function SocioDetail({
                   className="flex items-start justify-between gap-4 rounded-[10px] border border-gray-200 bg-white px-4 py-3"
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold text-[#101828]">
-                      {s.embarcacion ?? 'Sin embarcación'}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <p className="truncate text-sm font-semibold text-[#101828]">
+                        {s.embarcacion ?? 'Sin embarcación'}
+                      </p>
+                      {s.estado === 'revocado' && (
+                        <span className="shrink-0 rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-medium text-red-600">
+                          Cancelada
+                        </span>
+                      )}
+                    </div>
                     <div className="mt-1 grid grid-cols-1 gap-x-4 gap-y-0.5 text-xs text-gray-500 sm:grid-cols-3">
                       <span>
                         <strong className="text-gray-400">Salida: </strong>

@@ -61,7 +61,7 @@ const NAV_BY_VARIANT: Record<SidebarVariant, SidebarItem[]> = {
     { href: '/espacios', label: 'Espacios', icon: Anchor },
     { href: '/publicaciones', label: 'Publicaciones', icon: Newspaper },
     { href: '/comunicaciones', label: 'Comunicaciones', icon: MessageSquare },
-    { href: '/facturacion', label: 'Facturación', icon: FileText },
+    { href: '/facturacion', label: 'Comprobantes', icon: FileText },
     { href: '/tarifario', label: 'Tarifario', icon: Tag },
     { href: '/configuracion', label: 'Configuración', icon: Settings },
   ],

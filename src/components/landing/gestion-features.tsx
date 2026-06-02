@@ -2,7 +2,7 @@ import Image from 'next/image';
 import { Check } from 'lucide-react';
 
 const features = [
-  'Facturación',
+  'Comprobantes',
   'Venta de amarras y camas',
   'Sistema de roles',
   'Visualización de tareas en tiempo real',

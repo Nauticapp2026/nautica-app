@@ -1028,7 +1028,7 @@ export function FacturacionClient({
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="page-title">Facturación</h1>
+          <h1 className="page-title">Comprobantes</h1>
           <p className="page-subtitle mt-1">Gestión de facturas y cobros</p>
         </div>
         <div className="flex shrink-0 flex-wrap gap-2">
