@@ -74,4 +74,5 @@ export const FORMA_PAGO_LABEL: Record<string, string> = {
   debito_automatico: 'Débito automático',
   transferencia: 'Transferencia',
   cheque: 'Cheque',
+  mercado_pago: 'Mercado Pago',
 };

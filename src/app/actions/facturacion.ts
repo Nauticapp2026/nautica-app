@@ -108,6 +108,7 @@ function precioSinIva(total: number, alicuota: string): number {
 }
 
 function buildCliente(p: {
+  id: string;
   email: string;
   nombre: string | null;
   apellido: string | null;
@@ -124,16 +125,17 @@ function buildCliente(p: {
   const condicionPago = CONDICION_PAGO_API[p.condicionVenta] ?? '201';
 
   return {
+    codigo: p.id,
     documento_tipo: TIPO_DOC_API[p.tipoDocumento ?? ''] ?? 'OTRO',
     documento_nro: p.numeroDocumento ?? '',
     razon_social: razon,
     email: p.email,
     domicilio: p.direccion ?? '',
-    provincia: '1', // CABA por defecto — TODO: hacer configurable por guardería/socio
+    provincia: '1',
     envia_por_mail: 'S',
     reclama_deuda: 'N',
+    rg5329: 'N',
     condicion_pago: condicionPago,
-    // Si condicionVenta = 'otros' (código 214), AFIP requiere descripción adicional.
     ...(condicionPago === '214' ? { condicion_pago_otra: 'Otros' } : {}),
     condicion_iva: CONDICION_IVA_API[p.condicionIva ?? ''] ?? 'CF',
     condicion_iva_operacion: '1',
@@ -147,14 +149,18 @@ function buildDetalle(
   const alicuota = alicuotaPara(tipo);
   return items.map((it) => ({
     cantidad: it.cantidad,
+    afecta_stock: 'N' as const,
     producto: {
       descripcion: it.descripcion,
       codigo: 'NAUT-001',
       lista_precios: 'standard',
       leyenda: '',
       unidad_bulto: 1,
+      unidad_medida: 7,
       alicuota,
       precio_unitario_sin_iva: precioSinIva(it.importeUnitario, alicuota),
+      actualiza_precio: 'N' as const,
+      rg5329: 'N' as const,
     },
     leyenda: '',
     tratamiento_descuento: 'A',
@@ -354,6 +360,7 @@ export async function crearFacturaCore(
     fecha: toTusFecha(data.fecha),
     vencimiento: toTusFecha(data.vencimiento),
     tipo: TIPO_FACTURA_API[data.tipoFactura],
+    idioma: 1,
     external_reference: facturaId,
     operacion: 'V',
     punto_venta: puntoVenta,
@@ -799,6 +806,7 @@ export async function emitirNotaCreditoAction(data: EmitirNcData): Promise<Emiti
   const [guarderia] = await db
     .select({
       puntoDeVenta: guarderias.puntoDeVenta,
+      cuit: guarderias.cuit,
       rubro: guarderias.rubro,
       tusfacturasApikey: guarderias.tusfacturasApikey,
       tusfacturasApitoken: guarderias.tusfacturasApitoken,
@@ -843,14 +851,15 @@ export async function emitirNotaCreditoAction(data: EmitirNcData): Promise<Emiti
     tipo_comprobante: TIPO_FACTURA_API[tipoOriginal],
     punto_venta: puntoVentaStr,
     numero: numeroStr,
-    cae: original.cae,
-    fecha: toTusFecha(original.emision),
+    comprobante_fecha: toTusFecha(original.emision),
+    cuit: (guarderia.cuit ?? '').replace(/[-\s]/g, ''),
   };
 
   const ncComprobante: TusFacturasComprobante = {
     fecha: hoy,
     vencimiento: hoy,
     tipo: TIPO_NC_API[tipoOriginal],
+    idioma: 1,
     external_reference: ncId,
     operacion: 'V',
     punto_venta: String(guarderia.puntoDeVenta),
@@ -869,7 +878,7 @@ export async function emitirNotaCreditoAction(data: EmitirNcData): Promise<Emiti
       formas_pago: [{ descripcion: 'Nota de crédito', importe: ncImporte }],
       total: ncImporte,
     },
-    asociados: [asociado],
+    comprobantes_asociados: [asociado],
   };
 
   let apiResponse;

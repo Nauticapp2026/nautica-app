@@ -17,6 +17,7 @@ export type TusFacturasCredentials = {
 };
 
 export type TusFacturasCliente = {
+  codigo: string; // identificador único del cliente en TF (usamos el UUID del socio)
   documento_tipo: string; // 'DNI' | 'CUIT' | 'CUIL' | 'PASAPORTE' | 'CDI' | 'OTRO'
   documento_nro: string;
   razon_social: string;
@@ -26,21 +27,26 @@ export type TusFacturasCliente = {
   condicion_pago_otra?: string; // requerido si condicion_pago === '214' (Otra)
   envia_por_mail: 'S' | 'N';
   reclama_deuda: 'S' | 'N';
+  rg5329: 'S' | 'N';
   condicion_pago: string; // '201' contado, '211' 30 días, etc.
   condicion_iva: string; // 'CF' | 'RI' | 'M' | 'E' | 'CDEX' | 'IVNA' | 'PDEX'
-  condicion_iva_operacion: string; // '1' Gravada
+  condicion_iva_operacion: string;
 };
 
 export type TusFacturasDetalleItem = {
   cantidad: number;
+  afecta_stock: 'S' | 'N';
   producto: {
     descripcion: string;
     codigo: string;
     lista_precios: string; // 'standard'
     leyenda: string;
     unidad_bulto: number;
+    unidad_medida: number; // 7 = unidades (tabla AFIP)
     alicuota: string; // '21'
     precio_unitario_sin_iva: number;
+    actualiza_precio: 'S' | 'N';
+    rg5329: 'S' | 'N';
   };
   leyenda: string;
   tratamiento_descuento: string; // 'A'
@@ -56,14 +62,15 @@ export type TusFacturasComprobanteAsociado = {
   tipo_comprobante: string; // 'FACTURA A' | 'FACTURA B' | 'FACTURA C'
   punto_venta: string; // '00005'
   numero: string; // '00000001'
-  cae: string;
-  fecha: string; // 'DD/MM/YYYY'
+  comprobante_fecha: string; // 'DD/MM/YYYY'
+  cuit: string; // CUIT del emisor del comprobante original (la guardería)
 };
 
 export type TusFacturasComprobante = {
   fecha: string; // 'DD/MM/YYYY'
   vencimiento: string; // 'DD/MM/YYYY'
   tipo: string; // 'FACTURA A' | 'NOTA DE CREDITO A' | ...
+  idioma: number; // 1 = Español
   external_reference: string;
   operacion: 'V'; // Venta
   punto_venta: string;
@@ -80,7 +87,7 @@ export type TusFacturasComprobante = {
     total: number;
   };
   /** Solo para NC — referencia a la factura original */
-  asociados?: TusFacturasComprobanteAsociado[];
+  comprobantes_asociados?: TusFacturasComprobanteAsociado[];
 };
 
 export type TusFacturasNuevaFacturaInput = {
