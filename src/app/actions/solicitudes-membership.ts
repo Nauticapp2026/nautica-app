@@ -7,7 +7,7 @@ import { embarcaciones, guarderias, profiles, solicitudesMembership } from '@/li
 import { getActiveMarina } from '@/lib/auth/session';
 import { sendEmail } from '@/lib/email/resend';
 import { solicitudAprobadaEmail } from '@/lib/email/templates/solicitud-aprobada';
-import { sendPushToUser } from '@/lib/push-notifications';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 // El trigger SQL `_on_solicitud_membership_resolved` (mig mobile 0038) se encarga
 // de crear la membership rol='socio' cuando la solicitud pasa a 'aprobada'. Acá
@@ -157,7 +157,7 @@ export async function rechazarSolicitudAction(
     return { error: 'No pudimos rechazar la solicitud. Intentá de nuevo.' };
   }
 
-  // Notificación push al solicitante. Fire-and-forget.
+  // Notificación in-app al solicitante. Fire-and-forget.
   try {
     const [row] = await db
       .select({ nombre: guarderias.nombre })
@@ -166,15 +166,18 @@ export async function rechazarSolicitudAction(
       .limit(1);
 
     if (row?.nombre) {
-      await sendPushToUser({
-        userId: check.solicitanteId,
-        title: 'Solicitud no aceptada',
-        body: `Ups! ${row.nombre} no aceptó tu solicitud. Te invitamos a seguir mirando, seguro hay otros clubes que te están esperando.`,
-        data: { tipo: 'solicitud_rechazada', guarderiaId: check.gId },
+      const adminClient = createAdminClient();
+      await adminClient.from('notificaciones').insert({
+        user_id: check.solicitanteId,
+        tipo: 'solicitud_rechazada',
+        payload: {
+          guarderia_id: check.gId,
+          guarderia_nombre: row.nombre,
+        },
       });
     }
   } catch (err) {
-    console.error('[rechazarSolicitudAction] push error:', err);
+    console.error('[rechazarSolicitudAction] notif error:', err);
   }
 
   return {};
