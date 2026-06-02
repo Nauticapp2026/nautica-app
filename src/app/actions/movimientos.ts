@@ -187,7 +187,9 @@ export type InformarPagoData = {
   datosPago?: Record<string, unknown>;
 };
 
-export async function informarPagoAction(data: InformarPagoData): Promise<{ error?: string }> {
+export async function informarPagoAction(
+  data: InformarPagoData,
+): Promise<{ error?: string; movimientoId?: string; concepto?: string; importe?: string }> {
   const ctx = await getActiveMarina();
   if (!ctx) return { error: 'No autenticado' };
   if (!isAdmin(ctx)) return { error: 'Solo administradores pueden informar pagos.' };
@@ -212,20 +214,23 @@ export async function informarPagoAction(data: InformarPagoData): Promise<{ erro
 
   try {
     const importe = monto.toFixed(2);
-    await db.insert(movimientosCuentaCorriente).values({
-      socioId: data.socioId,
-      concepto,
-      tipo: 'otro',
-      estado: 'pagado',
-      debe: '0',
-      haber: importe,
-      importeSigned: `-${importe}`,
-      fecha: data.fecha ? new Date(data.fecha) : new Date(),
-      formaDePago: data.formaDePago as never,
-      datosPago: data.datosPago ?? null,
-    });
+    const [inserted] = await db
+      .insert(movimientosCuentaCorriente)
+      .values({
+        socioId: data.socioId,
+        concepto,
+        tipo: 'otro',
+        estado: 'pagado',
+        debe: '0',
+        haber: importe,
+        importeSigned: `-${importe}`,
+        fecha: data.fecha ? new Date(data.fecha) : new Date(),
+        formaDePago: data.formaDePago as never,
+        datosPago: data.datosPago ?? null,
+      })
+      .returning({ id: movimientosCuentaCorriente.id });
     revalidatePath(`/usuarios/${data.socioId}`);
-    return {};
+    return { movimientoId: inserted.id, concepto, importe };
   } catch {
     return { error: 'Error al registrar el pago.' };
   }

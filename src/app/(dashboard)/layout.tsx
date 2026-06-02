@@ -1,8 +1,11 @@
 import { redirect } from 'next/navigation';
+import { and, count, eq } from 'drizzle-orm';
 import { getActiveMarina, getPostLoginRedirect } from '@/lib/auth/session';
 import { yaAceptoVersionVigente } from '@/lib/auth/terminos';
 import { Sidebar } from '@/components/shared/sidebar';
 import { GuarderiaInactivaScreen } from '@/components/shared/guarderia-inactiva-screen';
+import { db } from '@/lib/db';
+import { solicitudesMembership } from '@/lib/db/schema';
 
 // Roles con acceso al dashboard web. El resto (socio, invitado, etc.)
 // se gestiona desde la app mobile.
@@ -44,6 +47,16 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   const userInitial = (profile.nombre?.[0] ?? profile.email[0]).toUpperCase();
 
+  const [{ pendientes }] = await db
+    .select({ pendientes: count() })
+    .from(solicitudesMembership)
+    .where(
+      and(
+        eq(solicitudesMembership.guarderiaId, activeMembership.guarderiaId),
+        eq(solicitudesMembership.estado, 'pendiente'),
+      ),
+    );
+
   return (
     <div className="flex min-h-screen flex-col bg-[#F9FAFB] md:flex-row">
       <Sidebar
@@ -51,6 +64,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         userName={userName}
         userInitial={userInitial}
         rol={activeMembership.rol}
+        pendingSolicitudes={pendientes}
       />
       <main className="min-w-0 flex-1 overflow-auto">{children}</main>
     </div>

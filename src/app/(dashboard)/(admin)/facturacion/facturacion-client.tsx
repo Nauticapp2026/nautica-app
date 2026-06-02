@@ -2,15 +2,32 @@
 
 import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { AlertCircle, CheckCircle2, Download, Edit3, FileText, Plus, Send, X } from 'lucide-react';
+import {
+  AlertCircle,
+  CheckCircle2,
+  CornerDownLeft,
+  Download,
+  Edit3,
+  FileDown,
+  FileText,
+  Plus,
+  Printer,
+  Send,
+  Trash2,
+  X,
+} from 'lucide-react';
 
 import {
   createBatchInvoicesAction,
   createInvoiceAction,
+  emitirNotaCreditoAction,
   getSocioPendientesAction,
   markInvoicePaidAction,
+  ventanillaEmitirFacturaAction,
   type BatchResult,
+  type EmitirNcMotivo,
   type MovimientoPendiente,
+  type VentanillaItem,
 } from '@/app/actions/facturacion';
 import { formatArgentinaDate } from '@/lib/dates';
 import { EmptyState } from '@/components/shared/empty-state';
@@ -31,6 +48,8 @@ type Factura = {
   descripcion: string | null;
   socioId: string | null;
   socioNombre: string;
+  cae: string | null;
+  facturaOriginalId: string | null;
 };
 
 type Socio = {
@@ -61,6 +80,10 @@ const TIPO_FACTURA_LABEL: Record<string, string> = {
   factura_a: 'A',
   factura_b: 'B',
   factura_c: 'C',
+  recibo: 'Recibo',
+  nota_credito_a: 'NC A',
+  nota_credito_b: 'NC B',
+  nota_credito_c: 'NC C',
 };
 
 const TIPO_FACTURA_OPTS = [
@@ -978,6 +1001,546 @@ function MarcarPagadaModal({
   );
 }
 
+// ─── Modal: nota de crédito ────────────────────────────────────────────────
+
+const MOTIVO_OPTS = [
+  { value: 'anulacion_total', label: 'Anulación total' },
+  { value: 'descuento_parcial', label: 'Descuento parcial' },
+  { value: 'devolucion_servicio', label: 'Devolución de servicio' },
+];
+
+function NotaCreditoModal({
+  open,
+  onClose,
+  factura,
+}: {
+  open: boolean;
+  onClose: () => void;
+  factura: Factura | null;
+}) {
+  const router = useRouter();
+  const [motivo, setMotivo] = useState<EmitirNcMotivo>('anulacion_total');
+  const [importe, setImporte] = useState('');
+  const [descripcion, setDescripcion] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<{ comprobanteNro?: string; pdfUrl?: string } | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  if (!open || !factura) return null;
+
+  const importeOriginal = parseFloat(factura.importe ?? '0');
+  const needsImporte = motivo !== 'anulacion_total';
+
+  function handleSubmit() {
+    if (!factura) return;
+    setError(null);
+    const importeNum = needsImporte ? parseFloat(importe.replace(',', '.')) : undefined;
+    startTransition(async () => {
+      const res = await emitirNotaCreditoAction({
+        facturaOriginalId: factura.id,
+        motivo,
+        importe: importeNum,
+        descripcion: descripcion || undefined,
+      });
+      if (res.error) {
+        setError(res.error);
+      } else {
+        setResult({ comprobanteNro: res.comprobanteNro, pdfUrl: res.pdfUrl });
+        router.refresh();
+      }
+    });
+  }
+
+  function handleClose() {
+    setMotivo('anulacion_total');
+    setImporte('');
+    setDescripcion('');
+    setError(null);
+    setResult(null);
+    onClose();
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl">
+        <div className="flex items-start justify-between p-6 pb-4">
+          <div>
+            <h2 className="text-[18px] font-bold" style={{ color: '#101828' }}>
+              Emitir Nota de Crédito
+            </h2>
+            <p className="mt-0.5 text-sm" style={{ color: '#669E9D' }}>
+              Comprobante {factura.codigo ?? factura.id.slice(0, 8)} — {fmtMoney(factura.importe)}
+            </p>
+          </div>
+          <button
+            onClick={handleClose}
+            className="rounded-[8px] p-1 text-gray-400 hover:bg-gray-100"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="border-t border-gray-200" />
+
+        {result ? (
+          <div className="space-y-4 p-6">
+            <div className="flex items-center gap-3 rounded-[10px] bg-teal-50 p-4">
+              <CheckCircle2 className="h-5 w-5 shrink-0 text-teal-600" />
+              <div>
+                <p className="font-semibold text-teal-900">NC emitida correctamente</p>
+                {result.comprobanteNro && (
+                  <p className="text-sm text-teal-700">Nro: {result.comprobanteNro}</p>
+                )}
+              </div>
+            </div>
+            {result.pdfUrl && (
+              <a
+                href={result.pdfUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex w-full items-center justify-center gap-2 rounded-[10px] border border-gray-200 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                <Download className="h-4 w-4" />
+                Descargar PDF
+              </a>
+            )}
+            <button
+              onClick={handleClose}
+              className="w-full rounded-[10px] py-2.5 text-sm font-semibold text-white transition hover:opacity-90"
+              style={{ background: '#175861' }}
+            >
+              Cerrar
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="space-y-4 p-6">
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
+                  Motivo
+                </label>
+                <select
+                  className={inputCls}
+                  value={motivo}
+                  onChange={(e) => {
+                    setMotivo(e.target.value as EmitirNcMotivo);
+                    setImporte('');
+                  }}
+                >
+                  {MOTIVO_OPTS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {needsImporte && (
+                <div>
+                  <label
+                    className="mb-1.5 block text-xs font-semibold"
+                    style={{ color: '#101828' }}
+                  >
+                    Importe a acreditar
+                    <span className="ml-1 font-normal text-gray-400">
+                      (máx. {fmtMoney(factura.importe)})
+                    </span>
+                  </label>
+                  <input
+                    className={inputCls}
+                    inputMode="decimal"
+                    placeholder={`0,00 (máx ${importeOriginal.toFixed(2)})`}
+                    value={importe}
+                    onChange={(e) => setImporte(e.target.value)}
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
+                  Descripción (opcional)
+                </label>
+                <input
+                  className={inputCls}
+                  placeholder="Se auto-genera si se deja vacío"
+                  value={descripcion}
+                  onChange={(e) => setDescripcion(e.target.value)}
+                />
+              </div>
+
+              {error && (
+                <div className="flex items-start gap-2 rounded-[10px] bg-red-50 p-3 text-sm text-red-700">
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span>{error}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="border-t border-gray-200 p-6">
+              <div className="flex gap-3">
+                <button
+                  onClick={handleClose}
+                  className="flex-1 rounded-[10px] border border-[#d1d5dc] bg-white py-2.5 text-sm font-medium text-[#364153] transition hover:bg-gray-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleSubmit}
+                  disabled={isPending || (needsImporte && !importe)}
+                  className="flex-1 rounded-[10px] py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+                  style={{ background: '#175861' }}
+                >
+                  {isPending ? 'Emitiendo...' : 'Emitir NC'}
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Modal: ventanilla (consumo + factura en un paso) ─────────────────────
+
+type LineaItem = { descripcion: string; cantidad: string; importe: string };
+
+function VentanillaModal({
+  open,
+  onClose,
+  socios,
+}: {
+  open: boolean;
+  onClose: () => void;
+  socios: Socio[];
+}) {
+  const router = useRouter();
+  const [socioId, setSocioId] = useState('');
+  const [tipoFactura, setTipoFactura] = useState('factura_c');
+  const [condicionVenta, setCondicionVenta] = useState('contado');
+  const [medioPago, setMedioPago] = useState('efectivo');
+  const [fecha, setFecha] = useState(todayIso);
+  const [vencimiento, setVencimiento] = useState(() => addDays(todayIso(), 30));
+  const [lineas, setLineas] = useState<LineaItem[]>([
+    { descripcion: '', cantidad: '1', importe: '' },
+  ]);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<{ comprobanteNro?: string; pdfUrl?: string } | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  if (!open) return null;
+
+  const total = lineas.reduce((s, l) => {
+    const cant = parseFloat(l.cantidad) || 0;
+    const imp = parseFloat(l.importe.replace(',', '.')) || 0;
+    return s + cant * imp;
+  }, 0);
+
+  const isValid =
+    Boolean(socioId) &&
+    lineas.every((l) => l.descripcion.trim() && parseFloat(l.importe.replace(',', '.')) > 0);
+
+  function addLinea() {
+    setLineas((prev) => [...prev, { descripcion: '', cantidad: '1', importe: '' }]);
+  }
+
+  function removeLinea(i: number) {
+    setLineas((prev) => prev.filter((_, idx) => idx !== i));
+  }
+
+  function updateLinea(i: number, field: keyof LineaItem, value: string) {
+    setLineas((prev) => prev.map((l, idx) => (idx === i ? { ...l, [field]: value } : l)));
+  }
+
+  function handleClose() {
+    setSocioId('');
+    setLineas([{ descripcion: '', cantidad: '1', importe: '' }]);
+    setError(null);
+    setResult(null);
+    onClose();
+  }
+
+  function handleSubmit() {
+    setError(null);
+    const items: VentanillaItem[] = lineas.map((l) => ({
+      descripcion: l.descripcion.trim(),
+      cantidad: parseFloat(l.cantidad) || 1,
+      importeUnitario: parseFloat(l.importe.replace(',', '.')) || 0,
+    }));
+    startTransition(async () => {
+      const res = await ventanillaEmitirFacturaAction({
+        socioId,
+        tipoFactura: tipoFactura as never,
+        condicionVenta: condicionVenta as never,
+        medioPago: medioPago as never,
+        fecha,
+        vencimiento,
+        items,
+      });
+      if (res.error) {
+        setError(res.error);
+      } else {
+        setResult({ comprobanteNro: res.comprobanteNro, pdfUrl: res.pdfUrl });
+        router.refresh();
+      }
+    });
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-2xl bg-white shadow-2xl">
+        <div className="flex items-start justify-between p-6 pb-4">
+          <div>
+            <h2 className="text-[18px] font-bold" style={{ color: '#101828' }}>
+              Ventanilla — todo en un paso
+            </h2>
+            <p className="mt-0.5 text-sm" style={{ color: '#669E9D' }}>
+              Cargá el consumo y emití la factura AFIP al instante
+            </p>
+          </div>
+          <button
+            onClick={handleClose}
+            className="rounded-[8px] p-1 text-gray-400 hover:bg-gray-100"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="border-t border-gray-200" />
+
+        {result ? (
+          <div className="space-y-4 p-6">
+            <div className="flex items-center gap-3 rounded-[10px] bg-teal-50 p-4">
+              <CheckCircle2 className="h-5 w-5 shrink-0 text-teal-600" />
+              <div>
+                <p className="font-semibold text-teal-900">Comprobante emitido</p>
+                {result.comprobanteNro && (
+                  <p className="text-sm text-teal-700">Nro: {result.comprobanteNro}</p>
+                )}
+              </div>
+            </div>
+            {result.pdfUrl && (
+              <a
+                href={result.pdfUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex w-full items-center justify-center gap-2 rounded-[10px] border border-gray-200 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                <Download className="h-4 w-4" />
+                Descargar PDF
+              </a>
+            )}
+            <button
+              onClick={handleClose}
+              className="w-full rounded-[10px] py-2.5 text-sm font-semibold text-white transition hover:opacity-90"
+              style={{ background: '#175861' }}
+            >
+              Cerrar
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="flex-1 space-y-5 overflow-y-auto p-6">
+              {/* Socio + parámetros */}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="sm:col-span-2">
+                  <label
+                    className="mb-1.5 block text-xs font-semibold"
+                    style={{ color: '#101828' }}
+                  >
+                    Socio
+                  </label>
+                  <select
+                    className={inputCls}
+                    value={socioId}
+                    onChange={(e) => setSocioId(e.target.value)}
+                  >
+                    <option value="">Seleccioná un socio...</option>
+                    {socios.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.nombre}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label
+                    className="mb-1.5 block text-xs font-semibold"
+                    style={{ color: '#101828' }}
+                  >
+                    Tipo de comprobante
+                  </label>
+                  <select
+                    className={inputCls}
+                    value={tipoFactura}
+                    onChange={(e) => setTipoFactura(e.target.value)}
+                  >
+                    {TIPO_FACTURA_OPTS.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label
+                    className="mb-1.5 block text-xs font-semibold"
+                    style={{ color: '#101828' }}
+                  >
+                    Condición de venta
+                  </label>
+                  <select
+                    className={inputCls}
+                    value={condicionVenta}
+                    onChange={(e) => setCondicionVenta(e.target.value)}
+                  >
+                    {CONDICION_VENTA_OPTS.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label
+                    className="mb-1.5 block text-xs font-semibold"
+                    style={{ color: '#101828' }}
+                  >
+                    Medio de pago
+                  </label>
+                  <select
+                    className={inputCls}
+                    value={medioPago}
+                    onChange={(e) => setMedioPago(e.target.value)}
+                  >
+                    {MEDIO_PAGO_OPTS.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label
+                    className="mb-1.5 block text-xs font-semibold"
+                    style={{ color: '#101828' }}
+                  >
+                    Fecha
+                  </label>
+                  <input
+                    type="date"
+                    className={inputCls}
+                    value={fecha}
+                    onChange={(e) => setFecha(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label
+                    className="mb-1.5 block text-xs font-semibold"
+                    style={{ color: '#101828' }}
+                  >
+                    Vencimiento
+                  </label>
+                  <input
+                    type="date"
+                    className={inputCls}
+                    value={vencimiento}
+                    onChange={(e) => setVencimiento(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {/* Ítems */}
+              <div>
+                <label className="mb-2 block text-xs font-semibold" style={{ color: '#101828' }}>
+                  Ítems
+                </label>
+                <div className="space-y-2">
+                  {lineas.map((l, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <input
+                        className={`${inputCls} flex-1`}
+                        placeholder="Descripción"
+                        value={l.descripcion}
+                        onChange={(e) => updateLinea(i, 'descripcion', e.target.value)}
+                      />
+                      <input
+                        className="h-11 w-16 shrink-0 rounded-[10px] border border-gray-200 bg-white px-3 text-center text-sm focus:border-[#175861] focus:ring-1 focus:ring-[#175861] focus:outline-none"
+                        placeholder="Cant"
+                        inputMode="numeric"
+                        value={l.cantidad}
+                        onChange={(e) => updateLinea(i, 'cantidad', e.target.value)}
+                      />
+                      <input
+                        className="h-11 w-28 shrink-0 rounded-[10px] border border-gray-200 bg-white px-3 text-sm focus:border-[#175861] focus:ring-1 focus:ring-[#175861] focus:outline-none"
+                        placeholder="Precio"
+                        inputMode="decimal"
+                        value={l.importe}
+                        onChange={(e) => updateLinea(i, 'importe', e.target.value)}
+                      />
+                      {lineas.length > 1 && (
+                        <button
+                          onClick={() => removeLinea(i)}
+                          className="shrink-0 rounded-[8px] p-2 text-gray-400 hover:bg-red-50 hover:text-red-500"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <button
+                  onClick={addLinea}
+                  className="mt-2 flex items-center gap-1 text-sm font-medium transition hover:opacity-70"
+                  style={{ color: '#175861' }}
+                >
+                  <Plus className="h-4 w-4" />
+                  Agregar ítem
+                </button>
+              </div>
+
+              {total > 0 && (
+                <div className="flex justify-end">
+                  <div className="text-right">
+                    <p className="text-xs text-gray-400">Total a facturar</p>
+                    <p className="text-lg font-bold" style={{ color: '#101828' }}>
+                      {fmtMoney(total)}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {error && (
+                <div className="flex items-start gap-2 rounded-[10px] bg-red-50 p-3 text-sm text-red-700">
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span>{error}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="border-t border-gray-200 p-6">
+              <div className="flex gap-3">
+                <button
+                  onClick={handleClose}
+                  className="flex-1 rounded-[10px] border border-[#d1d5dc] bg-white py-2.5 text-sm font-medium text-[#364153] transition hover:bg-gray-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleSubmit}
+                  disabled={isPending || !isValid}
+                  className="flex-1 rounded-[10px] py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+                  style={{ background: '#175861' }}
+                >
+                  {isPending ? 'Emitiendo...' : 'Emitir comprobante'}
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Componente principal ──────────────────────────────────────────────────
 
 export function FacturacionClient({
@@ -993,26 +1556,138 @@ export function FacturacionClient({
   posConfigurado: boolean;
   certificadoOk: boolean;
 }) {
+  const [activeTab, setActiveTab] = useState<'afip' | 'recibos'>('afip');
   const [search, setSearch] = useState('');
+  const [filterEstado, setFilterEstado] = useState('');
+  const [filterTipo, setFilterTipo] = useState('');
+  const [filterDesde, setFilterDesde] = useState('');
+  const [filterHasta, setFilterHasta] = useState('');
   const [nuevaOpen, setNuevaOpen] = useState(false);
   const [loteOpen, setLoteOpen] = useState(false);
+  const [ventanillaOpen, setVentanillaOpen] = useState(false);
   const [pagarFactura, setPagarFactura] = useState<Factura | null>(null);
+  const [ncFactura, setNcFactura] = useState<Factura | null>(null);
 
   const puedeFacturar = posConfigurado && certificadoOk;
+  const hasFiltrosAfip = Boolean(
+    search || filterEstado || filterTipo || filterDesde || filterHasta,
+  );
+  const hasFiltrosRecibos = Boolean(search || filterDesde || filterHasta);
 
-  const filtradas = useMemo(() => {
-    if (!search.trim()) return facturas;
-    const q = search.toLowerCase();
-    return facturas.filter((f) => {
-      const tipo = TIPO_FACTURA_LABEL[f.tipoFactura ?? ''] ?? f.tipoFactura ?? '';
-      return (
-        (f.codigo ?? '').toLowerCase().includes(q) ||
-        tipo.toLowerCase().includes(q) ||
-        f.socioNombre.toLowerCase().includes(q) ||
-        (f.descripcion ?? '').toLowerCase().includes(q)
+  // Tabla AFIP/NC — excluye recibos
+  const filtradosAfip = useMemo(() => {
+    return facturas
+      .filter((f) => f.tipoFactura !== 'recibo')
+      .filter((f) => {
+        if (search.trim()) {
+          const q = search.toLowerCase();
+          const tipo = TIPO_FACTURA_LABEL[f.tipoFactura ?? ''] ?? f.tipoFactura ?? '';
+          const ok =
+            (f.codigo ?? '').toLowerCase().includes(q) ||
+            tipo.toLowerCase().includes(q) ||
+            f.socioNombre.toLowerCase().includes(q) ||
+            (f.descripcion ?? '').toLowerCase().includes(q);
+          if (!ok) return false;
+        }
+        if (filterEstado && f.estado !== filterEstado) return false;
+        if (filterTipo) {
+          const t = f.tipoFactura ?? '';
+          if (filterTipo === 'afip' && !['factura_a', 'factura_b', 'factura_c'].includes(t))
+            return false;
+          if (filterTipo === 'nc' && !t.startsWith('nota_credito')) return false;
+        }
+        if (filterDesde && f.emision && f.emision < filterDesde) return false;
+        if (filterHasta && f.emision && f.emision.slice(0, 10) > filterHasta) return false;
+        return true;
+      });
+  }, [facturas, search, filterEstado, filterTipo, filterDesde, filterHasta]);
+
+  // Tabla Recibos internos
+  const filtradosRecibos = useMemo(() => {
+    return facturas
+      .filter((f) => f.tipoFactura === 'recibo')
+      .filter((f) => {
+        if (search.trim()) {
+          const q = search.toLowerCase();
+          const ok =
+            (f.codigo ?? '').toLowerCase().includes(q) ||
+            f.socioNombre.toLowerCase().includes(q) ||
+            (f.descripcion ?? '').toLowerCase().includes(q);
+          if (!ok) return false;
+        }
+        if (filterDesde && f.emision && f.emision < filterDesde) return false;
+        if (filterHasta && f.emision && f.emision.slice(0, 10) > filterHasta) return false;
+        return true;
+      });
+  }, [facturas, search, filterDesde, filterHasta]);
+
+  function limpiarFiltros() {
+    setSearch('');
+    setFilterEstado('');
+    setFilterTipo('');
+    setFilterDesde('');
+    setFilterHasta('');
+  }
+
+  function exportarCSV() {
+    const BOM = '﻿';
+    const esc = (v: string) => `"${v.replace(/"/g, '""')}"`;
+    if (activeTab === 'afip') {
+      const cols = [
+        'Número',
+        'Tipo',
+        'Cliente',
+        'Fecha',
+        'Vencimiento',
+        'Total',
+        'Estado',
+        'Descripción',
+      ];
+      const rows = filtradosAfip.map((f) =>
+        [
+          f.codigo ?? '',
+          TIPO_FACTURA_LABEL[f.tipoFactura ?? ''] ?? f.tipoFactura ?? '',
+          f.socioNombre,
+          f.emision ? fmtDate(f.emision) : '',
+          f.vencimiento ? fmtDate(f.vencimiento) : '',
+          f.importe ?? '0',
+          f.estado ?? '',
+          f.descripcion ?? '',
+        ]
+          .map(esc)
+          .join(','),
       );
-    });
-  }, [facturas, search]);
+      const csv = BOM + [cols.map(esc).join(','), ...rows].join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `comprobantes-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } else {
+      const cols = ['Número', 'Cliente', 'Fecha', 'Total', 'Descripción'];
+      const rows = filtradosRecibos.map((f) =>
+        [
+          f.codigo ?? '',
+          f.socioNombre,
+          f.emision ? fmtDate(f.emision) : '',
+          f.importe ?? '0',
+          f.descripcion ?? '',
+        ]
+          .map(esc)
+          .join(','),
+      );
+      const csv = BOM + [cols.map(esc).join(','), ...rows].join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `recibos-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+  }
 
   return (
     <div className="space-y-6 p-4 md:p-8">
@@ -1023,6 +1698,12 @@ export function FacturacionClient({
         onClose={() => setPagarFactura(null)}
         factura={pagarFactura}
       />
+      <NotaCreditoModal open={!!ncFactura} onClose={() => setNcFactura(null)} factura={ncFactura} />
+      <VentanillaModal
+        open={ventanillaOpen}
+        onClose={() => setVentanillaOpen(false)}
+        socios={socios}
+      />
 
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -1031,6 +1712,15 @@ export function FacturacionClient({
           <p className="page-subtitle mt-1">Gestión de comprobantes y cobros</p>
         </div>
         <div className="flex shrink-0 flex-wrap gap-2">
+          {puedeFacturar && (
+            <button
+              onClick={() => setVentanillaOpen(true)}
+              className="flex items-center justify-center gap-2 rounded-[10px] border border-[#d1d5dc] bg-white px-4 py-2.5 text-sm font-semibold text-[#364153] transition hover:bg-gray-50"
+            >
+              <Send className="h-4 w-4" />
+              Ventanilla
+            </button>
+          )}
           <button
             onClick={() => setLoteOpen(true)}
             disabled={!puedeFacturar}
@@ -1087,44 +1777,265 @@ export function FacturacionClient({
         <KpiCard value={fmtMoney(kpis.totalFacturado)} label="Total facturado" />
       </div>
 
+      {/* Tabs */}
+      <div className="flex gap-1 border-b border-gray-200">
+        <button
+          onClick={() => setActiveTab('afip')}
+          className={`px-4 py-2.5 text-sm font-semibold transition ${
+            activeTab === 'afip'
+              ? 'border-b-2 border-[#175861] text-[#175861]'
+              : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          Comprobantes AFIP
+          <span className="ml-2 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+            {facturas.filter((f) => f.tipoFactura !== 'recibo').length}
+          </span>
+        </button>
+        <button
+          onClick={() => setActiveTab('recibos')}
+          className={`px-4 py-2.5 text-sm font-semibold transition ${
+            activeTab === 'recibos'
+              ? 'border-b-2 border-[#175861] text-[#175861]'
+              : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          Recibos internos
+          <span className="ml-2 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+            {facturas.filter((f) => f.tipoFactura === 'recibo').length}
+          </span>
+        </button>
+      </div>
+
       {/* Tabla */}
       <div className="rounded-2xl border border-gray-200 bg-white">
-        <div className="border-b border-gray-100 p-4">
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar por comprobante o tipo..."
-            className="h-10 w-full rounded-[10px] border border-gray-200 bg-white px-4 text-sm focus:border-[#175861] focus:ring-1 focus:ring-[#175861] focus:outline-none"
-          />
+        <div className="space-y-3 border-b border-gray-100 p-4">
+          {/* Fila 1: búsqueda + exportar */}
+          <div className="flex gap-2">
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar por número, cliente o descripción..."
+              className="h-10 flex-1 rounded-[10px] border border-gray-200 bg-white px-4 text-sm focus:border-[#175861] focus:ring-1 focus:ring-[#175861] focus:outline-none"
+            />
+            <button
+              onClick={exportarCSV}
+              disabled={(activeTab === 'afip' ? filtradosAfip : filtradosRecibos).length === 0}
+              title="Exportar CSV"
+              className="flex h-10 items-center gap-1.5 rounded-[10px] border border-gray-200 bg-white px-3 text-sm font-medium text-gray-600 transition hover:bg-gray-50 disabled:opacity-40"
+            >
+              <FileDown className="h-4 w-4" />
+              <span className="hidden sm:inline">Exportar</span>
+            </button>
+          </div>
+          {/* Fila 2: filtros */}
+          <div className="flex flex-wrap gap-2">
+            {activeTab === 'afip' && (
+              <>
+                <select
+                  value={filterEstado}
+                  onChange={(e) => setFilterEstado(e.target.value)}
+                  className="h-9 rounded-[8px] border border-gray-200 bg-white px-3 text-sm text-gray-600 focus:border-[#175861] focus:outline-none"
+                >
+                  <option value="">Todos los estados</option>
+                  <option value="pendiente">Pendiente</option>
+                  <option value="pagada">Pagada</option>
+                  <option value="vencida">Vencida</option>
+                </select>
+                <select
+                  value={filterTipo}
+                  onChange={(e) => setFilterTipo(e.target.value)}
+                  className="h-9 rounded-[8px] border border-gray-200 bg-white px-3 text-sm text-gray-600 focus:border-[#175861] focus:outline-none"
+                >
+                  <option value="">Todos los tipos</option>
+                  <option value="afip">Facturas AFIP</option>
+                  <option value="nc">Notas de Crédito</option>
+                </select>
+              </>
+            )}
+            <input
+              type="date"
+              value={filterDesde}
+              onChange={(e) => setFilterDesde(e.target.value)}
+              title="Desde"
+              className="h-9 rounded-[8px] border border-gray-200 bg-white px-3 text-sm text-gray-600 focus:border-[#175861] focus:outline-none"
+            />
+            <input
+              type="date"
+              value={filterHasta}
+              onChange={(e) => setFilterHasta(e.target.value)}
+              title="Hasta"
+              className="h-9 rounded-[8px] border border-gray-200 bg-white px-3 text-sm text-gray-600 focus:border-[#175861] focus:outline-none"
+            />
+            {(activeTab === 'afip' ? hasFiltrosAfip : hasFiltrosRecibos) && (
+              <button
+                onClick={limpiarFiltros}
+                className="h-9 rounded-[8px] px-3 text-sm text-gray-400 transition hover:text-gray-600"
+              >
+                Limpiar
+              </button>
+            )}
+          </div>
         </div>
 
-        {filtradas.length === 0 ? (
+        {activeTab === 'afip' ? (
+          filtradosAfip.length === 0 ? (
+            <EmptyState
+              icon={<FileText className="h-7 w-7 opacity-40" />}
+              text={
+                hasFiltrosAfip
+                  ? 'No se encontraron comprobantes con ese criterio.'
+                  : 'Todavía no hay comprobantes AFIP emitidos.'
+              }
+            />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[900px] text-sm">
+                <thead>
+                  <tr className="bg-gray-50 text-left text-xs font-semibold text-gray-500">
+                    <th className="px-4 py-3">Número</th>
+                    <th className="px-4 py-3">Tipo</th>
+                    <th className="px-4 py-3">Cliente</th>
+                    <th className="px-4 py-3">Fecha</th>
+                    <th className="px-4 py-3">Vencimiento</th>
+                    <th className="px-4 py-3">Período</th>
+                    <th className="px-4 py-3 text-right">Total</th>
+                    <th className="px-4 py-3 text-center">Estado</th>
+                    <th className="px-4 py-3 text-right">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtradosAfip.map((f) => (
+                    <tr
+                      key={f.id}
+                      className="border-t border-gray-100 transition hover:bg-gray-50/50"
+                    >
+                      <td className="px-4 py-3 font-medium" style={{ color: '#101828' }}>
+                        {f.codigo ?? '—'}
+                      </td>
+                      <td className="px-4 py-3 text-gray-500">
+                        {TIPO_FACTURA_LABEL[f.tipoFactura ?? ''] ?? '—'}
+                      </td>
+                      <td className="px-4 py-3 font-medium" style={{ color: '#175861' }}>
+                        {f.socioNombre}
+                      </td>
+                      <td className="px-4 py-3 text-gray-500">{fmtDate(f.emision)}</td>
+                      <td className="px-4 py-3 text-gray-500">{fmtDate(f.vencimiento)}</td>
+                      <td className="px-4 py-3 text-xs text-gray-500">
+                        {f.desde ? (
+                          <div>
+                            <div>Desde {fmtDate(f.desde)}</div>
+                            <div>Hasta {fmtDate(f.hasta)}</div>
+                          </div>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-right font-medium" style={{ color: '#101828' }}>
+                        {fmtMoney(f.importe)}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span
+                          className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${
+                            ESTADO_BADGE[f.estado ?? 'pendiente'] ?? 'bg-gray-100 text-gray-600'
+                          }`}
+                        >
+                          {ESTADO_LABEL[f.estado ?? 'pendiente'] ?? f.estado}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => setPagarFactura(f)}
+                            disabled={f.estado === 'pagada'}
+                            title="Marcar como pagada"
+                            className="rounded-[6px] p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-[#175861] disabled:opacity-30 disabled:hover:bg-transparent"
+                          >
+                            <Edit3 className="h-4 w-4" />
+                          </button>
+                          {f.archivo ? (
+                            <a
+                              href={f.archivo}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title="Ver PDF"
+                              className="rounded-[6px] p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-[#175861]"
+                            >
+                              <Send className="h-4 w-4" />
+                            </a>
+                          ) : (
+                            <button
+                              disabled
+                              title="PDF no disponible"
+                              className="rounded-[6px] p-1.5 text-gray-400 opacity-30"
+                            >
+                              <Send className="h-4 w-4" />
+                            </button>
+                          )}
+                          {f.archivo ? (
+                            <a
+                              href={f.archivo}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              download
+                              title="Descargar"
+                              className="rounded-[6px] p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-[#175861]"
+                            >
+                              <Download className="h-4 w-4" />
+                            </a>
+                          ) : (
+                            <button
+                              disabled
+                              title="PDF no disponible"
+                              className="rounded-[6px] p-1.5 text-gray-400 opacity-30"
+                            >
+                              <Download className="h-4 w-4" />
+                            </button>
+                          )}
+                          {(f.tipoFactura === 'factura_a' ||
+                            f.tipoFactura === 'factura_b' ||
+                            f.tipoFactura === 'factura_c') &&
+                          f.cae ? (
+                            <button
+                              onClick={() => setNcFactura(f)}
+                              title="Emitir Nota de Crédito"
+                              className="rounded-[6px] p-1.5 text-gray-400 transition hover:bg-amber-50 hover:text-amber-600"
+                            >
+                              <CornerDownLeft className="h-4 w-4" />
+                            </button>
+                          ) : null}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
+        ) : // Tab: Recibos internos
+        filtradosRecibos.length === 0 ? (
           <EmptyState
             icon={<FileText className="h-7 w-7 opacity-40" />}
             text={
-              search
-                ? 'No se encontraron comprobantes con ese criterio.'
-                : 'Todavía no hay comprobantes emitidos.'
+              hasFiltrosRecibos
+                ? 'No se encontraron recibos con ese criterio.'
+                : 'Todavía no hay recibos internos emitidos.'
             }
           />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px] text-sm">
+            <table className="w-full min-w-[600px] text-sm">
               <thead>
                 <tr className="bg-gray-50 text-left text-xs font-semibold text-gray-500">
                   <th className="px-4 py-3">Número</th>
-                  <th className="px-4 py-3">Tipo</th>
                   <th className="px-4 py-3">Cliente</th>
                   <th className="px-4 py-3">Fecha</th>
-                  <th className="px-4 py-3">Vencimiento</th>
-                  <th className="px-4 py-3">Período</th>
                   <th className="px-4 py-3 text-right">Total</th>
-                  <th className="px-4 py-3 text-center">Estado</th>
                   <th className="px-4 py-3 text-right">Acciones</th>
                 </tr>
               </thead>
               <tbody>
-                {filtradas.map((f) => (
+                {filtradosRecibos.map((f) => (
                   <tr
                     key={f.id}
                     className="border-t border-gray-100 transition hover:bg-gray-50/50"
@@ -1132,85 +2043,24 @@ export function FacturacionClient({
                     <td className="px-4 py-3 font-medium" style={{ color: '#101828' }}>
                       {f.codigo ?? '—'}
                     </td>
-                    <td className="px-4 py-3 text-gray-500">
-                      {TIPO_FACTURA_LABEL[f.tipoFactura ?? ''] ?? '—'}
-                    </td>
                     <td className="px-4 py-3 font-medium" style={{ color: '#175861' }}>
                       {f.socioNombre}
                     </td>
                     <td className="px-4 py-3 text-gray-500">{fmtDate(f.emision)}</td>
-                    <td className="px-4 py-3 text-gray-500">{fmtDate(f.vencimiento)}</td>
-                    <td className="px-4 py-3 text-xs text-gray-500">
-                      {f.desde ? (
-                        <div>
-                          <div>Desde {fmtDate(f.desde)}</div>
-                          <div>Hasta {fmtDate(f.hasta)}</div>
-                        </div>
-                      ) : (
-                        '—'
-                      )}
-                    </td>
                     <td className="px-4 py-3 text-right font-medium" style={{ color: '#101828' }}>
                       {fmtMoney(f.importe)}
                     </td>
-                    <td className="px-4 py-3 text-center">
-                      <span
-                        className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${
-                          ESTADO_BADGE[f.estado ?? 'pendiente'] ?? 'bg-gray-100 text-gray-600'
-                        }`}
-                      >
-                        {ESTADO_LABEL[f.estado ?? 'pendiente'] ?? f.estado}
-                      </span>
-                    </td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => setPagarFactura(f)}
-                          disabled={f.estado === 'pagada'}
-                          title="Marcar como pagada"
-                          className="rounded-[6px] p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-[#175861] disabled:opacity-30 disabled:hover:bg-transparent"
+                      <div className="flex items-center justify-end">
+                        <a
+                          href={`/facturacion/recibo/${f.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="Ver / Imprimir recibo"
+                          className="rounded-[6px] p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-[#175861]"
                         >
-                          <Edit3 className="h-4 w-4" />
-                        </button>
-                        {f.archivo ? (
-                          <a
-                            href={f.archivo}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title="Ver PDF"
-                            className="rounded-[6px] p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-[#175861]"
-                          >
-                            <Send className="h-4 w-4" />
-                          </a>
-                        ) : (
-                          <button
-                            disabled
-                            title="PDF no disponible"
-                            className="rounded-[6px] p-1.5 text-gray-400 opacity-30"
-                          >
-                            <Send className="h-4 w-4" />
-                          </button>
-                        )}
-                        {f.archivo ? (
-                          <a
-                            href={f.archivo}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            download
-                            title="Descargar"
-                            className="rounded-[6px] p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-[#175861]"
-                          >
-                            <Download className="h-4 w-4" />
-                          </a>
-                        ) : (
-                          <button
-                            disabled
-                            title="PDF no disponible"
-                            className="rounded-[6px] p-1.5 text-gray-400 opacity-30"
-                          >
-                            <Download className="h-4 w-4" />
-                          </button>
-                        )}
+                          <Printer className="h-4 w-4" />
+                        </a>
                       </div>
                     </td>
                   </tr>

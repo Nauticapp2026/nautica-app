@@ -7,11 +7,13 @@ import {
   ArrowLeft,
   User,
   Anchor,
+  CheckCircle2,
   CreditCard,
   DollarSign,
   Users,
   Clock,
   FileText,
+  Printer,
   Ship,
   TrendingUp,
   AlertTriangle,
@@ -27,6 +29,7 @@ import {
   informarPagoAction,
   marcarPagadasAction,
 } from '@/app/actions/movimientos';
+import { crearReciboInternoAction } from '@/app/actions/facturacion';
 import {
   createEmbarcacionAction,
   deleteEmbarcacionAction,
@@ -845,10 +848,18 @@ function InformarPagoModal({
   saldoBruto: number;
 }) {
   const router = useRouter();
+  const [step, setStep] = useState<'form' | 'post-pago' | 'recibo-creado'>('form');
+  const [pagoResult, setPagoResult] = useState<{
+    movimientoId: string;
+    concepto: string;
+    importe: string;
+    fecha: string;
+    formaDePago: string;
+  } | null>(null);
+  const [reciboId, setReciboId] = useState<string | null>(null);
   const [formaDePago, setFormaDePago] = useState('');
   const [datosPago, setDatosPago] = useState<Record<string, string>>({});
-  // Inicializar monto con el saldo deudor (lazy init — se re-evalúa en cada
-  // remount que ocurre cuando key cambia al abrir el modal).
+  // Lazy init — monto se pre-llena con el saldo deudor en cada remount (key cambia al abrir).
   const [monto, setMonto] = useState(() =>
     saldoBruto > 0 ? saldoBruto.toFixed(2).replace('.', ',') : '',
   );
@@ -858,8 +869,9 @@ function InformarPagoModal({
 
   const isValid = Boolean(formaDePago && monto && parseFloat(montoToNumberStr(monto)) > 0);
 
-  function handleClose() {
+  function handleFinalClose() {
     onClose();
+    router.refresh();
   }
 
   function handleSubmit() {
@@ -875,15 +887,134 @@ function InformarPagoModal({
       if (res.error) {
         setError(res.error);
       } else {
-        handleClose();
-        toast.success('Pago registrado');
-        router.refresh();
+        setPagoResult({
+          movimientoId: res.movimientoId!,
+          concepto: res.concepto!,
+          importe: res.importe!,
+          fecha: fecha || new Date().toISOString().slice(0, 10),
+          formaDePago,
+        });
+        setStep('post-pago');
+      }
+    });
+  }
+
+  function handleCrearRecibo() {
+    if (!pagoResult) return;
+    startTransition(async () => {
+      const res = await crearReciboInternoAction({
+        socioId,
+        movimientoId: pagoResult.movimientoId,
+        importe: pagoResult.importe,
+        descripcion: pagoResult.concepto,
+        medioPago: pagoResult.formaDePago,
+        fecha: pagoResult.fecha,
+      });
+      if (res.error) {
+        setError(res.error);
+      } else {
+        setReciboId(res.id!);
+        setStep('recibo-creado');
       }
     });
   }
 
   if (!open) return null;
 
+  // ── Step: post-pago ──────────────────────────────────────────────────────────
+  if (step === 'post-pago') {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div className="w-full max-w-sm rounded-2xl bg-white shadow-2xl">
+          <div className="p-6 pb-4">
+            <h2 className="text-[18px] font-bold" style={{ color: '#101828' }}>
+              Pago registrado
+            </h2>
+            <p className="mt-0.5 text-sm" style={{ color: '#669E9D' }}>
+              ¿Desea emitir un comprobante para {socioNombre}?
+            </p>
+          </div>
+          <div className="border-t border-gray-200" />
+          <div className="space-y-3 p-6">
+            <button
+              onClick={() => {
+                toast.success('Pago registrado');
+                onClose();
+                router.push('/facturacion');
+                router.refresh();
+              }}
+              className="w-full rounded-[10px] border border-[#175861] bg-white px-4 py-3 text-left text-sm font-medium text-[#175861] transition hover:bg-teal-50"
+            >
+              <span className="font-semibold">Factura AFIP</span>
+              <span className="ml-2 text-xs text-gray-400">Se emite con CAE</span>
+            </button>
+            <button
+              onClick={handleCrearRecibo}
+              disabled={isPending}
+              className="w-full rounded-[10px] border border-gray-200 bg-white px-4 py-3 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
+            >
+              <span className="font-semibold">Comprobante interno</span>
+              <span className="ml-2 text-xs text-gray-400">Sin valor fiscal</span>
+            </button>
+            <button
+              onClick={() => {
+                toast.success('Pago registrado');
+                handleFinalClose();
+              }}
+              className="w-full rounded-[10px] px-4 py-3 text-left text-sm font-medium text-gray-500 transition hover:bg-gray-50"
+            >
+              Sin comprobante
+              <span className="ml-2 text-xs text-gray-400">Solo movimiento</span>
+            </button>
+            {error && <p className="text-sm text-red-600">{error}</p>}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Step: recibo-creado ──────────────────────────────────────────────────────
+  if (step === 'recibo-creado') {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div className="w-full max-w-sm rounded-2xl bg-white shadow-2xl">
+          <div className="flex flex-col items-center p-6 text-center">
+            <CheckCircle2 className="mb-3 h-12 w-12 text-teal-600" />
+            <h2 className="text-[18px] font-bold" style={{ color: '#101828' }}>
+              Comprobante creado
+            </h2>
+            <p className="mt-1 text-sm" style={{ color: '#669E9D' }}>
+              El pago y el recibo interno fueron registrados.
+            </p>
+          </div>
+          <div className="border-t border-gray-200" />
+          <div className="flex gap-3 p-6">
+            <button
+              onClick={() => {
+                toast.success('Pago registrado');
+                handleFinalClose();
+              }}
+              className="flex-1 rounded-[10px] border border-[#d1d5dc] bg-white py-2.5 text-sm font-medium text-[#364153] transition hover:bg-gray-50"
+            >
+              Cerrar
+            </button>
+            <a
+              href={`/facturacion/recibo/${reciboId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex flex-1 items-center justify-center gap-2 rounded-[10px] py-2.5 text-sm font-semibold text-white transition hover:opacity-90"
+              style={{ background: '#175861' }}
+            >
+              <Printer className="h-4 w-4" />
+              Imprimir
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Step: form ───────────────────────────────────────────────────────────────
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="flex max-h-[90vh] w-full max-w-lg flex-col rounded-2xl bg-white shadow-2xl">
@@ -896,10 +1027,7 @@ function InformarPagoModal({
               Registre un pago a cuenta de {socioNombre}
             </p>
           </div>
-          <button
-            onClick={handleClose}
-            className="rounded-[8px] p-1 text-gray-400 hover:bg-gray-100"
-          >
+          <button onClick={onClose} className="rounded-[8px] p-1 text-gray-400 hover:bg-gray-100">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -962,7 +1090,7 @@ function InformarPagoModal({
         <div className="border-t border-gray-200 p-6">
           <div className="flex gap-3">
             <button
-              onClick={handleClose}
+              onClick={onClose}
               className="flex-1 rounded-[10px] border border-[#d1d5dc] bg-white py-2.5 text-sm font-medium text-[#364153] transition hover:bg-gray-50"
             >
               Cancelar

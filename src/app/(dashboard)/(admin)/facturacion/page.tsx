@@ -71,6 +71,8 @@ export default async function FacturacionPage() {
         archivo: facturacion.archivo,
         descripcion: facturacion.descripcion,
         socioId: facturacion.socioId,
+        cae: facturacion.cae,
+        facturaOriginalId: facturacion.facturaOriginalId,
         socioNombre: profiles.nombre,
         socioApellido: profiles.apellido,
         socioEmail: profiles.email,
@@ -135,6 +137,8 @@ export default async function FacturacionPage() {
     archivo: f.archivo,
     descripcion: f.descripcion,
     socioId: f.socioId,
+    cae: f.cae,
+    facturaOriginalId: f.facturaOriginalId,
     socioNombre: [f.socioNombre, f.socioApellido].filter(Boolean).join(' ') || f.socioEmail || '—',
   }));
 

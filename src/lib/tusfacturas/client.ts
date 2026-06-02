@@ -52,10 +52,18 @@ export type TusFacturasFormaPago = {
   importe: number;
 };
 
+export type TusFacturasComprobanteAsociado = {
+  tipo_comprobante: string; // 'FACTURA A' | 'FACTURA B' | 'FACTURA C'
+  punto_venta: string; // '00005'
+  numero: string; // '00000001'
+  cae: string;
+  fecha: string; // 'DD/MM/YYYY'
+};
+
 export type TusFacturasComprobante = {
   fecha: string; // 'DD/MM/YYYY'
   vencimiento: string; // 'DD/MM/YYYY'
-  tipo: string; // 'FACTURA A' | 'FACTURA B' | 'FACTURA C'
+  tipo: string; // 'FACTURA A' | 'NOTA DE CREDITO A' | ...
   external_reference: string;
   operacion: 'V'; // Venta
   punto_venta: string;
@@ -71,6 +79,8 @@ export type TusFacturasComprobante = {
     formas_pago: TusFacturasFormaPago[];
     total: number;
   };
+  /** Solo para NC — referencia a la factura original */
+  asociados?: TusFacturasComprobanteAsociado[];
 };
 
 export type TusFacturasNuevaFacturaInput = {

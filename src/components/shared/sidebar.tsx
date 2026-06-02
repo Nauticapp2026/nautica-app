@@ -87,9 +87,17 @@ type Props = {
   userInitial: string;
   rol: string;
   variant?: SidebarVariant;
+  pendingSolicitudes?: number;
 };
 
-export function Sidebar({ subtitle, userName, userInitial, rol, variant = 'dashboard' }: Props) {
+export function Sidebar({
+  subtitle,
+  userName,
+  userInitial,
+  rol,
+  variant = 'dashboard',
+  pendingSolicitudes,
+}: Props) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
@@ -170,7 +178,18 @@ export function Sidebar({ subtitle, userName, userInitial, rol, variant = 'dashb
                 }`}
               >
                 <Icon className="h-[18px] w-[18px] shrink-0" />
-                {label}
+                <span className="flex-1">{label}</span>
+                {href === '/solicitudes-socio' &&
+                  pendingSolicitudes != null &&
+                  pendingSolicitudes > 0 && (
+                    <span
+                      className={`flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-bold ${
+                        active ? 'bg-white/25 text-white' : 'bg-red-500 text-white'
+                      }`}
+                    >
+                      {pendingSolicitudes > 99 ? '99+' : pendingSolicitudes}
+                    </span>
+                  )}
               </Link>
             );
           })}

@@ -20,6 +20,7 @@ import {
   toTusFecha,
   type TusFacturasCliente,
   type TusFacturasComprobante,
+  type TusFacturasComprobanteAsociado,
   type TusFacturasCredentials,
   type TusFacturasDetalleItem,
   type TusFacturasFormaPago,
@@ -28,8 +29,10 @@ import {
   CONDICION_IVA_API,
   CONDICION_PAGO_API,
   FORMA_PAGO_LABEL,
+  NC_TIPO_FACTURA,
   TIPO_DOC_API,
   TIPO_FACTURA_API,
+  TIPO_NC_API,
 } from '@/lib/tusfacturas/mappers';
 
 // ─── Tipos ──────────────────────────────────────────────────────────────────
@@ -392,6 +395,7 @@ export async function crearFacturaCore(
       socioId: data.socioId,
       codigo: apiResponse.comprobante_nro ?? null,
       archivo: apiResponse.comprobante_pdf_url ?? null,
+      cae: apiResponse.cae ?? null,
       descripcion: descripcionFactura,
       tipoFactura: data.tipoFactura,
       estado: estadoFactura,
@@ -643,4 +647,370 @@ export async function markInvoicePaidAction(
   } catch {
     return { error: 'Error al actualizar la factura.' };
   }
+}
+
+// ─── Action: crear recibo interno ─────────────────────────────────────────────
+
+export type CreateReciboInternoData = {
+  socioId: string;
+  movimientoId: string;
+  importe: string;
+  descripcion: string;
+  medioPago: string;
+  fecha?: string;
+};
+
+export async function crearReciboInternoAction(
+  data: CreateReciboInternoData,
+): Promise<{ id?: string; error?: string }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+
+  const gId = ctx.activeMembership.guarderiaId;
+
+  try {
+    const id = randomUUID();
+    const codigo = `RCP-${id.slice(-6).toUpperCase()}`;
+    const emision = data.fecha ? new Date(data.fecha) : new Date();
+
+    await db.insert(facturacion).values({
+      id,
+      guarderiaId: gId,
+      socioId: data.socioId,
+      tipoFactura: 'recibo',
+      estado: 'pagada',
+      importe: data.importe,
+      descripcion: data.descripcion,
+      medioPago: data.medioPago as MedioPago,
+      emision,
+      movimientoId: data.movimientoId,
+      codigo,
+    });
+
+    revalidatePath('/facturacion');
+    revalidatePath(`/usuarios/${data.socioId}`);
+    return { id };
+  } catch {
+    return { error: 'Error al crear el comprobante interno.' };
+  }
+}
+
+// ─── Action: emitir nota de crédito ───────────────────────────────────────────
+
+export type EmitirNcMotivo = 'anulacion_total' | 'descuento_parcial' | 'devolucion_servicio';
+
+export type EmitirNcData = {
+  facturaOriginalId: string;
+  motivo: EmitirNcMotivo;
+  /** Requerido si motivo !== 'anulacion_total'. */
+  importe?: number;
+  descripcion?: string;
+};
+
+export type EmitirNcResult = {
+  error?: string;
+  ncId?: string;
+  comprobanteNro?: string;
+  pdfUrl?: string;
+};
+
+export async function emitirNotaCreditoAction(data: EmitirNcData): Promise<EmitirNcResult> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+
+  const gId = ctx.activeMembership.guarderiaId;
+
+  // 1. Cargar la factura original (validando scope)
+  const [original] = await db
+    .select({
+      id: facturacion.id,
+      tipoFactura: facturacion.tipoFactura,
+      codigo: facturacion.codigo,
+      cae: facturacion.cae,
+      emision: facturacion.emision,
+      importe: facturacion.importe,
+      socioId: facturacion.socioId,
+      condicionVenta: facturacion.condicionVenta,
+    })
+    .from(facturacion)
+    .where(and(eq(facturacion.id, data.facturaOriginalId), eq(facturacion.guarderiaId, gId)))
+    .limit(1);
+
+  if (!original) return { error: 'Factura no encontrada.' };
+
+  const tipoOriginal = original.tipoFactura;
+  if (
+    tipoOriginal !== 'factura_a' &&
+    tipoOriginal !== 'factura_b' &&
+    tipoOriginal !== 'factura_c'
+  ) {
+    return { error: 'Solo se puede emitir NC sobre facturas AFIP (A, B o C).' };
+  }
+
+  if (!original.cae) {
+    return {
+      error:
+        'Esta factura no tiene CAE registrado. Solo se pueden emitir NC sobre facturas emitidas desde este sistema.',
+    };
+  }
+
+  if (!original.codigo) return { error: 'La factura no tiene número de comprobante.' };
+
+  // Parsear "PPPPP-NNNNNNNN" → punto_venta y numero
+  const [puntoVentaStr, numeroStr] = original.codigo.split('-');
+  if (!puntoVentaStr || !numeroStr) {
+    return { error: 'El número de comprobante tiene formato inesperado.' };
+  }
+
+  // 2. Determinar importe de la NC
+  const importeOriginal = parseFloat(original.importe ?? '0');
+  let ncImporte: number;
+  if (data.motivo === 'anulacion_total') {
+    ncImporte = importeOriginal;
+  } else {
+    if (!data.importe || data.importe <= 0) {
+      return { error: 'Ingresá el importe de la nota de crédito.' };
+    }
+    if (data.importe > importeOriginal) {
+      return { error: 'El importe de la NC no puede superar el total de la factura original.' };
+    }
+    ncImporte = data.importe;
+  }
+
+  // 3. Cargar socio y creds de guardería
+  const [socio] = await db
+    .select({
+      id: profiles.id,
+      email: profiles.email,
+      nombre: profiles.nombre,
+      apellido: profiles.apellido,
+      razonSocial: profiles.razonSocial,
+      tipoDocumento: profiles.tipoDocumento,
+      numeroDocumento: profiles.numeroDocumento,
+      direccion: profiles.direccion,
+      condicionIva: profiles.condicionIva,
+    })
+    .from(profiles)
+    .where(eq(profiles.id, original.socioId!))
+    .limit(1);
+
+  if (!socio) return { error: 'No se encontró el socio de la factura original.' };
+
+  const [guarderia] = await db
+    .select({
+      puntoDeVenta: guarderias.puntoDeVenta,
+      rubro: guarderias.rubro,
+      tusfacturasApikey: guarderias.tusfacturasApikey,
+      tusfacturasApitoken: guarderias.tusfacturasApitoken,
+      tusfacturasUsertoken: guarderias.tusfacturasUsertoken,
+    })
+    .from(guarderias)
+    .where(eq(guarderias.id, gId))
+    .limit(1);
+
+  if (
+    !guarderia?.puntoDeVenta ||
+    !guarderia.tusfacturasApikey ||
+    !guarderia.tusfacturasApitoken ||
+    !guarderia.tusfacturasUsertoken
+  ) {
+    return { error: 'Faltan datos de facturación de la guardería.' };
+  }
+
+  const credsOverride: TusFacturasCredentials = {
+    apikey: guarderia.tusfacturasApikey,
+    apitoken: guarderia.tusfacturasApitoken,
+    usertoken: guarderia.tusfacturasUsertoken,
+  };
+
+  // 4. Construir payload NC
+  const ncId = randomUUID();
+  const hoy = toTusFecha(new Date());
+  const condVenta = (original.condicionVenta ?? 'contado') as CondicionVenta;
+  const cliente = buildCliente({ ...socio, condicionVenta: condVenta });
+
+  const MOTIVO_LABEL: Record<EmitirNcMotivo, string> = {
+    anulacion_total: 'Anulación total',
+    descuento_parcial: 'Descuento parcial',
+    devolucion_servicio: 'Devolución de servicio',
+  };
+
+  const descripcionNc =
+    data.descripcion?.trim() ||
+    `NC — ${MOTIVO_LABEL[data.motivo]} de comprobante ${original.codigo}`;
+
+  const asociado: TusFacturasComprobanteAsociado = {
+    tipo_comprobante: TIPO_FACTURA_API[tipoOriginal],
+    punto_venta: puntoVentaStr,
+    numero: numeroStr,
+    cae: original.cae,
+    fecha: toTusFecha(original.emision),
+  };
+
+  const ncComprobante: TusFacturasComprobante = {
+    fecha: hoy,
+    vencimiento: hoy,
+    tipo: TIPO_NC_API[tipoOriginal],
+    external_reference: ncId,
+    operacion: 'V',
+    punto_venta: String(guarderia.puntoDeVenta),
+    moneda: 'PES',
+    cotizacion: 1,
+    periodo_facturado_desde: hoy,
+    periodo_facturado_hasta: hoy,
+    rubro: guarderia.rubro ?? 'Servicios náuticos',
+    rubro_grupo_contable: process.env.TUSFACTURAS_RUBRO_GRUPO ?? 'Servicios',
+    detalle: buildDetalle(
+      [{ descripcion: descripcionNc, cantidad: 1, importeUnitario: ncImporte }],
+      tipoOriginal,
+    ),
+    total: ncImporte.toFixed(2),
+    pagos: {
+      formas_pago: [{ descripcion: 'Nota de crédito', importe: ncImporte }],
+      total: ncImporte,
+    },
+    asociados: [asociado],
+  };
+
+  let apiResponse;
+  try {
+    apiResponse = await crearFactura({ cliente, comprobante: ncComprobante }, credsOverride);
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'Error al emitir la NC en TusFacturas.' };
+  }
+
+  // 5. Persistir NC + movimiento de crédito
+  try {
+    const ncTipoFactura = NC_TIPO_FACTURA[tipoOriginal] as
+      | 'nota_credito_a'
+      | 'nota_credito_b'
+      | 'nota_credito_c';
+
+    await db.insert(facturacion).values({
+      id: ncId,
+      guarderiaId: gId,
+      socioId: original.socioId,
+      tipoFactura: ncTipoFactura,
+      estado: 'pagada',
+      codigo: apiResponse.comprobante_nro ?? null,
+      archivo: apiResponse.comprobante_pdf_url ?? null,
+      cae: apiResponse.cae ?? null,
+      descripcion: descripcionNc,
+      importe: ncImporte.toFixed(2),
+      emision: new Date(),
+      externalReference: ncId,
+      facturaOriginalId: data.facturaOriginalId,
+    });
+
+    // Crear movimiento de crédito para ajustar saldo
+    if (original.socioId) {
+      await db.insert(movimientosCuentaCorriente).values({
+        socioId: original.socioId,
+        concepto: descripcionNc,
+        tipo: 'otro',
+        estado: 'pagado',
+        debe: '0',
+        haber: ncImporte.toFixed(2),
+        importeSigned: `-${ncImporte.toFixed(2)}`,
+        fecha: new Date(),
+      });
+    }
+
+    revalidatePath('/facturacion');
+    if (original.socioId) revalidatePath(`/usuarios/${original.socioId}`);
+
+    return {
+      ncId,
+      comprobanteNro: apiResponse.comprobante_nro,
+      pdfUrl: apiResponse.comprobante_pdf_url,
+    };
+  } catch (err) {
+    console.error('NC emitida en TusFacturas pero falló persistencia', {
+      comprobanteNro: apiResponse.comprobante_nro,
+      err,
+    });
+    return {
+      error:
+        'La NC se emitió en AFIP pero no se pudo guardar. Contactá al administrador con el número ' +
+        (apiResponse.comprobante_nro ?? ncId),
+    };
+  }
+}
+
+// ─── Action: ventanilla — consumo + factura en un paso ────────────────────────
+
+export type VentanillaItem = {
+  descripcion: string;
+  cantidad: number;
+  importeUnitario: number;
+};
+
+export type VentanillaData = {
+  socioId: string;
+  tipoFactura: TipoFactura;
+  condicionVenta: CondicionVenta;
+  medioPago: MedioPago;
+  fecha: string;
+  vencimiento: string;
+  items: VentanillaItem[];
+};
+
+export async function ventanillaEmitirFacturaAction(data: VentanillaData): Promise<FacturaResult> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+
+  const gId = ctx.activeMembership.guarderiaId;
+
+  if (!data.items || data.items.length === 0) return { error: 'Ingresá al menos un ítem.' };
+
+  // Verificar que el socio pertenece a esta guardería
+  const [membership] = await db
+    .select({ id: memberships.id })
+    .from(memberships)
+    .where(
+      and(
+        eq(memberships.userId, data.socioId),
+        eq(memberships.guarderiaId, gId),
+        eq(memberships.status, 'active'),
+      ),
+    );
+  if (!membership) return { error: 'El socio no pertenece a esta guardería.' };
+
+  // Crear los movimientos primero
+  const movimientoIds: string[] = [];
+  for (const item of data.items) {
+    const importe = (item.cantidad * item.importeUnitario).toFixed(2);
+    const [inserted] = await db
+      .insert(movimientosCuentaCorriente)
+      .values({
+        socioId: data.socioId,
+        concepto: item.descripcion,
+        tipo: 'otro',
+        estado: 'no_pagado',
+        debe: importe,
+        haber: '0',
+        importeSigned: importe,
+        fecha: new Date(data.fecha),
+      })
+      .returning({ id: movimientosCuentaCorriente.id });
+    movimientoIds.push(inserted.id);
+  }
+
+  // Emitir la factura linkando los movimientos recién creados
+  const result = await crearFacturaCore({
+    ...data,
+    guarderiaId: gId,
+    desde: data.fecha,
+    hasta: data.fecha,
+    movimientoIds,
+  });
+
+  // Si la factura falló, limpiar los movimientos creados
+  if (result.error) {
+    await db
+      .delete(movimientosCuentaCorriente)
+      .where(inArray(movimientosCuentaCorriente.id, movimientoIds));
+  }
+
+  return result;
 }

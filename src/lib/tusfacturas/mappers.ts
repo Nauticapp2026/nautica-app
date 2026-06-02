@@ -9,6 +9,20 @@ export const TIPO_FACTURA_API: Record<string, string> = {
   factura_c: 'FACTURA C',
 };
 
+// factura original (db) → tipo NC para TusFacturas
+export const TIPO_NC_API: Record<string, string> = {
+  factura_a: 'NOTA DE CREDITO A',
+  factura_b: 'NOTA DE CREDITO B',
+  factura_c: 'NOTA DE CREDITO C',
+};
+
+// factura original (db) → tipo NC para guardar en DB
+export const NC_TIPO_FACTURA: Record<string, string> = {
+  factura_a: 'nota_credito_a',
+  factura_b: 'nota_credito_b',
+  factura_c: 'nota_credito_c',
+};
+
 // tipo_documento (db) → tusfacturas documento_tipo
 export const TIPO_DOC_API: Record<string, string> = {
   dni: 'DNI',

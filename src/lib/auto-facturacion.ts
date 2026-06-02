@@ -18,7 +18,13 @@
 import { and, count, desc, eq, gte, lte, sql } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
-import { facturacion, memberships, movimientosCuentaCorriente } from '@/lib/db/schema';
+import {
+  facturacion,
+  guarderias,
+  memberships,
+  movimientosCuentaCorriente,
+  profiles,
+} from '@/lib/db/schema';
 import { crearFacturaCore } from '@/app/actions/facturacion';
 
 type AutoEmisionResult = {
@@ -53,6 +59,27 @@ function startOfDay(d: Date): Date {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
 }
 
+/**
+ * Deriva el tipo de factura según las condiciones IVA del emisor (guardería) y
+ * del receptor (socio). Devuelve null si no hay información suficiente para
+ * determinarlo con certeza (el caller cae en fallback a la última factura).
+ *
+ * Lógica AFIP:
+ *  - Guardería Monotributo → siempre Factura C (sin IVA discriminado).
+ *  - Guardería RI + Socio RI → Factura A (B2B con IVA discriminado).
+ *  - Guardería RI + cualquier otro → Factura B.
+ */
+function derivarTipoFactura(
+  guardCondicionIva: string | null,
+  socioCondicionIva: string | null,
+): 'factura_a' | 'factura_b' | 'factura_c' | null {
+  if (guardCondicionIva === 'monotributo') return 'factura_c';
+  if (guardCondicionIva === 'responsable_inscripto') {
+    return socioCondicionIva === 'responsable_inscripto' ? 'factura_a' : 'factura_b';
+  }
+  return null;
+}
+
 export async function runAutoEmision(
   guarderiaIds: string[],
   now: Date = new Date(),
@@ -71,9 +98,17 @@ export async function runAutoEmision(
   const finHoy = addDays(inicioHoy, 1);
 
   for (const guarderiaId of guarderiaIds) {
+    const [guardRow] = await db
+      .select({ condicionIva: guarderias.condicionIva })
+      .from(guarderias)
+      .where(eq(guarderias.id, guarderiaId))
+      .limit(1);
+    const guardCondicionIva = guardRow?.condicionIva ?? null;
+
     const sociosRows = await db
-      .select({ socioId: memberships.userId })
+      .select({ socioId: memberships.userId, socioCondicionIva: profiles.condicionIva })
       .from(memberships)
+      .innerJoin(profiles, eq(profiles.id, memberships.userId))
       .where(
         and(
           eq(memberships.guarderiaId, guarderiaId),
@@ -82,7 +117,7 @@ export async function runAutoEmision(
         ),
       );
 
-    for (const { socioId } of sociosRows) {
+    for (const { socioId, socioCondicionIva } of sociosRows) {
       // 1. Idempotencia: si ya hay factura creada hoy, skip.
       const [yaHoy] = await db
         .select({ n: count() })
@@ -154,10 +189,14 @@ export async function runAutoEmision(
       const desde = ymd(startOfMonth(now));
       const hasta = ymd(endOfMonth(now));
 
+      const derivado = derivarTipoFactura(guardCondicionIva, socioCondicionIva);
+      const tipoFactura =
+        derivado ?? (ultima.tipoFactura as 'factura_a' | 'factura_b' | 'factura_c');
+
       const r = await crearFacturaCore({
         guarderiaId,
         socioId,
-        tipoFactura: ultima.tipoFactura as 'factura_a' | 'factura_b' | 'factura_c',
+        tipoFactura,
         condicionVenta: ultima.condicionVenta as never,
         medioPago: ultima.medioPago as never,
         estado: 'pendiente',

@@ -12,6 +12,7 @@ import {
   primaryKey,
   uniqueIndex,
   index,
+  type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
 import { relations, sql } from 'drizzle-orm';
 
@@ -141,7 +142,15 @@ export const condicionVentaEnum = pgEnum('condicion_venta', [
   'payway',
 ]);
 
-export const tipoFacturaEnum = pgEnum('tipo_factura', ['factura_a', 'factura_b', 'factura_c']);
+export const tipoFacturaEnum = pgEnum('tipo_factura', [
+  'factura_a',
+  'factura_b',
+  'factura_c',
+  'recibo',
+  'nota_credito_a',
+  'nota_credito_b',
+  'nota_credito_c',
+]);
 
 export const tipoCuentaCorrienteEnum = pgEnum('tipo_cta_cte', ['mensual', 'espacio', 'otro']);
 
@@ -952,6 +961,13 @@ export const facturacion = pgTable(
     hasta: timestamp('hasta', { withTimezone: true }),
     vencimiento: timestamp('vencimiento', { withTimezone: true }),
     externalReference: text('external_reference'),
+    cae: text('cae'),
+    facturaOriginalId: uuid('factura_original_id').references((): AnyPgColumn => facturacion.id, {
+      onDelete: 'set null',
+    }),
+    movimientoId: uuid('movimiento_id').references(() => movimientosCuentaCorriente.id, {
+      onDelete: 'set null',
+    }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
