@@ -10,8 +10,40 @@ function isAdmin(ctx: NonNullable<Awaited<ReturnType<typeof getActiveMarina>>>):
   return (
     ctx.profile.isSuperAdmin ||
     ctx.activeMembership.rol === 'administrador_general' ||
-    ctx.activeMembership.rol === 'administrativo'
+    ctx.activeMembership.rol === 'administrativo' ||
+    ctx.activeMembership.rol === 'contable'
   );
+}
+
+const FORMAS_PAGO_LABEL: Record<string, string> = {
+  efectivo: 'Efectivo',
+  tarjeta_credito: 'Tarjeta de crédito',
+  tarjeta_debito: 'Tarjeta de débito',
+  debito_automatico: 'Débito automático',
+  transferencia: 'Transferencia',
+  cheque: 'Cheque',
+  mercado_pago: 'Mercado Pago',
+};
+
+function conceptoFromPago(formaDePago: string, datosPago?: Record<string, unknown>): string {
+  const label = FORMAS_PAGO_LABEL[formaDePago] ?? 'Pago';
+  switch (formaDePago) {
+    case 'transferencia': {
+      const banco = datosPago?.banco ? ` ${datosPago.banco}` : '';
+      const nro = datosPago?.nroOperacion ? ` Op. ${datosPago.nroOperacion}` : '';
+      return `Pago — Transferencia${banco}${nro}`;
+    }
+    case 'cheque': {
+      const nro = datosPago?.numeroCheque ? ` #${datosPago.numeroCheque}` : '';
+      return `Pago — Cheque${nro}`;
+    }
+    case 'mercado_pago': {
+      const nro = datosPago?.nroOperacion ? ` Op. ${datosPago.nroOperacion}` : '';
+      return `Pago — Mercado Pago${nro}`;
+    }
+    default:
+      return `Pago — ${label}`;
+  }
 }
 
 export type AddMovimientoData = {
@@ -20,36 +52,16 @@ export type AddMovimientoData = {
   concepto: string;
   monto: string;
   fecha: string;
-};
-
-export type MarcarPagadasData = {
-  ids: string[];
-  socioId: string;
-  formaDePago: string;
-  // Transferencia
-  bancoTransferencia?: string;
-  clienteTransferencia?: string;
-  cbuAliasTransferencia?: string;
-  montoTransferencia?: string;
-  fechaTransferencia?: string;
-  numeroOperacionTransferencia?: string;
-  observacionesTransferencia?: string;
-  // Cheque
-  numeroCheque?: string;
-  bancoEmisorCheque?: string;
-  sucursalCheque?: string;
-  cuitCuilCheque?: string;
-  titularCheque?: string;
-  importeCheque?: string;
-  tipoCheque?: string;
-  monedaCheque?: string;
-  cuentaCheque?: string;
-  observacionesCheque?: string;
+  estado?: 'no_pagado' | 'pagado';
+  formaDePago?: string;
+  datosPago?: Record<string, unknown>;
 };
 
 export async function addMovimientoAction(data: AddMovimientoData): Promise<{ error?: string }> {
   const ctx = await getActiveMarina();
   if (!ctx) return { error: 'No autenticado' };
+
+  const estado = data.estado ?? 'no_pagado';
 
   try {
     await db.insert(movimientosCuentaCorriente).values({
@@ -57,9 +69,15 @@ export async function addMovimientoAction(data: AddMovimientoData): Promise<{ er
       servicioId: data.servicioId || null,
       concepto: data.concepto.trim() || null,
       tipo: 'otro',
-      estado: 'no_pagado',
+      estado,
       debe: data.monto || '0',
       fecha: data.fecha ? new Date(data.fecha) : new Date(),
+      ...(estado === 'pagado' && data.formaDePago
+        ? {
+            formaDePago: data.formaDePago as never,
+            datosPago: data.datosPago ?? null,
+          }
+        : {}),
     });
     revalidatePath(`/usuarios/${data.socioId}`);
     return {};
@@ -67,6 +85,13 @@ export async function addMovimientoAction(data: AddMovimientoData): Promise<{ er
     return { error: 'Error al agregar el movimiento.' };
   }
 }
+
+export type MarcarPagadasData = {
+  ids: string[];
+  socioId: string;
+  formaDePago: string;
+  datosPago?: Record<string, unknown>;
+};
 
 export async function marcarPagadasAction(data: MarcarPagadasData): Promise<{ error?: string }> {
   const ctx = await getActiveMarina();
@@ -76,57 +101,24 @@ export async function marcarPagadasAction(data: MarcarPagadasData): Promise<{ er
   const setData: Record<string, unknown> = {
     estado: 'pagado',
     formaDePago: data.formaDePago,
+    datosPago: data.datosPago ?? null,
   };
 
-  if (data.formaDePago === 'transferencia') {
-    Object.assign(setData, {
-      bancoTransferencia: data.bancoTransferencia || null,
-      clienteTransferencia: data.clienteTransferencia || null,
-      cbuAliasTransferencia: data.cbuAliasTransferencia || null,
-      montoTransferencia: data.montoTransferencia || null,
-      fechaTransferencia: data.fechaTransferencia ? new Date(data.fechaTransferencia) : null,
-      numeroOperacionTransferencia: data.numeroOperacionTransferencia || null,
-      observacionesTransferencia: data.observacionesTransferencia || null,
-    });
-  } else if (data.formaDePago === 'cheque') {
-    Object.assign(setData, {
-      numeroCheque: data.numeroCheque || null,
-      bancoEmisorCheque: data.bancoEmisorCheque || null,
-      sucursalCheque: data.sucursalCheque || null,
-      cuitCuilCheque: data.cuitCuilCheque || null,
-      titularCheque: data.titularCheque || null,
-      importeCheque: data.importeCheque || null,
-      tipoCheque: data.tipoCheque || null,
-      monedaCheque: data.monedaCheque || null,
-      cuentaCheque: data.cuentaCheque || null,
-      observacionesCheque: data.observacionesCheque || null,
-    });
-  }
-
-  // Para cheque/transferencia: si el importe pagado difiere de la suma de
-  // los items seleccionados, generamos un movimiento ajuste — saldo a favor
-  // (haber) si pagó de más, deuda pendiente (debe) si pagó de menos. Esto
-  // mantiene la cuenta corriente consistente.
+  // Para métodos con importe explícito, comparar contra el total de los items
+  // seleccionados y generar un movimiento ajuste si hay diferencia.
+  const methodsWithAmount = ['cheque', 'transferencia', 'mercado_pago'];
   let importePagado = 0;
-  if (data.formaDePago === 'cheque' && data.importeCheque) {
-    importePagado = parseFloat(data.importeCheque);
-  } else if (data.formaDePago === 'transferencia' && data.montoTransferencia) {
-    importePagado = parseFloat(data.montoTransferencia);
+  if (methodsWithAmount.includes(data.formaDePago) && data.datosPago?.importe) {
+    importePagado = parseFloat(String(data.datosPago.importe));
   }
 
   try {
-    // 1. Marcar todos los items seleccionados como pagados.
     await db
       .update(movimientosCuentaCorriente)
       .set(setData as never)
       .where(inArray(movimientosCuentaCorriente.id, data.ids));
 
-    // 2. Si aplica (cheque o transferencia con importe), comparar contra
-    //    la suma de debes y generar movimiento ajuste si hay diferencia.
-    if (
-      (data.formaDePago === 'cheque' || data.formaDePago === 'transferencia') &&
-      importePagado > 0
-    ) {
+    if (methodsWithAmount.includes(data.formaDePago) && importePagado > 0) {
       const items = await db
         .select({ debe: movimientosCuentaCorriente.debe })
         .from(movimientosCuentaCorriente)
@@ -135,20 +127,28 @@ export async function marcarPagadasAction(data: MarcarPagadasData): Promise<{ er
       const diff = importePagado - totalDebe;
 
       if (Math.abs(diff) >= 0.01) {
-        const formaLabel = data.formaDePago === 'cheque' ? 'Cheque' : 'Transferencia';
-        const refExtra =
-          data.formaDePago === 'cheque' && data.numeroCheque
-            ? ` #${data.numeroCheque}`
-            : data.formaDePago === 'transferencia' && data.numeroOperacionTransferencia
-              ? ` Op. ${data.numeroOperacionTransferencia}`
-              : '';
+        let conceptoBase = '';
+        switch (data.formaDePago) {
+          case 'cheque': {
+            const nro = data.datosPago?.numeroCheque ? ` #${data.datosPago.numeroCheque}` : '';
+            conceptoBase = `Cheque${nro}`;
+            break;
+          }
+          case 'transferencia': {
+            const op = data.datosPago?.nroOperacion ? ` Op. ${data.datosPago.nroOperacion}` : '';
+            conceptoBase = `Transferencia${op}`;
+            break;
+          }
+          case 'mercado_pago':
+            conceptoBase = 'Mercado Pago';
+            break;
+        }
 
         if (diff > 0) {
-          // Saldo a favor — pagó de más.
           const importe = diff.toFixed(2);
           await db.insert(movimientosCuentaCorriente).values({
             socioId: data.socioId,
-            concepto: `Saldo a favor — ${formaLabel}${refExtra}`,
+            concepto: `Saldo a favor — ${conceptoBase}`,
             tipo: 'otro',
             estado: 'pagado',
             debe: '0',
@@ -157,11 +157,10 @@ export async function marcarPagadasAction(data: MarcarPagadasData): Promise<{ er
             fecha: new Date(),
           });
         } else {
-          // Deuda pendiente — pagó de menos.
           const importe = Math.abs(diff).toFixed(2);
           await db.insert(movimientosCuentaCorriente).values({
             socioId: data.socioId,
-            concepto: `Saldo pendiente — ${formaLabel}${refExtra} no cubre el total`,
+            concepto: `Saldo pendiente — ${conceptoBase} no cubre el total`,
             tipo: 'otro',
             estado: 'no_pagado',
             debe: importe,
@@ -180,29 +179,23 @@ export async function marcarPagadasAction(data: MarcarPagadasData): Promise<{ er
   }
 }
 
-// Informar un pago a cuenta del socio. Crea un movimiento con `haber > 0`
-// (es un crédito que reduce el saldo pendiente) y estado 'pagado' (porque
-// ES un pago, no algo por cobrar). El concepto guarda lo que el admin
-// escriba en el modal (descripción + forma de pago, libre).
 export type InformarPagoData = {
   socioId: string;
-  concepto: string;
   monto: string;
   fecha: string;
+  formaDePago: string;
+  datosPago?: Record<string, unknown>;
 };
 
 export async function informarPagoAction(data: InformarPagoData): Promise<{ error?: string }> {
   const ctx = await getActiveMarina();
   if (!ctx) return { error: 'No autenticado' };
   if (!isAdmin(ctx)) return { error: 'Solo administradores pueden informar pagos.' };
-
-  const concepto = data.concepto.trim();
-  if (!concepto) return { error: 'El concepto es obligatorio.' };
+  if (!data.formaDePago) return { error: 'La forma de pago es obligatoria.' };
 
   const monto = parseFloat(data.monto);
   if (!Number.isFinite(monto) || monto <= 0) return { error: 'El monto debe ser mayor a 0.' };
 
-  // Verificar que el socio pertenezca a la guarderia activa.
   const [m] = await db
     .select({ id: memberships.id })
     .from(memberships)
@@ -215,6 +208,8 @@ export async function informarPagoAction(data: InformarPagoData): Promise<{ erro
     );
   if (!m) return { error: 'El socio no pertenece a esta guardería.' };
 
+  const concepto = conceptoFromPago(data.formaDePago, data.datosPago);
+
   try {
     const importe = monto.toFixed(2);
     await db.insert(movimientosCuentaCorriente).values({
@@ -224,9 +219,10 @@ export async function informarPagoAction(data: InformarPagoData): Promise<{ erro
       estado: 'pagado',
       debe: '0',
       haber: importe,
-      // importeSigned negativo: convención del esquema (haber descuenta del saldo).
       importeSigned: `-${importe}`,
       fecha: data.fecha ? new Date(data.fecha) : new Date(),
+      formaDePago: data.formaDePago as never,
+      datosPago: data.datosPago ?? null,
     });
     revalidatePath(`/usuarios/${data.socioId}`);
     return {};
@@ -259,7 +255,6 @@ export async function eliminarPagoAction(movimientoId: string): Promise<{ error?
     return { error: 'Solo se pueden anular pagos a cuenta.' };
   }
 
-  // Verificar que el socio pertenezca a la guarderia activa (multi-tenancy).
   const [m] = await db
     .select({ id: memberships.id })
     .from(memberships)

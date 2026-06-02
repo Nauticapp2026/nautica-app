@@ -95,6 +95,7 @@ export const medioPagoEnum = pgEnum('medio_pago', [
   'debito_automatico',
   'transferencia',
   'cheque',
+  'mercado_pago',
 ]);
 
 export const tipoDocumentoEnum = pgEnum('tipo_documento', [
@@ -920,6 +921,7 @@ export const movimientosCuentaCorriente = pgTable(
     titularCheque: text('titular_cheque'),
     observacionesCheque: text('observaciones_cheque'),
     comprobanteChequeUrls: text('comprobante_cheque_urls').array(),
+    datosPago: jsonb('datos_pago'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },

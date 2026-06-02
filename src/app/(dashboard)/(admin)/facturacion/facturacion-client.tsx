@@ -73,10 +73,8 @@ const CONDICION_VENTA_OPTS = [
   { value: 'contado', label: 'Contado' },
   { value: 'cuenta_corriente', label: 'Cuenta corriente' },
   { value: 'dias_30', label: '30 días' },
-  { value: 'transferencia_bancaria', label: 'Transferencia bancaria' },
-  { value: 'tarjeta_credito', label: 'Tarjeta de crédito' },
-  { value: 'tarjeta_debito', label: 'Tarjeta de débito' },
-  { value: 'mercadopago', label: 'Mercado Pago' },
+  { value: 'dias_60', label: '60 días' },
+  { value: 'dias_90', label: '90 días' },
 ];
 
 const MEDIO_PAGO_OPTS = [
@@ -86,6 +84,7 @@ const MEDIO_PAGO_OPTS = [
   { value: 'debito_automatico', label: 'Débito automático' },
   { value: 'transferencia', label: 'Transferencia' },
   { value: 'cheque', label: 'Cheque' },
+  { value: 'mercado_pago', label: 'Mercado Pago' },
 ];
 
 const ESTADO_BADGE: Record<string, string> = {
@@ -147,7 +146,7 @@ function KpiCard({ value, label }: { value: string; label: string }) {
   );
 }
 
-// ─── Modal: Nueva factura ───────────────────────────────────────────────────
+// ─── Modal: Nuevo comprobante ───────────────────────────────────────────────
 
 function NuevaFacturaModal({
   open,
@@ -274,7 +273,7 @@ function NuevaFacturaModal({
       if (res.error) {
         setError(res.error);
       } else {
-        setSuccess(`Factura emitida ${res.comprobanteNro ?? ''}`);
+        setSuccess(`Comprobante emitido ${res.comprobanteNro ?? ''}`);
         setTimeout(() => {
           handleClose();
           router.refresh();
@@ -291,10 +290,10 @@ function NuevaFacturaModal({
         <div className="flex items-start justify-between p-6 pb-4">
           <div>
             <h2 className="text-lg font-bold" style={{ color: '#101828' }}>
-              Nueva factura
+              Nuevo comprobante
             </h2>
             <p className="mt-0.5 text-sm" style={{ color: '#669E9D' }}>
-              Emití una factura tomando los movimientos pendientes del socio
+              Emití un comprobante tomando los movimientos pendientes del socio
             </p>
           </div>
           <button
@@ -437,7 +436,7 @@ function NuevaFacturaModal({
               </label>
               <input
                 className={inputCls}
-                placeholder="Detalle de la factura"
+                placeholder="Detalle del comprobante"
                 value={form.descripcion}
                 onChange={set('descripcion')}
               />
@@ -523,7 +522,7 @@ function NuevaFacturaModal({
           {form.socioId && selectedMovs.size > 0 && (
             <div className="mb-4 flex items-center justify-between rounded-[10px] bg-gray-50 px-4 py-3">
               <p className="text-sm font-semibold" style={{ color: '#101828' }}>
-                Total a facturar
+                Total a emitir
               </p>
               <p className="text-lg font-bold" style={{ color: '#175861' }}>
                 {fmtMoney(totalSeleccionado)}
@@ -543,7 +542,7 @@ function NuevaFacturaModal({
               className="flex-1 rounded-[10px] py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
               style={{ background: '#175861' }}
             >
-              {isPending ? 'Emitiendo...' : 'Emitir factura'}
+              {isPending ? 'Emitiendo...' : 'Emitir comprobante'}
             </button>
           </div>
         </div>
@@ -649,7 +648,7 @@ function LoteModal({
               Factura en lote
             </h2>
             <p className="mt-0.5 text-sm" style={{ color: '#669E9D' }}>
-              Emití una factura por cada socio con movimientos pendientes
+              Emití un comprobante por cada socio con movimientos pendientes
             </p>
           </div>
           <button
@@ -670,7 +669,7 @@ function LoteModal({
                     className="mb-1.5 block text-xs font-semibold"
                     style={{ color: '#101828' }}
                   >
-                    Tipo de factura
+                    Tipo de comprobante
                   </label>
                   <select
                     className={inputCls}
@@ -834,7 +833,7 @@ function LoteModal({
           ) : (
             <div className="space-y-3">
               <div className="rounded-[10px] bg-green-50 p-4 text-sm text-green-800">
-                <p className="font-semibold">{result.succeeded.length} facturas emitidas</p>
+                <p className="font-semibold">{result.succeeded.length} comprobantes emitidos</p>
                 {result.skipped.length > 0 && (
                   <p className="mt-0.5 text-green-700">
                     {result.skipped.length} socios omitidos (sin pendientes)
@@ -877,7 +876,7 @@ function LoteModal({
               >
                 {isPending
                   ? 'Emitiendo...'
-                  : `Emitir ${selectedIds.size} factura${selectedIds.size === 1 ? '' : 's'}`}
+                  : `Emitir ${selectedIds.size} comprobante${selectedIds.size === 1 ? '' : 's'}`}
               </button>
             )}
           </div>
@@ -1029,7 +1028,7 @@ export function FacturacionClient({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="page-title">Comprobantes</h1>
-          <p className="page-subtitle mt-1">Gestión de facturas y cobros</p>
+          <p className="page-subtitle mt-1">Gestión de comprobantes y cobros</p>
         </div>
         <div className="flex shrink-0 flex-wrap gap-2">
           <button
@@ -1057,7 +1056,7 @@ export function FacturacionClient({
             style={{ background: '#175861' }}
           >
             <Plus className="h-4 w-4" />
-            Nueva factura
+            Nuevo comprobante
           </button>
         </div>
       </div>
@@ -1094,7 +1093,7 @@ export function FacturacionClient({
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar por factura o por tipo..."
+            placeholder="Buscar por comprobante o tipo..."
             className="h-10 w-full rounded-[10px] border border-gray-200 bg-white px-4 text-sm focus:border-[#175861] focus:ring-1 focus:ring-[#175861] focus:outline-none"
           />
         </div>
@@ -1104,8 +1103,8 @@ export function FacturacionClient({
             icon={<FileText className="h-7 w-7 opacity-40" />}
             text={
               search
-                ? 'No se encontraron facturas con ese criterio.'
-                : 'Todavía no hay facturas emitidas.'
+                ? 'No se encontraron comprobantes con ese criterio.'
+                : 'Todavía no hay comprobantes emitidos.'
             }
           />
         ) : (

@@ -128,6 +128,7 @@ const FORMAS_PAGO = [
   { value: 'debito_automatico', label: 'Débito automático' },
   { value: 'transferencia', label: 'Transferencia' },
   { value: 'cheque', label: 'Cheque' },
+  { value: 'mercado_pago', label: 'Mercado Pago' },
 ];
 
 const TABS = [
@@ -178,28 +179,305 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-// ─── Forma de Pago Modal ──────────────────────────────────────────────────────
+// ─── Forma de Pago Fields ─────────────────────────────────────────────────────
 
-const EMPTY_PAGO = {
-  formaDePago: '',
-  bancoTransferencia: '',
-  clienteTransferencia: '',
-  cbuAliasTransferencia: '',
-  montoTransferencia: '',
-  fechaTransferencia: '',
-  numeroOperacionTransferencia: '',
-  observacionesTransferencia: '',
-  numeroCheque: '',
-  bancoEmisorCheque: '',
-  sucursalCheque: '',
-  cuitCuilCheque: '',
-  titularCheque: '',
-  importeCheque: '',
-  tipoCheque: '',
-  monedaCheque: '',
-  cuentaCheque: '',
-  observacionesCheque: '',
-};
+function FormaPagoFields({
+  formaDePago,
+  datosPago,
+  setDatosPago,
+}: {
+  formaDePago: string;
+  datosPago: Record<string, string>;
+  setDatosPago: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+}) {
+  const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+    setDatosPago((prev) => ({ ...prev, [k]: e.target.value }));
+  const val = (k: string) => datosPago[k] ?? '';
+
+  if (!formaDePago || formaDePago === 'efectivo') return null;
+
+  if (formaDePago === 'tarjeta_credito') {
+    return (
+      <>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Field label="Banco / Entidad">
+            <input
+              className={inputCls}
+              placeholder="Banco"
+              value={val('banco')}
+              onChange={set('banco')}
+            />
+          </Field>
+          <Field label="Últimos 4 dígitos">
+            <input
+              className={inputCls}
+              placeholder="1234"
+              maxLength={4}
+              value={val('ultimos4')}
+              onChange={set('ultimos4')}
+            />
+          </Field>
+        </div>
+        <Field label="Cuotas">
+          <select className={inputCls} value={val('cuotas')} onChange={set('cuotas')}>
+            <option value="">Seleccione...</option>
+            {[1, 2, 3, 6, 9, 12, 18, 24].map((n) => (
+              <option key={n} value={String(n)}>
+                {n === 1 ? 'Contado' : `${n} cuotas`}
+              </option>
+            ))}
+          </select>
+        </Field>
+      </>
+    );
+  }
+
+  if (formaDePago === 'tarjeta_debito') {
+    return (
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <Field label="Banco / Entidad">
+          <input
+            className={inputCls}
+            placeholder="Banco"
+            value={val('banco')}
+            onChange={set('banco')}
+          />
+        </Field>
+        <Field label="Últimos 4 dígitos">
+          <input
+            className={inputCls}
+            placeholder="1234"
+            maxLength={4}
+            value={val('ultimos4')}
+            onChange={set('ultimos4')}
+          />
+        </Field>
+      </div>
+    );
+  }
+
+  if (formaDePago === 'debito_automatico') {
+    return (
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <Field label="Banco / Entidad">
+          <input
+            className={inputCls}
+            placeholder="Banco"
+            value={val('banco')}
+            onChange={set('banco')}
+          />
+        </Field>
+        <Field label="CBU / Alias">
+          <input
+            className={inputCls}
+            placeholder="CBU / Alias"
+            value={val('cbuAlias')}
+            onChange={set('cbuAlias')}
+          />
+        </Field>
+      </div>
+    );
+  }
+
+  if (formaDePago === 'transferencia') {
+    return (
+      <>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Field label="Banco origen">
+            <input
+              className={inputCls}
+              placeholder="Banco"
+              value={val('banco')}
+              onChange={set('banco')}
+            />
+          </Field>
+          <Field label="Nombre del titular">
+            <input
+              className={inputCls}
+              placeholder="Nombre"
+              value={val('titular')}
+              onChange={set('titular')}
+            />
+          </Field>
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Field label="CBU / Alias">
+            <input
+              className={inputCls}
+              placeholder="CBU / Alias"
+              value={val('cbuAlias')}
+              onChange={set('cbuAlias')}
+            />
+          </Field>
+          <Field label="Importe">
+            <input
+              className={inputCls}
+              inputMode="decimal"
+              placeholder="0,00"
+              value={val('importe')}
+              onChange={set('importe')}
+            />
+          </Field>
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Field label="Fecha de transferencia">
+            <input type="date" className={inputCls} value={val('fecha')} onChange={set('fecha')} />
+          </Field>
+          <Field label="Nro. de operación / ref.">
+            <input
+              className={inputCls}
+              placeholder="Número"
+              value={val('nroOperacion')}
+              onChange={set('nroOperacion')}
+            />
+          </Field>
+        </div>
+        <Field label="Observaciones">
+          <input
+            className={inputCls}
+            placeholder="Observaciones"
+            value={val('observaciones')}
+            onChange={set('observaciones')}
+          />
+        </Field>
+      </>
+    );
+  }
+
+  if (formaDePago === 'cheque') {
+    return (
+      <>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Field label="Número de cheque">
+            <input
+              className={inputCls}
+              placeholder="Número"
+              value={val('numeroCheque')}
+              onChange={set('numeroCheque')}
+            />
+          </Field>
+          <Field label="Banco emisor">
+            <input
+              className={inputCls}
+              placeholder="Banco"
+              value={val('banco')}
+              onChange={set('banco')}
+            />
+          </Field>
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Field label="Sucursal">
+            <input
+              className={inputCls}
+              placeholder="Sucursal"
+              value={val('sucursal')}
+              onChange={set('sucursal')}
+            />
+          </Field>
+          <Field label="CUIT / CUIL del emisor">
+            <input
+              className={inputCls}
+              placeholder="CUIT/CUIL"
+              value={val('cuitCuil')}
+              onChange={set('cuitCuil')}
+            />
+          </Field>
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Field label="Nombre del titular del cheque">
+            <input
+              className={inputCls}
+              placeholder="Nombre"
+              value={val('titular')}
+              onChange={set('titular')}
+            />
+          </Field>
+          <Field label="Importe del cheque">
+            <input
+              className={inputCls}
+              inputMode="decimal"
+              placeholder="0,00"
+              value={val('importe')}
+              onChange={set('importe')}
+            />
+          </Field>
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Field label="Tipo de cheque">
+            <select className={inputCls} value={val('tipoCheque')} onChange={set('tipoCheque')}>
+              <option value="">Seleccione una opción...</option>
+              <option value="al_dia">Al día</option>
+              <option value="diferido">Diferido</option>
+            </select>
+          </Field>
+          <Field label="Moneda">
+            <select className={inputCls} value={val('moneda')} onChange={set('moneda')}>
+              <option value="">Seleccione una opción...</option>
+              <option value="pesos">Pesos</option>
+              <option value="dolares">Dólares</option>
+            </select>
+          </Field>
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Field label="Cuenta donde se deposita">
+            <input
+              className={inputCls}
+              placeholder="Cuenta"
+              value={val('cuenta')}
+              onChange={set('cuenta')}
+            />
+          </Field>
+          <Field label="Observaciones">
+            <input
+              className={inputCls}
+              placeholder="Observaciones"
+              value={val('observaciones')}
+              onChange={set('observaciones')}
+            />
+          </Field>
+        </div>
+      </>
+    );
+  }
+
+  if (formaDePago === 'mercado_pago') {
+    return (
+      <>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Field label="Nombre / Email del pagador">
+            <input
+              className={inputCls}
+              placeholder="Nombre o email"
+              value={val('pagador')}
+              onChange={set('pagador')}
+            />
+          </Field>
+          <Field label="Nro. de operación">
+            <input
+              className={inputCls}
+              placeholder="Número"
+              value={val('nroOperacion')}
+              onChange={set('nroOperacion')}
+            />
+          </Field>
+        </div>
+        <Field label="Importe">
+          <input
+            className={inputCls}
+            inputMode="decimal"
+            placeholder="0,00"
+            value={val('importe')}
+            onChange={set('importe')}
+          />
+        </Field>
+      </>
+    );
+  }
+
+  return null;
+}
+
+// ─── Forma de Pago Modal ──────────────────────────────────────────────────────
 
 function FormaPagoModal({
   open,
@@ -215,28 +493,31 @@ function FormaPagoModal({
   onSuccess: () => void;
 }) {
   const router = useRouter();
-  const [form, setForm] = useState(EMPTY_PAGO);
+  const [formaDePago, setFormaDePago] = useState('');
+  const [datosPago, setDatosPago] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const set =
-    (k: keyof typeof EMPTY_PAGO) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-      setForm((f) => ({ ...f, [k]: e.target.value }));
-
   function handleClose() {
-    setForm(EMPTY_PAGO);
+    setFormaDePago('');
+    setDatosPago({});
     setError(null);
     onClose();
   }
 
   function handleSubmit() {
-    if (!form.formaDePago) {
+    if (!formaDePago) {
       setError('Seleccioná una forma de pago.');
       return;
     }
     setError(null);
     startTransition(async () => {
-      const res = await marcarPagadasAction({ ids: selectedIds, socioId, ...form });
+      const res = await marcarPagadasAction({
+        ids: selectedIds,
+        socioId,
+        formaDePago,
+        datosPago: datosPago as Record<string, unknown>,
+      });
       if (res.error) {
         setError(res.error);
       } else {
@@ -248,9 +529,6 @@ function FormaPagoModal({
   }
 
   if (!open) return null;
-
-  const esTransferencia = form.formaDePago === 'transferencia';
-  const esCheque = form.formaDePago === 'cheque';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -277,7 +555,14 @@ function FormaPagoModal({
         {/* Body */}
         <div className="flex-1 space-y-4 overflow-y-auto p-6">
           <Field label="Forma de pago">
-            <select className={inputCls} value={form.formaDePago} onChange={set('formaDePago')}>
+            <select
+              className={inputCls}
+              value={formaDePago}
+              onChange={(e) => {
+                setFormaDePago(e.target.value);
+                setDatosPago({});
+              }}
+            >
               <option value="">Seleccione una opción...</option>
               {FORMAS_PAGO.map((o) => (
                 <option key={o.value} value={o.value}>
@@ -287,171 +572,11 @@ function FormaPagoModal({
             </select>
           </Field>
 
-          {/* Transferencia fields */}
-          {esTransferencia && (
-            <>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Field label="Banco origen">
-                  <input
-                    className={inputCls}
-                    placeholder="Banco"
-                    value={form.bancoTransferencia}
-                    onChange={set('bancoTransferencia')}
-                  />
-                </Field>
-                <Field label="Nombre del titular">
-                  <input
-                    className={inputCls}
-                    placeholder="Nombre"
-                    value={form.clienteTransferencia}
-                    onChange={set('clienteTransferencia')}
-                  />
-                </Field>
-              </div>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Field label="CBU / Alias">
-                  <input
-                    className={inputCls}
-                    placeholder="CBU / Alias"
-                    value={form.cbuAliasTransferencia}
-                    onChange={set('cbuAliasTransferencia')}
-                  />
-                </Field>
-                <Field label="Monto">
-                  <input
-                    className={inputCls}
-                    placeholder="Monto"
-                    value={form.montoTransferencia}
-                    onChange={set('montoTransferencia')}
-                  />
-                </Field>
-              </div>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Field label="Fecha de transferencia">
-                  <input
-                    type="date"
-                    className={inputCls}
-                    value={form.fechaTransferencia}
-                    onChange={set('fechaTransferencia')}
-                  />
-                </Field>
-                <Field label="Nro. de operación / ref.">
-                  <input
-                    className={inputCls}
-                    placeholder="Número"
-                    value={form.numeroOperacionTransferencia}
-                    onChange={set('numeroOperacionTransferencia')}
-                  />
-                </Field>
-              </div>
-              <Field label="Observaciones">
-                <input
-                  className={inputCls}
-                  placeholder="Observaciones"
-                  value={form.observacionesTransferencia}
-                  onChange={set('observacionesTransferencia')}
-                />
-              </Field>
-            </>
-          )}
-
-          {/* Cheque fields */}
-          {esCheque && (
-            <>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Field label="Número de cheque">
-                  <input
-                    className={inputCls}
-                    placeholder="Número"
-                    value={form.numeroCheque}
-                    onChange={set('numeroCheque')}
-                  />
-                </Field>
-                <Field label="Banco emisor">
-                  <input
-                    className={inputCls}
-                    placeholder="Banco"
-                    value={form.bancoEmisorCheque}
-                    onChange={set('bancoEmisorCheque')}
-                  />
-                </Field>
-              </div>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Field label="Sucursal">
-                  <input
-                    className={inputCls}
-                    placeholder="Sucursal"
-                    value={form.sucursalCheque}
-                    onChange={set('sucursalCheque')}
-                  />
-                </Field>
-                <Field label="CUIT / CUIL del emisor">
-                  <input
-                    className={inputCls}
-                    placeholder="CUIT/CUIL"
-                    value={form.cuitCuilCheque}
-                    onChange={set('cuitCuilCheque')}
-                  />
-                </Field>
-              </div>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Field label="Nombre del titular del cheque">
-                  <input
-                    className={inputCls}
-                    placeholder="Nombre"
-                    value={form.titularCheque}
-                    onChange={set('titularCheque')}
-                  />
-                </Field>
-                <Field label="Importe del cheque">
-                  <input
-                    className={inputCls}
-                    placeholder="Importe"
-                    value={form.importeCheque}
-                    onChange={set('importeCheque')}
-                  />
-                </Field>
-              </div>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Field label="Tipo de cheque">
-                  <select className={inputCls} value={form.tipoCheque} onChange={set('tipoCheque')}>
-                    <option value="">Seleccione una opción...</option>
-                    <option value="al_dia">Al día</option>
-                    <option value="diferido">Diferido</option>
-                  </select>
-                </Field>
-                <Field label="Moneda">
-                  <select
-                    className={inputCls}
-                    value={form.monedaCheque}
-                    onChange={set('monedaCheque')}
-                  >
-                    <option value="">Seleccione una opción...</option>
-                    <option value="pesos">Pesos</option>
-                    <option value="dolares">Dólares</option>
-                  </select>
-                </Field>
-              </div>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Field label="Cuenta donde se deposita">
-                  <input
-                    className={inputCls}
-                    placeholder="Cuenta"
-                    value={form.cuentaCheque}
-                    onChange={set('cuentaCheque')}
-                  />
-                </Field>
-                <Field label="Observaciones">
-                  <input
-                    className={inputCls}
-                    placeholder="Observaciones"
-                    value={form.observacionesCheque}
-                    onChange={set('observacionesCheque')}
-                  />
-                </Field>
-              </div>
-            </>
-          )}
+          <FormaPagoFields
+            formaDePago={formaDePago}
+            datosPago={datosPago}
+            setDatosPago={setDatosPago}
+          />
 
           {error && <p className="text-sm text-red-600">{error}</p>}
         </div>
@@ -467,7 +592,7 @@ function FormaPagoModal({
             </button>
             <button
               onClick={handleSubmit}
-              disabled={isPending || !form.formaDePago}
+              disabled={isPending || !formaDePago}
               className="flex-1 rounded-[10px] py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
               style={{ background: '#175861' }}
             >
@@ -500,10 +625,15 @@ function AgregarServicioModal({
   const [concepto, setConcepto] = useState('');
   const [monto, setMonto] = useState('');
   const [fecha, setFecha] = useState('');
+  const [estadoPago, setEstadoPago] = useState<'no_pagado' | 'pagado'>('no_pagado');
+  const [formaDePago, setFormaDePago] = useState('');
+  const [datosPago, setDatosPago] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const isValid = Boolean(servicioId && monto);
+  const isValid = Boolean(
+    servicioId && monto && (estadoPago === 'no_pagado' || Boolean(formaDePago)),
+  );
 
   function handleServicioChange(e: React.ChangeEvent<HTMLSelectElement>) {
     const id = e.target.value;
@@ -517,6 +647,9 @@ function AgregarServicioModal({
     setConcepto('');
     setMonto('');
     setFecha('');
+    setEstadoPago('no_pagado');
+    setFormaDePago('');
+    setDatosPago({});
     setError(null);
     onClose();
   }
@@ -530,6 +663,10 @@ function AgregarServicioModal({
         concepto,
         monto: montoToNumberStr(monto),
         fecha,
+        estado: estadoPago,
+        ...(estadoPago === 'pagado' && formaDePago
+          ? { formaDePago, datosPago: datosPago as Record<string, unknown> }
+          : {}),
       });
       if (res.error) {
         setError(res.error);
@@ -544,7 +681,7 @@ function AgregarServicioModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl">
+      <div className="flex max-h-[90vh] w-full max-w-md flex-col rounded-2xl bg-white shadow-2xl">
         <div className="flex items-start justify-between p-6 pb-4">
           <div>
             <h2 className="text-[18px] font-bold" style={{ color: '#101828' }}>
@@ -563,7 +700,29 @@ function AgregarServicioModal({
         </div>
         <div className="border-t border-gray-200" />
 
-        <div className="space-y-4 p-6">
+        <div className="flex-1 space-y-4 overflow-y-auto p-6">
+          {/* Toggle Pendiente / Pagado */}
+          <div className="flex rounded-[10px] border border-gray-200 bg-gray-50 p-1">
+            <button
+              type="button"
+              onClick={() => {
+                setEstadoPago('no_pagado');
+                setFormaDePago('');
+                setDatosPago({});
+              }}
+              className={`flex-1 rounded-[8px] py-1.5 text-sm font-medium transition ${estadoPago === 'no_pagado' ? 'bg-white text-[#101828] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+            >
+              Pendiente
+            </button>
+            <button
+              type="button"
+              onClick={() => setEstadoPago('pagado')}
+              className={`flex-1 rounded-[8px] py-1.5 text-sm font-medium transition ${estadoPago === 'pagado' ? 'bg-white text-[#101828] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+            >
+              Pagado
+            </button>
+          </div>
+
           <div>
             <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
               Servicio
@@ -617,6 +776,33 @@ function AgregarServicioModal({
             </div>
           </div>
 
+          {estadoPago === 'pagado' && (
+            <>
+              <Field label="Forma de pago">
+                <select
+                  className={inputCls}
+                  value={formaDePago}
+                  onChange={(e) => {
+                    setFormaDePago(e.target.value);
+                    setDatosPago({});
+                  }}
+                >
+                  <option value="">Seleccione una opción...</option>
+                  {FORMAS_PAGO.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <FormaPagoFields
+                formaDePago={formaDePago}
+                datosPago={datosPago}
+                setDatosPago={setDatosPago}
+              />
+            </>
+          )}
+
           {error && <p className="text-sm text-red-600">{error}</p>}
         </div>
 
@@ -650,26 +836,29 @@ function InformarPagoModal({
   onClose,
   socioId,
   socioNombre,
+  saldoBruto,
 }: {
   open: boolean;
   onClose: () => void;
   socioId: string;
   socioNombre: string;
+  saldoBruto: number;
 }) {
   const router = useRouter();
-  const [concepto, setConcepto] = useState('');
-  const [monto, setMonto] = useState('');
+  const [formaDePago, setFormaDePago] = useState('');
+  const [datosPago, setDatosPago] = useState<Record<string, string>>({});
+  // Inicializar monto con el saldo deudor (lazy init — se re-evalúa en cada
+  // remount que ocurre cuando key cambia al abrir el modal).
+  const [monto, setMonto] = useState(() =>
+    saldoBruto > 0 ? saldoBruto.toFixed(2).replace('.', ',') : '',
+  );
   const [fecha, setFecha] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const isValid = Boolean(concepto.trim() && monto && parseFloat(montoToNumberStr(monto)) > 0);
+  const isValid = Boolean(formaDePago && monto && parseFloat(montoToNumberStr(monto)) > 0);
 
   function handleClose() {
-    setConcepto('');
-    setMonto('');
-    setFecha('');
-    setError(null);
     onClose();
   }
 
@@ -678,14 +867,16 @@ function InformarPagoModal({
     startTransition(async () => {
       const res = await informarPagoAction({
         socioId,
-        concepto,
         monto: montoToNumberStr(monto),
         fecha,
+        formaDePago,
+        datosPago: datosPago as Record<string, unknown>,
       });
       if (res.error) {
         setError(res.error);
       } else {
         handleClose();
+        toast.success('Pago registrado');
         router.refresh();
       }
     });
@@ -695,7 +886,7 @@ function InformarPagoModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl">
+      <div className="flex max-h-[90vh] w-full max-w-lg flex-col rounded-2xl bg-white shadow-2xl">
         <div className="flex items-start justify-between p-6 pb-4">
           <div>
             <h2 className="text-[18px] font-bold" style={{ color: '#101828' }}>
@@ -714,19 +905,7 @@ function InformarPagoModal({
         </div>
         <div className="border-t border-gray-200" />
 
-        <div className="space-y-4 p-6">
-          <div>
-            <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
-              Concepto / forma de pago
-            </label>
-            <input
-              className={inputCls}
-              placeholder="Ej. Pago en efectivo · Transferencia Galicia"
-              value={concepto}
-              onChange={(e) => setConcepto(e.target.value)}
-            />
-          </div>
-
+        <div className="flex-1 space-y-4 overflow-y-auto p-6">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
@@ -752,6 +931,30 @@ function InformarPagoModal({
               />
             </div>
           </div>
+
+          <Field label="Forma de pago">
+            <select
+              className={inputCls}
+              value={formaDePago}
+              onChange={(e) => {
+                setFormaDePago(e.target.value);
+                setDatosPago({});
+              }}
+            >
+              <option value="">Seleccione una opción...</option>
+              {FORMAS_PAGO.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+
+          <FormaPagoFields
+            formaDePago={formaDePago}
+            datosPago={datosPago}
+            setDatosPago={setDatosPago}
+          />
 
           {error && <p className="text-sm text-red-600">{error}</p>}
         </div>
@@ -1591,10 +1794,12 @@ export function SocioDetail({
         onSuccess={() => setSelectedIds(new Set())}
       />
       <InformarPagoModal
+        key={String(modalInformarPagoOpen)}
         open={modalInformarPagoOpen}
         onClose={() => setModalInformarPagoOpen(false)}
         socioId={socio.id}
         socioNombre={nombre}
+        saldoBruto={saldoBruto}
       />
 
       {/* Back */}

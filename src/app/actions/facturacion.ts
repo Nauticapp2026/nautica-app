@@ -58,7 +58,8 @@ type MedioPago =
   | 'tarjeta_debito'
   | 'debito_automatico'
   | 'transferencia'
-  | 'cheque';
+  | 'cheque'
+  | 'mercado_pago';
 
 type EstadoFactura = 'pagada' | 'pendiente' | 'vencida';
 
