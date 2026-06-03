@@ -636,8 +636,6 @@ Para desconectar Payway, usá el botón **Desconectar** en esa misma pantalla. E
    - Nombre del titular (tal como figura en la tarjeta)
 4. Hacé clic en **Registrar tarjeta**.
 
-El sistema realiza un cobro de **$1** para validar y registrar la tarjeta (requerido por Payway). Este importe queda registrado en el historial de cobros.
-
 Una vez registrada, el tab muestra la tarjeta activa con los últimos 4 dígitos y la marca.
 
 **Para reemplazar una tarjeta:** hacé clic en **Reemplazar** y completá los nuevos datos. El proceso es el mismo que el alta.

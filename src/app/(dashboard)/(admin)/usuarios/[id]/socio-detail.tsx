@@ -2845,8 +2845,8 @@ function PaywayTab({
               </Field>
               <div className="sm:col-span-2">
                 <p className="text-xs text-gray-500">
-                  Se realizará un cobro de $1 para validar y registrar la tarjeta. El primer cobro
-                  real se generará automáticamente en el próximo ciclo de facturación.
+                  El primer cobro real se generará automáticamente en el próximo ciclo de
+                  facturación.
                 </p>
               </div>
             </div>
