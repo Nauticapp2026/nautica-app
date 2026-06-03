@@ -7,6 +7,7 @@ import {
   guarderias,
   memberships,
   movimientosCuentaCorriente,
+  paywayCobros,
   profiles,
 } from '@/lib/db/schema';
 
@@ -29,6 +30,7 @@ export default async function FacturacionPage() {
     lista,
     sociosList,
     [guarderiaInfo],
+    cobrosLista,
   ] = await Promise.all([
     db
       .select({ pendientesCount: count() })
@@ -122,6 +124,24 @@ export default async function FacturacionPage() {
       .from(guarderias)
       .where(eq(guarderias.id, gId))
       .limit(1),
+
+    db
+      .select({
+        id: paywayCobros.id,
+        socioId: paywayCobros.socioId,
+        socioNombre: profiles.nombre,
+        socioApellido: profiles.apellido,
+        monto: paywayCobros.monto,
+        estado: paywayCobros.estado,
+        errorMensaje: paywayCobros.errorMensaje,
+        movimientosIds: paywayCobros.movimientosIds,
+        createdAt: paywayCobros.createdAt,
+      })
+      .from(paywayCobros)
+      .leftJoin(profiles, eq(profiles.id, paywayCobros.socioId))
+      .where(eq(paywayCobros.guarderiaId, gId))
+      .orderBy(desc(paywayCobros.createdAt))
+      .limit(200),
   ]);
 
   const facturas = lista.map((f) => ({
@@ -154,6 +174,17 @@ export default async function FacturacionPage() {
   const posConfigurado = guarderiaInfo?.puntoDeVenta != null;
   const certificadoOk = guarderiaInfo?.certificadoAfipOk ?? false;
 
+  const cobrosPayway = cobrosLista.map((c) => ({
+    id: c.id,
+    socioId: c.socioId,
+    socioNombre: [c.socioNombre, c.socioApellido].filter(Boolean).join(' ') || '—',
+    monto: c.monto,
+    estado: c.estado,
+    errorMensaje: c.errorMensaje,
+    movimientosIds: c.movimientosIds,
+    createdAt: c.createdAt.toISOString(),
+  }));
+
   return (
     <FacturacionClient
       facturas={facturas}
@@ -166,6 +197,7 @@ export default async function FacturacionPage() {
       }}
       posConfigurado={posConfigurado}
       certificadoOk={certificadoOk}
+      cobrosPayway={cobrosPayway}
     />
   );
 }

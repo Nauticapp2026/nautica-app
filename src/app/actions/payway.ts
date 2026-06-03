@@ -1,11 +1,17 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, inArray } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 
 import { db } from '@/lib/db';
-import { guarderias, memberships, paywayTokens } from '@/lib/db/schema';
+import {
+  guarderias,
+  memberships,
+  movimientosCuentaCorriente,
+  paywayCobros,
+  paywayTokens,
+} from '@/lib/db/schema';
 import { getActiveMarina } from '@/lib/auth/session';
 
 // SDK callback-based → wrappear en Promise
@@ -147,6 +153,135 @@ export async function guardarTarjetaSocioAction(
     });
 
   revalidatePath(`/usuarios/${data.socioId}`);
+  return {};
+}
+
+export async function reintentarCobroPaywayAction(cobroId: string): Promise<{ error?: string }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+  if (!isAdmin(ctx)) return { error: 'Solo administradores.' };
+
+  const guarderiaId = ctx.activeMembership.guarderiaId;
+
+  // Verificar que el cobro pertenece a esta guardería y está en estado fallido
+  const [cobro] = await db
+    .select({
+      id: paywayCobros.id,
+      socioId: paywayCobros.socioId,
+      movimientosIds: paywayCobros.movimientosIds,
+    })
+    .from(paywayCobros)
+    .where(and(eq(paywayCobros.id, cobroId), eq(paywayCobros.guarderiaId, guarderiaId)))
+    .limit(1);
+  if (!cobro) return { error: 'Cobro no encontrado.' };
+
+  // Verificar que los movimientos aún estén pendientes de pago
+  const movsPendientes = await db
+    .select({ id: movimientosCuentaCorriente.id, debe: movimientosCuentaCorriente.debe })
+    .from(movimientosCuentaCorriente)
+    .where(
+      and(
+        inArray(movimientosCuentaCorriente.id, cobro.movimientosIds),
+        eq(movimientosCuentaCorriente.estado, 'no_pagado'),
+      ),
+    );
+  if (!movsPendientes.length) return { error: 'Los movimientos ya están pagados.' };
+
+  const totalPesos = movsPendientes.reduce((acc, m) => acc + parseFloat(m.debe ?? '0'), 0);
+  if (totalPesos < 0.01) return { error: 'El monto a cobrar es cero.' };
+
+  // Token del socio
+  const [token] = await db
+    .select({
+      customerToken: paywayTokens.customerToken,
+      paymentMethodId: paywayTokens.paymentMethodId,
+      bin: paywayTokens.bin,
+    })
+    .from(paywayTokens)
+    .where(
+      and(
+        eq(paywayTokens.socioId, cobro.socioId),
+        eq(paywayTokens.guarderiaId, guarderiaId),
+        eq(paywayTokens.activo, true),
+      ),
+    )
+    .limit(1);
+  if (!token) return { error: 'El socio no tiene tarjeta registrada.' };
+
+  // Credenciales
+  const [g] = await db
+    .select({ publicKey: guarderias.paywayPublicKey, privateKey: guarderias.paywayPrivateKey })
+    .from(guarderias)
+    .where(eq(guarderias.id, guarderiaId))
+    .limit(1);
+  if (!g?.publicKey || !g?.privateKey) return { error: 'Payway no configurado.' };
+
+  const ambient = process.env.NODE_ENV === 'production' ? 'production' : 'developer';
+  const sdk = makePaywaySdk(ambient, g.publicKey, g.privateKey);
+  const siteTransactionId = randomUUID();
+  const movimientosIds = movsPendientes.map((m) => m.id);
+
+  // Nuevo registro de intento
+  const [nuevoCobro] = await db
+    .insert(paywayCobros)
+    .values({
+      guarderiaId,
+      socioId: cobro.socioId,
+      monto: Math.round(totalPesos * 100),
+      siteTransactionId,
+      estado: 'pendiente',
+      movimientosIds,
+    })
+    .returning({ id: paywayCobros.id });
+
+  let result: Record<string, unknown>;
+  try {
+    result = await paymentAsync(sdk, {
+      site_transaction_id: siteTransactionId,
+      token: token.customerToken,
+      user_id: cobro.socioId,
+      payment_method_id: token.paymentMethodId,
+      bin: token.bin,
+      amount: totalPesos,
+      currency: 'ARS',
+      installments: 1,
+      description: 'Cuota mensual (reintento) — NauticaApp',
+      payment_type: 'recurrente',
+      sub_payments: [],
+      store_credential: true,
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    await db
+      .update(paywayCobros)
+      .set({ estado: 'error', errorMensaje: msg })
+      .where(eq(paywayCobros.id, nuevoCobro.id));
+    return { error: 'Error al conectar con Payway. Intentá de nuevo.' };
+  }
+
+  const approved = result.status === 'approved';
+  const paywayPaymentId = result.id != null ? String(result.id) : null;
+
+  if (approved) {
+    await db
+      .update(movimientosCuentaCorriente)
+      .set({ estado: 'pagado', formaDePago: 'debito_automatico' })
+      .where(inArray(movimientosCuentaCorriente.id, movimientosIds));
+    await db
+      .update(paywayCobros)
+      .set({ estado: 'aprobado', paywayPaymentId })
+      .where(eq(paywayCobros.id, nuevoCobro.id));
+  } else {
+    const errDetail = (result.status_details as Record<string, unknown> | null)?.error;
+    const msg = errDetail ? String(errDetail) : ((result.status as string | null) ?? 'rechazado');
+    await db
+      .update(paywayCobros)
+      .set({ estado: 'rechazado', paywayPaymentId, errorMensaje: msg })
+      .where(eq(paywayCobros.id, nuevoCobro.id));
+    return { error: `Cobro rechazado: ${msg}` };
+  }
+
+  revalidatePath('/facturacion');
   return {};
 }
 
