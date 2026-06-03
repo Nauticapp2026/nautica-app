@@ -261,6 +261,13 @@ export const locacionServicioEnum = pgEnum('locacion_servicio', ['camas', 'amarr
 
 export const unidadMetrajeEnum = pgEnum('unidad_metraje', ['metros', 'pies']);
 
+export const paywayCobroEstadoEnum = pgEnum('payway_cobro_estado', [
+  'aprobado',
+  'rechazado',
+  'pendiente',
+  'error',
+]);
+
 // Rangos de eslora/manga para tarifas (Medidas en Bubble)
 export const medidaEnum = pgEnum('medida', [
   'hasta_16',
@@ -335,6 +342,9 @@ export const guarderias = pgTable(
     tusfacturasUsertoken: text('tusfacturas_usertoken'),
     // Certificado de enlace con AFIP — true = instalado y confirmado, puede facturar.
     certificadoAfipOk: boolean('certificado_afip_ok').default(false).notNull(),
+    // Credenciales Payway por guardería (débito automático con tarjeta tokenizada).
+    paywayPublicKey: text('payway_public_key'),
+    paywayPrivateKey: text('payway_private_key'),
     // Activación a nivel plataforma. false = los usuarios de la guardería ven
     // una pantalla "pendiente de activación" en lugar del dashboard. El super
     // admin activa desde /super-admin/guarderias.
@@ -1197,6 +1207,63 @@ export const publicaciones = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [index('publicaciones_guarderia_idx').on(t.guarderiaId)],
+);
+
+// =============================================================================
+// PAYWAY — débito automático con tarjeta tokenizada
+// =============================================================================
+
+export const paywayTokens = pgTable(
+  'payway_tokens',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    guarderiaId: uuid('guarderia_id')
+      .notNull()
+      .references(() => guarderias.id, { onDelete: 'cascade' }),
+    socioId: uuid('socio_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    customerToken: text('customer_token').notNull(),
+    paymentMethodId: integer('payment_method_id').notNull(), // 1=Visa, 2=Mastercard, 65=Amex
+    bin: text('bin').notNull().default(''), // primeros 6 dígitos, requerido en MIT
+    lastFour: text('last_four').notNull(),
+    activo: boolean('activo').notNull().default(true),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex('payway_tokens_guarderia_socio_unique').on(t.guarderiaId, t.socioId),
+    index('payway_tokens_guarderia_idx').on(t.guarderiaId),
+    index('payway_tokens_socio_idx').on(t.socioId),
+  ],
+);
+
+export const paywayCobros = pgTable(
+  'payway_cobros',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    guarderiaId: uuid('guarderia_id')
+      .notNull()
+      .references(() => guarderias.id, { onDelete: 'cascade' }),
+    socioId: uuid('socio_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    monto: integer('monto').notNull(), // en centavos, ej. $3.000 = 300000
+    siteTransactionId: uuid('site_transaction_id').notNull().unique(),
+    paywayPaymentId: text('payway_payment_id'),
+    estado: paywayCobroEstadoEnum('estado').notNull().default('pendiente'),
+    errorMensaje: text('error_mensaje'),
+    movimientosIds: uuid('movimientos_ids')
+      .array()
+      .notNull()
+      .default(sql`'{}'`),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index('payway_cobros_guarderia_idx').on(t.guarderiaId),
+    index('payway_cobros_socio_idx').on(t.socioId),
+    index('payway_cobros_created_idx').on(t.createdAt),
+  ],
 );
 
 // =============================================================================

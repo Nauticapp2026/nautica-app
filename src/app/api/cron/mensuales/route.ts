@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { runAutoEmision } from '@/lib/auto-facturacion';
 import { runMonthlyGeneration } from '@/lib/movimientos-mensuales';
+import { runPaywayCharges } from '@/lib/payway-cobros';
 
 // Invocado diariamente por Vercel Cron (ver vercel.json: 0 5 * * *).
 // Para cada guardería cuyo `diaFacturacion === hoy`:
@@ -23,7 +24,8 @@ export async function GET(req: Request): Promise<Response> {
     const now = new Date();
     const movs = await runMonthlyGeneration(now);
     const facturas = await runAutoEmision(movs.guarderiaIds, now);
-    return NextResponse.json({ ok: true, movimientos: movs, facturas });
+    const cobros = await runPaywayCharges(movs.guarderiaIds);
+    return NextResponse.json({ ok: true, movimientos: movs, facturas, cobros });
   } catch (err) {
     console.error('[cron/mensuales] error', err);
     return NextResponse.json(

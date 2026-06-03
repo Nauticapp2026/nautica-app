@@ -9,11 +9,13 @@ import {
   facturacion,
   facturacionItemMovimientos,
   facturacionItems,
+  guarderias,
   invitados,
   lados,
   marinas,
   memberships,
   movimientosCuentaCorriente,
+  paywayTokens,
   pisos,
   porteria,
   profiles,
@@ -71,6 +73,8 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
     salidasList,
     espacioActualRow,
     espaciosDisponibles,
+    guarderiaRow,
+    paywayTokenRow,
   ] = await Promise.all([
     db
       .select({
@@ -214,6 +218,22 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
         ),
       )
       .orderBy(asc(areas.nombre), asc(espacios.orden)),
+
+    db
+      .select({ paywayPublicKey: guarderias.paywayPublicKey })
+      .from(guarderias)
+      .where(eq(guarderias.id, gId))
+      .limit(1),
+
+    db
+      .select({
+        lastFour: paywayTokens.lastFour,
+        paymentMethodId: paywayTokens.paymentMethodId,
+        activo: paywayTokens.activo,
+      })
+      .from(paywayTokens)
+      .where(and(eq(paywayTokens.socioId, id), eq(paywayTokens.guarderiaId, gId)))
+      .limit(1),
   ]);
 
   // Para cada movimiento facturado, traer el código de la factura. Lo
@@ -328,6 +348,16 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
 
   return (
     <SocioDetail
+      paywayPublicKey={guarderiaRow[0]?.paywayPublicKey ?? null}
+      paywayToken={
+        paywayTokenRow[0]
+          ? {
+              lastFour: paywayTokenRow[0].lastFour,
+              paymentMethodId: paywayTokenRow[0].paymentMethodId,
+              activo: paywayTokenRow[0].activo,
+            }
+          : null
+      }
       socio={{
         ...socio,
         memberSince: socio.memberSince.toISOString(),

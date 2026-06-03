@@ -622,6 +622,50 @@ export async function createMiembroEquipoAction(
 }
 
 // =============================================================================
+// PAYWAY — credenciales por guardería
+// =============================================================================
+
+export type SavePaywayCredsData = {
+  publicKey: string;
+  privateKey: string;
+};
+
+export async function savePaywayCredsAction(
+  data: SavePaywayCredsData,
+): Promise<{ error?: string }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+  if (!isAdmin(ctx)) return { error: 'Solo administradores pueden configurar Payway.' };
+
+  const publicKey = data.publicKey.trim();
+  const privateKey = data.privateKey.trim();
+  if (!publicKey) return { error: 'La public key es obligatoria.' };
+  if (!privateKey) return { error: 'La private key es obligatoria.' };
+
+  await db
+    .update(guarderias)
+    .set({ paywayPublicKey: publicKey, paywayPrivateKey: privateKey, updatedAt: new Date() })
+    .where(eq(guarderias.id, ctx.activeMembership.guarderiaId));
+
+  revalidatePath('/configuracion');
+  return {};
+}
+
+export async function deletePaywayCredsAction(): Promise<{ error?: string }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+  if (!isAdmin(ctx)) return { error: 'Solo administradores pueden desconectar Payway.' };
+
+  await db
+    .update(guarderias)
+    .set({ paywayPublicKey: null, paywayPrivateKey: null, updatedAt: new Date() })
+    .where(eq(guarderias.id, ctx.activeMembership.guarderiaId));
+
+  revalidatePath('/configuracion');
+  return {};
+}
+
+// =============================================================================
 // IMAGENES DE LA GUARDERIA
 // =============================================================================
 

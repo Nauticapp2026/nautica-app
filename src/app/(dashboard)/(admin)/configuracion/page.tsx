@@ -12,6 +12,7 @@ import {
   ConfiguracionClient,
   type InfoGeneralData,
   type MiembroEquipo,
+  type PaywayData,
   type PlanInfo,
   type PuntoVentaData,
   type TabKey,
@@ -19,7 +20,7 @@ import {
 
 const DIAS = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'] as const;
 
-const VALID_TABS: TabKey[] = ['info', 'equipo', 'plan', 'punto_venta'];
+const VALID_TABS: TabKey[] = ['info', 'equipo', 'plan', 'punto_venta', 'payway'];
 
 type Props = {
   searchParams: Promise<{ tab?: string; nuevo?: string }>;
@@ -68,6 +69,8 @@ export default async function ConfiguracionPage({ searchParams }: Props) {
       diaFacturacion: guarderias.diaFacturacion,
       certificadoAfipOk: guarderias.certificadoAfipOk,
       plan: guarderias.plan,
+      paywayPublicKey: guarderias.paywayPublicKey,
+      paywayPrivateKey: guarderias.paywayPrivateKey,
     })
     .from(guarderias)
     .where(eq(guarderias.id, guarderiaId))
@@ -175,6 +178,11 @@ export default async function ConfiguracionPage({ searchParams }: Props) {
     activarMenuGastronomico: guarderia?.activarMenuGastronomico ?? false,
   };
 
+  const payway: PaywayData = {
+    publicKey: guarderia?.paywayPublicKey ?? '',
+    privateKey: guarderia?.paywayPrivateKey ?? '',
+  };
+
   const puntoVenta: PuntoVentaData = {
     puntoDeVenta: guarderia?.puntoDeVenta ?? null,
     razonSocial: guarderia?.razonSocial ?? '',
@@ -191,6 +199,7 @@ export default async function ConfiguracionPage({ searchParams }: Props) {
       currentUserId={ctx.profile.id}
       features={features}
       puntoVenta={puntoVenta}
+      payway={payway}
       planes={planes}
       currentPlan={(guarderia?.plan ?? 'esencial') as PlanInfo['slug']}
       initialTab={initialTab}
