@@ -1680,8 +1680,8 @@ function PaywayTab({ initial }: { initial: PaywayData }) {
       {!yaConfigurado && (
         <div className="mb-6 rounded-[10px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           <strong>Antes de continuar:</strong> necesitás una cuenta activa en{' '}
-          <span className="font-medium">Payway (decidir.com.ar)</span>. Las claves las encontrás en
-          el panel de tu cuenta bajo Integración → Credenciales.
+          <span className="font-medium">Payway (ventasonline.payway.com.ar)</span>. Las claves las
+          encontrás en el panel de tu cuenta bajo Integración → Credenciales.
         </div>
       )}
 
