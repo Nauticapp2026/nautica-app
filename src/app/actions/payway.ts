@@ -54,7 +54,7 @@ export type GuardarTarjetaData = {
   paymentMethodId: number; // 1=Visa, 2=MC, 65=Amex
   lastFour: string;
   bin: string; // primeros 6 dígitos
-  amount: number; // monto del primer cobro en pesos (float, ej: 15000.00)
+  // sin campo amount: se cobra $1 fijo solo para tokenizar; el cobro real lo hace el cron
 };
 
 export async function guardarTarjetaSocioAction(
@@ -91,19 +91,21 @@ export async function guardarTarjetaSocioAction(
     return { error: 'Esta guardería no tiene Payway configurado.' };
   }
 
-  const amount = Math.max(data.amount, 1); // mínimo $1
+  // $1 fijo para tokenizar — el cobro real lo hace el cron tras facturar
+  const ENROLLMENT_AMOUNT = 1;
+  const siteTransactionId = randomUUID();
   const ambient = process.env.NODE_ENV === 'production' ? 'production' : 'developer';
   const sdk = makePaywaySdk(ambient, g.publicKey, g.privateKey);
 
   let result: Record<string, unknown>;
   try {
     result = await paymentAsync(sdk, {
-      site_transaction_id: randomUUID(),
+      site_transaction_id: siteTransactionId,
       token: data.token,
       user_id: data.socioId,
       payment_method_id: data.paymentMethodId,
       bin: data.bin,
-      amount,
+      amount: ENROLLMENT_AMOUNT,
       currency: 'ARS',
       installments: 1,
       description: 'Alta débito automático - NauticaApp',
@@ -128,6 +130,8 @@ export async function guardarTarjetaSocioAction(
     return { error: 'Payway no devolvió el token de tarjeta. Contactá con soporte.' };
   }
 
+  const paywayPaymentId = result.id != null ? String(result.id) : null;
+
   // Guardar o reemplazar token (unique: guarderia_id + socio_id)
   await db
     .insert(paywayTokens)
@@ -151,6 +155,17 @@ export async function guardarTarjetaSocioAction(
         updatedAt: new Date(),
       },
     });
+
+  // Registrar el cobro de $1 de alta en el historial de auditoría
+  await db.insert(paywayCobros).values({
+    guarderiaId,
+    socioId: data.socioId,
+    monto: 100, // $1 en centavos
+    siteTransactionId,
+    paywayPaymentId,
+    estado: 'aprobado',
+    movimientosIds: [],
+  });
 
   revalidatePath(`/usuarios/${data.socioId}`);
   return {};

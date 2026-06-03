@@ -2514,12 +2514,7 @@ export function SocioDetail({
 
       {/* Débito automático Payway */}
       {activeTab === 'payway' && (
-        <PaywayTab
-          socioId={socio.id}
-          paywayPublicKey={paywayPublicKey}
-          paywayToken={paywayToken}
-          pendingAmount={Math.max(0, parseFloat(socio.deuda ?? '0'))}
-        />
+        <PaywayTab socioId={socio.id} paywayPublicKey={paywayPublicKey} paywayToken={paywayToken} />
       )}
     </div>
   );
@@ -2629,12 +2624,10 @@ function PaywayTab({
   socioId,
   paywayPublicKey,
   paywayToken,
-  pendingAmount,
 }: {
   socioId: string;
   paywayPublicKey: string | null;
   paywayToken: PaywayTokenInfo | null;
-  pendingAmount: number;
 }) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
@@ -2647,7 +2640,6 @@ function PaywayTab({
   const [expYear, setExpYear] = useState('');
   const [cvv, setCvv] = useState('');
   const [holder, setHolder] = useState('');
-  const [amount, setAmount] = useState(pendingAmount > 0 ? pendingAmount.toFixed(2) : '1.00');
   const [feedback, setFeedback] = useState<{ type: 'error' | 'success'; msg: string } | null>(null);
   const [pending, startTransition] = useTransition();
   const [pendingDelete, startDelete] = useTransition();
@@ -2671,11 +2663,6 @@ function PaywayTab({
         type: 'error',
         msg: 'El SDK de Payway no terminó de cargar. Esperá un momento.',
       });
-      return;
-    }
-    const amountNum = parseFloat(amount);
-    if (isNaN(amountNum) || amountNum < 1) {
-      setFeedback({ type: 'error', msg: 'El monto debe ser al menos $1.' });
       return;
     }
     setFeedback(null);
@@ -2709,7 +2696,6 @@ function PaywayTab({
           paymentMethodId,
           lastFour,
           bin,
-          amount: amountNum,
         };
 
         startTransition(async () => {
@@ -2858,19 +2844,10 @@ function PaywayTab({
                 />
               </Field>
               <div className="sm:col-span-2">
-                <Field
-                  label={`Monto del primer cobro${pendingAmount > 0 ? ` (deuda actual: $${pendingAmount.toLocaleString('es-AR', { minimumFractionDigits: 2 })})` : ''}`}
-                >
-                  <input
-                    className={inputCls}
-                    type="number"
-                    inputMode="decimal"
-                    step="0.01"
-                    min="1"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                  />
-                </Field>
+                <p className="text-xs text-gray-500">
+                  Se realizará un cobro de $1 para validar y registrar la tarjeta. El primer cobro
+                  real se generará automáticamente en el próximo ciclo de facturación.
+                </p>
               </div>
             </div>
 
@@ -2888,7 +2865,7 @@ function PaywayTab({
                 disabled={pending || !scriptReady}
                 className="bg-primary hover:bg-primary/90 rounded-[10px] px-6 py-3 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {pending ? 'Procesando…' : !scriptReady ? 'Cargando SDK…' : 'Registrar y cobrar'}
+                {pending ? 'Procesando…' : !scriptReady ? 'Cargando SDK…' : 'Registrar tarjeta'}
               </button>
               {paywayToken && (
                 <button
