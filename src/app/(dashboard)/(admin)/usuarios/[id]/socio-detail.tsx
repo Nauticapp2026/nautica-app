@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useTransition, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import Script from 'next/script';
 import {
   ArrowLeft,
   User,
@@ -43,6 +44,11 @@ import {
   updateSocioAction,
   uploadSocioDocumentoAction,
 } from '@/app/actions/socios';
+import {
+  guardarTarjetaSocioAction,
+  eliminarTarjetaSocioAction,
+  type GuardarTarjetaData,
+} from '@/app/actions/payway';
 import { formatArgentinaDate, formatArgentinaDateTime, formatNaiveDateTime } from '@/lib/dates';
 import { EmptyState } from '@/components/shared/empty-state';
 
@@ -142,6 +148,7 @@ const TABS = [
   { id: 'navegantes', label: 'Navegantes', icon: Users },
   { id: 'salidas', label: 'Salidas', icon: Clock },
   { id: 'documentacion', label: 'Documentación', icon: FileText },
+  { id: 'payway', label: 'Débito automático', icon: CreditCard },
 ] as const;
 
 type TabId = (typeof TABS)[number]['id'];
@@ -1784,6 +1791,12 @@ function DocumentacionTab({
 
 export type EspacioOption = { id: string; label: string };
 
+type PaywayTokenInfo = {
+  lastFour: string;
+  paymentMethodId: number;
+  activo: boolean;
+};
+
 export function SocioDetail({
   socio,
   embarcaciones,
@@ -1794,6 +1807,8 @@ export function SocioDetail({
   salidas = [],
   espacioActual,
   espaciosDisponibles,
+  paywayPublicKey = null,
+  paywayToken = null,
 }: {
   socio: SocioData;
   embarcaciones: Embarcacion[];
@@ -1804,6 +1819,8 @@ export function SocioDetail({
   salidas?: SalidaItem[];
   espacioActual: EspacioOption | null;
   espaciosDisponibles: EspacioOption[];
+  paywayPublicKey?: string | null;
+  paywayToken?: PaywayTokenInfo | null;
 }) {
   const [activeTab, setActiveTab] = useState<TabId>('generales');
   const [modalServicioOpen, setModalServicioOpen] = useState(false);
@@ -2494,6 +2511,16 @@ export function SocioDetail({
       {activeTab === 'documentacion' && (
         <DocumentacionTab socioId={socio.id} documentos={documentos} />
       )}
+
+      {/* Débito automático Payway */}
+      {activeTab === 'payway' && (
+        <PaywayTab
+          socioId={socio.id}
+          paywayPublicKey={paywayPublicKey}
+          paywayToken={paywayToken}
+          pendingAmount={Math.max(0, parseFloat(socio.deuda ?? '0'))}
+        />
+      )}
     </div>
   );
 }
@@ -2588,5 +2615,310 @@ function EspacioAsignadoCard({
         </button>
       </div>
     </div>
+  );
+}
+
+// ─── Payway Tab ──────────────────────────────────────────────────────────────
+
+const PAYWAY_URL_PROD = 'https://ventasonline.payway.com.ar/api/v2';
+const PAYWAY_URL_DEV = 'https://developers-ventasonline.payway.com.ar/api/v2';
+
+const CARD_BRAND: Record<number, string> = { 1: 'Visa', 2: 'Mastercard', 65: 'Amex' };
+
+function PaywayTab({
+  socioId,
+  paywayPublicKey,
+  paywayToken,
+  pendingAmount,
+}: {
+  socioId: string;
+  paywayPublicKey: string | null;
+  paywayToken: PaywayTokenInfo | null;
+  pendingAmount: number;
+}) {
+  const router = useRouter();
+  const formRef = useRef<HTMLFormElement>(null);
+
+  const decidirRef = useRef<any>(null);
+  const [scriptReady, setScriptReady] = useState(false);
+
+  const [cardNumber, setCardNumber] = useState('');
+  const [expMonth, setExpMonth] = useState('');
+  const [expYear, setExpYear] = useState('');
+  const [cvv, setCvv] = useState('');
+  const [holder, setHolder] = useState('');
+  const [amount, setAmount] = useState(pendingAmount > 0 ? pendingAmount.toFixed(2) : '1.00');
+  const [feedback, setFeedback] = useState<{ type: 'error' | 'success'; msg: string } | null>(null);
+  const [pending, startTransition] = useTransition();
+  const [pendingDelete, startDelete] = useTransition();
+  const [showForm, setShowForm] = useState(!paywayToken);
+
+  useEffect(() => {
+    if (scriptReady && paywayPublicKey) {
+      const url = process.env.NODE_ENV === 'production' ? PAYWAY_URL_PROD : PAYWAY_URL_DEV;
+
+      const decidir = new (window as any).Decidir(url);
+      decidir.setPublishableKey(paywayPublicKey);
+      decidir.setTimeout(10000);
+      decidirRef.current = decidir;
+    }
+  }, [scriptReady, paywayPublicKey]);
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!decidirRef.current || !formRef.current) {
+      setFeedback({
+        type: 'error',
+        msg: 'El SDK de Payway no terminó de cargar. Esperá un momento.',
+      });
+      return;
+    }
+    const amountNum = parseFloat(amount);
+    if (isNaN(amountNum) || amountNum < 1) {
+      setFeedback({ type: 'error', msg: 'El monto debe ser al menos $1.' });
+      return;
+    }
+    setFeedback(null);
+
+    decidirRef.current.createToken(
+      formRef.current,
+      (status: number, response: { token?: string; error?: string }) => {
+        if (status !== 200 && status !== 201) {
+          setFeedback({
+            type: 'error',
+            msg: `Error al tokenizar la tarjeta (${status}): ${response.error ?? ''}`,
+          });
+          return;
+        }
+        const oneTimeToken = response.token;
+        if (!oneTimeToken) {
+          setFeedback({ type: 'error', msg: 'No se pudo obtener el token de la tarjeta.' });
+          return;
+        }
+
+        const rawNumber = cardNumber.replace(/\s/g, '');
+        const bin = rawNumber.slice(0, 6);
+        const lastFour = rawNumber.slice(-4);
+        const firstDigit = bin[0];
+        const paymentMethodId =
+          firstDigit === '4' ? 1 : firstDigit === '5' ? 2 : firstDigit === '3' ? 65 : 1;
+
+        const payload: GuardarTarjetaData = {
+          socioId,
+          token: oneTimeToken,
+          paymentMethodId,
+          lastFour,
+          bin,
+          amount: amountNum,
+        };
+
+        startTransition(async () => {
+          const res = await guardarTarjetaSocioAction(payload);
+          if (res.error) {
+            setFeedback({ type: 'error', msg: res.error });
+            toast.error(res.error);
+          } else {
+            toast.success('Tarjeta registrada correctamente.');
+            setShowForm(false);
+            router.refresh();
+          }
+        });
+      },
+    );
+  }
+
+  function handleEliminar() {
+    if (!window.confirm('¿Eliminar la tarjeta? El socio dejará de tener débito automático.'))
+      return;
+    startDelete(async () => {
+      const res = await eliminarTarjetaSocioAction(socioId);
+      if (res.error) {
+        toast.error(res.error);
+      } else {
+        toast.success('Tarjeta eliminada.');
+        setShowForm(true);
+        router.refresh();
+      }
+    });
+  }
+
+  if (!paywayPublicKey) {
+    return (
+      <div className="rounded-2xl border border-gray-200 bg-white p-4 md:p-8">
+        <h2 className="mb-2 text-base font-bold" style={{ color: '#101828' }}>
+          Débito automático
+        </h2>
+        <p className="text-sm text-gray-500">
+          Esta guardería no tiene Payway configurado. Cargá las credenciales en{' '}
+          <a href="/configuracion?tab=payway" className="text-primary underline">
+            Configuración → Payway
+          </a>
+          .
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <Script
+        src="https://ventasonline.payway.com.ar/static/v2.6.4/decidir.js"
+        strategy="afterInteractive"
+        onLoad={() => setScriptReady(true)}
+      />
+
+      <div className="rounded-2xl border border-gray-200 bg-white p-4 md:p-8">
+        <h2 className="mb-1 text-base font-bold" style={{ color: '#101828' }}>
+          Débito automático
+        </h2>
+        <p className="mb-6 text-sm text-gray-500">
+          Registrá la tarjeta del socio para cobrarle automáticamente cada mes.
+        </p>
+
+        {paywayToken && !showForm && (
+          <div className="mb-6 flex items-center justify-between rounded-[10px] border border-[#CAE6E4] bg-[#ECFDF3] px-4 py-3">
+            <div className="text-sm text-[#175861]">
+              <span className="font-semibold">
+                {CARD_BRAND[paywayToken.paymentMethodId] ?? 'Tarjeta'} •••• {paywayToken.lastFour}
+              </span>
+              {' — '}
+              <span>{paywayToken.activo ? 'Débito automático activo' : 'Inactiva'}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowForm(true)}
+              className="ml-4 text-xs text-[#175861] underline hover:opacity-70"
+            >
+              Reemplazar
+            </button>
+          </div>
+        )}
+
+        {showForm && (
+          <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="sm:col-span-2">
+                <Field label="Número de tarjeta">
+                  <input
+                    className={inputCls}
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="XXXX XXXX XXXX XXXX"
+                    maxLength={19}
+                    value={cardNumber}
+                    data-decidir="card_number"
+                    onChange={(e) => setCardNumber(e.target.value.replace(/[^\d\s]/g, ''))}
+                  />
+                </Field>
+              </div>
+              <Field label="Mes de vencimiento">
+                <input
+                  className={inputCls}
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="MM"
+                  maxLength={2}
+                  value={expMonth}
+                  data-decidir="card_expiration_month"
+                  onChange={(e) => setExpMonth(e.target.value.replace(/\D/g, ''))}
+                />
+              </Field>
+              <Field label="Año de vencimiento">
+                <input
+                  className={inputCls}
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="AA"
+                  maxLength={2}
+                  value={expYear}
+                  data-decidir="card_expiration_year"
+                  onChange={(e) => setExpYear(e.target.value.replace(/\D/g, ''))}
+                />
+              </Field>
+              <Field label="Código de seguridad (CVV)">
+                <input
+                  className={inputCls}
+                  type="password"
+                  inputMode="numeric"
+                  placeholder="XXX"
+                  maxLength={4}
+                  value={cvv}
+                  data-decidir="security_code"
+                  onChange={(e) => setCvv(e.target.value.replace(/\D/g, ''))}
+                />
+              </Field>
+              <Field label="Titular (como figura en la tarjeta)">
+                <input
+                  className={inputCls}
+                  type="text"
+                  placeholder="NOMBRE APELLIDO"
+                  value={holder}
+                  data-decidir="card_holder_name"
+                  onChange={(e) => setHolder(e.target.value.toUpperCase())}
+                />
+              </Field>
+              <div className="sm:col-span-2">
+                <Field
+                  label={`Monto del primer cobro${pendingAmount > 0 ? ` (deuda actual: $${pendingAmount.toLocaleString('es-AR', { minimumFractionDigits: 2 })})` : ''}`}
+                >
+                  <input
+                    className={inputCls}
+                    type="number"
+                    inputMode="decimal"
+                    step="0.01"
+                    min="1"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                  />
+                </Field>
+              </div>
+            </div>
+
+            {feedback && (
+              <p
+                className={`text-sm ${feedback.type === 'error' ? 'text-red-600' : 'text-[#175861]'}`}
+              >
+                {feedback.msg}
+              </p>
+            )}
+
+            <div className="flex items-center gap-3">
+              <button
+                type="submit"
+                disabled={pending || !scriptReady}
+                className="bg-primary hover:bg-primary/90 rounded-[10px] px-6 py-3 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {pending ? 'Procesando…' : !scriptReady ? 'Cargando SDK…' : 'Registrar y cobrar'}
+              </button>
+              {paywayToken && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowForm(false);
+                    setFeedback(null);
+                  }}
+                  className="text-sm text-gray-500 hover:text-gray-700"
+                >
+                  Cancelar
+                </button>
+              )}
+            </div>
+          </form>
+        )}
+
+        {paywayToken && !showForm && (
+          <div className="mt-8 border-t border-gray-100 pt-6">
+            <button
+              type="button"
+              onClick={handleEliminar}
+              disabled={pendingDelete}
+              className="rounded-[10px] border border-red-200 px-5 py-3 text-sm font-semibold text-red-600 transition hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {pendingDelete ? 'Eliminando…' : 'Eliminar tarjeta'}
+            </button>
+          </div>
+        )}
+      </div>
+    </>
   );
 }

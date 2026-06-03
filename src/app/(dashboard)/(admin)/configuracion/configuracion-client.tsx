@@ -21,8 +21,10 @@ import { toast } from 'sonner';
 import {
   confirmarCertificadoAfipAction,
   createMiembroEquipoAction,
+  deletePaywayCredsAction,
   deleteMiembroEquipoAction,
   savePuntoVentaAction,
+  savePaywayCredsAction,
   solicitarCertificadoAfipAction,
   updateGuarderiaFeaturesAction,
   updateGuarderiaGeneralAction,
@@ -33,19 +35,23 @@ import {
   type GuarderiaFeatures,
   type HorarioInput,
   type SavePuntoVentaData,
+  type SavePaywayCredsData,
   type UpdateGuarderiaGeneralData,
   type UpdateMiembroEquipoData,
 } from '@/app/actions/configuracion';
 import { EmptyState } from '@/components/shared/empty-state';
 import { ImagesUploader } from '@/components/shared/images-uploader';
 
-export type TabKey = 'info' | 'equipo' | 'plan' | 'punto_venta';
+export type TabKey = 'info' | 'equipo' | 'plan' | 'punto_venta' | 'payway';
+
+export type PaywayData = SavePaywayCredsData;
 
 const TABS: { key: TabKey; label: string; icon: typeof Bell }[] = [
   { key: 'info', label: 'Información general', icon: Receipt },
   { key: 'equipo', label: 'Equipo', icon: Users },
   { key: 'plan', label: 'Plan', icon: CreditCard },
   { key: 'punto_venta', label: 'Datos de facturación', icon: Building2 },
+  { key: 'payway', label: 'Payway', icon: CreditCard },
 ];
 
 const TIPO_OPTS = [
@@ -155,6 +161,7 @@ export function ConfiguracionClient({
   currentUserId,
   features,
   puntoVenta,
+  payway,
   planes,
   currentPlan,
   initialTab = 'info',
@@ -165,6 +172,7 @@ export function ConfiguracionClient({
   currentUserId: string;
   features: GuarderiaFeatures;
   puntoVenta: PuntoVentaData;
+  payway: PaywayData;
   planes: PlanInfo[];
   currentPlan: PlanSlug;
   initialTab?: TabKey;
@@ -221,6 +229,7 @@ export function ConfiguracionClient({
       )}
       {activeTab === 'plan' && <PlanTab planes={planes} currentPlan={currentPlan} />}
       {activeTab === 'punto_venta' && <PuntoVentaTab initial={puntoVenta} />}
+      {activeTab === 'payway' && <PaywayTab initial={payway} />}
     </div>
   );
 }
@@ -1608,5 +1617,134 @@ function TabPlaceholder({ title }: { title: string }) {
       </h2>
       <p className="mt-2 text-sm text-gray-500">Próximamente</p>
     </div>
+  );
+}
+
+function PaywayTab({ initial }: { initial: PaywayData }) {
+  const yaConfigurado = !!initial.publicKey;
+  const [data, setData] = useState<PaywayData>(initial);
+  const [feedback, setFeedback] = useState<{ type: 'error' | 'success'; msg: string } | null>(null);
+  const [pending, startTransition] = useTransition();
+  const [pendingDelete, startDelete] = useTransition();
+  const [showPrivate, setShowPrivate] = useState(false);
+
+  const onField = (key: keyof PaywayData, value: string) => {
+    setData((prev) => ({ ...prev, [key]: value }));
+    setFeedback(null);
+  };
+
+  const onSubmit = () => {
+    setFeedback(null);
+    startTransition(async () => {
+      const res = await savePaywayCredsAction(data);
+      if (res.error) {
+        setFeedback({ type: 'error', msg: res.error });
+        toast.error(res.error);
+      } else {
+        setFeedback({ type: 'success', msg: 'Credenciales Payway guardadas.' });
+        toast.success('Credenciales Payway guardadas.');
+      }
+    });
+  };
+
+  const onDelete = () => {
+    if (!window.confirm('¿Desconectar Payway? Se eliminarán las claves guardadas.')) return;
+    startDelete(async () => {
+      const res = await deletePaywayCredsAction();
+      if (res.error) {
+        toast.error(res.error);
+      } else {
+        setData({ publicKey: '', privateKey: '' });
+        setFeedback(null);
+        toast.success('Payway desconectado.');
+      }
+    });
+  };
+
+  return (
+    <section className="rounded-2xl border border-gray-200 bg-white p-4 md:p-8">
+      <h2 className="mb-1 text-base font-bold" style={{ color: '#101828' }}>
+        Payway — débito automático
+      </h2>
+      <p className="mb-6 text-sm text-gray-500">
+        Ingresá las claves de tu cuenta Payway para habilitar el cobro automático mensual con
+        tarjeta a los socios que lo activen.
+      </p>
+
+      {yaConfigurado && (
+        <div className="mb-6 rounded-[10px] border border-[#CAE6E4] bg-[#ECFDF3] px-4 py-3 text-sm text-[#175861]">
+          Payway está conectado. Podés actualizar las claves o desconectarlo.
+        </div>
+      )}
+
+      {!yaConfigurado && (
+        <div className="mb-6 rounded-[10px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <strong>Antes de continuar:</strong> necesitás una cuenta activa en{' '}
+          <span className="font-medium">Payway (decidir.com.ar)</span>. Las claves las encontrás en
+          el panel de tu cuenta bajo Integración → Credenciales.
+        </div>
+      )}
+
+      <div className="space-y-4">
+        <Field label="Public Key" required>
+          <input
+            className={inputCls}
+            type="text"
+            placeholder="e.g. 1234567890abcdef..."
+            value={data.publicKey}
+            onChange={(e) => onField('publicKey', e.target.value)}
+          />
+        </Field>
+
+        <Field label="Private Key" required>
+          <div className="relative">
+            <input
+              className={inputCls}
+              type={showPrivate ? 'text' : 'password'}
+              placeholder="Tu private key de Payway"
+              value={data.privateKey}
+              onChange={(e) => onField('privateKey', e.target.value)}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPrivate((v) => !v)}
+              className="absolute top-1/2 right-3 -translate-y-1/2 text-xs text-gray-400 hover:text-gray-600"
+            >
+              {showPrivate ? 'Ocultar' : 'Mostrar'}
+            </button>
+          </div>
+        </Field>
+      </div>
+
+      {feedback && (
+        <p
+          className={`mt-4 text-sm ${feedback.type === 'error' ? 'text-red-600' : 'text-[#175861]'}`}
+        >
+          {feedback.msg}
+        </p>
+      )}
+
+      <div className="mt-6 flex items-center justify-between">
+        <button
+          type="button"
+          onClick={onSubmit}
+          disabled={pending}
+          className="bg-primary hover:bg-primary/90 rounded-[10px] px-6 py-3 text-sm font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {pending ? 'Guardando…' : yaConfigurado ? 'Actualizar claves' : 'Conectar Payway'}
+        </button>
+
+        {yaConfigurado && (
+          <button
+            type="button"
+            onClick={onDelete}
+            disabled={pendingDelete}
+            className="rounded-[10px] border border-red-200 px-5 py-3 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {pendingDelete ? 'Desconectando…' : 'Desconectar'}
+          </button>
+        )}
+      </div>
+    </section>
   );
 }
