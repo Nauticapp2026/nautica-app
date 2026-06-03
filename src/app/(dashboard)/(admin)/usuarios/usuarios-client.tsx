@@ -4,6 +4,7 @@ import { useState, useTransition, useMemo, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
+  AlertTriangle,
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
@@ -55,6 +56,7 @@ type Socio = {
   embarcacion: string | null;
   ubicacion: string | null;
   docsCompletos: boolean;
+  datosIncompletos: boolean;
   invitados: InvitadoItem[];
   accesosExternos: AccesoItem[];
 };
@@ -797,9 +799,16 @@ export function UsuariosClient({
                             </button>
                           </td>
                           <td className="px-4 py-3">
-                            <p className="font-medium" style={{ color: '#175861' }}>
-                              {nombre}
-                            </p>
+                            <div className="flex items-center gap-1.5">
+                              <p className="font-medium" style={{ color: '#175861' }}>
+                                {nombre}
+                              </p>
+                              {s.datosIncompletos && (
+                                <span title="Datos incompletos" className="shrink-0">
+                                  <AlertTriangle className="h-3.5 w-3.5 text-amber-400" />
+                                </span>
+                              )}
+                            </div>
                             <p className="text-xs" style={{ color: '#669E9D' }}>
                               {s.email}
                             </p>

@@ -39,6 +39,9 @@ export default async function UsuariosPage({
       email: profiles.email,
       telefono: profiles.telefono,
       direccion: profiles.direccion,
+      tipoDocumento: profiles.tipoDocumento,
+      numeroDocumento: profiles.numeroDocumento,
+      condicionIva: profiles.condicionIva,
     })
     .from(memberships)
     .innerJoin(profiles, eq(profiles.id, memberships.userId))
@@ -265,6 +268,16 @@ export default async function UsuariosPage({
     const deuda = Math.max(0, debe - haber);
     const tipos = tiposPorSocio.get(s.profileId);
     const docsCompletos = (tipos?.size ?? 0) >= TIPOS_REQUERIDOS.size;
+    const tieneEmbarcacion = Boolean(s.profileId && embByProfile[s.profileId]);
+    const datosIncompletos =
+      !s.nombre?.trim() ||
+      !s.apellido?.trim() ||
+      !s.telefono?.trim() ||
+      !s.tipoDocumento ||
+      !s.numeroDocumento?.trim() ||
+      !s.direccion?.trim() ||
+      !s.condicionIva ||
+      !tieneEmbarcacion;
     return {
       ...s,
       deuda: deuda.toFixed(2),
@@ -272,6 +285,7 @@ export default async function UsuariosPage({
       embarcacion: s.profileId ? (embByProfile[s.profileId] ?? null) : null,
       ubicacion: s.profileId ? (ubicacionByProfile[s.profileId] ?? null) : null,
       docsCompletos,
+      datosIncompletos,
       invitados: invitadosBySocio.get(s.profileId) ?? [],
       accesosExternos: accesosBySocio.get(s.profileId) ?? [],
     };
