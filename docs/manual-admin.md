@@ -18,6 +18,7 @@ Guía paso a paso para gestionar tu club o guardería náutica desde el panel we
 10. [Facturación](#10-facturación)
 11. [Tarifario](#11-tarifario)
 12. [Configuración](#12-configuración)
+13. [Débito automático (Payway)](#13-débito-automático-payway)
 
 ---
 
@@ -597,6 +598,114 @@ El certificado permite que el sistema emita facturas directamente a AFIP en nomb
 > Hasta que no confirmes la instalación del certificado, el botón "Nueva factura" aparece deshabilitado.
 
 ---
+
+## 13. Débito automático (Payway)
+
+El débito automático permite cobrar la cuota mensual directamente desde la tarjeta de crédito o débito del socio, sin necesidad de que el socio realice ninguna acción. El cobro se genera automáticamente el día de facturación de tu club.
+
+### ¿Cómo funciona?
+
+1. El admin configura las credenciales de Payway de tu club (una sola vez).
+2. El admin registra la tarjeta de cada socio que quiera adherirse al débito automático.
+3. Cada mes, el sistema genera la factura y cobra automáticamente desde la tarjeta.
+4. Si un cobro falla, el admin puede reintentarlo desde el panel de comprobantes.
+
+### Paso 1 — Configurar Payway en tu club
+
+> Necesitás tener una cuenta en **Payway (Decidir)** y tus claves pública y privada. Si no las tenés, contactá a Payway para darlas de alta.
+
+1. Andá a **Configuración** en el menú lateral.
+2. Hacé clic en la pestaña **Payway**.
+3. Ingresá tu **Clave pública** y tu **Clave privada**.
+4. Hacé clic en **Guardar credenciales**.
+
+Una vez configurado, el tab muestra el estado **Conectado**.
+
+Para desconectar Payway, usá el botón **Desconectar** en esa misma pantalla. Esto no elimina las tarjetas de los socios, pero los cobros automáticos dejarán de procesarse.
+
+---
+
+### Paso 2 — Registrar la tarjeta de un socio
+
+1. Andá a **Usuarios** y abrí el perfil del socio.
+2. Hacé clic en la pestaña **Débito automático**.
+3. Completá los datos de la tarjeta:
+   - Número de tarjeta
+   - Mes y año de vencimiento
+   - Código de seguridad (CVV)
+   - Nombre del titular (tal como figura en la tarjeta)
+4. Hacé clic en **Registrar tarjeta**.
+
+El sistema realiza un cobro de **$1** para validar y registrar la tarjeta (requerido por Payway). Este importe queda registrado en el historial de cobros.
+
+Una vez registrada, el tab muestra la tarjeta activa con los últimos 4 dígitos y la marca.
+
+**Para reemplazar una tarjeta:** hacé clic en **Reemplazar** y completá los nuevos datos. El proceso es el mismo que el alta.
+
+**Para dar de baja el débito automático:** hacé clic en **Eliminar tarjeta** al pie de la sección. Los cobros automáticos se detienen, pero los movimientos pendientes siguen en la cuenta del socio.
+
+---
+
+### Paso 3 — Cobros mensuales automáticos
+
+No hace falta hacer nada. El día de facturación configurado en tu club, el sistema:
+
+1. Genera los movimientos mensuales de cada espacio asignado.
+2. Emite la factura automáticamente (para socios que ya tuvieron al menos una factura).
+3. Cobra via débito automático a todos los socios con tarjeta registrada.
+
+Los movimientos cobrados quedan marcados como **Pagados** con forma de pago **Débito automático**.
+
+---
+
+### Ver el historial de cobros
+
+1. Andá a **Comprobantes** en el menú lateral.
+2. Hacé clic en la pestaña **Débito automático**.
+
+Vas a ver:
+
+- **Total cobrado** en el período.
+- **Cantidad de cobros aprobados y rechazados.**
+- **Tabla con cada cobro**: socio, fecha, monto, estado y detalle del error si lo hubo.
+
+#### Estados posibles
+
+| Estado    | Significado                                                                        |
+| --------- | ---------------------------------------------------------------------------------- |
+| Aprobado  | El cobro fue procesado correctamente.                                              |
+| Rechazado | Payway rechazó el cobro (fondos insuficientes, tarjeta vencida, etc.).             |
+| Error     | No se pudo conectar con Payway o hubo un error técnico.                            |
+| Pendiente | El cobro está en proceso (transitorio, no debería verse por más de unos segundos). |
+
+---
+
+### Reintentar un cobro fallido
+
+Si un cobro aparece como **Rechazado** o **Error**:
+
+1. En la tabla de **Débito automático**, buscá el cobro fallido.
+2. Hacé clic en **Reintentar**.
+3. El sistema vuelve a intentar el cobro con la misma tarjeta registrada.
+4. Si sale aprobado, los movimientos quedan marcados como pagados automáticamente.
+
+> Si el cobro vuelve a fallar, probablemente la tarjeta tiene un problema. Comunicarte con el socio para actualizar los datos.
+
+---
+
+### Preguntas frecuentes sobre débito automático
+
+**¿El socio recibe alguna notificación del cobro?**
+Payway envía la notificación directamente al banco del socio. La app no envía notificación adicional por el momento.
+
+**¿Qué pasa si el socio tiene deuda de meses anteriores?**
+El cron cobra el total de movimientos no pagados del socio en ese momento, no solo el mes corriente. Si tenía deuda acumulada, se cobra todo junto.
+
+**¿Se puede configurar un tope de monto?**
+No. Se cobra el total de los movimientos pendientes sin tope.
+
+**¿Qué pasa si el socio no tiene espacio asignado o no tiene movimientos ese mes?**
+No se genera ningún cobro. El débito automático solo se dispara si hay movimientos pendientes de pago.
 
 ---
 
