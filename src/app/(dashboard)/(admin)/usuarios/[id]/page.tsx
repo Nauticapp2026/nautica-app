@@ -16,6 +16,7 @@ import {
   movimientosCuentaCorriente,
   pisos,
   porteria,
+  porteriaInvitados,
   profiles,
   servicios as serviciosTable,
 } from '@/lib/db/schema';
@@ -69,6 +70,7 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
     invitadosList,
     documentosList,
     salidasList,
+    accesosExternosRaw,
     espacioActualRow,
     espaciosDisponibles,
   ] = await Promise.all([
@@ -164,6 +166,27 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
       )
       .orderBy(desc(porteria.createdAt)),
 
+    db
+      .select({
+        id: porteria.id,
+        desde: porteria.desde,
+        estado: porteria.estado,
+        createdAt: porteria.createdAt,
+        invitadoNombre: invitados.nombre,
+        invitadoApellido: invitados.apellido,
+      })
+      .from(porteria)
+      .leftJoin(porteriaInvitados, eq(porteriaInvitados.porteriaId, porteria.id))
+      .leftJoin(invitados, eq(invitados.id, porteriaInvitados.invitadoId))
+      .where(
+        and(
+          eq(porteria.socioId, id),
+          eq(porteria.guarderiaId, gId),
+          eq(porteria.tipo, 'acceso_externo'),
+        ),
+      )
+      .orderBy(desc(porteria.createdAt)),
+
     // Espacio actualmente asignado al socio (si tiene).
     db
       .select({
@@ -215,6 +238,26 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
       )
       .orderBy(asc(areas.nombre), asc(espacios.orden)),
   ]);
+
+  // Agrupar accesos externos por porteria.id (el join puede dar múltiples filas por invitado).
+  const accesosMap = new Map<
+    string,
+    { id: string; desde: Date | null; estado: string | null; createdAt: Date; nombres: string[] }
+  >();
+  for (const row of accesosExternosRaw) {
+    if (!accesosMap.has(row.id)) {
+      accesosMap.set(row.id, {
+        id: row.id,
+        desde: row.desde,
+        estado: row.estado,
+        createdAt: row.createdAt,
+        nombres: [],
+      });
+    }
+    const nombre = [row.invitadoNombre, row.invitadoApellido].filter(Boolean).join(' ');
+    if (nombre) accesosMap.get(row.id)!.nombres.push(nombre);
+  }
+  const accesosExternosList = [...accesosMap.values()];
 
   // Para cada movimiento facturado, traer el código de la factura. Lo
   // hacemos en una query separada para no duplicar filas con el JOIN M:N
@@ -361,6 +404,13 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
           ? `${s.embarcacionNombre ?? ''} (${s.embarcacionMatricula})`.trim()
           : (s.embarcacionNombre ?? null),
         createdAt: s.createdAt.toISOString(),
+      }))}
+      accesosExternos={accesosExternosList.map((a) => ({
+        id: a.id,
+        desde: a.desde?.toISOString() ?? null,
+        estado: a.estado ?? null,
+        createdAt: a.createdAt.toISOString(),
+        invitados: a.nombres,
       }))}
     />
   );

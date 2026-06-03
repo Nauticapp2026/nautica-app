@@ -104,7 +104,7 @@ export async function createTareaAction(
       operarioId: data.operarioId || null,
       embarcacionId: data.embarcacionId || null,
       estado: (data.estado ?? 'preparar') as EstadoTarea,
-      fechaHora: data.fechaHora ? new Date(data.fechaHora) : null,
+      fechaHora: data.fechaHora ? new Date(data.fechaHora + '-03:00') : null,
     })
     .returning({ id: tareas.id });
 
@@ -157,7 +157,7 @@ export async function updateTareaAction(data: UpdateTareaData): Promise<{ error?
       operarioId: data.operarioId || null,
       embarcacionId: data.embarcacionId || null,
       estado: estadoFinal,
-      fechaHora: data.fechaHora ? new Date(data.fechaHora) : null,
+      fechaHora: data.fechaHora ? new Date(data.fechaHora + '-03:00') : null,
     })
     .where(and(eq(tareas.id, data.id), eq(tareas.guarderiaId, gId)));
 

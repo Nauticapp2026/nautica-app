@@ -13,6 +13,7 @@ import {
   Users,
   Clock,
   FileText,
+  LogIn,
   Printer,
   Ship,
   TrendingUp,
@@ -104,6 +105,14 @@ type Invitado = {
   createdAt: string;
 };
 
+type AccesoExterno = {
+  id: string;
+  desde: string | null;
+  estado: string | null;
+  createdAt: string;
+  invitados: string[];
+};
+
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const CONDICION_IVA_OPTS = [
@@ -139,7 +148,8 @@ const TABS = [
   { id: 'embarcacion', label: 'Embarcación', icon: Anchor },
   { id: 'cuenta-corriente', label: 'Cuenta Corriente', icon: CreditCard },
   { id: 'facturacion', label: 'Comprobantes', icon: DollarSign },
-  { id: 'navegantes', label: 'Navegantes', icon: Users },
+  { id: 'navegantes', label: 'Invitados', icon: Users },
+  { id: 'accesos-externos', label: 'Accesos externos', icon: LogIn },
   { id: 'salidas', label: 'Salidas', icon: Clock },
   { id: 'documentacion', label: 'Documentación', icon: FileText },
 ] as const;
@@ -1792,6 +1802,7 @@ export function SocioDetail({
   invitados,
   documentos = [],
   salidas = [],
+  accesosExternos = [],
   espacioActual,
   espaciosDisponibles,
 }: {
@@ -1802,6 +1813,7 @@ export function SocioDetail({
   invitados: Invitado[];
   documentos?: DocumentoItem[];
   salidas?: SalidaItem[];
+  accesosExternos?: AccesoExterno[];
   espacioActual: EspacioOption | null;
   espaciosDisponibles: EspacioOption[];
 }) {
@@ -2432,6 +2444,49 @@ export function SocioDetail({
                       }`}
                     >
                       {activo ? 'Activo' : 'Inactivo'}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Accesos externos */}
+      {activeTab === 'accesos-externos' && (
+        <div className="rounded-2xl border border-gray-200 bg-white p-4 md:p-6">
+          {accesosExternos.length === 0 ? (
+            <EmptyState
+              icon={<LogIn className="h-7 w-7 opacity-40" />}
+              text="No hay accesos externos registrados."
+            />
+          ) : (
+            <div className="space-y-3">
+              {accesosExternos.map((a) => {
+                const estadoBadge =
+                  a.estado === 'usado'
+                    ? { label: 'Ingresó', cls: 'bg-teal-50 text-[#175861]' }
+                    : a.estado === 'revocado'
+                      ? { label: 'Cancelado', cls: 'bg-red-100 text-red-600' }
+                      : { label: 'Pendiente', cls: 'bg-gray-100 text-gray-500' };
+                return (
+                  <div
+                    key={a.id}
+                    className="flex items-start justify-between gap-4 rounded-[10px] border border-gray-200 bg-white px-4 py-3"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-[#101828]">
+                        {a.invitados.length > 0 ? a.invitados.join(', ') : '—'}
+                      </p>
+                      <p className="mt-0.5 text-xs text-gray-500">
+                        {a.desde ? fmtFechaHoraSalida(a.desde) : '—'}
+                      </p>
+                    </div>
+                    <span
+                      className={`inline-block shrink-0 rounded-full px-3 py-1 text-xs font-medium ${estadoBadge.cls}`}
+                    >
+                      {estadoBadge.label}
                     </span>
                   </div>
                 );

@@ -146,8 +146,8 @@ function fmtHora(iso: string | null): string {
 function toDatetimeLocal(iso: string | null): string {
   if (!iso) return '';
   const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  // sv-SE da "YYYY-MM-DD HH:mm:ss" en la TZ pedida, tomamos los primeros 16 chars
+  return d.toLocaleString('sv-SE', { timeZone: TZ_AR }).slice(0, 16).replace(' ', 'T');
 }
 
 // ─── Card ───────────────────────────────────────────────────────────────────
