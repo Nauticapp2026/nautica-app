@@ -871,15 +871,15 @@ export function UsuariosClient({
                         {isExpanded && (
                           <tr className="border-t border-gray-100 bg-gray-50/60">
                             <td colSpan={7} className="px-6 pt-3 pb-4">
-                              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                                {/* Navegantes autorizados */}
-                                <div>
+                              <div className="flex flex-col gap-0">
+                                {/* Invitados autorizados */}
+                                <div className="pb-4">
                                   <p className="mb-2 text-xs font-semibold tracking-wide text-gray-400 uppercase">
-                                    Navegantes autorizados
+                                    Invitados autorizados
                                   </p>
                                   {s.invitados.length === 0 ? (
                                     <p className="text-xs text-gray-400">
-                                      Sin navegantes registrados
+                                      Sin invitados registrados
                                     </p>
                                   ) : (
                                     <div className="space-y-1.5">
@@ -894,8 +894,7 @@ export function UsuariosClient({
                                   )}
                                 </div>
 
-                                {/* Accesos externos recientes */}
-                                <div>
+                                <div className="border-t border-gray-200 pt-4">
                                   <p className="mb-2 text-xs font-semibold tracking-wide text-gray-400 uppercase">
                                     Accesos externos recientes
                                   </p>
