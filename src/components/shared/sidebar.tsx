@@ -88,6 +88,7 @@ type Props = {
   rol: string;
   variant?: SidebarVariant;
   pendingSolicitudes?: number;
+  pendingAlertas?: number;
 };
 
 export function Sidebar({
@@ -97,6 +98,7 @@ export function Sidebar({
   rol,
   variant = 'dashboard',
   pendingSolicitudes,
+  pendingAlertas,
 }: Props) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -190,6 +192,15 @@ export function Sidebar({
                       {pendingSolicitudes > 99 ? '99+' : pendingSolicitudes}
                     </span>
                   )}
+                {href === '/dashboard' && pendingAlertas != null && pendingAlertas > 0 && (
+                  <span
+                    className={`flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-bold ${
+                      active ? 'bg-white/25 text-white' : 'bg-red-500 text-white'
+                    }`}
+                  >
+                    {pendingAlertas > 99 ? '99+' : pendingAlertas}
+                  </span>
+                )}
               </Link>
             );
           })}

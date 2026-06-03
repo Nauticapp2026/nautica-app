@@ -5,7 +5,7 @@ import { yaAceptoVersionVigente } from '@/lib/auth/terminos';
 import { Sidebar } from '@/components/shared/sidebar';
 import { GuarderiaInactivaScreen } from '@/components/shared/guarderia-inactiva-screen';
 import { db } from '@/lib/db';
-import { solicitudesMembership } from '@/lib/db/schema';
+import { alertas, solicitudesMembership } from '@/lib/db/schema';
 
 // Roles con acceso al dashboard web. El resto (socio, invitado, etc.)
 // se gestiona desde la app mobile.
@@ -47,15 +47,23 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   const userInitial = (profile.nombre?.[0] ?? profile.email[0]).toUpperCase();
 
-  const [{ pendientes }] = await db
-    .select({ pendientes: count() })
-    .from(solicitudesMembership)
-    .where(
-      and(
-        eq(solicitudesMembership.guarderiaId, activeMembership.guarderiaId),
-        eq(solicitudesMembership.estado, 'pendiente'),
+  const [[{ pendientes }], [{ alertasPendientes }]] = await Promise.all([
+    db
+      .select({ pendientes: count() })
+      .from(solicitudesMembership)
+      .where(
+        and(
+          eq(solicitudesMembership.guarderiaId, activeMembership.guarderiaId),
+          eq(solicitudesMembership.estado, 'pendiente'),
+        ),
       ),
-    );
+    db
+      .select({ alertasPendientes: count() })
+      .from(alertas)
+      .where(
+        and(eq(alertas.guarderiaId, activeMembership.guarderiaId), eq(alertas.estado, 'pendiente')),
+      ),
+  ]);
 
   return (
     <div className="flex min-h-screen flex-col bg-[#F9FAFB] md:flex-row">
@@ -65,6 +73,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         userInitial={userInitial}
         rol={activeMembership.rol}
         pendingSolicitudes={pendientes}
+        pendingAlertas={alertasPendientes}
       />
       <main className="min-w-0 flex-1 overflow-auto">{children}</main>
     </div>

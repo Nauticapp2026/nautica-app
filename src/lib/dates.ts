@@ -59,6 +59,23 @@ export function formatArgentinaDateTime(value: string | Date | null | undefined)
   });
 }
 
+// Igual que formatArgentinaDateTime pero sin aplicar conversión de TZ.
+// Usar cuando el timestamp fue guardado como naive (hora AR interpretada como
+// UTC por Postgres), para no restar 3 h extra al mostrar.
+export function formatNaiveDateTime(value: string | Date | null | undefined): string {
+  const d = toDate(value);
+  if (!d) return PLACEHOLDER;
+  return d.toLocaleString(LOCALE, {
+    timeZone: 'UTC',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+}
+
 // Fecha legible, ej "miércoles 28 de abril de 2026". Útil para headers.
 export function formatArgentinaDateLong(value: string | Date | null | undefined): string {
   const d = toDate(value);

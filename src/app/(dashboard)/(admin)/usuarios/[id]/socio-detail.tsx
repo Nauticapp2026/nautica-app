@@ -43,7 +43,7 @@ import {
   updateSocioAction,
   uploadSocioDocumentoAction,
 } from '@/app/actions/socios';
-import { formatArgentinaDate, formatArgentinaDateTime } from '@/lib/dates';
+import { formatArgentinaDate, formatArgentinaDateTime, formatNaiveDateTime } from '@/lib/dates';
 import { EmptyState } from '@/components/shared/empty-state';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -2470,11 +2470,11 @@ export function SocioDetail({
                     <div className="mt-1 grid grid-cols-1 gap-x-4 gap-y-0.5 text-xs text-gray-500 sm:grid-cols-3">
                       <span>
                         <strong className="text-gray-400">Salida: </strong>
-                        {fmtFechaHoraSalida(s.desde)}
+                        {formatNaiveDateTime(s.desde)}
                       </span>
                       <span>
                         <strong className="text-gray-400">Regreso: </strong>
-                        {fmtFechaHoraSalida(s.hasta)}
+                        {formatNaiveDateTime(s.hasta)}
                       </span>
                       <span>
                         <strong className="text-gray-400">Arribó: </strong>
