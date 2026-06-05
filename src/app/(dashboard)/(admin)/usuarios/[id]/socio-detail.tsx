@@ -2514,7 +2514,13 @@ export function SocioDetail({
 
       {/* Débito automático Payway */}
       {activeTab === 'payway' && (
-        <PaywayTab socioId={socio.id} paywayPublicKey={paywayPublicKey} paywayToken={paywayToken} />
+        <PaywayTab
+          socioId={socio.id}
+          paywayPublicKey={paywayPublicKey}
+          paywayToken={paywayToken}
+          socioDocType={socio.tipoDocumento}
+          socioDocNumber={socio.numeroDocumento}
+        />
       )}
     </div>
   );
@@ -2632,10 +2638,14 @@ function PaywayTab({
   socioId,
   paywayPublicKey,
   paywayToken,
+  socioDocType,
+  socioDocNumber,
 }: {
   socioId: string;
   paywayPublicKey: string | null;
   paywayToken: PaywayTokenInfo | null;
+  socioDocType: string | null;
+  socioDocNumber: string | null;
 }) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
@@ -2648,6 +2658,8 @@ function PaywayTab({
   const [expYear, setExpYear] = useState('');
   const [cvv, setCvv] = useState('');
   const [holder, setHolder] = useState('');
+  const [docType, setDocType] = useState((socioDocType ?? 'dni').toUpperCase());
+  const [docNumber, setDocNumber] = useState(socioDocNumber ?? '');
   const [feedback, setFeedback] = useState<{ type: 'error' | 'success'; msg: string } | null>(null);
   const [pending, startTransition] = useTransition();
   const [pendingDelete, startDelete] = useTransition();
@@ -2666,6 +2678,13 @@ function PaywayTab({
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!docNumber.trim()) {
+      setFeedback({
+        type: 'error',
+        msg: 'Ingresá el número de documento del titular de la tarjeta.',
+      });
+      return;
+    }
     if (!decidirRef.current || !formRef.current) {
       setFeedback({
         type: 'error',
@@ -2849,6 +2868,33 @@ function PaywayTab({
                   value={holder}
                   data-decidir="card_holder_name"
                   onChange={(e) => setHolder(e.target.value.toUpperCase())}
+                />
+              </Field>
+              <Field label="Tipo de documento">
+                <select
+                  className={inputCls}
+                  value={docType}
+                  data-decidir="card_holder_doc_type"
+                  onChange={(e) => setDocType(e.target.value)}
+                >
+                  <option value="DNI">DNI</option>
+                  <option value="CUIT">CUIT</option>
+                  <option value="CUIL">CUIL</option>
+                  <option value="CDI">CDI</option>
+                  <option value="LC">LC</option>
+                  <option value="LE">LE</option>
+                  <option value="OTRO">Otro</option>
+                </select>
+              </Field>
+              <Field label="Número de documento">
+                <input
+                  className={inputCls}
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="Solo números"
+                  value={docNumber}
+                  data-decidir="card_holder_doc_number"
+                  onChange={(e) => setDocNumber(e.target.value.replace(/\D/g, ''))}
                 />
               </Field>
               <div className="sm:col-span-2">
