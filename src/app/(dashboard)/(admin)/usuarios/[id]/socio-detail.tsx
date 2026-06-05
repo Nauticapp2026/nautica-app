@@ -2620,6 +2620,12 @@ const PAYWAY_URL_DEV = 'https://developers-ventasonline.payway.com.ar/api/v2';
 const PAYWAY_SDK_PROD = 'https://ventasonline.payway.com.ar/static/v2.6.4/decidir.js';
 const PAYWAY_SDK_DEV = 'https://developers-ventasonline.payway.com.ar/static/v2.6.4/decidir.js';
 
+// Sandbox se activa en dev local o cuando NEXT_PUBLIC_PAYWAY_SANDBOX=1.
+// La env var permite forzar sandbox en una preview o prod para pruebas
+// puntuales sin reescribir el codigo.
+const PAYWAY_USE_SANDBOX =
+  process.env.NODE_ENV !== 'production' || process.env.NEXT_PUBLIC_PAYWAY_SANDBOX === '1';
+
 const CARD_BRAND: Record<number, string> = { 1: 'Visa', 2: 'Mastercard', 65: 'Amex' };
 
 function PaywayTab({
@@ -2649,7 +2655,7 @@ function PaywayTab({
 
   useEffect(() => {
     if (scriptReady && paywayPublicKey) {
-      const url = process.env.NODE_ENV === 'production' ? PAYWAY_URL_PROD : PAYWAY_URL_DEV;
+      const url = PAYWAY_USE_SANDBOX ? PAYWAY_URL_DEV : PAYWAY_URL_PROD;
 
       const decidir = new (window as any).Decidir(url);
       decidir.setPublishableKey(paywayPublicKey);
@@ -2750,7 +2756,7 @@ function PaywayTab({
   return (
     <>
       <Script
-        src={process.env.NODE_ENV === 'production' ? PAYWAY_SDK_PROD : PAYWAY_SDK_DEV}
+        src={PAYWAY_USE_SANDBOX ? PAYWAY_SDK_DEV : PAYWAY_SDK_PROD}
         strategy="afterInteractive"
         onLoad={() => setScriptReady(true)}
       />
