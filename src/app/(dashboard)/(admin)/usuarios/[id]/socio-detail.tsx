@@ -2674,7 +2674,7 @@ function PaywayTab({
       // "i is not a function" al intentar /frauddetectionconf.
       const decidir = new (window as any).Decidir(url, true);
       decidir.setPublishableKey(paywayPublicKey);
-      decidir.setTimeout(10000);
+      decidir.setTimeout(30000);
       decidirRef.current = decidir;
     }
   }, [scriptReady, paywayPublicKey]);
