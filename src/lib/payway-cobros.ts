@@ -65,7 +65,11 @@ export async function runPaywayCharges(guarderiaIds: string[]): Promise<PaywayCh
     };
   }
 
-  const ambient = process.env.NODE_ENV === 'production' ? 'production' : 'developer';
+  // Sandbox se activa en dev local o cuando PAYWAY_SANDBOX=1.
+  // La env var permite forzar sandbox en una preview o prod para pruebas
+  // puntuales sin reescribir el codigo.
+  const useSandbox = process.env.NODE_ENV !== 'production' || process.env.PAYWAY_SANDBOX === '1';
+  const ambient = useSandbox ? 'developer' : 'production';
 
   const result: PaywayChargesResult = {
     guarderias: guarderiaIds.length,
