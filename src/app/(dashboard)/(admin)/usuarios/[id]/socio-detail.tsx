@@ -2696,7 +2696,7 @@ function PaywayTab({
 
     decidirRef.current.createToken(
       formRef.current,
-      (status: number, response: { token?: string; error?: string }) => {
+      (status: number, response: { id?: string; token?: string; error?: string }) => {
         if (status !== 200 && status !== 201) {
           setFeedback({
             type: 'error',
@@ -2704,7 +2704,9 @@ function PaywayTab({
           });
           return;
         }
-        const oneTimeToken = response.token;
+        // El SDK de Payway devuelve el token en `id`. Aceptamos `token`
+        // como fallback por si en algun ambiente viene con ese nombre.
+        const oneTimeToken = response.id ?? response.token;
         if (!oneTimeToken) {
           setFeedback({ type: 'error', msg: 'No se pudo obtener el token de la tarjeta.' });
           return;
