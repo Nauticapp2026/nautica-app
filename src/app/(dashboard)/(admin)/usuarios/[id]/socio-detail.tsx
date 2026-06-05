@@ -2621,10 +2621,17 @@ function EspacioAsignadoCard({
 
 // ─── Payway Tab ──────────────────────────────────────────────────────────────
 
+// URLs oficiales segun el SDK Node oficial de Payway (sdk-node-payway):
+// node_modules/sdk-node-payway/lib/utils/constants.js
+//   ENDPOINT_SANDBOX_V2 = "https://developers.decidir.com/api/v2"
+//   ENDPOINT_PRD_V2     = "https://ventasonline.payway.com.ar/api/v2"
 const PAYWAY_URL_PROD = 'https://ventasonline.payway.com.ar/api/v2';
-const PAYWAY_URL_DEV = 'https://developers-ventasonline.payway.com.ar/api/v2';
+const PAYWAY_URL_DEV = 'https://developers.decidir.com/api/v2';
+// Script: Payway no publica el SDK JS en developers.decidir.com, asi que
+// lo bajamos siempre del host prod. La URL pasada a new Decidir(url, true)
+// determina a donde van los requests.
 const PAYWAY_SDK_PROD = 'https://ventasonline.payway.com.ar/static/v2.6.4/decidir.js';
-const PAYWAY_SDK_DEV = 'https://developers-ventasonline.payway.com.ar/static/v2.6.4/decidir.js';
+const PAYWAY_SDK_DEV = 'https://ventasonline.payway.com.ar/static/v2.6.4/decidir.js';
 
 // Sandbox se activa en dev local o cuando NEXT_PUBLIC_PAYWAY_SANDBOX=1.
 // La env var permite forzar sandbox en una preview o prod para pruebas
