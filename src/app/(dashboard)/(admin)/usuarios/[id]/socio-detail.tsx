@@ -2669,30 +2669,12 @@ function PaywayTab({
     if (scriptReady && paywayPublicKey) {
       const url = PAYWAY_USE_SANDBOX ? PAYWAY_URL_DEV : PAYWAY_URL_PROD;
 
-      const decidir = new (window as any).Decidir(url);
+      // Segundo argumento `true` deshabilita Cybersource (anti-fraude). Si la
+      // cuenta no lo tiene habilitado, sin esto el SDK crashea con
+      // "i is not a function" al intentar /frauddetectionconf.
+      const decidir = new (window as any).Decidir(url, true);
       decidir.setPublishableKey(paywayPublicKey);
       decidir.setTimeout(10000);
-      // Deshabilitar fraud detection: el SDK por default intenta llamar a
-      // /frauddetectionconf al inicializarse y si la cuenta no lo tiene
-      // habilitado (caso tipico de sandbox) crashea con "i is not a function".
-      // El nombre del metodo varia entre versiones del SDK, probamos varios.
-      const decAny = decidir as Record<string, unknown>;
-      for (const method of [
-        'setFrauddetectionConfig',
-        'setFrauddetectionEnabled',
-        'setEnableFraudDetection',
-        'setSendToCs',
-      ]) {
-        const fn = decAny[method];
-        if (typeof fn === 'function') {
-          try {
-            (fn as (arg: unknown) => unknown).call(decidir, { sendToCs: false });
-            (fn as (arg: unknown) => unknown).call(decidir, false);
-          } catch {
-            // ignorar
-          }
-        }
-      }
       decidirRef.current = decidir;
     }
   }, [scriptReady, paywayPublicKey]);
