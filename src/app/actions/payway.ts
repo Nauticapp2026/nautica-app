@@ -94,7 +94,9 @@ export async function guardarTarjetaSocioAction(
   // $1 fijo para tokenizar — el cobro real lo hace el cron tras facturar
   const ENROLLMENT_AMOUNT = 1;
   const siteTransactionId = randomUUID();
-  const ambient = process.env.NODE_ENV === 'production' ? 'production' : 'developer';
+  // PAYWAY_SANDBOX=1 fuerza ambient developer aun en prod (testing).
+  const useSandbox = process.env.NODE_ENV !== 'production' || process.env.PAYWAY_SANDBOX === '1';
+  const ambient = useSandbox ? 'developer' : 'production';
   const sdk = makePaywaySdk(ambient, g.publicKey, g.privateKey);
 
   let result: Record<string, unknown>;
@@ -231,7 +233,9 @@ export async function reintentarCobroPaywayAction(cobroId: string): Promise<{ er
     .limit(1);
   if (!g?.publicKey || !g?.privateKey) return { error: 'Payway no configurado.' };
 
-  const ambient = process.env.NODE_ENV === 'production' ? 'production' : 'developer';
+  // PAYWAY_SANDBOX=1 fuerza ambient developer aun en prod (testing).
+  const useSandbox = process.env.NODE_ENV !== 'production' || process.env.PAYWAY_SANDBOX === '1';
+  const ambient = useSandbox ? 'developer' : 'production';
   const sdk = makePaywaySdk(ambient, g.publicKey, g.privateKey);
   const siteTransactionId = randomUUID();
   const movimientosIds = movsPendientes.map((m) => m.id);

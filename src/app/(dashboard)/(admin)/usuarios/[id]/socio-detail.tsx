@@ -2663,7 +2663,7 @@ function PaywayTab({
   const [expYear, setExpYear] = useState('');
   const [cvv, setCvv] = useState('');
   const [holder, setHolder] = useState('');
-  const [docType, setDocType] = useState((socioDocType ?? 'dni').toUpperCase());
+  const [docType, setDocType] = useState((socioDocType ?? 'dni').toLowerCase());
   const [docNumber, setDocNumber] = useState(socioDocNumber ?? '');
   const [feedback, setFeedback] = useState<{ type: 'error' | 'success'; msg: string } | null>(null);
   const [pending, startTransition] = useTransition();
@@ -2896,13 +2896,13 @@ function PaywayTab({
                   data-decidir="card_holder_doc_type"
                   onChange={(e) => setDocType(e.target.value)}
                 >
-                  <option value="DNI">DNI</option>
-                  <option value="CUIT">CUIT</option>
-                  <option value="CUIL">CUIL</option>
-                  <option value="CDI">CDI</option>
-                  <option value="LC">LC</option>
-                  <option value="LE">LE</option>
-                  <option value="OTRO">Otro</option>
+                  <option value="dni">DNI</option>
+                  <option value="cuit">CUIT</option>
+                  <option value="cuil">CUIL</option>
+                  <option value="cdi">CDI</option>
+                  <option value="lc">LC</option>
+                  <option value="le">LE</option>
+                  <option value="otro">Otro</option>
                 </select>
               </Field>
               <Field label="Número de documento">
