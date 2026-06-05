@@ -2822,7 +2822,10 @@ function PaywayTab({
                     maxLength={19}
                     value={cardNumber}
                     data-decidir="card_number"
-                    onChange={(e) => setCardNumber(e.target.value.replace(/[^\d\s]/g, ''))}
+                    onChange={(e) => {
+                      const digits = e.target.value.replace(/\D/g, '').slice(0, 16);
+                      setCardNumber(digits.replace(/(\d{4})(?=\d)/g, '$1 '));
+                    }}
                   />
                 </Field>
               </div>
