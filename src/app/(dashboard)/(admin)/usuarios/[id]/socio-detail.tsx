@@ -2622,12 +2622,8 @@ function EspacioAsignadoCard({
 // ─── Payway Tab ──────────────────────────────────────────────────────────────
 
 const PAYWAY_URL_PROD = 'https://ventasonline.payway.com.ar/api/v2';
-// Sandbox API: developers-ventasonline.payway.com.ar venia tirando 504; el host
-// historico Decidir suele ser mas estable y acepta las mismas claves.
-const PAYWAY_URL_DEV = 'https://developers.decidir.com/api/v2';
+const PAYWAY_URL_DEV = 'https://developers-ventasonline.payway.com.ar/api/v2';
 const PAYWAY_SDK_PROD = 'https://ventasonline.payway.com.ar/static/v2.6.4/decidir.js';
-// Sandbox SDK: el script vive en el dominio Payway aunque apuntemos al API
-// Decidir. La URL pasada a new Decidir(url) determina a donde van los requests.
 const PAYWAY_SDK_DEV = 'https://developers-ventasonline.payway.com.ar/static/v2.6.4/decidir.js';
 
 // Sandbox se activa en dev local o cuando NEXT_PUBLIC_PAYWAY_SANDBOX=1.
@@ -2677,13 +2673,24 @@ function PaywayTab({
       decidir.setPublishableKey(paywayPublicKey);
       decidir.setTimeout(10000);
       // Deshabilitar fraud detection: el SDK por default intenta llamar a
-      // /frauddetectionconf y si la cuenta no lo tiene habilitado (sandbox
-      // tipico) crashea con "i is not a function".
-      if (typeof decidir.setFrauddetectionConfig === 'function') {
-        try {
-          decidir.setFrauddetectionConfig({ sendToCs: false });
-        } catch {
-          // Ignorar — algunas versiones del SDK pueden tener firma distinta.
+      // /frauddetectionconf al inicializarse y si la cuenta no lo tiene
+      // habilitado (caso tipico de sandbox) crashea con "i is not a function".
+      // El nombre del metodo varia entre versiones del SDK, probamos varios.
+      const decAny = decidir as Record<string, unknown>;
+      for (const method of [
+        'setFrauddetectionConfig',
+        'setFrauddetectionEnabled',
+        'setEnableFraudDetection',
+        'setSendToCs',
+      ]) {
+        const fn = decAny[method];
+        if (typeof fn === 'function') {
+          try {
+            (fn as (arg: unknown) => unknown).call(decidir, { sendToCs: false });
+            (fn as (arg: unknown) => unknown).call(decidir, false);
+          } catch {
+            // ignorar
+          }
         }
       }
       decidirRef.current = decidir;
