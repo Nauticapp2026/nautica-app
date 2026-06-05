@@ -2676,6 +2676,16 @@ function PaywayTab({
       const decidir = new (window as any).Decidir(url);
       decidir.setPublishableKey(paywayPublicKey);
       decidir.setTimeout(10000);
+      // Deshabilitar fraud detection: el SDK por default intenta llamar a
+      // /frauddetectionconf y si la cuenta no lo tiene habilitado (sandbox
+      // tipico) crashea con "i is not a function".
+      if (typeof decidir.setFrauddetectionConfig === 'function') {
+        try {
+          decidir.setFrauddetectionConfig({ sendToCs: false });
+        } catch {
+          // Ignorar — algunas versiones del SDK pueden tener firma distinta.
+        }
+      }
       decidirRef.current = decidir;
     }
   }, [scriptReady, paywayPublicKey]);
