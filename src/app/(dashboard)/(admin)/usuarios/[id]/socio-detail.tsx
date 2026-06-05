@@ -2681,7 +2681,10 @@ function PaywayTab({
       // "i is not a function" al intentar /frauddetectionconf.
       const decidir = new (window as any).Decidir(url, true);
       decidir.setPublishableKey(paywayPublicKey);
-      decidir.setTimeout(30000);
+      // Doc oficial recomienda 0 (sin timeout) para sandbox y 3000ms para prod
+      // (https://documentacion-ventasonline.payway.com.ar). Sandbox a veces
+      // tarda mas de 30s y nos cortaba antes de que respondiera.
+      decidir.setTimeout(PAYWAY_USE_SANDBOX ? 0 : 3000);
       decidirRef.current = decidir;
     }
   }, [scriptReady, paywayPublicKey]);
