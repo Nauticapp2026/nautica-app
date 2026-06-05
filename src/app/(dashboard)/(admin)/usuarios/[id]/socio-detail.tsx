@@ -2622,8 +2622,13 @@ function EspacioAsignadoCard({
 // ─── Payway Tab ──────────────────────────────────────────────────────────────
 
 const PAYWAY_URL_PROD = 'https://ventasonline.payway.com.ar/api/v2';
-const PAYWAY_URL_DEV = 'https://developers-ventasonline.payway.com.ar/api/v2';
+// Sandbox API: usamos el host historico Decidir porque
+// developers-ventasonline.payway.com.ar respondia con 504 Gateway Timeout.
+const PAYWAY_URL_DEV = 'https://developers.decidir.com/api/v2';
 const PAYWAY_SDK_PROD = 'https://ventasonline.payway.com.ar/static/v2.6.4/decidir.js';
+// Sandbox SDK: el script se sirve desde el host Payway (Decidir no lo
+// publica). new Decidir(url, true) ya redirige los requests al host que
+// le pasamos arriba.
 const PAYWAY_SDK_DEV = 'https://developers-ventasonline.payway.com.ar/static/v2.6.4/decidir.js';
 
 // Sandbox se activa en dev local o cuando NEXT_PUBLIC_PAYWAY_SANDBOX=1.
