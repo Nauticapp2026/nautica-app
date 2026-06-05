@@ -2696,17 +2696,23 @@ function PaywayTab({
 
     decidirRef.current.createToken(
       formRef.current,
-      (status: number, response: { id?: string; token?: string; error?: string }) => {
+      (status: number, response?: { id?: string; token?: string; error?: unknown }) => {
         if (status !== 200 && status !== 201) {
+          const errMsg =
+            response?.error == null
+              ? ''
+              : typeof response.error === 'string'
+                ? response.error
+                : JSON.stringify(response.error);
           setFeedback({
             type: 'error',
-            msg: `Error al tokenizar la tarjeta (${status}): ${response.error ?? ''}`,
+            msg: `Error al tokenizar la tarjeta (${status}): ${errMsg}`,
           });
           return;
         }
         // El SDK de Payway devuelve el token en `id`. Aceptamos `token`
         // como fallback por si en algun ambiente viene con ese nombre.
-        const oneTimeToken = response.id ?? response.token;
+        const oneTimeToken = response?.id ?? response?.token;
         if (!oneTimeToken) {
           setFeedback({ type: 'error', msg: 'No se pudo obtener el token de la tarjeta.' });
           return;
