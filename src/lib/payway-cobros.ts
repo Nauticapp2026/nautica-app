@@ -20,6 +20,7 @@ import {
   paywayCobros,
   paywayTokens,
 } from '@/lib/db/schema';
+import { formatPaywayError } from '@/lib/payway/format-error';
 
 const sdkModulo = require('sdk-node-payway');
 
@@ -192,10 +193,11 @@ export async function runPaywayCharges(guarderiaIds: string[]): Promise<PaywayCh
         result.cobrosAprobados++;
         result.montoTotal += totalPesos;
       } else {
-        const errDetail = (paywayResult.status_details as Record<string, unknown> | null)?.error;
-        const msg = errDetail
-          ? String(errDetail)
-          : ((paywayResult.status as string | null) ?? 'rechazado');
+        console.error(
+          `[payway-cobros] Payway no aprobó socio=${token.socioId}`,
+          JSON.stringify(paywayResult),
+        );
+        const msg = formatPaywayError(paywayResult);
         await db
           .update(paywayCobros)
           .set({ estado: 'rechazado', paywayPaymentId, errorMensaje: msg })

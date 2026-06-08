@@ -13,6 +13,7 @@ import {
   paywayTokens,
 } from '@/lib/db/schema';
 import { getActiveMarina } from '@/lib/auth/session';
+import { formatPaywayError } from '@/lib/payway/format-error';
 
 // SDK callback-based → wrappear en Promise
 
@@ -121,9 +122,10 @@ export async function guardarTarjetaSocioAction(
   }
 
   if (result.status !== 'approved') {
-    const errDetail = (result.status_details as Record<string, unknown> | null)?.error;
+    console.error('[guardarTarjetaSocioAction] Payway no aprobó', JSON.stringify(result));
+    const motivo = formatPaywayError(result);
     return {
-      error: `Pago rechazado${errDetail ? `: ${errDetail}` : ''}. Verificá los datos de la tarjeta.`,
+      error: `Pago rechazado: ${motivo}. Verificá los datos de la tarjeta.`,
     };
   }
 
@@ -291,8 +293,8 @@ export async function reintentarCobroPaywayAction(cobroId: string): Promise<{ er
       .set({ estado: 'aprobado', paywayPaymentId })
       .where(eq(paywayCobros.id, nuevoCobro.id));
   } else {
-    const errDetail = (result.status_details as Record<string, unknown> | null)?.error;
-    const msg = errDetail ? String(errDetail) : ((result.status as string | null) ?? 'rechazado');
+    console.error('[reintentarCobroAction] Payway no aprobó', JSON.stringify(result));
+    const msg = formatPaywayError(result);
     await db
       .update(paywayCobros)
       .set({ estado: 'rechazado', paywayPaymentId, errorMensaje: msg })
