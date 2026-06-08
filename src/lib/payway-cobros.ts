@@ -163,6 +163,7 @@ export async function runPaywayCharges(guarderiaIds: string[]): Promise<PaywayCh
           payment_type: 'recurrente',
           sub_payments: [],
           store_credential: true,
+          fraud_detection: { send_to_cs: false },
         });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);

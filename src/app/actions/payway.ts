@@ -115,6 +115,7 @@ export async function guardarTarjetaSocioAction(
       payment_type: 'single',
       sub_payments: [],
       store_credential: true,
+      fraud_detection: { send_to_cs: false },
     });
   } catch (err) {
     console.error('[guardarTarjetaSocioAction] Payway SDK error', err);
@@ -269,6 +270,7 @@ export async function reintentarCobroPaywayAction(cobroId: string): Promise<{ er
       description: 'Cuota mensual (reintento) — NauticaApp',
       payment_type: 'recurrente',
       sub_payments: [],
+      fraud_detection: { send_to_cs: false },
       store_credential: true,
     });
   } catch (err) {
