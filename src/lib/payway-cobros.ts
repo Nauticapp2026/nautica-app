@@ -156,7 +156,7 @@ export async function runPaywayCharges(guarderiaIds: string[]): Promise<PaywayCh
           user_id: token.socioId,
           payment_method_id: token.paymentMethodId,
           bin: token.bin,
-          amount: totalPesos,
+          amount: Math.round(totalPesos * 100), // Payway en centavos
           currency: 'ARS',
           installments: 1,
           description: 'Cuota mensual — NauticaApp',

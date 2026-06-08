@@ -94,8 +94,9 @@ export async function guardarTarjetaSocioAction(
     return { error: 'Esta guardería no tiene Payway configurado.' };
   }
 
-  // $1 fijo para tokenizar — el cobro real lo hace el cron tras facturar
-  const ENROLLMENT_AMOUNT = 1;
+  // $1 fijo para tokenizar — el cobro real lo hace el cron tras facturar.
+  // Payway interpreta `amount` en CENTAVOS, no en pesos: $1 = 100.
+  const ENROLLMENT_AMOUNT = 100;
   const siteTransactionId = randomUUID();
   // PAYWAY_SANDBOX=1 fuerza ambient developer aun en prod (testing).
   const useSandbox = process.env.NODE_ENV !== 'production' || process.env.PAYWAY_SANDBOX === '1';
@@ -271,7 +272,7 @@ export async function reintentarCobroPaywayAction(cobroId: string): Promise<{ er
       user_id: cobro.socioId,
       payment_method_id: token.paymentMethodId,
       bin: token.bin,
-      amount: totalPesos,
+      amount: Math.round(totalPesos * 100), // Payway en centavos
       currency: 'ARS',
       installments: 1,
       description: 'Cuota mensual (reintento) — NauticaApp',
