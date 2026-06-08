@@ -132,6 +132,10 @@ export async function guardarTarjetaSocioAction(
 
   const customerToken = result.customer_token as string | null;
   if (!customerToken) {
+    console.error(
+      '[guardarTarjetaSocioAction] Payway aprobó pero no devolvió customer_token',
+      JSON.stringify(result),
+    );
     return { error: 'Payway no devolvió el token de tarjeta. Contactá con soporte.' };
   }
 
