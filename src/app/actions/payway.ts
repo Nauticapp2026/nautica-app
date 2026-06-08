@@ -11,6 +11,7 @@ import {
   movimientosCuentaCorriente,
   paywayCobros,
   paywayTokens,
+  profiles,
 } from '@/lib/db/schema';
 import { getActiveMarina } from '@/lib/auth/session';
 import { formatPaywayError } from '@/lib/payway/format-error';
@@ -67,10 +68,11 @@ export async function guardarTarjetaSocioAction(
 
   const guarderiaId = ctx.activeMembership.guarderiaId;
 
-  // Verificar que el socio pertenece a esta guardería
+  // Verificar que el socio pertenece a esta guardería + traer email para customer
   const [membership] = await db
-    .select({ userId: memberships.userId })
+    .select({ userId: memberships.userId, email: profiles.email })
     .from(memberships)
+    .innerJoin(profiles, eq(profiles.id, memberships.userId))
     .where(
       and(
         eq(memberships.userId, data.socioId),
@@ -115,6 +117,7 @@ export async function guardarTarjetaSocioAction(
       payment_type: 'single',
       sub_payments: [],
       store_credential: true,
+      customer: { id: data.socioId, email: membership.email },
       fraud_detection: { send_to_cs: false },
     });
   } catch (err) {
