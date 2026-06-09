@@ -187,15 +187,17 @@ function AlertaCard({
               {closingPorteria ? 'Cerrando…' : 'Cerrar salida'}
             </button>
           )}
-          <button
-            type="button"
-            disabled={loading || closingPorteria}
-            onClick={() => onResolver(alerta.id)}
-            className="inline-flex items-center gap-1.5 rounded-[10px] bg-[#175861] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#124a52] disabled:opacity-60"
-          >
-            <Check className="h-3.5 w-3.5" />
-            {loading ? 'Guardando…' : 'Marcar resuelta'}
-          </button>
+          {!isCritica && (
+            <button
+              type="button"
+              disabled={loading || closingPorteria}
+              onClick={() => onResolver(alerta.id)}
+              className="inline-flex items-center gap-1.5 rounded-[10px] bg-[#175861] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#124a52] disabled:opacity-60"
+            >
+              <Check className="h-3.5 w-3.5" />
+              {loading ? 'Guardando…' : 'Marcar resuelta'}
+            </button>
+          )}
         </div>
       </div>
     </div>
