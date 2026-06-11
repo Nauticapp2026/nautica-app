@@ -2542,8 +2542,8 @@ export function SocioDetail({
                         {nombreCompleto}
                       </p>
                       <div className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-gray-500">
-                        {n.desde && <span>Desde {formatNaiveDateTime(n.desde)}</span>}
-                        {n.hasta && <span>Hasta {formatNaiveDateTime(n.hasta)}</span>}
+                        {n.desde && <span>Desde {formatArgentinaDateTime(n.desde)}</span>}
+                        {n.hasta && <span>Hasta {formatArgentinaDateTime(n.hasta)}</span>}
                       </div>
                       {n.arribadaEn && (
                         <p className="mt-0.5 text-xs text-gray-400">
