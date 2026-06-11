@@ -21,7 +21,7 @@
  * deprecado). Sigue siendo útil como historial del alta.
  */
 
-import { and, eq, gte, isNotNull } from 'drizzle-orm';
+import { and, eq, gte, isNotNull, lte } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import { espacios, guarderias, movimientosCuentaCorriente, servicios } from '@/lib/db/schema';
@@ -152,6 +152,7 @@ export async function runMonthlyGeneration(now: Date = new Date()): Promise<{
   guarderiaIds: string[];
 }> {
   const diaHoy = now.getUTCDate();
+  const todayStr = now.toISOString().slice(0, 10);
 
   const rows = await db
     .select({
@@ -166,7 +167,15 @@ export async function runMonthlyGeneration(now: Date = new Date()): Promise<{
     .from(espacios)
     .innerJoin(servicios, eq(servicios.id, espacios.servicioId))
     .innerJoin(guarderias, eq(guarderias.id, espacios.guarderiaId))
-    .where(and(isNotNull(espacios.ocupanteId), isNotNull(espacios.servicioId)));
+    .where(
+      and(
+        isNotNull(espacios.ocupanteId),
+        isNotNull(espacios.servicioId),
+        // Solo facturar tarifas vigentes en la fecha de cobro
+        lte(servicios.vigenciaDesde, todayStr),
+        gte(servicios.vigenciaHasta, todayStr),
+      ),
+    );
 
   let created = 0;
   let skipped = 0;

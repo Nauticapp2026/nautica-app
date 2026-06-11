@@ -589,6 +589,8 @@ export const servicios = pgTable(
     locacion: locacionServicioEnum('locacion'),
     unidadMetraje: unidadMetrajeEnum('unidad_metraje'),
     clases: text('clases'),
+    vigenciaDesde: date('vigencia_desde').notNull(),
+    vigenciaHasta: date('vigencia_hasta').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },

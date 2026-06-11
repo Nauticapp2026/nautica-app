@@ -56,6 +56,8 @@ export type Tarifa = {
   eslora: number | null;
   manga: number | null;
   puntual: number | null;
+  vigenciaDesde: string;
+  vigenciaHasta: string;
 };
 
 const MEDIDAS: MedidaTarifa[] = [
@@ -112,6 +114,12 @@ function formatARS(n: number): string {
     currency: 'ARS',
     minimumFractionDigits: 2,
   });
+}
+
+function formatDate(iso: string): string {
+  // iso = "YYYY-MM-DD"
+  const [y, m, d] = iso.split('-');
+  return `${d}/${m}/${y}`;
 }
 
 type ModalState = { mode: 'create' } | { mode: 'edit'; tarifa: Tarifa } | null;
@@ -270,14 +278,16 @@ function TablaTarifas({
         <table className="w-full min-w-[560px] table-fixed text-sm">
           {/* Anchos fijos para que las 3 tablas (Cuota, Servicios, Espacios) queden alineadas verticalmente. */}
           <colgroup>
-            <col className="w-[50%]" />
-            <col className="w-[22%]" />
-            <col className="w-[14%]" />
-            <col className="w-[14%]" />
+            <col className="w-[44%]" />
+            <col className="w-[18%]" />
+            <col className="w-[16%]" />
+            <col className="w-[10%]" />
+            <col className="w-[12%]" />
           </colgroup>
           <thead>
             <tr className="border-b border-gray-200 text-left text-xs text-gray-500">
               <th className="px-5 py-3 font-semibold">Concepto</th>
+              <th className="px-5 py-3 font-semibold">Vigencia</th>
               <th className="px-5 py-3 font-semibold">Precio actual</th>
               <th className="px-5 py-3 font-semibold">Estado</th>
               <th className="px-5 py-3 text-right font-semibold">Acciones</th>
@@ -288,6 +298,9 @@ function TablaTarifas({
               <tr key={t.id} className="border-b border-gray-100 last:border-b-0">
                 <td className="px-5 py-3" style={{ color: '#101828' }}>
                   {t.nombre}
+                </td>
+                <td className="px-5 py-3 text-xs text-gray-500">
+                  {formatDate(t.vigenciaDesde)} – {formatDate(t.vigenciaHasta)}
                 </td>
                 <td className="px-5 py-3" style={{ color: '#101828' }}>
                   {formatARS(t.precio)}
@@ -349,6 +362,8 @@ function TarifaModal({
   const [nombre, setNombre] = useState(initial?.nombre ?? '');
   const [precio, setPrecio] = useState<string>(initial ? String(initial.precio) : '');
   const [estado, setEstado] = useState<EstadoTarifa>(initial?.estado ?? 'activo');
+  const [vigenciaDesde, setVigenciaDesde] = useState<string>(initial?.vigenciaDesde ?? '');
+  const [vigenciaHasta, setVigenciaHasta] = useState<string>(initial?.vigenciaHasta ?? '');
 
   // Cuota mensual
   const [medida, setMedida] = useState<MedidaTarifa | ''>(initial?.medida ?? '');
@@ -394,6 +409,18 @@ function TarifaModal({
       setError('El precio debe ser un número mayor o igual a 0.');
       return;
     }
+    if (!vigenciaDesde) {
+      setError('La fecha de inicio de vigencia es obligatoria.');
+      return;
+    }
+    if (!vigenciaHasta) {
+      setError('La fecha de vencimiento es obligatoria.');
+      return;
+    }
+    if (vigenciaDesde > vigenciaHasta) {
+      setError('La fecha de inicio debe ser anterior o igual al vencimiento.');
+      return;
+    }
 
     const toNumOrNull = (s: string): number | null => {
       if (s.trim() === '') return null;
@@ -408,6 +435,8 @@ function TarifaModal({
         nombre: nombre.trim(),
         precio: precioNum,
         medida: medida === '' ? null : medida,
+        vigenciaDesde,
+        vigenciaHasta,
       };
     } else if (tipo === 'espacios') {
       payload = {
@@ -419,12 +448,16 @@ function TarifaModal({
         eslora: toNumOrNull(eslora),
         manga: toNumOrNull(manga),
         puntual: toNumOrNull(puntual),
+        vigenciaDesde,
+        vigenciaHasta,
       };
     } else {
       payload = {
         tipo: 'servicios' as const,
         nombre: nombre.trim(),
         precio: precioNum,
+        vigenciaDesde,
+        vigenciaHasta,
       };
     }
 
@@ -616,6 +649,31 @@ function TarifaModal({
               value={precio}
               onChange={(e) => setPrecio(e.target.value)}
             />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-sm font-semibold text-gray-700">
+                Vigencia desde
+              </label>
+              <input
+                className={inputCls}
+                type="date"
+                required
+                value={vigenciaDesde}
+                onChange={(e) => setVigenciaDesde(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-semibold text-gray-700">Vencimiento</label>
+              <input
+                className={inputCls}
+                type="date"
+                required
+                value={vigenciaHasta}
+                onChange={(e) => setVigenciaHasta(e.target.value)}
+              />
+            </div>
           </div>
 
           {isEdit && (

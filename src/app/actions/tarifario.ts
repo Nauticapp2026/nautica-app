@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, isNull, lt, ne, not, or, sql } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import { profiles, servicios, serviciosHistorial } from '@/lib/db/schema';
@@ -61,6 +61,8 @@ type UnidadMetraje = (typeof UNIDADES)[number];
 export type TarifaInputBase = {
   nombre: string;
   precio: number;
+  vigenciaDesde: string;
+  vigenciaHasta: string;
 };
 
 export type TarifaCuotaMensualInput = TarifaInputBase & {
@@ -97,11 +99,22 @@ function isAdmin(ctx: NonNullable<Awaited<ReturnType<typeof getActiveMarina>>>):
   );
 }
 
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
 function validar(data: CreateTarifaData): string | null {
   if (!data.nombre.trim()) return 'El concepto es obligatorio.';
   if (!TIPOS.includes(data.tipo)) return 'Categoría inválida.';
   if (!Number.isFinite(data.precio) || data.precio < 0) {
     return 'El precio debe ser un número mayor o igual a 0.';
+  }
+  if (!data.vigenciaDesde || !DATE_RE.test(data.vigenciaDesde)) {
+    return 'La fecha de inicio de vigencia es obligatoria.';
+  }
+  if (!data.vigenciaHasta || !DATE_RE.test(data.vigenciaHasta)) {
+    return 'La fecha de vencimiento es obligatoria.';
+  }
+  if (data.vigenciaDesde > data.vigenciaHasta) {
+    return 'La fecha de inicio debe ser anterior o igual al vencimiento.';
   }
   if (data.tipo === 'cuota_mensual' && data.medida && !MEDIDAS.includes(data.medida)) {
     return 'Medida inválida.';
@@ -122,11 +135,54 @@ function validar(data: CreateTarifaData): string | null {
   return null;
 }
 
+async function checkVigenciaOverlap(
+  guarderiaId: string,
+  data: CreateTarifaData,
+  excludeId?: string,
+): Promise<string | null> {
+  const medidaCondition =
+    data.tipo === 'cuota_mensual' && data.medida
+      ? eq(servicios.medida, data.medida)
+      : isNull(servicios.medida);
+
+  const conditions = and(
+    eq(servicios.guarderiaId, guarderiaId),
+    eq(servicios.nombre, data.nombre.trim()),
+    eq(servicios.tipo, data.tipo),
+    medidaCondition,
+    // Overlap: NOT (existing.hasta < new.desde OR existing.desde > new.hasta)
+    not(
+      or(
+        lt(servicios.vigenciaHasta, data.vigenciaDesde),
+        gt(servicios.vigenciaDesde, data.vigenciaHasta),
+      )!,
+    ),
+    ...(excludeId ? [ne(servicios.id, excludeId)] : []),
+  );
+
+  const [existing] = await db
+    .select({
+      id: servicios.id,
+      vigenciaDesde: servicios.vigenciaDesde,
+      vigenciaHasta: servicios.vigenciaHasta,
+    })
+    .from(servicios)
+    .where(conditions)
+    .limit(1);
+
+  if (existing) {
+    return `Ya existe una tarifa de "${data.nombre.trim()}" con fechas superpuestas (${existing.vigenciaDesde} – ${existing.vigenciaHasta}).`;
+  }
+  return null;
+}
+
 function buildValues(data: CreateTarifaData) {
   const base = {
     nombre: data.nombre.trim(),
     tipo: data.tipo,
     precio: data.precio.toFixed(2),
+    vigenciaDesde: data.vigenciaDesde,
+    vigenciaHasta: data.vigenciaHasta,
   };
 
   if (data.tipo === 'cuota_mensual') {
@@ -155,10 +211,15 @@ export async function createTarifaAction(
   const err = validar(data);
   if (err) return { error: err };
 
+  const guarderiaId = ctx.activeMembership.guarderiaId;
+
+  const overlapErr = await checkVigenciaOverlap(guarderiaId, data);
+  if (overlapErr) return { error: overlapErr };
+
   const [row] = await db
     .insert(servicios)
     .values({
-      guarderiaId: ctx.activeMembership.guarderiaId,
+      guarderiaId,
       estado: 'activo',
       ...buildValues(data),
     })
@@ -186,6 +247,9 @@ export async function updateTarifaAction(data: UpdateTarifaData): Promise<{ erro
     .limit(1);
 
   if (!current) return { error: 'Tarifa no encontrada.' };
+
+  const overlapErr = await checkVigenciaOverlap(guarderiaId, data, data.id);
+  if (overlapErr) return { error: overlapErr };
 
   // Limpieza: cuando el tipo es "servicios" o cambia de tipo, reseteamos los campos
   // que no aplican a ese tipo para que no queden datos colgados.

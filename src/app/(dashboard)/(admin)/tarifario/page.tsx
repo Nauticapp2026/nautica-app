@@ -32,6 +32,8 @@ export default async function TarifarioPage() {
       eslora: servicios.eslora,
       manga: servicios.manga,
       puntual: servicios.puntual,
+      vigenciaDesde: servicios.vigenciaDesde,
+      vigenciaHasta: servicios.vigenciaHasta,
     })
     .from(servicios)
     .where(eq(servicios.guarderiaId, guarderiaId))
@@ -51,6 +53,8 @@ export default async function TarifarioPage() {
     eslora: toNum(r.eslora),
     manga: toNum(r.manga),
     puntual: toNum(r.puntual),
+    vigenciaDesde: r.vigenciaDesde,
+    vigenciaHasta: r.vigenciaHasta,
   }));
 
   return <TarifarioClient tarifas={tarifas} />;
