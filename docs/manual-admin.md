@@ -161,7 +161,11 @@ Historial de comprobantes AFIP emitidos al socio (facturas y notas de crédito).
 
 #### Pestaña Navegantes
 
-Lista de personas autorizadas a operar la embarcación del socio.
+Historial de accesos externos donde la persona fue autorizada como navegante por el socio. Cada registro muestra el nombre del navegante, el período autorizado (desde / hasta) y el estado:
+
+- **Autorizado** — el acceso está activo.
+- **Ingresó** — el navegante ya registró entrada en portería.
+- **Cancelado** — el acceso fue revocado desde la app.
 
 #### Pestaña Salidas
 
@@ -535,23 +539,29 @@ Desde aquí definís los precios de los servicios que ofrece tu club.
 Las tarifas están agrupadas por categoría. Podés filtrar usando los botones:
 
 - **Todas** — muestra todo.
-- **Cuota mensual** — cuotas periódicas.
-- **Servicios** — servicios adicionales (lavado, amarre de pasada, etc.).
 - **Espacios** — tarifas para amarras o camas (por metro/pie de eslora o manga).
+- **Cuota mensual** — cuotas periódicas.
+- **Servicios Extra** — servicios adicionales (lavado, amarre de pasada, etc.).
+
+Cada tarifa muestra su concepto, período de vigencia, precio con alícuota de IVA y estado. Si la fecha de vencimiento ya pasó, el estado aparece como **Vencida** (en ámbar) en lugar de Activa.
 
 ### Crear una tarifa
 
 1. Hacé clic en **Nueva tarifa**.
 2. Seleccioná la **Categoría**:
-   - **Cuota mensual** — ingresá el concepto, la medida (rangos de eslora desde "Hasta 16" hasta "Hasta 105") y el precio.
-   - **Servicios** — ingresá el concepto y el precio.
    - **Espacios** — seleccioná si es para Camas o Amarra, la unidad de metraje (Metros o Pies), la eslora, la manga y opcionalmente un valor puntual.
-3. Ingresá el **Precio**.
-4. Hacé clic en **Guardar**.
+   - **Cuota mensual** — ingresá el concepto, la medida (rangos de eslora desde "Hasta 16" hasta "Hasta 105") y el precio.
+   - **Servicios Extra** — ingresá el concepto y el precio.
+3. Ingresá el **Precio** y la **Alícuota de IVA**: 0 %, 10,5 % o 21 %.
+4. Definí la **Vigencia**:
+   - **Vigencia desde** — fecha a partir de la cual la tarifa está activa.
+   - **Vencimiento** — fecha hasta la que aplica.
+   - No pueden existir dos tarifas del mismo concepto con fechas superpuestas.
+5. Hacé clic en **Guardar tarifa**.
 
 ### Editar una tarifa
 
-Hacé clic en el ícono de edición (lápiz) en la fila de la tarifa. Podés cambiar el precio, el concepto o desactivarla cambiando el **Estado** a "Inactivo".
+Hacé clic en el ícono de edición (lápiz) en la fila de la tarifa. Podés cambiar el precio, el concepto, la alícuota de IVA, las fechas de vigencia o desactivarla cambiando el **Estado** a "Inactivo".
 
 ### Ajuste masivo de precios
 
@@ -575,9 +585,9 @@ Desde **Configuración** administrás los datos de tu club y las integraciones.
 
 ### Pestaña: Información general
 
-Datos básicos del club visibles en la app y en los documentos de facturación.
+Datos básicos del club y configuración de facturación, todo en una sola pestaña.
 
-**Campos:**
+**Datos del club:**
 
 - **Nombre del club / guardería** _(requerido)_
 - **CUIT** _(requerido)_
@@ -597,6 +607,30 @@ Para cada día de la semana podés configurar:
 Podés subir fotos que se muestran en el perfil público del club.
 
 Hacé clic en **Guardar cambios** al terminar.
+
+**Datos de facturación (AFIP):**
+
+Esta sección aparece debajo de las fotos. Configurá aquí el Punto de Venta para poder emitir facturas electrónicas.
+
+_Paso 1 — Configurar el Punto de Venta:_
+
+1. Completá los datos:
+   - **Número de Punto de Venta** _(requerido)_
+   - **Condición frente al IVA** _(requerida)_ — la de tu club.
+   - **Rubro** _(requerido)_
+   - **Razón social** _(requerida)_
+   - **Fecha de inicio de actividades** _(requerida)_
+2. Hacé clic en **Guardar**.
+
+_Paso 2 — Certificado de enlace con AFIP:_
+
+El certificado permite que el sistema emita facturas directamente a AFIP en nombre de tu club.
+
+1. Hacé clic en **Solicitar certificado AFIP**. TusFacturas va a enviar las instrucciones al mail del administrador de la cuenta de TusFacturas.
+2. Instalá el certificado en el portal de AFIP siguiendo las instrucciones recibidas.
+3. Volvé al panel y hacé clic en **Confirmar instalación** para habilitar la emisión.
+
+> Hasta que no confirmes la instalación del certificado, el botón "Nueva factura" aparece deshabilitado.
 
 ### Pestaña: Equipo
 
@@ -632,30 +666,6 @@ Los tres planes disponibles son **Esencial**, **Premium** y **Élite**. Cada uno
 1. Hacé clic en **Cambiar a [nombre del plan]** bajo el plan deseado.
 2. Confirmá el cambio en el modal.
 3. El cambio es inmediato. Las funcionalidades del nuevo plan se habilitan al instante.
-
-### Pestaña: Datos de facturación
-
-Configuración necesaria para poder emitir facturas electrónicas a través de AFIP.
-
-**Paso 1 — Configurar el Punto de Venta:**
-
-1. Completá los datos:
-   - **Número de Punto de Venta** _(requerido)_
-   - **Condición frente al IVA** _(requerida)_ — la de tu club.
-   - **Rubro** _(requerido)_
-   - **Razón social** _(requerida)_
-   - **Fecha de inicio de actividades** _(requerida)_
-2. Hacé clic en **Guardar**.
-
-**Paso 2 — Certificado de enlace con AFIP:**
-
-El certificado permite que el sistema emita facturas directamente a AFIP en nombre de tu club.
-
-1. Hacé clic en **Solicitar certificado AFIP**. TusFacturas va a enviar las instrucciones al mail del administrador de la cuenta de TusFacturas (el mail con el que se registró el club en esa plataforma).
-2. Instalá el certificado en el portal de AFIP siguiendo las instrucciones recibidas.
-3. Volvé al panel y hacé clic en **Confirmar instalación** para habilitar la emisión.
-
-> Hasta que no confirmes la instalación del certificado, el botón "Nueva factura" aparece deshabilitado.
 
 ---
 
