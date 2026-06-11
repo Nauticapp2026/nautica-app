@@ -135,6 +135,7 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
           eq(porteria.socioId, id),
           eq(porteria.guarderiaId, gId),
           eq(porteria.tipo, 'acceso_externo'),
+          eq(porteriaInvitados.esNavegante, true),
         ),
       )
       .orderBy(desc(porteria.createdAt)),
