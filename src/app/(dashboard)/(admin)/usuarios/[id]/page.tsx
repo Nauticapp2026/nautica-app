@@ -84,6 +84,7 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
         modelo: embarcaciones.modelo,
         seguro: embarcaciones.seguro,
         esloraM: embarcaciones.esloraM,
+        esPrincipal: embarcaciones.esPrincipal,
       })
       .from(embarcaciones)
       .where(and(eq(embarcaciones.profileId, id), eq(embarcaciones.guarderiaId, gId))),

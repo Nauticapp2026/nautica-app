@@ -691,6 +691,7 @@ export const embarcaciones = pgTable(
     modelo: text('modelo'),
     seguro: text('seguro'),
     esloraM: numeric('eslora_m', { precision: 6, scale: 2 }),
+    esPrincipal: boolean('es_principal').notNull().default(false),
     fotoUrl: text('foto_url'),
     ubicacion: text('ubicacion'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),

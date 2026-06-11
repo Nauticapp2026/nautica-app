@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, ne } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { embarcaciones, memberships } from '@/lib/db/schema';
 import { getActiveMarina } from '@/lib/auth/session';
@@ -14,7 +14,7 @@ export type EmbarcacionInput = {
   esloraM: string;
 };
 
-export type CreateEmbarcacionData = EmbarcacionInput & { socioId: string };
+export type CreateEmbarcacionData = EmbarcacionInput & { socioId: string; esPrincipal?: boolean };
 export type UpdateEmbarcacionData = EmbarcacionInput & { id: string };
 
 function norm(s: string): string | null {
@@ -32,7 +32,6 @@ export async function createEmbarcacionAction(
 
   if (!data.nombre.trim()) return { error: 'El nombre de la embarcación es obligatorio.' };
 
-  // Verificar que el socio pertenezca a la guardería activa.
   const [member] = await db
     .select({ id: memberships.id })
     .from(memberships)
@@ -40,7 +39,24 @@ export async function createEmbarcacionAction(
     .limit(1);
   if (!member) return { error: 'Socio no pertenece a esta guardería.' };
 
+  // Contar cuántas embarcaciones ya tiene para saber si será la primera.
+  const existing = await db
+    .select({ id: embarcaciones.id })
+    .from(embarcaciones)
+    .where(and(eq(embarcaciones.profileId, data.socioId), eq(embarcaciones.guarderiaId, gId)));
+
+  const esPrimera = existing.length === 0;
+  const marcarPrincipal = esPrimera || data.esPrincipal === true;
+
   try {
+    if (marcarPrincipal && !esPrimera) {
+      // Desmarcar las existentes antes de insertar la nueva como principal.
+      await db
+        .update(embarcaciones)
+        .set({ esPrincipal: false })
+        .where(and(eq(embarcaciones.profileId, data.socioId), eq(embarcaciones.guarderiaId, gId)));
+    }
+
     const [row] = await db
       .insert(embarcaciones)
       .values({
@@ -51,8 +67,10 @@ export async function createEmbarcacionAction(
         modelo: norm(data.modelo),
         seguro: norm(data.seguro),
         esloraM: norm(data.esloraM),
+        esPrincipal: marcarPrincipal,
       })
       .returning({ id: embarcaciones.id });
+
     revalidatePath(`/usuarios/${data.socioId}`);
     return { id: row.id };
   } catch {
@@ -70,7 +88,6 @@ export async function updateEmbarcacionAction(
 
   if (!data.nombre.trim()) return { error: 'El nombre de la embarcación es obligatorio.' };
 
-  // Validar que la embarcación sea de la guardería activa.
   const [existing] = await db
     .select({ profileId: embarcaciones.profileId })
     .from(embarcaciones)
@@ -89,10 +106,47 @@ export async function updateEmbarcacionAction(
         esloraM: norm(data.esloraM),
       })
       .where(eq(embarcaciones.id, data.id));
+
     if (existing.profileId) revalidatePath(`/usuarios/${existing.profileId}`);
     return {};
   } catch {
     return { error: 'Error al actualizar la embarcación.' };
+  }
+}
+
+export async function setPrincipalAction(id: string): Promise<{ error?: string }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'Tu sesión expiró. Recargá la página e intentá de nuevo.' };
+
+  const gId = ctx.activeMembership.guarderiaId;
+
+  const [target] = await db
+    .select({ profileId: embarcaciones.profileId })
+    .from(embarcaciones)
+    .where(and(eq(embarcaciones.id, id), eq(embarcaciones.guarderiaId, gId)))
+    .limit(1);
+  if (!target) return { error: 'Embarcación no pertenece a esta guardería.' };
+
+  try {
+    if (target.profileId) {
+      // Desmarcar todas las demás del mismo socio.
+      await db
+        .update(embarcaciones)
+        .set({ esPrincipal: false })
+        .where(
+          and(
+            eq(embarcaciones.profileId, target.profileId),
+            eq(embarcaciones.guarderiaId, gId),
+            ne(embarcaciones.id, id),
+          ),
+        );
+    }
+    await db.update(embarcaciones).set({ esPrincipal: true }).where(eq(embarcaciones.id, id));
+
+    if (target.profileId) revalidatePath(`/usuarios/${target.profileId}`);
+    return {};
+  } catch {
+    return { error: 'Error al actualizar la embarcación principal.' };
   }
 }
 
@@ -103,7 +157,7 @@ export async function deleteEmbarcacionAction(id: string): Promise<{ error?: str
   const gId = ctx.activeMembership.guarderiaId;
 
   const [existing] = await db
-    .select({ profileId: embarcaciones.profileId })
+    .select({ profileId: embarcaciones.profileId, esPrincipal: embarcaciones.esPrincipal })
     .from(embarcaciones)
     .where(and(eq(embarcaciones.id, id), eq(embarcaciones.guarderiaId, gId)))
     .limit(1);
@@ -111,6 +165,24 @@ export async function deleteEmbarcacionAction(id: string): Promise<{ error?: str
 
   try {
     await db.delete(embarcaciones).where(eq(embarcaciones.id, id));
+
+    // Si era la principal y quedan otras, promover la primera restante.
+    if (existing.esPrincipal && existing.profileId) {
+      const [next] = await db
+        .select({ id: embarcaciones.id })
+        .from(embarcaciones)
+        .where(
+          and(eq(embarcaciones.profileId, existing.profileId), eq(embarcaciones.guarderiaId, gId)),
+        )
+        .limit(1);
+      if (next) {
+        await db
+          .update(embarcaciones)
+          .set({ esPrincipal: true })
+          .where(eq(embarcaciones.id, next.id));
+      }
+    }
+
     if (existing.profileId) revalidatePath(`/usuarios/${existing.profileId}`);
     return {};
   } catch {

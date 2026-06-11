@@ -16,6 +16,7 @@ import {
   FileText,
   Printer,
   Ship,
+  Star,
   TrendingUp,
   AlertTriangle,
   Paperclip,
@@ -34,6 +35,7 @@ import { crearReciboInternoAction } from '@/app/actions/facturacion';
 import {
   createEmbarcacionAction,
   deleteEmbarcacionAction,
+  setPrincipalAction,
   updateEmbarcacionAction,
 } from '@/app/actions/embarcaciones';
 import { assignEspacioToSocioAction, moveOcupanteAction } from '@/app/actions/espacios';
@@ -77,6 +79,7 @@ type Embarcacion = {
   modelo: string | null;
   seguro: string | null;
   esloraM: string | null;
+  esPrincipal: boolean;
 };
 
 type Movimiento = {
@@ -1215,9 +1218,12 @@ function EmbarcacionesTab({
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [agregando, setAgregando] = useState(false);
   const [form, setForm] = useState(EMBARCACION_VACIA);
+  const [esPrincipalNueva, setEsPrincipalNueva] = useState(false);
   const [esloraUnidad, setEsloraUnidad] = useState<'m' | 'ft'>('m');
   const [error, setError] = useState<string | null>(null);
   const [isSaving, startSaving] = useTransition();
+
+  const hayMultiples = embarcaciones.length > 1;
 
   function startEdit(e: Embarcacion) {
     setError(null);
@@ -1238,6 +1244,7 @@ function EmbarcacionesTab({
     setAgregando(false);
     setForm(EMBARCACION_VACIA);
     setEsloraUnidad('m');
+    setEsPrincipalNueva(false);
     setError(null);
   }
 
@@ -1246,6 +1253,7 @@ function EmbarcacionesTab({
     setEditandoId(null);
     setForm(EMBARCACION_VACIA);
     setEsloraUnidad('m');
+    setEsPrincipalNueva(false);
     setAgregando(true);
   }
 
@@ -1295,6 +1303,7 @@ function EmbarcacionesTab({
         socioId,
         ...form,
         esloraM: esloraParaGuardar(),
+        esPrincipal: esPrincipalNueva,
       });
       if (res.error) {
         setError(res.error);
@@ -1319,176 +1328,277 @@ function EmbarcacionesTab({
     });
   }
 
-  // Solo permitimos 1 embarcación por socio — tomamos la primera.
-  const embarcacion = embarcaciones[0] ?? null;
-  const editando = embarcacion != null && editandoId === embarcacion.id;
+  function hacerPrincipal(id: string) {
+    startSaving(async () => {
+      const res = await setPrincipalAction(id);
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+      router.refresh();
+    });
+  }
 
-  return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-4 md:p-6">
-      {/* Header — mismo patrón que la tab Generales */}
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-[18px] font-bold" style={{ color: '#101828' }}>
-          {agregando ? 'Nueva embarcación' : 'Datos de la Embarcación'}
-        </p>
-        {embarcacion && !editando && !agregando && (
-          <button
-            onClick={() => startEdit(embarcacion)}
-            className="shrink-0 justify-center rounded-[10px] border border-[#d1d5dc] px-4 py-2 text-sm font-medium text-[#364153] transition hover:bg-gray-50"
-          >
-            Editar
-          </button>
-        )}
-        {(editando || agregando) && (
-          <div className="flex shrink-0 gap-2">
+  // ── Bloque de campos reutilizado en edición y alta ──
+  const camposForm = (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div>
+        <label className="mb-1.5 block text-xs font-semibold text-gray-500">Nombre</label>
+        <input className={inputCls} value={form.nombre} onChange={setField('nombre')} />
+      </div>
+      <div>
+        <label className="mb-1.5 block text-xs font-semibold text-gray-500">Matrícula</label>
+        <input className={inputCls} value={form.matricula} onChange={setField('matricula')} />
+      </div>
+      <div>
+        <label className="mb-1.5 block text-xs font-semibold text-gray-500">Modelo</label>
+        <input className={inputCls} value={form.modelo} onChange={setField('modelo')} />
+      </div>
+      <div>
+        <label className="mb-1.5 block text-xs font-semibold text-gray-500">Seguro</label>
+        <input className={inputCls} value={form.seguro} onChange={setField('seguro')} />
+      </div>
+      <div>
+        <label className="mb-1.5 block text-xs font-semibold text-gray-500">Eslora</label>
+        <div className="flex gap-2">
+          <input
+            className={inputCls}
+            type="number"
+            min="0"
+            step="0.01"
+            placeholder={esloraUnidad === 'm' ? 'ej: 9.50' : 'ej: 31.2'}
+            value={form.esloraM}
+            onChange={setField('esloraM')}
+          />
+          <div className="flex shrink-0 overflow-hidden rounded-[10px] border border-gray-200">
             <button
-              onClick={cancel}
-              disabled={isSaving}
-              className="flex-1 justify-center rounded-[10px] border border-[#d1d5dc] px-4 py-2 text-sm font-medium text-[#364153] transition hover:bg-gray-50 disabled:opacity-40 sm:flex-none"
+              type="button"
+              onClick={() => switchEsloraUnidad('m')}
+              className={`px-3 text-xs font-semibold transition ${
+                esloraUnidad === 'm'
+                  ? 'bg-[#175861] text-white'
+                  : 'bg-white text-gray-500 hover:bg-gray-50'
+              }`}
             >
-              Cancelar
+              m
             </button>
             <button
-              onClick={() => (agregando ? guardarNueva() : guardarEdicion(embarcacion!.id))}
-              disabled={isSaving}
-              className="flex-1 justify-center rounded-[10px] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-40 sm:flex-none"
-              style={{ background: '#175861' }}
+              type="button"
+              onClick={() => switchEsloraUnidad('ft')}
+              className={`px-3 text-xs font-semibold transition ${
+                esloraUnidad === 'ft'
+                  ? 'bg-[#175861] text-white'
+                  : 'bg-white text-gray-500 hover:bg-gray-50'
+              }`}
             >
-              {isSaving ? 'Guardando...' : agregando ? 'Crear' : 'Guardar'}
+              ft
             </button>
           </div>
-        )}
+        </div>
       </div>
+    </div>
+  );
 
-      {!embarcacion && !agregando ? (
-        <div className="space-y-4">
+  return (
+    <div className="space-y-4">
+      {/* Tarjeta por cada embarcación existente */}
+      {embarcaciones.map((emb) => {
+        const esteEditando = editandoId === emb.id;
+        return (
+          <div key={emb.id} className="rounded-2xl border border-gray-200 bg-white p-4 md:p-6">
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-2">
+                <p className="text-[18px] font-bold" style={{ color: '#101828' }}>
+                  {esteEditando ? 'Editar embarcación' : emb.nombre}
+                </p>
+                {hayMultiples && emb.esPrincipal && !esteEditando && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-teal-50 px-2 py-0.5 text-xs font-semibold text-teal-700">
+                    <Star className="h-3 w-3 fill-teal-600 text-teal-600" />
+                    Principal
+                  </span>
+                )}
+              </div>
+              {!esteEditando && !agregando && editandoId === null && (
+                <button
+                  onClick={() => startEdit(emb)}
+                  className="shrink-0 justify-center rounded-[10px] border border-[#d1d5dc] px-4 py-2 text-sm font-medium text-[#364153] transition hover:bg-gray-50"
+                >
+                  Editar
+                </button>
+              )}
+              {esteEditando && (
+                <div className="flex shrink-0 gap-2">
+                  <button
+                    onClick={cancel}
+                    disabled={isSaving}
+                    className="flex-1 justify-center rounded-[10px] border border-[#d1d5dc] px-4 py-2 text-sm font-medium text-[#364153] transition hover:bg-gray-50 disabled:opacity-40 sm:flex-none"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={() => guardarEdicion(emb.id)}
+                    disabled={isSaving}
+                    className="flex-1 justify-center rounded-[10px] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-40 sm:flex-none"
+                    style={{ background: '#175861' }}
+                  >
+                    {isSaving ? 'Guardando...' : 'Guardar'}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {esteEditando ? (
+              <div className="space-y-4">
+                {camposForm}
+                {error && (
+                  <div className="rounded-[10px] border border-red-200 bg-red-50 p-3">
+                    <p className="text-sm font-medium text-red-700">{error}</p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-1.5 block text-xs font-semibold text-gray-500">
+                      Nombre
+                    </label>
+                    <p className="text-sm font-medium" style={{ color: '#101828' }}>
+                      {emb.nombre}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-xs font-semibold text-gray-500">
+                      Matrícula
+                    </label>
+                    <p className="text-sm" style={{ color: '#101828' }}>
+                      {emb.matricula ?? '—'}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-xs font-semibold text-gray-500">
+                      Modelo
+                    </label>
+                    <p className="text-sm" style={{ color: '#101828' }}>
+                      {emb.modelo ?? '—'}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-xs font-semibold text-gray-500">
+                      Seguro
+                    </label>
+                    <p className="text-sm" style={{ color: '#101828' }}>
+                      {emb.seguro ?? '—'}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-xs font-semibold text-gray-500">
+                      Eslora
+                    </label>
+                    <p className="text-sm" style={{ color: '#101828' }}>
+                      {emb.esloraM ? `${emb.esloraM} m` : '—'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 border-t border-gray-100 pt-4">
+                  {hayMultiples && !emb.esPrincipal && (
+                    <button
+                      onClick={() => hacerPrincipal(emb.id)}
+                      disabled={isSaving}
+                      className="inline-flex items-center gap-1.5 rounded-[10px] border border-[#d1d5dc] bg-white px-3 py-1.5 text-xs font-medium text-[#364153] transition hover:bg-gray-50 disabled:opacity-40"
+                    >
+                      <Star className="h-3.5 w-3.5" />
+                      Hacer principal
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setConfirmDeleteId(emb.id)}
+                    disabled={isSaving}
+                    className="inline-flex items-center gap-2 rounded-[10px] border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50 hover:text-red-700 disabled:opacity-40"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Eliminar
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      {/* Formulario de nueva embarcación */}
+      {agregando && (
+        <div className="rounded-2xl border border-gray-200 bg-white p-4 md:p-6">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-[18px] font-bold" style={{ color: '#101828' }}>
+              Nueva embarcación
+            </p>
+            <div className="flex shrink-0 gap-2">
+              <button
+                onClick={cancel}
+                disabled={isSaving}
+                className="flex-1 justify-center rounded-[10px] border border-[#d1d5dc] px-4 py-2 text-sm font-medium text-[#364153] transition hover:bg-gray-50 disabled:opacity-40 sm:flex-none"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={guardarNueva}
+                disabled={isSaving}
+                className="flex-1 justify-center rounded-[10px] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-40 sm:flex-none"
+                style={{ background: '#175861' }}
+              >
+                {isSaving ? 'Guardando...' : 'Crear'}
+              </button>
+            </div>
+          </div>
+          <div className="space-y-4">
+            {camposForm}
+            {embarcaciones.length >= 1 && (
+              <label className="flex cursor-pointer items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={esPrincipalNueva}
+                  onChange={(e) => setEsPrincipalNueva(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300 accent-[#175861]"
+                />
+                <span className="text-sm font-medium text-gray-700">Principal</span>
+              </label>
+            )}
+            {error && (
+              <div className="rounded-[10px] border border-red-200 bg-red-50 p-3">
+                <p className="text-sm font-medium text-red-700">{error}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Empty state */}
+      {embarcaciones.length === 0 && !agregando && (
+        <div className="rounded-2xl border border-gray-200 bg-white p-4 md:p-6">
           <EmptyState
             icon={<Ship className="h-7 w-7 opacity-40" />}
             text="Este socio no tiene embarcación registrada."
           />
-          <div className="flex justify-center">
-            <button
-              onClick={startAgregar}
-              className="inline-flex items-center gap-2 rounded-[10px] px-4 py-2 text-sm font-semibold text-white"
-              style={{ background: '#175861' }}
-            >
-              <Plus className="h-4 w-4" />
-              Agregar embarcación
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <label className="mb-1.5 block text-xs font-semibold text-gray-500">Nombre</label>
-              {editando || agregando ? (
-                <input className={inputCls} value={form.nombre} onChange={setField('nombre')} />
-              ) : (
-                <p className="text-sm font-medium" style={{ color: '#101828' }}>
-                  {embarcacion?.nombre ?? '—'}
-                </p>
-              )}
-            </div>
-            <div>
-              <label className="mb-1.5 block text-xs font-semibold text-gray-500">Matrícula</label>
-              {editando || agregando ? (
-                <input
-                  className={inputCls}
-                  value={form.matricula}
-                  onChange={setField('matricula')}
-                />
-              ) : (
-                <p className="text-sm" style={{ color: '#101828' }}>
-                  {embarcacion?.matricula ?? '—'}
-                </p>
-              )}
-            </div>
-            <div>
-              <label className="mb-1.5 block text-xs font-semibold text-gray-500">Modelo</label>
-              {editando || agregando ? (
-                <input className={inputCls} value={form.modelo} onChange={setField('modelo')} />
-              ) : (
-                <p className="text-sm" style={{ color: '#101828' }}>
-                  {embarcacion?.modelo ?? '—'}
-                </p>
-              )}
-            </div>
-            <div>
-              <label className="mb-1.5 block text-xs font-semibold text-gray-500">Seguro</label>
-              {editando || agregando ? (
-                <input className={inputCls} value={form.seguro} onChange={setField('seguro')} />
-              ) : (
-                <p className="text-sm" style={{ color: '#101828' }}>
-                  {embarcacion?.seguro ?? '—'}
-                </p>
-              )}
-            </div>
-            <div>
-              <label className="mb-1.5 block text-xs font-semibold text-gray-500">Eslora</label>
-              {editando || agregando ? (
-                <div className="flex gap-2">
-                  <input
-                    className={inputCls}
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    placeholder={esloraUnidad === 'm' ? 'ej: 9.50' : 'ej: 31.2'}
-                    value={form.esloraM}
-                    onChange={setField('esloraM')}
-                  />
-                  <div className="flex shrink-0 overflow-hidden rounded-[10px] border border-gray-200">
-                    <button
-                      type="button"
-                      onClick={() => switchEsloraUnidad('m')}
-                      className={`px-3 text-xs font-semibold transition ${
-                        esloraUnidad === 'm'
-                          ? 'bg-[#175861] text-white'
-                          : 'bg-white text-gray-500 hover:bg-gray-50'
-                      }`}
-                    >
-                      m
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => switchEsloraUnidad('ft')}
-                      className={`px-3 text-xs font-semibold transition ${
-                        esloraUnidad === 'ft'
-                          ? 'bg-[#175861] text-white'
-                          : 'bg-white text-gray-500 hover:bg-gray-50'
-                      }`}
-                    >
-                      ft
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <p className="text-sm" style={{ color: '#101828' }}>
-                  {embarcacion?.esloraM ? `${embarcacion.esloraM} m` : '—'}
-                </p>
-              )}
-            </div>
-          </div>
-
-          {error && (
-            <div className="rounded-[10px] border border-red-200 bg-red-50 p-3">
-              <p className="text-sm font-medium text-red-700">{error}</p>
-            </div>
-          )}
-
-          {embarcacion && !editando && !agregando && (
-            <div className="border-t border-gray-100 pt-4">
-              <button
-                onClick={() => setConfirmDeleteId(embarcacion.id)}
-                className="inline-flex items-center gap-2 rounded-[10px] border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50 hover:text-red-700"
-              >
-                <Trash2 className="h-4 w-4" />
-                Eliminar embarcación
-              </button>
-            </div>
-          )}
         </div>
       )}
 
+      {/* Botón agregar */}
+      {!agregando && (
+        <div className="flex justify-end">
+          <button
+            onClick={startAgregar}
+            className="inline-flex items-center gap-2 rounded-[10px] px-4 py-2 text-sm font-semibold text-white"
+            style={{ background: '#175861' }}
+          >
+            <Plus className="h-4 w-4" />
+            Agregar embarcación
+          </button>
+        </div>
+      )}
+
+      {/* Diálogo confirmar eliminación */}
       {confirmDeleteId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
