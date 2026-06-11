@@ -11,7 +11,6 @@ import {
   FilterX,
   Minus,
   Plus,
-  Receipt,
   Trash2,
   Users,
   X,
@@ -42,15 +41,14 @@ import {
 import { EmptyState } from '@/components/shared/empty-state';
 import { ImagesUploader } from '@/components/shared/images-uploader';
 
-export type TabKey = 'info' | 'equipo' | 'plan' | 'punto_venta' | 'payway';
+export type TabKey = 'info' | 'equipo' | 'plan' | 'payway';
 
 export type PaywayData = SavePaywayCredsData;
 
 const TABS: { key: TabKey; label: string; icon: typeof Bell }[] = [
-  { key: 'info', label: 'Información general', icon: Receipt },
+  { key: 'info', label: 'Información general', icon: Building2 },
   { key: 'equipo', label: 'Equipo', icon: Users },
   { key: 'plan', label: 'Plan', icon: CreditCard },
-  { key: 'punto_venta', label: 'Datos Impositivos', icon: Building2 },
   { key: 'payway', label: 'Payway', icon: CreditCard },
 ];
 
@@ -220,7 +218,12 @@ export function ConfiguracionClient({
       </div>
 
       {activeTab === 'info' && (
-        <InfoGeneralForm initial={infoGeneral} puntoDeVenta={puntoVenta.puntoDeVenta} />
+        <>
+          <InfoGeneralForm initial={infoGeneral} />
+          <div className="mt-6">
+            <PuntoVentaTab initial={puntoVenta} />
+          </div>
+        </>
       )}
       {activeTab === 'equipo' && (
         <EquipoTab
@@ -230,19 +233,12 @@ export function ConfiguracionClient({
         />
       )}
       {activeTab === 'plan' && <PlanTab planes={planes} currentPlan={currentPlan} />}
-      {activeTab === 'punto_venta' && <PuntoVentaTab initial={puntoVenta} />}
       {activeTab === 'payway' && <PaywayTab initial={payway} />}
     </div>
   );
 }
 
-function InfoGeneralForm({
-  initial,
-  puntoDeVenta,
-}: {
-  initial: InfoGeneralData;
-  puntoDeVenta: number | null;
-}) {
+function InfoGeneralForm({ initial }: { initial: InfoGeneralData }) {
   const [data, setData] = useState<InfoGeneralData>(initial);
   const [feedback, setFeedback] = useState<{ type: 'error' | 'success'; msg: string } | null>(null);
   const [pending, startTransition] = useTransition();
@@ -292,7 +288,7 @@ function InfoGeneralForm({
           />
         </Field>
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <Field label="CUIT" required>
             <input
               className={inputCls}
@@ -312,13 +308,6 @@ function InfoGeneralForm({
                 </option>
               ))}
             </select>
-          </Field>
-          <Field label="Número de Referencia">
-            <input
-              className={`${inputCls} bg-gray-50 text-gray-500`}
-              value={puntoDeVenta ?? '—'}
-              readOnly
-            />
           </Field>
         </div>
 
