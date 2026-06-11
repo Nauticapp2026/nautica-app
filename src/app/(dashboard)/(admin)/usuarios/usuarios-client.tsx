@@ -666,7 +666,7 @@ export function UsuariosClient({
       <div className="p-4 md:p-8">
         {/* Header */}
         <div className="mb-6">
-          <h1 className="page-title">Usuarios</h1>
+          <h1 className="page-title">Socios</h1>
           <p className="page-subtitle mt-1">Gestiona socios del club</p>
         </div>
 
@@ -740,7 +740,7 @@ export function UsuariosClient({
                   <tr className="bg-gray-50 text-left text-xs font-semibold text-gray-500">
                     <th className="w-10 px-4 py-3" />
                     <SortableTh
-                      label="Socio"
+                      label="Nombre"
                       sortKey="socio"
                       activeKey={sortKey}
                       dir={sortDir}
@@ -762,7 +762,7 @@ export function UsuariosClient({
                     />
                     <th className="px-4 py-3 text-center">Estado</th>
                     <SortableTh
-                      label="Deuda"
+                      label="Saldo"
                       sortKey="deuda"
                       activeKey={sortKey}
                       dir={sortDir}
