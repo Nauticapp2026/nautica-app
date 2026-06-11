@@ -306,7 +306,7 @@ function TablaTarifas({
                   {formatARS(t.precio)}
                 </td>
                 <td className="px-5 py-3">
-                  <EstadoBadge estado={t.estado} />
+                  <EstadoBadge estado={t.estado} vigenciaHasta={t.vigenciaHasta} />
                 </td>
                 <td className="px-5 py-3">
                   <div className="flex justify-end gap-2">
@@ -337,11 +337,21 @@ function TablaTarifas({
   );
 }
 
-function EstadoBadge({ estado }: { estado: EstadoTarifa }) {
-  const cls = estado === 'activo' ? 'bg-[#ECFDF3] text-[#027A48]' : 'bg-gray-100 text-gray-500';
+function EstadoBadge({ estado, vigenciaHasta }: { estado: EstadoTarifa; vigenciaHasta: string }) {
+  const today = new Date().toISOString().slice(0, 10);
+  const vencida = estado === 'activo' && vigenciaHasta < today;
+
+  const cls = vencida
+    ? 'bg-amber-50 text-amber-700'
+    : estado === 'activo'
+      ? 'bg-[#ECFDF3] text-[#027A48]'
+      : 'bg-gray-100 text-gray-500';
+
+  const label = vencida ? 'Vencida' : estado === 'activo' ? 'Activa' : 'Inactiva';
+
   return (
     <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${cls}`}>
-      {estado === 'activo' ? 'Activo' : 'Inactivo'}
+      {label}
     </span>
   );
 }
