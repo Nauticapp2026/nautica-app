@@ -147,7 +147,6 @@ const TABS = [
   { id: 'generales', label: 'Generales', icon: User },
   { id: 'embarcacion', label: 'Embarcación', icon: Anchor },
   { id: 'cuenta-corriente', label: 'Cuenta Corriente', icon: CreditCard },
-  { id: 'facturacion', label: 'Comprobantes', icon: DollarSign },
   { id: 'navegantes', label: 'Navegantes', icon: Users },
   { id: 'salidas', label: 'Salidas', icon: Clock },
   { id: 'documentacion', label: 'Documentación', icon: FileText },
@@ -2500,16 +2499,6 @@ export function SocioDetail({
               </div>
             </>
           )}
-        </div>
-      )}
-
-      {/* Facturación */}
-      {activeTab === 'facturacion' && (
-        <div className="rounded-2xl border border-gray-200 bg-white p-4 md:p-6">
-          <EmptyState
-            icon={<DollarSign className="h-7 w-7 opacity-40" />}
-            text="No hay facturas registradas."
-          />
         </div>
       )}
 
