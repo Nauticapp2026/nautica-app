@@ -92,18 +92,18 @@ type FiltroCategoria = 'todas' | TipoTarifa;
 
 const CATEGORIAS: { key: FiltroCategoria; label: string }[] = [
   { key: 'todas', label: 'Todas' },
-  { key: 'cuota_mensual', label: 'Cuota mensual' },
-  { key: 'servicios', label: 'Servicios' },
   { key: 'espacios', label: 'Espacios' },
+  { key: 'cuota_mensual', label: 'Cuota mensual' },
+  { key: 'servicios', label: 'Servicios Extra' },
 ];
 
 const TIPO_LABELS: Record<TipoTarifa, string> = {
   cuota_mensual: 'Cuota mensual',
-  servicios: 'Servicios',
+  servicios: 'Servicios Extra',
   espacios: 'Espacios',
 };
 
-const GRUPO_ORDER: TipoTarifa[] = ['cuota_mensual', 'servicios', 'espacios'];
+const GRUPO_ORDER: TipoTarifa[] = ['espacios', 'cuota_mensual', 'servicios'];
 
 const inputCls =
   'h-11 w-full rounded-[10px] border border-gray-200 bg-white px-4 text-sm text-[#101828] focus:border-[#175861] focus:outline-none focus:ring-1 focus:ring-[#175861]';
@@ -501,9 +501,9 @@ function TarifaModal({
               onChange={(e) => setTipo(e.target.value as TipoTarifa)}
             >
               <option value="">Seleccione una opción…</option>
-              <option value="cuota_mensual">Cuota mensual</option>
-              <option value="servicios">Servicios</option>
               <option value="espacios">Espacios</option>
+              <option value="cuota_mensual">Cuota mensual</option>
+              <option value="servicios">Servicios Extra</option>
             </select>
           </div>
 
