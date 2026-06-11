@@ -18,6 +18,7 @@ import {
   paywayTokens,
   pisos,
   porteria,
+  porteriaInvitados,
   profiles,
   servicios as serviciosTable,
 } from '@/lib/db/schema';
@@ -68,7 +69,7 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
     embarcacionesList,
     movimientosList,
     serviciosList,
-    invitadosList,
+    navegantesList,
     documentosList,
     salidasList,
     espacioActualRow,
@@ -117,25 +118,26 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
 
     db
       .select({
-        id: invitados.id,
+        id: porteriaInvitados.id,
         nombre: invitados.nombre,
         apellido: invitados.apellido,
-        email: invitados.email,
-        telefono: invitados.telefono,
-        motivo: invitados.motivo,
-        estado: invitados.estado,
-        validoHasta: invitados.validoHasta,
-        createdAt: invitados.createdAt,
+        estado: porteria.estado,
+        desde: porteria.desde,
+        hasta: porteria.hasta,
+        arribadaEn: porteria.arribadaEn,
+        createdAt: porteria.createdAt,
       })
-      .from(invitados)
+      .from(porteriaInvitados)
+      .innerJoin(porteria, eq(porteria.id, porteriaInvitados.porteriaId))
+      .innerJoin(invitados, eq(invitados.id, porteriaInvitados.invitadoId))
       .where(
         and(
-          eq(invitados.socioId, id),
-          eq(invitados.guarderiaId, gId),
-          eq(invitados.estado, 'activo'),
+          eq(porteria.socioId, id),
+          eq(porteria.guarderiaId, gId),
+          eq(porteria.tipo, 'acceso_externo'),
         ),
       )
-      .orderBy(desc(invitados.createdAt)),
+      .orderBy(desc(porteria.createdAt)),
 
     db
       .select({
@@ -375,10 +377,12 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
         facturaCodigo: facturasPorMovimiento.get(m.id) ?? null,
       }))}
       servicios={serviciosList}
-      invitados={invitadosList.map((i) => ({
-        ...i,
-        validoHasta: i.validoHasta?.toISOString() ?? null,
-        createdAt: i.createdAt.toISOString(),
+      navegantes={navegantesList.map((n) => ({
+        ...n,
+        desde: n.desde?.toISOString() ?? null,
+        hasta: n.hasta?.toISOString() ?? null,
+        arribadaEn: n.arribadaEn?.toISOString() ?? null,
+        createdAt: n.createdAt.toISOString(),
       }))}
       documentos={documentosConUrl}
       salidas={salidasList.map((s) => ({

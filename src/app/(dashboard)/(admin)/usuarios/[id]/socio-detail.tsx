@@ -101,15 +101,14 @@ type Servicio = {
   precio: string | null;
 };
 
-type Invitado = {
+type Navegante = {
   id: string;
   nombre: string;
   apellido: string | null;
-  email: string | null;
-  telefono: string | null;
-  motivo: string | null;
   estado: string | null;
-  validoHasta: string | null;
+  desde: string | null;
+  hasta: string | null;
+  arribadaEn: string | null;
   createdAt: string;
 };
 
@@ -147,7 +146,7 @@ const TABS = [
   { id: 'generales', label: 'Generales', icon: User },
   { id: 'embarcacion', label: 'Embarcación', icon: Anchor },
   { id: 'cuenta-corriente', label: 'Cuenta Corriente', icon: CreditCard },
-  { id: 'navegantes', label: 'Invitados', icon: Users },
+  { id: 'navegantes', label: 'Navegantes', icon: Users },
   { id: 'salidas', label: 'Salidas', icon: Clock },
   { id: 'documentacion', label: 'Documentación', icon: FileText },
   { id: 'payway', label: 'Débito automático', icon: CreditCard },
@@ -1911,7 +1910,7 @@ export function SocioDetail({
   embarcaciones,
   movimientos,
   servicios,
-  invitados,
+  navegantes,
   documentos = [],
   salidas = [],
   espacioActual,
@@ -1923,7 +1922,7 @@ export function SocioDetail({
   embarcaciones: Embarcacion[];
   movimientos: Movimiento[];
   servicios: Servicio[];
-  invitados: Invitado[];
+  navegantes: Navegante[];
   documentos?: DocumentoItem[];
   salidas?: SalidaItem[];
   espacioActual: EspacioOption | null;
@@ -2502,23 +2501,34 @@ export function SocioDetail({
         </div>
       )}
 
-      {/* Invitados autorizados */}
+      {/* Navegantes — accesos externos del socio */}
       {activeTab === 'navegantes' && (
         <div className="rounded-2xl border border-gray-200 bg-white p-4 md:p-6">
-          {invitados.length === 0 ? (
+          {navegantes.length === 0 ? (
             <EmptyState
               icon={<Users className="h-7 w-7 opacity-40" />}
-              text="No hay invitados autorizados."
+              text="No hay navegantes registrados."
             />
           ) : (
             <div className="space-y-3">
-              {invitados.map((i) => {
-                const nombreCompleto = [i.nombre, i.apellido].filter(Boolean).join(' ') || '—';
-                const inicial = (i.nombre?.[0] ?? '?').toUpperCase();
-                const activo = i.estado === 'activo';
+              {navegantes.map((n) => {
+                const nombreCompleto = [n.nombre, n.apellido].filter(Boolean).join(' ') || '—';
+                const inicial = (n.nombre?.[0] ?? '?').toUpperCase();
+                const estadoLabel =
+                  n.estado === 'usado'
+                    ? 'Ingresó'
+                    : n.estado === 'revocado'
+                      ? 'Cancelado'
+                      : 'Autorizado';
+                const estadoCls =
+                  n.estado === 'usado'
+                    ? 'bg-blue-50 text-blue-700'
+                    : n.estado === 'revocado'
+                      ? 'bg-gray-100 text-gray-500'
+                      : 'bg-teal-50 text-[#175861]';
                 return (
                   <div
-                    key={i.id}
+                    key={n.id}
                     className="flex items-center gap-4 rounded-[10px] border border-gray-100 bg-gray-50 p-4"
                   >
                     <div
@@ -2532,22 +2542,19 @@ export function SocioDetail({
                         {nombreCompleto}
                       </p>
                       <div className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-gray-500">
-                        {i.email && <span>{i.email}</span>}
-                        {i.telefono && <span>{i.telefono}</span>}
-                        {i.motivo && <span>{i.motivo}</span>}
+                        {n.desde && <span>Desde {formatNaiveDateTime(n.desde)}</span>}
+                        {n.hasta && <span>Hasta {formatNaiveDateTime(n.hasta)}</span>}
                       </div>
-                      {i.validoHasta && (
+                      {n.arribadaEn && (
                         <p className="mt-0.5 text-xs text-gray-400">
-                          Válido hasta {fmtDate(i.validoHasta)}
+                          Ingresó {formatArgentinaDateTime(n.arribadaEn)}
                         </p>
                       )}
                     </div>
                     <span
-                      className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${
-                        activo ? 'bg-teal-50 text-[#175861]' : 'bg-gray-100 text-gray-500'
-                      }`}
+                      className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${estadoCls}`}
                     >
-                      {activo ? 'Activo' : 'Inactivo'}
+                      {estadoLabel}
                     </span>
                   </div>
                 );
