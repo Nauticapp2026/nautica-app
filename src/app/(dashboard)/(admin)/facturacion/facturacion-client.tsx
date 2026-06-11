@@ -347,16 +347,13 @@ function NuevaFacturaModal({
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
-                Cliente / Proveedor*
+                Cliente*
               </label>
               <select className={inputCls} value={form.socioId} onChange={handleSocioChange}>
                 <option value="">Seleccioná un socio...</option>
                 {socios.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.nombre}
-                    {s.pendientes > 0
-                      ? ` — ${s.pendientes} pendiente${s.pendientes > 1 ? 's' : ''} (${fmtMoney(s.pendienteTotal)})`
-                      : ''}
                   </option>
                 ))}
               </select>
