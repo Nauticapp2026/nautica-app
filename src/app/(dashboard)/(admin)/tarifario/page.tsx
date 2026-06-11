@@ -34,6 +34,7 @@ export default async function TarifarioPage() {
       puntual: servicios.puntual,
       vigenciaDesde: servicios.vigenciaDesde,
       vigenciaHasta: servicios.vigenciaHasta,
+      alicuotaIva: servicios.alicuotaIva,
     })
     .from(servicios)
     .where(eq(servicios.guarderiaId, guarderiaId))
@@ -55,6 +56,7 @@ export default async function TarifarioPage() {
     puntual: toNum(r.puntual),
     vigenciaDesde: r.vigenciaDesde,
     vigenciaHasta: r.vigenciaHasta,
+    alicuotaIva: r.alicuotaIva != null ? Number(r.alicuotaIva) : 21,
   }));
 
   return <TarifarioClient tarifas={tarifas} />;

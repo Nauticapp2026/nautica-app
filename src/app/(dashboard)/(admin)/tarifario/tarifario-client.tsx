@@ -58,6 +58,7 @@ export type Tarifa = {
   puntual: number | null;
   vigenciaDesde: string;
   vigenciaHasta: string;
+  alicuotaIva: number;
 };
 
 const MEDIDAS: MedidaTarifa[] = [
@@ -304,6 +305,7 @@ function TablaTarifas({
                 </td>
                 <td className="px-5 py-3" style={{ color: '#101828' }}>
                   {formatARS(t.precio)}
+                  <span className="block text-xs text-gray-400">IVA {t.alicuotaIva}%</span>
                 </td>
                 <td className="px-5 py-3">
                   <EstadoBadge estado={t.estado} vigenciaHasta={t.vigenciaHasta} />
@@ -371,6 +373,7 @@ function TarifaModal({
   const [tipo, setTipo] = useState<TipoTarifa | ''>(initial?.tipo ?? '');
   const [nombre, setNombre] = useState(initial?.nombre ?? '');
   const [precio, setPrecio] = useState<string>(initial ? String(initial.precio) : '');
+  const [alicuotaIva, setAlicuotaIva] = useState<number>(initial?.alicuotaIva ?? 21);
   const [estado, setEstado] = useState<EstadoTarifa>(initial?.estado ?? 'activo');
   const [vigenciaDesde, setVigenciaDesde] = useState<string>(initial?.vigenciaDesde ?? '');
   const [vigenciaHasta, setVigenciaHasta] = useState<string>(initial?.vigenciaHasta ?? '');
@@ -444,6 +447,7 @@ function TarifaModal({
         tipo: 'cuota_mensual' as const,
         nombre: nombre.trim(),
         precio: precioNum,
+        alicuotaIva: alicuotaIva as 0 | 10.5 | 21,
         medida: medida === '' ? null : medida,
         vigenciaDesde,
         vigenciaHasta,
@@ -453,6 +457,7 @@ function TarifaModal({
         tipo: 'espacios' as const,
         nombre: nombre.trim(),
         precio: precioNum,
+        alicuotaIva: alicuotaIva as 0 | 10.5 | 21,
         locacion,
         unidadMetraje,
         eslora: toNumOrNull(eslora),
@@ -466,6 +471,7 @@ function TarifaModal({
         tipo: 'servicios' as const,
         nombre: nombre.trim(),
         precio: precioNum,
+        alicuotaIva: alicuotaIva as 0 | 10.5 | 21,
         vigenciaDesde,
         vigenciaHasta,
       };
@@ -648,17 +654,31 @@ function TarifaModal({
             </div>
           )}
 
-          <div>
-            <label className="mb-1 block text-sm font-semibold text-gray-700">Precio</label>
-            <input
-              className={inputCls}
-              type="number"
-              min={0}
-              step="0.01"
-              placeholder="Precio"
-              value={precio}
-              onChange={(e) => setPrecio(e.target.value)}
-            />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-sm font-semibold text-gray-700">Precio</label>
+              <input
+                className={inputCls}
+                type="number"
+                min={0}
+                step="0.01"
+                placeholder="Precio"
+                value={precio}
+                onChange={(e) => setPrecio(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-semibold text-gray-700">IVA</label>
+              <select
+                className={inputCls}
+                value={alicuotaIva}
+                onChange={(e) => setAlicuotaIva(Number(e.target.value))}
+              >
+                <option value={0}>0%</option>
+                <option value={10.5}>10,5%</option>
+                <option value={21}>21%</option>
+              </select>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">

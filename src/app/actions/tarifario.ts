@@ -58,9 +58,13 @@ type Locacion = (typeof LOCACIONES)[number];
 const UNIDADES = ['metros', 'pies'] as const;
 type UnidadMetraje = (typeof UNIDADES)[number];
 
+const ALICUOTAS_IVA = [0, 10.5, 21] as const;
+type AlicuotaIva = (typeof ALICUOTAS_IVA)[number];
+
 export type TarifaInputBase = {
   nombre: string;
   precio: number;
+  alicuotaIva: AlicuotaIva;
   vigenciaDesde: string;
   vigenciaHasta: string;
 };
@@ -106,6 +110,9 @@ function validar(data: CreateTarifaData): string | null {
   if (!TIPOS.includes(data.tipo)) return 'Categoría inválida.';
   if (!Number.isFinite(data.precio) || data.precio < 0) {
     return 'El precio debe ser un número mayor o igual a 0.';
+  }
+  if (!(ALICUOTAS_IVA as readonly number[]).includes(data.alicuotaIva)) {
+    return 'Alícuota de IVA inválida.';
   }
   if (!data.vigenciaDesde || !DATE_RE.test(data.vigenciaDesde)) {
     return 'La fecha de inicio de vigencia es obligatoria.';
@@ -181,6 +188,7 @@ function buildValues(data: CreateTarifaData) {
     nombre: data.nombre.trim(),
     tipo: data.tipo,
     precio: data.precio.toFixed(2),
+    alicuotaIva: data.alicuotaIva.toFixed(2),
     vigenciaDesde: data.vigenciaDesde,
     vigenciaHasta: data.vigenciaHasta,
   };

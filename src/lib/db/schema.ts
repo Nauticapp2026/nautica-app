@@ -591,6 +591,7 @@ export const servicios = pgTable(
     clases: text('clases'),
     vigenciaDesde: date('vigencia_desde').notNull(),
     vigenciaHasta: date('vigencia_hasta').notNull(),
+    alicuotaIva: numeric('alicuota_iva', { precision: 5, scale: 2 }).notNull().default('21'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
