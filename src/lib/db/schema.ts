@@ -739,6 +739,7 @@ export const invitados = pgTable(
     apellido: text('apellido'),
     email: text('email'),
     telefono: text('telefono'),
+    dni: text('dni'),
     motivo: text('motivo'),
     tipo: tipoInvitadoEnum('tipo').default('titular'),
     estado: estadoInvitadoEnum('estado').default('activo'),
