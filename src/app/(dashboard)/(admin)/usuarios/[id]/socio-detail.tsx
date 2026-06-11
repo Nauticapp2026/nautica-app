@@ -147,7 +147,7 @@ const TABS = [
   { id: 'generales', label: 'Generales', icon: User },
   { id: 'embarcacion', label: 'Embarcación', icon: Anchor },
   { id: 'cuenta-corriente', label: 'Cuenta Corriente', icon: CreditCard },
-  { id: 'navegantes', label: 'Navegantes', icon: Users },
+  { id: 'navegantes', label: 'Invitados', icon: Users },
   { id: 'salidas', label: 'Salidas', icon: Clock },
   { id: 'documentacion', label: 'Documentación', icon: FileText },
   { id: 'payway', label: 'Débito automático', icon: CreditCard },
@@ -2502,13 +2502,13 @@ export function SocioDetail({
         </div>
       )}
 
-      {/* Navegantes */}
+      {/* Invitados autorizados */}
       {activeTab === 'navegantes' && (
         <div className="rounded-2xl border border-gray-200 bg-white p-4 md:p-6">
           {invitados.length === 0 ? (
             <EmptyState
               icon={<Users className="h-7 w-7 opacity-40" />}
-              text="No hay navegantes autorizados."
+              text="No hay invitados autorizados."
             />
           ) : (
             <div className="space-y-3">
