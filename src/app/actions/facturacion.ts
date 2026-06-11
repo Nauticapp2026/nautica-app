@@ -298,14 +298,14 @@ export async function crearFacturaCore(
   ) {
     return {
       error:
-        'Esta guardería todavía no tiene los datos de facturación configurados. Andá a Configuración → Datos de facturación y completá los datos antes de facturar.',
+        'Esta guardería todavía no tiene los datos impositivos configurados. Andá a Mi perfil → Datos Impositivos y completá los datos antes de facturar.',
     };
   }
 
   if (!guarderia.certificadoAfipOk) {
     return {
       error:
-        'El certificado de enlace con AFIP todavía no está confirmado. Andá a Configuración → Datos de facturación, solicitá el certificado y confirmá la instalación antes de emitir facturas.',
+        'El certificado de enlace con AFIP todavía no está confirmado. Andá a Mi perfil → Datos Impositivos, solicitá el certificado y confirmá la instalación antes de emitir facturas.',
     };
   }
 

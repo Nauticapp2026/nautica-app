@@ -330,9 +330,9 @@ function CrearSocioModal({ open, onClose }: { open: boolean; onClose: () => void
               </Field>
             </div>
 
-            {/* Datos de facturación */}
+            {/* Datos Impositivos */}
             <div className="space-y-4">
-              <SectionHeader title="Datos de facturación" />
+              <SectionHeader title="Datos Impositivos" />
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Field label="Tipo Documento">
                   <select

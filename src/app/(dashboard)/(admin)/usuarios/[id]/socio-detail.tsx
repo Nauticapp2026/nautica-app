@@ -2436,7 +2436,7 @@ export function SocioDetail({
                       <th className="w-10 px-4 py-3"></th>
                       <th className="px-4 py-3">Fecha</th>
                       <th className="px-4 py-3">Detalle</th>
-                      <th className="px-4 py-3">Nº factura</th>
+                      <th className="px-4 py-3">Nº comprobante</th>
                       <th className="px-4 py-3 text-right">Total</th>
                       <th className="px-4 py-3 text-right">Estado</th>
                     </tr>

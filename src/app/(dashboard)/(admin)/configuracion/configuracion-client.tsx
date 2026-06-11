@@ -50,7 +50,7 @@ const TABS: { key: TabKey; label: string; icon: typeof Bell }[] = [
   { key: 'info', label: 'Información general', icon: Receipt },
   { key: 'equipo', label: 'Equipo', icon: Users },
   { key: 'plan', label: 'Plan', icon: CreditCard },
-  { key: 'punto_venta', label: 'Datos de facturación', icon: Building2 },
+  { key: 'punto_venta', label: 'Datos Impositivos', icon: Building2 },
   { key: 'payway', label: 'Payway', icon: CreditCard },
 ];
 
@@ -192,7 +192,7 @@ export function ConfiguracionClient({
   return (
     <div className="p-4 md:p-8">
       <header className="mb-6">
-        <h1 className="page-title">Configuración</h1>
+        <h1 className="page-title">Mi perfil</h1>
         <p className="page-subtitle mt-1">Administra la configuración de tu guardería náutica</p>
       </header>
 
@@ -219,7 +219,9 @@ export function ConfiguracionClient({
         </div>
       </div>
 
-      {activeTab === 'info' && <InfoGeneralForm initial={infoGeneral} />}
+      {activeTab === 'info' && (
+        <InfoGeneralForm initial={infoGeneral} puntoDeVenta={puntoVenta.puntoDeVenta} />
+      )}
       {activeTab === 'equipo' && (
         <EquipoTab
           miembros={miembros}
@@ -234,7 +236,13 @@ export function ConfiguracionClient({
   );
 }
 
-function InfoGeneralForm({ initial }: { initial: InfoGeneralData }) {
+function InfoGeneralForm({
+  initial,
+  puntoDeVenta,
+}: {
+  initial: InfoGeneralData;
+  puntoDeVenta: number | null;
+}) {
   const [data, setData] = useState<InfoGeneralData>(initial);
   const [feedback, setFeedback] = useState<{ type: 'error' | 'success'; msg: string } | null>(null);
   const [pending, startTransition] = useTransition();
@@ -284,7 +292,7 @@ function InfoGeneralForm({ initial }: { initial: InfoGeneralData }) {
           />
         </Field>
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <Field label="CUIT" required>
             <input
               className={inputCls}
@@ -304,6 +312,13 @@ function InfoGeneralForm({ initial }: { initial: InfoGeneralData }) {
                 </option>
               ))}
             </select>
+          </Field>
+          <Field label="Número de Referencia">
+            <input
+              className={`${inputCls} bg-gray-50 text-gray-500`}
+              value={puntoDeVenta ?? '—'}
+              readOnly
+            />
           </Field>
         </div>
 
@@ -1362,7 +1377,7 @@ function PuntoVentaTab({ initial }: { initial: PuntoVentaData }) {
   const onSubmit = () => {
     setFeedback(null);
     if (!data.puntoDeVenta || data.puntoDeVenta <= 0) {
-      setFeedback({ type: 'error', msg: 'Ingresá un número de punto de venta válido.' });
+      setFeedback({ type: 'error', msg: 'Ingresá un número de referencia válido.' });
       return;
     }
     if (!data.fechaInicio) {
@@ -1378,7 +1393,8 @@ function PuntoVentaTab({ initial }: { initial: PuntoVentaData }) {
         fechaInicio: data.fechaInicio,
       });
       if (res.error) setFeedback({ type: 'error', msg: res.error });
-      else setFeedback({ type: 'success', msg: 'Punto de venta sincronizado con TusFacturas.' });
+      else
+        setFeedback({ type: 'success', msg: 'Número de referencia sincronizado con TusFacturas.' });
     });
   };
 
@@ -1387,27 +1403,27 @@ function PuntoVentaTab({ initial }: { initial: PuntoVentaData }) {
   return (
     <section className="rounded-2xl border border-gray-200 bg-white p-4 md:p-8">
       <h2 className="mb-2 text-base font-bold" style={{ color: '#101828' }}>
-        Datos de facturación
+        Datos Impositivos
       </h2>
 
       {yaConfigurado && (
         <div className="mb-6 rounded-[10px] border border-[#CAE6E4] bg-[#ECFDF3] px-4 py-3 text-sm text-[#175861]">
-          Este punto de venta ya fue creado en TusFacturas. Los datos no se pueden modificar desde
-          acá.
+          Este número de referencia ya fue creado en TusFacturas. Los datos no se pueden modificar
+          desde acá.
         </div>
       )}
 
       {!yaConfigurado && (
         <div className="mb-6 rounded-[10px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          <strong>Antes de continuar:</strong> el número de punto de venta tiene que estar dado de
-          alta previamente en AFIP (Servicios → Administrador de Relaciones → POS de Facturación
+          <strong>Antes de continuar:</strong> el número de referencia tiene que estar dado de alta
+          previamente en AFIP (Servicios → Administrador de Relaciones → POS de Facturación
           Electrónica). Si no existe en AFIP, las facturas van a ser rechazadas al emitirlas.
         </div>
       )}
 
       <div className="space-y-4">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <Field label="Punto de venta" required>
+          <Field label="Número de Referencia" required>
             <input
               className={`${inputCls} ${readOnlyCls}`}
               type="number"

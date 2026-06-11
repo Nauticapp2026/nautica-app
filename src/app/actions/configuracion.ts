@@ -220,7 +220,7 @@ export async function savePuntoVentaAction(data: SavePuntoVentaData): Promise<{ 
   if (!isAdmin(ctx)) return { error: 'Solo administradores pueden editar la configuración.' };
 
   if (!Number.isInteger(data.puntoDeVenta) || data.puntoDeVenta <= 0) {
-    return { error: 'El punto de venta debe ser un número entero positivo.' };
+    return { error: 'El número de referencia debe ser un número entero positivo.' };
   }
   if (!data.razonSocial.trim()) return { error: 'La razón social es obligatoria.' };
   if (!CONDICIONES_IVA.includes(data.condicionIva)) return { error: 'Condición IVA inválida.' };
@@ -250,7 +250,7 @@ export async function savePuntoVentaAction(data: SavePuntoVentaData): Promise<{ 
 
   if (guarderia.puntoDeVentaActual != null) {
     return {
-      error: 'Ya tenés un punto de venta configurado. No se puede volver a agregar.',
+      error: 'Ya tenés un número de referencia configurado. No se puede volver a agregar.',
     };
   }
 

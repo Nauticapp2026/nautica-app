@@ -1773,14 +1773,14 @@ export function FacturacionClient({
           <strong>Emisión bloqueada.</strong>{' '}
           {!posConfigurado ? (
             <>
-              Andá a <strong>Configuración → Datos de facturación</strong> y completá los datos del
-              POS antes de emitir facturas.
+              Andá a <strong>Mi perfil → Datos Impositivos</strong> y completá los datos del POS
+              antes de emitir facturas.
             </>
           ) : (
             <>
               El certificado de enlace con AFIP todavía no está confirmado. Andá a{' '}
-              <strong>Configuración → Datos de facturación</strong>, solicitá el certificado y
-              confirmá la instalación.
+              <strong>Mi perfil → Datos Impositivos</strong>, solicitá el certificado y confirmá la
+              instalación.
             </>
           )}
         </div>
