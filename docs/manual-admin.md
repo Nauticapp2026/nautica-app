@@ -97,9 +97,15 @@ Desde **Usuarios → Socios** gestionás el padrón de socios de tu club.
 
 ### Ver la lista de socios
 
-La tabla muestra: nombre, email, embarcación asignada, ubicación, estado y deuda.
+La tabla muestra: número de socio, nombre, email, embarcación asignada, ubicación, estado y deuda.
 
 - Usá la barra de búsqueda para filtrar por nombre o email.
+- El **número de socio** (#NNN) aparece como un chip junto al nombre. Podés editarlo en el perfil del socio → pestaña **Generales**.
+- El **estado** de la membresía se indica con un badge de color:
+  - **Verde (Activo)** — socio con membresía vigente.
+  - **Ámbar (Pausado)** — membresía temporalmente suspendida.
+  - **Gris (Inactivo)** — socio inactivo.
+  - **Rojo (Moroso)** — socio con deuda pendiente.
 - Si un socio tiene un **ícono de alerta amarillo** junto a su nombre, significa que tiene datos de perfil o documentación incompletos. Hacé clic en su nombre para ver qué falta completar.
 - Cada fila tiene un **botón chevron (›)** a la derecha. Al hacerle clic se despliega un panel con:
   - **Invitados autorizados** — personas que el socio autorizó a ingresar al club.
@@ -114,10 +120,11 @@ La tabla muestra: nombre, email, embarcación asignada, ubicación, estado y deu
    - Nombre y apellido
    - Email _(requerido)_
    - Teléfono
-
-   **Datos de facturación**
    - Tipo de documento: DNI / CUIT / CUIL / Pasaporte / CDI
    - Número de documento
+
+   **Datos impositivos**
+   - **Emite comprobante fiscal** — si está marcado, el socio aparece en los selectores de facturación (individual, ventanilla y lote). Desmarcalo si el socio no requiere factura fiscal — no aparecerá en ningún flujo de emisión de comprobantes AFIP.
    - Razón social (si corresponde)
    - Condición frente al IVA: Consumidor Final / Responsable Monotributo / IVA Responsable Inscripto / IVA Sujeto Exento / Proveedor del Exterior / Cliente del Exterior / IVA No Alcanzado
    - Dirección, ciudad, código postal
@@ -126,7 +133,8 @@ La tabla muestra: nombre, email, embarcación asignada, ubicación, estado y deu
    - Nombre de la embarcación
    - Matrícula
    - Modelo
-   - Eslora y manga
+   - Eslora: ingresá el valor y usá el toggle **m / pies** para elegir la unidad (siempre se guarda en metros)
+   - Manga
 
    **Adjuntos** _(opcional)_
    - Podés subir documentación desde esta sección o hacerlo después desde el perfil del socio.
@@ -140,6 +148,9 @@ Hacé clic en el nombre del socio en la tabla para abrir su perfil. El perfil ti
 #### Pestaña Generales
 
 Mostrá y editá los datos personales: nombre, apellido, email, teléfono, documento, dirección, razón social, condición IVA.
+
+- **Número de socio** — campo editable para asignar o modificar el número interno del socio. El número aparece como chip (#NNN) en la cabecera del perfil y en la lista de socios.
+- **Estado de membresía** — selector en la cabecera del perfil para cambiar el estado: **Activo**, **Pausado**, **Inactivo**. También está disponible la opción **Eliminar** para desvincular al socio del club.
 
 #### Pestaña Embarcación
 
@@ -190,7 +201,7 @@ Si tenés muchos socios o embarcaciones para cargar, podés hacerlo importando u
 ### Importar socios desde Excel
 
 1. En **Usuarios → Socios**, hacé clic en **Importar socios**.
-2. Descargá la plantilla haciendo clic en **Descargar plantilla**. Abrí el archivo `.xlsx` y completá los datos de cada socio en una fila.
+2. Descargá la plantilla haciendo clic en **Descargar plantilla**. Abrí el archivo `.xlsx` y completá los datos de cada socio en una fila. La plantilla incluye una columna **Número de socio** (opcional); si la completás, se asigna ese número al socio; si la dejás vacía, el sistema asigna el siguiente número disponible automáticamente.
 3. Guardá el archivo y volvé al panel. Hacé clic en **Elegir archivo .xlsx** y seleccioná tu archivo.
 4. El sistema mostrará una vista previa con el resultado del análisis:
    - **A crear** (verde) — socios nuevos que se van a agregar.
@@ -456,31 +467,38 @@ Las tarjetas superiores muestran:
 2. Seleccioná el **socio** en el campo Cliente.
 3. El sistema muestra automáticamente los **conceptos pendientes** del socio (movimientos mensuales sin facturar). Marcá los que querés incluir. Podés usar **Todos** o **Ninguno** para seleccionar rápido.
 4. Completá los campos:
-   - **Tipo de comprobante**: Factura C (Monotributo) / Factura B (Consumidor Final) / Factura A (Responsable Inscripto) — el sistema sugiere el tipo según la condición IVA del socio.
+   - **Tipo de comprobante** — se determina automáticamente según la condición IVA del club y del socio (campo de solo lectura):
+     - Club Monotributo → siempre **Factura C**.
+     - Club Responsable Inscripto + Socio Responsable Inscripto → **Factura A**.
+     - Club Responsable Inscripto + cualquier otra condición → **Factura B**.
    - **Condición de venta**: Contado, Transferencia bancaria, Tarjeta de crédito, Mercado Pago, etc.
    - **Fecha** y **Vencimiento**.
    - **Período desde / hasta**.
 5. Hacé clic en **Emitir factura**. La factura se envía a AFIP y queda registrada.
+
+> Solo aparecen en el selector los socios con **Emite comprobante fiscal** activado. Los socios sin ese flag no se muestran en este formulario.
 
 ### Emitir comprobante por ventanilla
 
 Para facturar servicios puntuales que no están cargados como movimientos del socio:
 
 1. Hacé clic en **Ventanilla**.
-2. Seleccioná el socio.
+2. Seleccioná el socio. El **tipo de comprobante** se asigna automáticamente (igual que en la factura individual) y aparece como campo de solo lectura.
 3. Agregá los ítems: descripción, cantidad y precio unitario de cada uno.
-4. Completá tipo de comprobante, condición de venta y fecha.
+4. Completá condición de venta y fecha.
 5. Hacé clic en **Emitir**. La factura se envía a AFIP de inmediato.
 
-> Solo disponible si el POS y el certificado AFIP están configurados.
+> Solo disponible si el POS y el certificado AFIP están configurados. Solo aparecen socios con **Emite comprobante fiscal** activado.
 
 ### Facturación en lote
 
 Emití facturas para múltiples socios al mismo tiempo.
 
 1. Hacé clic en **Factura en lote**.
-2. El sistema lista los socios con conceptos pendientes. Seleccioná los que querés facturar.
+2. El sistema lista los socios con conceptos pendientes (solo socios con **Emite comprobante fiscal** activado). Seleccioná los que querés facturar.
 3. Revisá el resumen y confirmá.
+
+El tipo de comprobante se determina automáticamente para cada socio según la condición IVA del club y de cada socio individualmente (igual que en la factura individual). La condición de venta es siempre **Contado**.
 
 > La facturación mensual automática corre el día del mes que configuraste en **Configuración → Información general** (campo "Día de facturación"). Solo aplica a socios que ya tuvieron al menos una factura emitida.
 
@@ -543,7 +561,12 @@ Las tarifas están agrupadas por categoría. Podés filtrar usando los botones:
 - **Cuota mensual** — cuotas periódicas.
 - **Servicios Extra** — servicios adicionales (lavado, amarre de pasada, etc.).
 
-Cada tarifa muestra su concepto, período de vigencia, precio con alícuota de IVA y estado. Si la fecha de vencimiento ya pasó, el estado aparece como **Vencida** (en ámbar) en lugar de Activa.
+Cada tarifa muestra su concepto, período de vigencia, precio y estado. En la columna de precio se muestran dos valores:
+
+- **Precio c/IVA** — el precio de lista (incluye IVA).
+- **Precio s/IVA** — calculado automáticamente según la alícuota configurada (precio ÷ (1 + alícuota)). Si la alícuota es 0 %, aparece el texto "Sin IVA".
+
+Si la fecha de vencimiento ya pasó, el estado aparece como **Vencida** (en ámbar) en lugar de Activa.
 
 ### Crear una tarifa
 
