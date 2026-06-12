@@ -40,6 +40,7 @@ export type Tarea = {
   estado: EstadoTarea;
   fechaHora: string | null;
   createdAt: string;
+  updatedAt: string;
   operarioId: string | null;
   operarioNombre: string | null;
   embarcacionId: string | null;
@@ -648,6 +649,10 @@ export function TareasClient({
       if (t.estado === 'salida_programada') {
         const dia = fechaArYmd(t.fechaHora);
         return dia === hoyAr;
+      }
+      // Guardadas: desaparecen al día siguiente (terminal del día).
+      if (t.estado === 'guardada') {
+        return fechaArYmd(t.updatedAt) === hoyAr;
       }
       return true;
     });

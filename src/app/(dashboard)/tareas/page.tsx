@@ -45,6 +45,7 @@ export default async function TareasPage() {
         socioApellido: socioProfile.apellido,
         socioEmail: socioProfile.email,
         solicitudLavadoEstado: solicitudesLavado.estado,
+        updatedAt: tareas.updatedAt,
       })
       .from(tareas)
       .leftJoin(profiles, eq(profiles.id, tareas.operarioId))
@@ -110,6 +111,7 @@ export default async function TareasPage() {
     embarcacionId: t.embarcacionId,
     embarcacionNombre: t.embarcacionNombre,
     socioNombre: [t.socioNombre, t.socioApellido].filter(Boolean).join(' ') || t.socioEmail || null,
+    updatedAt: t.updatedAt.toISOString(),
     solicitudLavadoEstado: t.solicitudLavadoEstado as
       | 'pendiente'
       | 'aceptada'
