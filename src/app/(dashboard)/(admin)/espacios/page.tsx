@@ -23,6 +23,7 @@ import {
 import {
   EspaciosClient,
   type AreaView,
+  type EmbarcacionOpt,
   type EspacioCell,
   type ServicioEspacio,
   type SocioOpt,
@@ -150,13 +151,16 @@ export default async function EspaciosPage() {
       )
       .orderBy(asc(servicios.nombre)),
 
-    // Embarcaciones de la guardería (solo lo necesario para el filtro de
-    // tamaño en el modal "Cambiar ubicación"). El barco se guarda en
-    // metros vía eslora_m.
+    // Embarcaciones de la guardería: id + nombre para el selector del modal
+    // Editar espacio, profileId + esloraM para la validación de tamaño en
+    // "Cambiar ubicación", y espacioId para saber qué barco está en cada espacio.
     db
       .select({
+        id: embarcaciones.id,
         profileId: embarcaciones.profileId,
+        nombre: embarcaciones.nombre,
         esloraM: embarcaciones.esloraM,
+        espacioId: embarcaciones.espacioId,
       })
       .from(embarcaciones)
       .where(eq(embarcaciones.guarderiaId, guarderiaId)),
@@ -164,11 +168,27 @@ export default async function EspaciosPage() {
 
   const toNum = (v: string | null) => (v != null ? Number(v) : null);
 
+  // Mapa: espacioId → embarcación asignada a ese espacio.
+  const embarcacionPorEspacio = new Map<
+    string,
+    { id: string; nombre: string; profileId: string }
+  >();
+  for (const e of embarcacionesRows) {
+    if (e.espacioId && e.profileId) {
+      embarcacionPorEspacio.set(e.espacioId, {
+        id: e.id,
+        nombre: e.nombre,
+        profileId: e.profileId,
+      });
+    }
+  }
+
   // Mapa auxiliar: marinaId -> espacios ordenados por nomenclatura numérica
   const espaciosPorMarina = new Map<string, EspacioCell[]>();
   const espaciosPorPiso = new Map<string, EspacioCell[]>();
 
   for (const e of espaciosRows) {
+    const emb = embarcacionPorEspacio.get(e.id);
     const cell: EspacioCell = {
       id: e.id,
       nomenclatura: e.nomenclatura ?? '',
@@ -178,6 +198,8 @@ export default async function EspaciosPage() {
       eslora: toNum(e.eslora),
       manga: toNum(e.manga),
       puntual: toNum(e.puntual),
+      embarcacionId: emb?.id ?? null,
+      embarcacionNombre: emb?.nombre ?? null,
     };
     if (e.marinaId) {
       const arr = espaciosPorMarina.get(e.marinaId) ?? [];
@@ -273,12 +295,17 @@ export default async function EspaciosPage() {
     if (v > actual) esloraMaxPorSocio[e.profileId] = v;
   }
 
+  const embarcacionesList: EmbarcacionOpt[] = embarcacionesRows
+    .filter((e) => e.profileId != null)
+    .map((e) => ({ id: e.id, nombre: e.nombre, profileId: e.profileId! }));
+
   return (
     <EspaciosClient
       areas={areasView}
       socios={socios}
       serviciosEspacios={serviciosEspacios}
       esloraMaxPorSocio={esloraMaxPorSocio}
+      embarcaciones={embarcacionesList}
     />
   );
 }

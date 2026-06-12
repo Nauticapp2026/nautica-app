@@ -184,6 +184,7 @@ type EstadoEspacio = (typeof ESTADOS_ESPACIO)[number];
 export type UpdateEspacioInput = {
   id: string;
   ocupanteId: string | null;
+  embarcacionId: string | null;
   nomenclatura: string;
   estado: EstadoEspacio;
   servicioId: string | null;
@@ -229,6 +230,22 @@ export async function updateEspacioAction(input: UpdateEspacioInput): Promise<{ 
     if (!m) return { error: 'El cliente seleccionado no es miembro de esta guardería.' };
   }
 
+  // Validar que la embarcación pertenezca al ocupante si se proveen ambos.
+  if (input.embarcacionId && input.ocupanteId) {
+    const [emb] = await db
+      .select({ id: embarcaciones.id })
+      .from(embarcaciones)
+      .where(
+        and(
+          eq(embarcaciones.id, input.embarcacionId),
+          eq(embarcaciones.profileId, input.ocupanteId),
+          eq(embarcaciones.guarderiaId, guarderiaId),
+        ),
+      )
+      .limit(1);
+    if (!emb) return { error: 'La embarcación no pertenece al cliente seleccionado.' };
+  }
+
   // Validar que el servicio pertenezca a la guardería.
   let tarifaPrecio: string | null = null;
   let servicioNombre: string | null = null;
@@ -272,6 +289,21 @@ export async function updateEspacioAction(input: UpdateEspacioInput): Promise<{ 
       fechaAsignacion: nuevaFechaAsignacion,
     })
     .where(eq(espacios.id, input.id));
+
+  // Actualizar la embarcación asignada a este espacio: primero desvinculamos
+  // cualquier embarcación que estuviera en él, luego vinculamos la nueva.
+  await db
+    .update(embarcaciones)
+    .set({ espacioId: null, updatedAt: new Date() })
+    .where(and(eq(embarcaciones.espacioId, input.id), eq(embarcaciones.guarderiaId, guarderiaId)));
+  if (input.embarcacionId) {
+    await db
+      .update(embarcaciones)
+      .set({ espacioId: input.id, updatedAt: new Date() })
+      .where(
+        and(eq(embarcaciones.id, input.embarcacionId), eq(embarcaciones.guarderiaId, guarderiaId)),
+      );
+  }
 
   // Si hay ocupante + servicio, garantizamos el movimiento mensual del mes
   // corriente. La base del proporcional es la mayor entre `fechaAsignacion`
@@ -319,6 +351,7 @@ export async function updateEspacioAction(input: UpdateEspacioInput): Promise<{ 
 export async function assignEspacioToSocioAction(input: {
   socioId: string;
   espacioId: string;
+  embarcacionId?: string;
 }): Promise<{ error?: string }> {
   const ctx = await getActiveMarina();
   if (!ctx) return { error: 'No autenticado' };
@@ -364,14 +397,31 @@ export async function assignEspacioToSocioAction(input: {
     })
     .where(eq(espacios.id, input.espacioId));
 
-  // Asociar la embarcación del socio al espacio (si tiene). Solo asociamos
-  // las que no tengan ya otro espacio asignado para no pisar configuraciones.
-  await db
-    .update(embarcaciones)
-    .set({ espacioId: input.espacioId, updatedAt: new Date() })
-    .where(
-      and(eq(embarcaciones.profileId, input.socioId), eq(embarcaciones.guarderiaId, guarderiaId)),
-    );
+  // Asociar embarcación al espacio: si viene explícita, usarla; si no,
+  // auto-asignar solo cuando el socio tiene exactamente una embarcación
+  // sin espacio (caso frecuente: un barco, asignación inicial).
+  if (input.embarcacionId) {
+    await db
+      .update(embarcaciones)
+      .set({ espacioId: input.espacioId, updatedAt: new Date() })
+      .where(
+        and(eq(embarcaciones.id, input.embarcacionId), eq(embarcaciones.guarderiaId, guarderiaId)),
+      );
+  } else {
+    const barcosDelSocio = await db
+      .select({ id: embarcaciones.id, espacioId: embarcaciones.espacioId })
+      .from(embarcaciones)
+      .where(
+        and(eq(embarcaciones.profileId, input.socioId), eq(embarcaciones.guarderiaId, guarderiaId)),
+      );
+    const sinEspacio = barcosDelSocio.filter((b) => !b.espacioId);
+    if (sinEspacio.length === 1) {
+      await db
+        .update(embarcaciones)
+        .set({ espacioId: input.espacioId, updatedAt: new Date() })
+        .where(eq(embarcaciones.id, sinEspacio[0].id));
+    }
+  }
 
   // Si el espacio tiene tarifa, generamos el movimiento mensual proporcional
   // de este mes. Si todavía no tiene tarifa, el movimiento se crea cuando

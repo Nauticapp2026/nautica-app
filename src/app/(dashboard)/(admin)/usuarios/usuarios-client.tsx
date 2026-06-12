@@ -59,6 +59,7 @@ type Socio = {
   ubicacion: string | null;
   docsCompletos: boolean;
   datosIncompletos: boolean;
+  fechaIngreso: string | null;
   invitados: InvitadoItem[];
   accesosExternos: AccesoItem[];
 };
@@ -78,7 +79,7 @@ function buildWhatsappUrl(telefono: string | null): string | null {
   return `https://wa.me/${normalized}`;
 }
 
-type SortKey = 'socio' | 'embarcacion' | 'ubicacion' | 'deuda';
+type SortKey = 'numero' | 'socio' | 'embarcacion' | 'ubicacion' | 'deuda';
 type SortDir = 'asc' | 'desc';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -180,7 +181,9 @@ function CrearSocioModal({ open, onClose }: { open: boolean; onClose: () => void
     form.apellido.trim() &&
     form.email.trim() &&
     form.telefono.trim() &&
-    form.direccion.trim(),
+    form.direccion.trim() &&
+    form.tipoDocumento &&
+    form.numeroDocumento.trim(),
   );
 
   const set =
@@ -355,7 +358,7 @@ function CrearSocioModal({ open, onClose }: { open: boolean; onClose: () => void
                 />
               </Field>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Field label="Tipo Documento">
+                <Field label="Tipo Documento" required>
                   <select
                     className={inputCls}
                     value={form.tipoDocumento}
@@ -369,7 +372,7 @@ function CrearSocioModal({ open, onClose }: { open: boolean; onClose: () => void
                     ))}
                   </select>
                 </Field>
-                <Field label="Número Documento">
+                <Field label="Número Documento" required>
                   <input
                     className={inputCls}
                     placeholder="32434..."
@@ -389,7 +392,11 @@ function CrearSocioModal({ open, onClose }: { open: boolean; onClose: () => void
                     <input
                       type="checkbox"
                       checked={facturaFiscal}
-                      onChange={(e) => setFacturaFiscal(e.target.checked)}
+                      onChange={(e) => {
+                        setFacturaFiscal(e.target.checked);
+                        if (!e.target.checked)
+                          setForm((f) => ({ ...f, razonSocial: '', condicionIva: '' }));
+                      }}
                       className="h-3.5 w-3.5 cursor-pointer accent-[#175861]"
                     />
                     <span className="text-xs text-gray-500">Emite comprobante fiscal</span>
@@ -403,6 +410,7 @@ function CrearSocioModal({ open, onClose }: { open: boolean; onClose: () => void
                     placeholder="Razón social"
                     value={form.razonSocial}
                     onChange={set('razonSocial')}
+                    disabled={!facturaFiscal}
                   />
                 </Field>
                 <Field label="Condición frente IVA">
@@ -410,6 +418,7 @@ function CrearSocioModal({ open, onClose }: { open: boolean; onClose: () => void
                     className={inputCls}
                     value={form.condicionIva}
                     onChange={set('condicionIva')}
+                    disabled={!facturaFiscal}
                   >
                     <option value="">Seleccione...</option>
                     {CONDICION_IVA_OPTS.map((o) => (
@@ -694,6 +703,11 @@ export function UsuariosClient({
     if (!sortKey) return base;
 
     const cmp = (a: Socio, b: Socio): number => {
+      if (sortKey === 'numero') {
+        const aNum = a.numeroSocio ?? Infinity;
+        const bNum = b.numeroSocio ?? Infinity;
+        return aNum - bNum;
+      }
       if (sortKey === 'deuda') {
         return parseFloat(a.deuda ?? '0') - parseFloat(b.deuda ?? '0');
       }
@@ -807,7 +821,14 @@ export function UsuariosClient({
                 <thead>
                   <tr className="bg-gray-50 text-left text-xs font-semibold text-gray-500">
                     <th className="w-10 px-4 py-3" />
-                    <th className="w-14 px-4 py-3 text-center">#</th>
+                    <SortableTh
+                      label="#"
+                      sortKey="numero"
+                      activeKey={sortKey}
+                      dir={sortDir}
+                      onClick={() => toggleSort('numero')}
+                      align="center"
+                    />
                     <SortableTh
                       label="Nombre"
                       sortKey="socio"
@@ -830,6 +851,7 @@ export function UsuariosClient({
                       onClick={() => toggleSort('ubicacion')}
                     />
                     <th className="px-4 py-3 text-center">Estado</th>
+                    <th className="px-4 py-3 text-center">Ingreso</th>
                     <SortableTh
                       label="Saldo"
                       sortKey="deuda"
@@ -905,6 +927,9 @@ export function UsuariosClient({
                                 Activo
                               </span>
                             )}
+                          </td>
+                          <td className="px-4 py-3 text-center text-xs text-gray-400">
+                            {s.fechaIngreso ? formatArgentinaDate(s.fechaIngreso) : '—'}
                           </td>
                           <td
                             className="px-4 py-3 text-center font-medium"

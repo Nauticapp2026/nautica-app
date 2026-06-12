@@ -63,6 +63,8 @@ export type EspacioCell = {
   eslora: number | null;
   manga: number | null;
   puntual: number | null;
+  embarcacionId: string | null;
+  embarcacionNombre: string | null;
 };
 
 export type AreaView = {
@@ -78,6 +80,8 @@ export type AreaView = {
 };
 
 export type SocioOpt = { id: string; nombre: string };
+
+export type EmbarcacionOpt = { id: string; nombre: string; profileId: string };
 
 export type ServicioEspacio = {
   id: string;
@@ -213,11 +217,13 @@ export function EspaciosClient({
   socios,
   serviciosEspacios,
   esloraMaxPorSocio,
+  embarcaciones,
 }: {
   areas: AreaView[];
   socios: SocioOpt[];
   serviciosEspacios: ServicioEspacio[];
   esloraMaxPorSocio: Record<string, number>;
+  embarcaciones: EmbarcacionOpt[];
 }) {
   const router = useRouter();
   const [filtro, setFiltro] = useState<Filtro>('marina');
@@ -1082,6 +1088,7 @@ export function EspaciosClient({
           lugar={editEspacio.lugar}
           socios={socios}
           serviciosEspacios={serviciosEspacios}
+          embarcaciones={embarcaciones}
           onClose={() => setEditEspacio(null)}
           onSaved={() => {
             setEditEspacio(null);
@@ -2079,6 +2086,7 @@ function EditarEspacioModal({
   lugar,
   socios,
   serviciosEspacios,
+  embarcaciones,
   onClose,
   onSaved,
   onDelete,
@@ -2089,6 +2097,7 @@ function EditarEspacioModal({
   lugar: LugarEspacio;
   socios: SocioOpt[];
   serviciosEspacios: ServicioEspacio[];
+  embarcaciones: EmbarcacionOpt[];
   onClose: () => void;
   onSaved: () => void;
   onDelete: () => void;
@@ -2099,6 +2108,7 @@ function EditarEspacioModal({
       ? `${areaNombre} / ${lugar.peine}`
       : `${areaNombre} / ${lugar.lado} / ${lugar.piso}`;
   const [ocupanteId, setOcupanteId] = useState<string>(cell.ocupanteId ?? '');
+  const [embarcacionId, setEmbarcacionId] = useState<string>(cell.embarcacionId ?? '');
   const [nomenclatura, setNomenclatura] = useState<string>(cell.nomenclatura);
   const [estado, setEstado] = useState<EstadoEspacio>(cell.estado);
   const [servicioId, setServicioId] = useState<string>(cell.servicioId ?? '');
@@ -2134,6 +2144,7 @@ function EditarEspacioModal({
       const res = await updateEspacioAction({
         id: cell.id,
         ocupanteId: ocupanteId || null,
+        embarcacionId: embarcacionId || null,
         nomenclatura: nomenclatura.trim(),
         estado,
         servicioId: servicioId || null,
@@ -2181,7 +2192,15 @@ function EditarEspacioModal({
             <select
               className={inputCls}
               value={ocupanteId}
-              onChange={(e) => setOcupanteId(e.target.value)}
+              onChange={(e) => {
+                const newId = e.target.value;
+                setOcupanteId(newId);
+                // Si la embarcación actual no pertenece al nuevo socio, resetear.
+                const sigueValida = embarcaciones.some(
+                  (b) => b.id === embarcacionId && b.profileId === newId,
+                );
+                if (!sigueValida) setEmbarcacionId('');
+              }}
             >
               <option value="">Seleccione una opción…</option>
               {socios.map((s) => (
@@ -2191,6 +2210,32 @@ function EditarEspacioModal({
               ))}
             </select>
           </div>
+
+          {(() => {
+            const embsDelSocio = ocupanteId
+              ? embarcaciones.filter((b) => b.profileId === ocupanteId)
+              : [];
+            if (embsDelSocio.length === 0) return null;
+            return (
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-gray-700">
+                  Embarcación
+                </label>
+                <select
+                  className={inputCls}
+                  value={embarcacionId}
+                  onChange={(e) => setEmbarcacionId(e.target.value)}
+                >
+                  <option value="">Sin embarcación asignada</option>
+                  {embsDelSocio.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.nombre}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            );
+          })()}
 
           <div>
             <label className="mb-1 block text-sm font-semibold text-gray-700">

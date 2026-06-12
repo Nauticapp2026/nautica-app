@@ -44,6 +44,7 @@ export default async function UsuariosPage({
       condicionIva: profiles.condicionIva,
       membershipStatus: memberships.status,
       numeroSocio: memberships.numeroSocio,
+      membresiaCreatedAt: memberships.createdAt,
     })
     .from(memberships)
     .innerJoin(profiles, eq(profiles.id, memberships.userId))
@@ -290,6 +291,7 @@ export default async function UsuariosPage({
       ubicacion: s.profileId ? (ubicacionByProfile[s.profileId] ?? null) : null,
       docsCompletos,
       datosIncompletos,
+      fechaIngreso: s.membresiaCreatedAt?.toISOString() ?? null,
       invitados: invitadosBySocio.get(s.profileId) ?? [],
       accesosExternos: accesosBySocio.get(s.profileId) ?? [],
     };

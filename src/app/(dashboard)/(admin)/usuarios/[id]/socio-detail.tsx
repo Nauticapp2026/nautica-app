@@ -84,6 +84,8 @@ type Embarcacion = {
   seguro: string | null;
   esloraM: string | null;
   esPrincipal: boolean;
+  espacioId: string | null;
+  espacioLabel: string | null;
 };
 
 type Movimiento = {
@@ -1218,14 +1220,83 @@ function montoToNumberStr(input: string): string {
 
 // ─── Embarcaciones tab ───────────────────────────────────────────────────────
 
+function EspacioEmbarcacionRow({
+  socioId,
+  emb,
+  espaciosDisponibles,
+}: {
+  socioId: string;
+  emb: Embarcacion;
+  espaciosDisponibles: EspacioOption[];
+}) {
+  const router = useRouter();
+  const [destinoId, setDestinoId] = useState('');
+  const [pending, startTransition] = useTransition();
+
+  const tieneEspacio = emb.espacioId != null;
+
+  function submit() {
+    if (!destinoId) {
+      toast.error('Seleccioná un espacio.');
+      return;
+    }
+    startTransition(async () => {
+      const res = tieneEspacio
+        ? await moveOcupanteAction({ origenId: emb.espacioId!, destinoId })
+        : await assignEspacioToSocioAction({
+            socioId,
+            espacioId: destinoId,
+            embarcacionId: emb.id,
+          });
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+      toast.success(tieneEspacio ? 'Espacio cambiado.' : 'Espacio asignado.');
+      setDestinoId('');
+      router.refresh();
+    });
+  }
+
+  if (espaciosDisponibles.length === 0 && !tieneEspacio) return null;
+
+  return (
+    <div className="flex flex-col gap-2 border-t border-gray-100 pt-4 sm:flex-row sm:items-center">
+      <select
+        value={destinoId}
+        onChange={(e) => setDestinoId(e.target.value)}
+        disabled={pending}
+        className="h-10 flex-1 rounded-[10px] border border-gray-200 bg-white px-3 text-sm text-[#101828] focus:border-[#175861] focus:ring-1 focus:ring-[#175861] focus:outline-none disabled:opacity-50"
+      >
+        <option value="">{tieneEspacio ? 'Cambiar espacio…' : 'Asignar espacio…'}</option>
+        {espaciosDisponibles.map((e) => (
+          <option key={e.id} value={e.id}>
+            {e.label}
+          </option>
+        ))}
+      </select>
+      <button
+        onClick={submit}
+        disabled={!destinoId || pending}
+        className="shrink-0 rounded-[10px] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+        style={{ background: '#175861' }}
+      >
+        {pending ? 'Guardando…' : tieneEspacio ? 'Cambiar' : 'Asignar'}
+      </button>
+    </div>
+  );
+}
+
 const EMBARCACION_VACIA = { nombre: '', matricula: '', modelo: '', seguro: '', esloraM: '' };
 
 function EmbarcacionesTab({
   socioId,
   embarcaciones,
+  espaciosDisponibles,
 }: {
   socioId: string;
   embarcaciones: Embarcacion[];
+  espaciosDisponibles: EspacioOption[];
 }) {
   const router = useRouter();
   const [editandoId, setEditandoId] = useState<string | null>(null);
@@ -1513,7 +1584,21 @@ function EmbarcacionesTab({
                       {emb.esloraM ? `${emb.esloraM} m` : '—'}
                     </p>
                   </div>
+                  <div>
+                    <label className="mb-1.5 block text-xs font-semibold text-gray-500">
+                      Espacio
+                    </label>
+                    <p className="text-sm" style={{ color: '#101828' }}>
+                      {emb.espacioLabel ?? '—'}
+                    </p>
+                  </div>
                 </div>
+
+                <EspacioEmbarcacionRow
+                  socioId={socioId}
+                  emb={emb}
+                  espaciosDisponibles={espaciosDisponibles}
+                />
 
                 <div className="flex flex-wrap items-center gap-2 border-t border-gray-100 pt-4">
                   {hayMultiples && !emb.esPrincipal && (
@@ -1929,7 +2014,6 @@ export function SocioDetail({
   navegantes,
   documentos = [],
   salidas = [],
-  espacioActual,
   espaciosDisponibles,
   paywayPublicKey = null,
   paywayToken = null,
@@ -1941,7 +2025,6 @@ export function SocioDetail({
   navegantes: Navegante[];
   documentos?: DocumentoItem[];
   salidas?: SalidaItem[];
-  espacioActual: EspacioOption | null;
   espaciosDisponibles: EspacioOption[];
   paywayPublicKey?: string | null;
   paywayToken?: PaywayTokenInfo | null;
@@ -2409,10 +2492,9 @@ export function SocioDetail({
       {/* Embarcación */}
       {activeTab === 'embarcacion' && (
         <div className="space-y-4">
-          <EmbarcacionesTab socioId={socio.id} embarcaciones={embarcaciones} />
-          <EspacioAsignadoCard
+          <EmbarcacionesTab
             socioId={socio.id}
-            espacioActual={espacioActual}
+            embarcaciones={embarcaciones}
             espaciosDisponibles={espaciosDisponibles}
           />
         </div>

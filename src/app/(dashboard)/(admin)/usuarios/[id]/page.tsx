@@ -74,7 +74,7 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
     navegantesList,
     documentosList,
     salidasList,
-    espacioActualRow,
+    espaciosSocioRows,
     espaciosDisponibles,
     guarderiaRow,
     paywayTokenRow,
@@ -88,6 +88,7 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
         seguro: embarcaciones.seguro,
         esloraM: embarcaciones.esloraM,
         esPrincipal: embarcaciones.esPrincipal,
+        espacioId: embarcaciones.espacioId,
       })
       .from(embarcaciones)
       .where(and(eq(embarcaciones.profileId, id), eq(embarcaciones.guarderiaId, gId))),
@@ -174,7 +175,8 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
       )
       .orderBy(desc(porteria.createdAt)),
 
-    // Espacio actualmente asignado al socio (si tiene).
+    // Espacios de los que el socio es ocupante (uno por embarcación).
+    // Traemos todos para poder armar el label de cada uno.
     db
       .select({
         id: espacios.id,
@@ -189,8 +191,7 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
       .leftJoin(marinas, eq(marinas.id, espacios.marinaId))
       .leftJoin(lados, eq(lados.id, espacios.ladoId))
       .leftJoin(pisos, eq(pisos.id, espacios.pisoId))
-      .where(and(eq(espacios.ocupanteId, id), eq(espacios.guarderiaId, gId)))
-      .limit(1),
+      .where(and(eq(espacios.ocupanteId, id), eq(espacios.guarderiaId, gId))),
 
     // Espacios disponibles para asignar/cambiar. Ya no exigimos tarifa
     // configurada: si el espacio no tiene tarifa, se asigna igual y el
@@ -315,14 +316,14 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
     return partes.join(' · ') || 'Espacio';
   }
 
-  const espacioActual = espacioActualRow[0]
-    ? { id: espacioActualRow[0].id, label: labelEspacio(espacioActualRow[0]) }
-    : null;
+  // Mapa espacioId → label para enriquecer las embarcaciones.
+  const espacioLabelMap = new Map<string, string>();
+  for (const e of espaciosSocioRows) {
+    espacioLabelMap.set(e.id, labelEspacio(e));
+  }
 
   // Eslora máxima de las embarcaciones del socio (siempre en metros).
-  // Sirve para filtrar espacios destino cuando el socio ya tiene espacio
-  // (es una mudanza). El barco tiene que entrar — eslora del espacio
-  // tiene que ser ≥ eslora del barco más grande del socio.
+  // Se usa para filtrar espacios destino compatibles con el barco más grande.
   const esloraMaxBarcoM = embarcacionesList.reduce((max, e) => {
     const v = e.esloraM != null ? Number(e.esloraM) : 0;
     return v > max ? v : max;
@@ -332,20 +333,14 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
     eslora: string | null;
     unidadMetraje: 'metros' | 'pies' | null;
   }): boolean {
-    if (e.eslora == null) return true; // sin eslora seteada → no se valida
+    if (e.eslora == null) return true;
     const esloraNum = Number(e.eslora);
     const esloraM = e.unidadMetraje === 'pies' ? esloraNum * 0.3048 : esloraNum;
     return esloraM + 0.01 >= esloraMaxBarcoM;
   }
 
-  // Solo filtramos por tamaño cuando es un cambio (el socio ya tiene
-  // espacio). En la asignación inicial no validamos — el admin elige
-  // libremente.
-  const esCambio = espacioActual != null;
   const espaciosFiltrados =
-    esCambio && esloraMaxBarcoM > 0
-      ? espaciosDisponibles.filter(espacioAceptaBarco)
-      : espaciosDisponibles;
+    esloraMaxBarcoM > 0 ? espaciosDisponibles.filter(espacioAceptaBarco) : espaciosDisponibles;
 
   const espaciosDisponiblesView = espaciosFiltrados.map((e) => ({
     id: e.id,
@@ -371,8 +366,13 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
         condicionIva: socio.condicionIva ?? null,
         estadoSocio: socio.estadoSocio ?? null,
       }}
-      embarcaciones={embarcacionesList}
-      espacioActual={espacioActual}
+      embarcaciones={embarcacionesList.map((e) => ({
+        ...e,
+        esloraM: e.esloraM ?? null,
+        esPrincipal: e.esPrincipal ?? false,
+        espacioId: e.espacioId ?? null,
+        espacioLabel: e.espacioId ? (espacioLabelMap.get(e.espacioId) ?? null) : null,
+      }))}
       espaciosDisponibles={espaciosDisponiblesView}
       movimientos={movimientosList.map((m) => ({
         ...m,
