@@ -273,6 +273,22 @@ El tablero de Tareas organiza el trabajo operativo del equipo en columnas por es
 | Guardada          | Embarcación de regreso y guardada    |
 | Lavado            | Solicitudes de lavado                |
 
+### Qué muestra cada tarjeta
+
+Cada tarjeta muestra:
+
+- **Nombre del socio** (arriba, en gris).
+- **Nombre de la embarcación** (en negrita).
+- **Ubicación** — nave y/o número de espacio donde está guardada la embarcación (ej. "Nave A — A-12"). Aparece si el espacio está asignado en el sistema.
+- **Para el DD/MM** — solo en tarjetas de lavado: la fecha en que el socio pidió que el lavado esté listo.
+- **Descripción / nota** — si la tarea tiene texto.
+
+### Visibilidad según estado
+
+- **Salida programada** — solo se muestran las salidas del día en curso. Las del futuro se ocultarán hasta que llegue su fecha.
+- **Guardada** — las embarcaciones guardadas durante el día aparecen en esa columna. Al día siguiente desaparecen del tablero automáticamente.
+- **Lavado lista** — cuando marcás un lavado como **Lista**, la tarjeta se mantiene visible el resto del día y desaparece sola al día siguiente.
+
 ### Crear una tarea
 
 1. Hacé clic en el botón **+** de la columna correspondiente, o en **Nueva tarea** (si lo tiene el header).
@@ -295,7 +311,7 @@ En la tarjeta de la tarea, usá el selector **Operario** para asignar o cambiar 
 
 ### Tareas de lavado
 
-Las solicitudes de lavado que llegan desde la app mobile aparecen en la columna **Lavado**.
+Las solicitudes de lavado que llegan desde la app mobile aparecen en la columna **Lavado**. Cada tarjeta muestra el nombre de la embarcación, su ubicación en el club y la fecha para la que el socio pidió que el lavado esté listo.
 
 - La solicitud puede estar en estado: **Pendiente**, **Aceptada**, **Lista** o **Cancelada**.
 - Para cancelar una solicitud de lavado, hacé clic en la opción correspondiente e ingresá el motivo (ej. "No tenemos turno disponible para ese día").
@@ -689,8 +705,10 @@ Los tres planes disponibles son **Esencial**, **Premium** y **Élite**. Cada uno
 **Cambiar de plan:**
 
 1. Hacé clic en **Cambiar a [nombre del plan]** bajo el plan deseado.
-2. Confirmá el cambio en el modal.
-3. El cambio es inmediato. Las funcionalidades del nuevo plan se habilitan al instante.
+2. Confirmá el cambio en el modal. El sistema te indica la fecha exacta en que se aplicará.
+3. El cambio **no es inmediato**: se programa para el **último día del mes en curso**. Hasta esa fecha seguís con tu plan actual.
+
+Si confirmaste un cambio y querés cancelarlo antes de que se aplique, aparece un aviso ámbar en la parte superior de la pestaña con el detalle del cambio pendiente y un botón **Cancelar cambio**.
 
 ---
 

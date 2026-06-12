@@ -418,6 +418,14 @@
 <tr><td>Navegando</td><td>Embarcación actualmente en el agua</td></tr>
 <tr><td>Guardada</td><td>Embarcación de regreso y guardada</td></tr>
 <tr><td>Lavado</td><td>Solicitudes de lavado</td></tr></tbody></table></tbody></table>
+<h3>Qué muestra cada tarjeta</h3>
+
+<p>Cada tarjeta muestra:</p>
+
+<ul><li><strong>Nombre del socio</strong> (arriba, en gris).</li><li><strong>Nombre de la embarcación</strong> (en negrita).</li><li><strong>Ubicación</strong> — nave y/o número de espacio donde está guardada la embarcación (ej. "Nave A — A-12"). Aparece si el espacio está asignado en el sistema.</li><li><strong>Para el DD/MM</strong> — solo en tarjetas de lavado: la fecha en que el socio pidió que el lavado esté listo.</li><li><strong>Descripción / nota</strong> — si la tarea tiene texto.</li></ul>
+<h3>Visibilidad según estado</h3>
+
+<ul><li><strong>Salida programada</strong> — solo se muestran las salidas del día en curso. Las del futuro se ocultarán hasta que llegue su fecha.</li><li><strong>Guardada</strong> — las embarcaciones guardadas durante el día aparecen en esa columna. Al día siguiente desaparecen del tablero automáticamente.</li><li><strong>Lavado lista</strong> — cuando marcás un lavado como <strong>Lista</strong>, la tarjeta se mantiene visible el resto del día y desaparece sola al día siguiente.</li></ul>
 <h3>Crear una tarea</h3>
 
 <ol><li>Hacé clic en el botón <strong>+</strong> de la columna correspondiente, o en <strong>Nueva tarea</strong> (si lo tiene el header).</li><li>Completá el formulario:</li></ol>   - <strong>Descripción</strong> <em>(requerida)</em> — qué hay que hacer.
@@ -437,7 +445,7 @@
 
 <h3>Tareas de lavado</h3>
 
-<p>Las solicitudes de lavado que llegan desde la app mobile aparecen en la columna <strong>Lavado</strong>.</p>
+<p>Las solicitudes de lavado que llegan desde la app mobile aparecen en la columna <strong>Lavado</strong>. Cada tarjeta muestra el nombre de la embarcación, su ubicación en el club y la fecha para la que el socio pidió que el lavado esté listo.</p>
 
 <ul><li>La solicitud puede estar en estado: <strong>Pendiente</strong>, <strong>Aceptada</strong>, <strong>Lista</strong> o <strong>Cancelada</strong>.</li><li>Para cancelar una solicitud de lavado, hacé clic en la opción correspondiente e ingresá el motivo (ej. "No tenemos turno disponible para ese día").</li></ul>
 <hr>
@@ -728,7 +736,9 @@
 
 <p><strong>Cambiar de plan:</strong></p>
 
-<ol><li>Hacé clic en <strong>Cambiar a [nombre del plan]</strong> bajo el plan deseado.</li><li>Confirmá el cambio en el modal.</li><li>El cambio es inmediato. Las funcionalidades del nuevo plan se habilitan al instante.</li></ol>
+<ol><li>Hacé clic en <strong>Cambiar a [nombre del plan]</strong> bajo el plan deseado.</li><li>Confirmá el cambio en el modal. El sistema te indica la fecha exacta en que se aplicará.</li><li>El cambio <strong>no es inmediato</strong>: se programa para el <strong>último día del mes en curso</strong>. Hasta esa fecha seguís con tu plan actual.</li></ol>
+<p>Si confirmaste un cambio y querés cancelarlo antes de que se aplique, aparece un aviso ámbar en la parte superior de la pestaña con el detalle del cambio pendiente y un botón <strong>Cancelar cambio</strong>.</p>
+
 <hr>
 
 <h2>13. Débito automático (Payway)</h2>
