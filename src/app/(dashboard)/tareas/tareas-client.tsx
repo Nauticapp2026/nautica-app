@@ -45,8 +45,11 @@ export type Tarea = {
   operarioNombre: string | null;
   embarcacionId: string | null;
   embarcacionNombre: string | null;
+  ubicacion: string | null;
   socioNombre: string | null;
   solicitudLavadoEstado: EstadoSolicitudLavado | null;
+  solicitudDiaUso: string | null;
+  solicitudUpdatedAt: string | null;
 };
 
 const ESTADO_SOLICITUD_LAVADO_LABEL: Record<EstadoSolicitudLavado, string> = {
@@ -149,6 +152,12 @@ function toDatetimeLocal(iso: string | null): string {
   const d = new Date(iso);
   // sv-SE da "YYYY-MM-DD HH:mm:ss" en la TZ pedida, tomamos los primeros 16 chars
   return d.toLocaleString('sv-SE', { timeZone: TZ_AR }).slice(0, 16).replace(' ', 'T');
+}
+
+// 'YYYY-MM-DD' → 'DD/MM'
+function formatDiaUso(d: string): string {
+  const [, month, day] = d.split('-');
+  return `${day}/${month}`;
 }
 
 // ─── Card ───────────────────────────────────────────────────────────────────
@@ -264,6 +273,15 @@ function TareaCard({
       <p className="text-base font-bold" style={{ color: '#101828' }}>
         {tarea.embarcacionNombre ?? 'Sin embarcación'}
       </p>
+
+      {tarea.ubicacion && <p className="mt-0.5 text-xs text-gray-500">{tarea.ubicacion}</p>}
+
+      {tarea.estado === 'lavado' && tarea.solicitudDiaUso && (
+        <div className="mt-1 flex items-center gap-1 text-xs font-medium text-[#175861]">
+          <CalendarClock className="h-3 w-3 shrink-0" />
+          <span>Para el {formatDiaUso(tarea.solicitudDiaUso)}</span>
+        </div>
+      )}
 
       {(tarea.descripcion || tarea.nota) && (
         <div className="mt-2 flex items-start gap-1.5 text-xs text-gray-600">
@@ -653,6 +671,10 @@ export function TareasClient({
       // Guardadas: desaparecen al día siguiente (terminal del día).
       if (t.estado === 'guardada') {
         return fechaArYmd(t.updatedAt) === hoyAr;
+      }
+      // Lavado lista: se muestra el resto del día y desaparece al siguiente.
+      if (t.estado === 'lavado' && t.solicitudLavadoEstado === 'lista') {
+        return fechaArYmd(t.solicitudUpdatedAt) === hoyAr;
       }
       return true;
     });

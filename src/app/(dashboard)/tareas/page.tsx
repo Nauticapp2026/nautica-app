@@ -3,9 +3,27 @@ import { alias } from 'drizzle-orm/pg-core';
 
 import { getActiveMarina } from '@/lib/auth/session';
 import { db } from '@/lib/db';
-import { embarcaciones, memberships, profiles, solicitudesLavado, tareas } from '@/lib/db/schema';
+import {
+  embarcaciones,
+  espacios,
+  memberships,
+  naves,
+  profiles,
+  solicitudesLavado,
+  tareas,
+} from '@/lib/db/schema';
 
 import { TareasClient } from './tareas-client';
+
+function buildUbicacion(
+  naveNombre: string | null,
+  espNomenclatura: string | null,
+  ubicacionLibre: string | null,
+): string | null {
+  if (naveNombre && espNomenclatura) return `${naveNombre} — ${espNomenclatura}`;
+  if (espNomenclatura) return espNomenclatura;
+  return ubicacionLibre ?? null;
+}
 
 export default async function TareasPage() {
   const ctx = await getActiveMarina();
@@ -25,6 +43,12 @@ export default async function TareasPage() {
   // Alias para traer al socio dueño de la embarcación (profiles se usa dos veces:
   // una para el operario y otra para el socio).
   const socioProfile = alias(profiles, 'socio_profile');
+  // Alias para el espacio y nave asociados a la embarcación de la tarea.
+  const embEspacio = alias(espacios, 'emb_espacio');
+  const embNave = alias(naves, 'emb_nave');
+  // Fallback: embarcación principal del socio cuando la tarea no tiene embarcacionId
+  // (p.ej. solicitudes de lavado creadas desde mobile sin vincular embarcación).
+  const lavadoEmb = alias(embarcaciones, 'lavado_emb');
 
   const [listado, operariosList, embarcacionesList] = await Promise.all([
     db
@@ -35,30 +59,45 @@ export default async function TareasPage() {
         estado: tareas.estado,
         fechaHora: tareas.fechaHora,
         createdAt: tareas.createdAt,
+        updatedAt: tareas.updatedAt,
         operarioId: tareas.operarioId,
         operarioNombre: profiles.nombre,
         operarioApellido: profiles.apellido,
         operarioEmail: profiles.email,
         embarcacionId: tareas.embarcacionId,
         embarcacionNombre: embarcaciones.nombre,
+        embUbicacion: embarcaciones.ubicacion,
+        embEspacioNomenclatura: embEspacio.nomenclatura,
+        embNaveNombre: embNave.nombre,
+        lavadoEmbNombre: lavadoEmb.nombre,
         socioNombre: socioProfile.nombre,
         socioApellido: socioProfile.apellido,
         socioEmail: socioProfile.email,
         solicitudLavadoEstado: solicitudesLavado.estado,
-        updatedAt: tareas.updatedAt,
+        solicitudDiaUso: solicitudesLavado.diaUso,
+        solicitudUpdatedAt: solicitudesLavado.updatedAt,
       })
       .from(tareas)
       .leftJoin(profiles, eq(profiles.id, tareas.operarioId))
       .leftJoin(embarcaciones, eq(embarcaciones.id, tareas.embarcacionId))
       .leftJoin(socioProfile, eq(socioProfile.id, embarcaciones.profileId))
+      .leftJoin(embEspacio, eq(embEspacio.id, embarcaciones.espacioId))
+      .leftJoin(embNave, eq(embNave.id, embEspacio.naveId))
       .leftJoin(solicitudesLavado, eq(solicitudesLavado.tareaId, tareas.id))
+      .leftJoin(
+        lavadoEmb,
+        and(
+          eq(lavadoEmb.profileId, solicitudesLavado.socioId),
+          eq(lavadoEmb.guarderiaId, gId),
+          eq(lavadoEmb.esPrincipal, true),
+        ),
+      )
       .where(
         and(
           eq(tareas.guarderiaId, gId),
-          or(
-            isNull(solicitudesLavado.estado),
-            notInArray(solicitudesLavado.estado, ['lista', 'cancelada']),
-          ),
+          // 'cancelada' se excluye siempre. 'lista' se incluye y el cliente
+          // la oculta al día siguiente (mismo patrón que 'guardada').
+          or(isNull(solicitudesLavado.estado), notInArray(solicitudesLavado.estado, ['cancelada'])),
         ),
       )
       .orderBy(desc(tareas.createdAt))
@@ -105,19 +144,24 @@ export default async function TareasPage() {
       | 'lavado',
     fechaHora: t.fechaHora ? t.fechaHora.toISOString() : null,
     createdAt: t.createdAt.toISOString(),
+    updatedAt: t.updatedAt.toISOString(),
     operarioId: t.operarioId,
     operarioNombre:
       [t.operarioNombre, t.operarioApellido].filter(Boolean).join(' ') || t.operarioEmail || null,
     embarcacionId: t.embarcacionId,
-    embarcacionNombre: t.embarcacionNombre,
+    // Fallback: si la tarea no tiene embarcacionId (lavado desde mobile),
+    // usar la embarcación principal del socio.
+    embarcacionNombre: t.embarcacionNombre ?? t.lavadoEmbNombre,
+    ubicacion: buildUbicacion(t.embNaveNombre, t.embEspacioNomenclatura, t.embUbicacion),
     socioNombre: [t.socioNombre, t.socioApellido].filter(Boolean).join(' ') || t.socioEmail || null,
-    updatedAt: t.updatedAt.toISOString(),
     solicitudLavadoEstado: t.solicitudLavadoEstado as
       | 'pendiente'
       | 'aceptada'
       | 'lista'
       | 'cancelada'
       | null,
+    solicitudDiaUso: t.solicitudDiaUso ?? null,
+    solicitudUpdatedAt: t.solicitudUpdatedAt ? t.solicitudUpdatedAt.toISOString() : null,
   }));
 
   const operarios = operariosList.map((o) => ({
