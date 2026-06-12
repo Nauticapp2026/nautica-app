@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Manual del Administrador</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 10.5pt;
+    line-height: 1.65;
+    color: #1a1a2e;
+    background: #fff;
+  }
+
+  /* Cover page */
+  .cover {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 80px;
+    background: linear-gradient(135deg, #0d3d45 0%, #175861 60%, #1e7a87 100%);
+    color: white;
+    page-break-after: always;
+  }
+  .cover-badge {
+    font-size: 9pt;
+    font-weight: 600;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.6);
+    margin-bottom: 24px;
+  }
+  .cover h1 {
+    font-size: 36pt;
+    font-weight: 700;
+    line-height: 1.2;
+    color: white;
+    border: none;
+    padding: 0;
+    margin: 0 0 16px 0;
+  }
+  .cover-subtitle {
+    font-size: 14pt;
+    color: rgba(255,255,255,0.75);
+    margin-bottom: 60px;
+    max-width: 500px;
+    line-height: 1.5;
+  }
+  .cover-divider {
+    width: 60px;
+    height: 4px;
+    background: rgba(255,255,255,0.4);
+    border-radius: 2px;
+    margin-bottom: 40px;
+  }
+  .cover-meta {
+    font-size: 9pt;
+    color: rgba(255,255,255,0.5);
+    letter-spacing: 1px;
+  }
+
+  /* Page margins — ensures consistent whitespace on all four sides across every
+     page. Without this Chrome headless applies its own defaults unevenly. */
+  @page {
+    margin: 18mm 16mm;
+  }
+
+  /* Content */
+  .content {
+    max-width: 740px;
+    margin: 0 auto;
+    padding: 12px 40px;
+  }
+
+  h1 {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 20pt;
+    font-weight: bold;
+    color: #175861;
+    margin: 48px 0 16px;
+    padding-bottom: 10px;
+    border-bottom: 2.5px solid #175861;
+    page-break-after: avoid;
+  }
+  h2 {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 14pt;
+    font-weight: bold;
+    color: #175861;
+    margin: 40px 0 12px;
+    padding-bottom: 6px;
+    border-bottom: 1.5px solid #d4eaed;
+    page-break-after: avoid;
+  }
+  h3 {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 12pt;
+    font-weight: bold;
+    color: #0d3d45;
+    margin: 28px 0 8px;
+    page-break-after: avoid;
+  }
+  h4 {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 11pt;
+    font-weight: bold;
+    color: #175861;
+    margin: 20px 0 6px;
+    page-break-after: avoid;
+  }
+  h5, h6 {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 10pt;
+    font-weight: bold;
+    color: #444;
+    margin: 16px 0 4px;
+  }
+
+  p {
+    margin: 8px 0;
+    color: #333;
+  }
+
+  strong { color: #111; }
+
+  a { color: #175861; text-decoration: underline; }
+
+  ul, ol {
+    margin: 8px 0 8px 24px;
+    color: #333;
+  }
+  ul.nested {
+    margin-left: 36px;
+    margin-top: 4px;
+  }
+  li { margin: 4px 0; }
+
+  blockquote {
+    margin: 14px 0;
+    padding: 12px 16px;
+    border-left: 4px solid #175861;
+    background: #f0f8f9;
+    border-radius: 0 6px 6px 0;
+    color: #1a4a52;
+    font-size: 10.5pt;
+  }
+
+  code {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 9.5pt;
+    background: #f4f6f8;
+    padding: 1px 5px;
+    border-radius: 3px;
+    color: #0d3d45;
+  }
+
+  pre {
+    background: #f4f6f8;
+    border: 1px solid #e0e6e8;
+    border-radius: 6px;
+    padding: 14px 16px;
+    margin: 12px 0;
+    overflow-x: auto;
+    font-family: 'Courier New', Courier, monospace;
+  }
+  pre code {
+    background: none;
+    padding: 0;
+    font-size: 9pt;
+    color: #1a1a2e;
+    font-family: 'Courier New', Courier, monospace;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 14px 0;
+    font-size: 10pt;
+    page-break-inside: avoid;
+  }
+  th {
+    background: #175861;
+    color: white;
+    padding: 8px 12px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 9.5pt;
+  }
+  td {
+    padding: 7px 12px;
+    border-bottom: 1px solid #e8eef0;
+    color: #333;
+    vertical-align: top;
+  }
+  tr:nth-child(even) td { background: #f8fbfc; }
+  tr:hover td { background: #eef5f6; }
+
+  hr {
+    border: none;
+    border-top: 1px solid #e0e8ea;
+    margin: 32px 0;
+  }
+
+  @media print {
+    body { font-size: 10.5pt; }
+    .cover { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    tr:nth-child(even) td { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    blockquote { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    h2, h3, h4 { page-break-after: avoid; }
+    table, pre, blockquote { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <div class="cover-badge">NauticApp · Documentación</div>
+  <h1>Manual del Administrador</h1>
+  <div class="cover-divider"></div>
+  <div class="cover-subtitle">Guía completa para gestionar tu club o guardería náutica desde el panel web de NauticApp.</div>
+  <div class="cover-meta">Versión actualizada · Junio 2026</div>
+</div>
+
+<div class="content">
+<h1>Manual del Administrador — NauticApp</h1>
+
+<p>Guía paso a paso para gestionar tu club o guardería náutica desde el panel web.</p>
+
+<hr>
+
+<h2>Índice</h2>
+
+<ol><li><a href="#1-primeros-pasos">Primeros pasos</a></li><li><a href="#2-dashboard">Dashboard</a></li><li><a href="#3-usuarios--socios">Usuarios — Socios</a></li><li><a href="#4-usuarios--carga-masiva">Usuarios — Carga masiva</a></li><li><a href="#5-solicitudes-de-membresía">Solicitudes de membresía</a></li><li><a href="#6-tareas">Tareas</a></li><li><a href="#7-espacios">Espacios</a></li><li><a href="#8-publicaciones">Publicaciones</a></li><li><a href="#9-comunicaciones">Comunicaciones</a></li><li><a href="#10-comprobantes">Comprobantes</a></li><li><a href="#11-tarifario">Tarifario</a></li><li><a href="#12-configuración">Configuración</a></li><li><a href="#13-débito-automático-payway">Débito automático (Payway)</a></li></ol>
+<hr>
+
+<h2>1. Primeros pasos</h2>
+
+<h3>Ingresar al panel</h3>
+
+<ol><li>Abrí el navegador y entrá a <strong>www.nauticapp.club</strong>.</li><li>Ingresá con tu <strong>email</strong> y <strong>contraseña</strong>.</li><li>Si es tu primera vez, revisá el email de invitación que recibiste y hacé clic en el enlace para activar tu cuenta.</li></ol>
+<h3>Navegar por el panel</h3>
+
+<p>El menú lateral izquierdo es la navegación principal. Desde ahí accedés a todas las secciones:</p>
+
+<ul><li><strong>Dashboard</strong> — resumen operativo del día</li><li><strong>Usuarios</strong> — socios, invitados y proveedores</li><li><strong>Solicitudes</strong> — pedidos de nuevos socios desde la app mobile</li><li><strong>Tareas</strong> — tablero operativo para el equipo</li><li><strong>Espacios</strong> — amarras, camas y ubicaciones</li><li><strong>Publicaciones</strong> — avisos de amarras y camas en NautiShop</li><li><strong>Comunicaciones</strong> — anuncios y novedades para socios</li><li><strong>Comprobantes</strong> — emisión y seguimiento de facturas</li><li><strong>Tarifario</strong> — precios y servicios</li><li><strong>Configuración</strong> — datos del club, equipo, plan y facturación</li></ul>
+<p>En la parte inferior del menú encontrás el botón <strong>¿Necesitás ayuda?</strong> para contactar soporte por WhatsApp.</p>
+
+<hr>
+
+<h2>2. Dashboard</h2>
+
+<p>El Dashboard es la pantalla de inicio. Muestra el estado operativo del club en tiempo real.</p>
+
+<h3>Qué muestra</h3>
+
+<ul><li><strong>Embarcaciones en guardería</strong> — cantidad de embarcaciones actualmente activas.</li><li><strong>Socios activos</strong> — total de socios con estado activo.</li><li><strong>Ingresos del mes</strong> — monto facturado en el mes en curso.</li><li><strong>Socios con deuda 2+ meses</strong> — socios con movimientos pendientes de cobro desde hace más de dos meses.</li><li><strong>Socios con documentación incompleta</strong> — socios a los que les falta subir documentación.</li></ul>
+<h3>Alertas operativas</h3>
+
+<p>Las alertas aparecen cuando hay embarcaciones que salieron y no confirmaron su regreso dentro del horario prometido.</p>
+
+<ul><li><strong>Críticas</strong> — sin respuesta del socio (marcadas en rojo).</li><li><strong>Retorno próximo</strong> — esperando confirmación de arribo.</li></ul>
+<p>Cada alerta muestra el nombre del socio, la embarcación, la hora prometida y la demora acumulada.</p>
+
+<p><strong>Resolver una alerta:</strong></p>
+
+<p>Las acciones disponibles dependen del tipo de alerta.</p>
+
+<p><strong>Alertas críticas (sin respuesta del socio):</strong></p>
+
+<ol><li>Si el socio tiene teléfono cargado, aparece el botón <strong>Llamar</strong>. Al tocarlo desde el celular abre el marcador directamente con el número del socio.</li><li>Si el socio no responde y necesitás cerrar la salida manualmente, hacé clic en <strong>Cerrar salida</strong>. Esto registra el arribo en ese momento y desactiva la alerta de forma permanente.</li></ol>
+<p><strong>Alertas de retorno próximo:</strong></p>
+
+<ol><li>Si el socio tiene teléfono cargado, aparece el botón <strong>Llamar</strong>.</li><li>Si el socio no responde y necesitás cerrar la salida manualmente, hacé clic en <strong>Cerrar salida</strong>. Esto registra el arribo en ese momento y desactiva la alerta de forma permanente.</li><li>Una vez resuelto el tema, hacé clic en <strong>Marcar resuelta</strong> para cerrar la alerta sin registrar arribo.</li></ol>
+<hr>
+
+<h2>3. Usuarios — Socios</h2>
+
+<p>La sección Usuarios tiene tres pestañas: <strong>Socios</strong>, <strong>Invitados</strong> y <strong>Proveedores</strong>. Cada una muestra los miembros del club con ese rol y permite gestionarlos individualmente.</p>
+
+<h3>Usuarios — Socios</h3>
+
+<p>Desde <strong>Usuarios → Socios</strong> gestionás el padrón de socios de tu club.</p>
+
+<h3>Ver la lista de socios</h3>
+
+<p>La tabla muestra: número de socio (#), nombre, email, embarcación asignada, ubicación, fecha de ingreso, estado y deuda.</p>
+
+<ul><li>Usá la barra de búsqueda para filtrar por nombre o email.</li><li>Hacé clic en el encabezado <strong>#</strong> para ordenar la lista por número de socio (ascendente o descendente).</li><li>La columna <strong>Ingreso</strong> muestra la fecha en que se incorporó el socio al club.</li><li>El <strong>número de socio</strong> (#NNN) aparece como un chip junto al nombre. Podés editarlo en el perfil del socio → pestaña <strong>Generales</strong>.</li><li>El <strong>estado</strong> de la membresía se indica con un badge de color:</li></ul><ul class="nested"><li>- <strong>Verde (Activo)</strong> — socio con membresía vigente.</li><li><strong>Ámbar (Pausado)</strong> — membresía temporalmente suspendida.</li><li><strong>Gris (Inactivo)</strong> — socio inactivo.</li><li><strong>Rojo (Moroso)</strong> — socio con deuda pendiente.</li></ul>- Si un socio tiene un <strong>ícono de alerta amarillo</strong> junto a su nombre, significa que tiene datos de perfil o documentación incompletos. Hacé clic en su nombre para ver qué falta completar.
+<ul><li>Cada fila tiene un <strong>botón chevron (›)</strong> a la derecha. Al hacerle clic se despliega un panel con:</li></ul><ul class="nested"><li>- <strong>Invitados autorizados</strong> — personas que el socio autorizó a ingresar al club.</li><li><strong>Accesos externos recientes</strong> — últimas entradas registradas por portería.</li></ul>
+<h3>Dar de alta un socio manualmente</h3>
+
+<ol><li>Hacé clic en <strong>Agregar socio</strong>.</li><li>Completá los datos en el formulario (las secciones se van desplegando):</li></ol>
+<p><strong>Datos personales</strong></p>
+<p>- Nombre y apellido</p>
+<p>- Email <em>(requerido)</em></p>
+<p>- Teléfono</p>
+<p>- Tipo de documento <em>(requerido)</em>: DNI / CUIT / CUIL / Pasaporte / CDI</p>
+<p>- Número de documento <em>(requerido)</em></p>
+
+<p><strong>Datos impositivos</strong></p>
+<p>- <strong>Emite comprobante fiscal</strong> — si está marcado, el socio aparece en los selectores de facturación (individual, ventanilla y lote) y se habilitan los campos de Razón social y Condición frente al IVA. Desmarcalo si el socio no requiere factura fiscal — esos campos se desactivan y el socio no aparecerá en ningún flujo de emisión de comprobantes AFIP.</p>
+<p>- Razón social <em>(disponible solo si marcaste "Emite comprobante fiscal")</em></p>
+<p>- Condición frente al IVA <em>(disponible solo si marcaste "Emite comprobante fiscal")</em>: Consumidor Final / Responsable Monotributo / IVA Responsable Inscripto / IVA Sujeto Exento / Proveedor del Exterior / Cliente del Exterior / IVA No Alcanzado</p>
+<p>- Dirección, ciudad, código postal</p>
+
+<p><strong>Datos de embarcación</strong> <em>(opcional al momento del alta)</em></p>
+<p>- Nombre de la embarcación</p>
+<p>- Matrícula</p>
+<p>- Modelo</p>
+<p>- Eslora: ingresá el valor y usá el toggle <strong>m / pies</strong> para elegir la unidad (siempre se guarda en metros)</p>
+<p>- Manga</p>
+
+<p><strong>Adjuntos</strong> <em>(opcional)</em></p>
+<p>- Podés subir documentación desde esta sección o hacerlo después desde el perfil del socio.</p>
+
+<ol><li>Hacé clic en <strong>Guardar</strong>.</li></ol>
+<h3>Ver y editar el perfil de un socio</h3>
+
+<p>Hacé clic en el nombre del socio en la tabla para abrir su perfil. El perfil tiene ocho pestañas:</p>
+
+<h4>Pestaña Generales</h4>
+
+<p>Mostrá y editá los datos personales: nombre, apellido, email, teléfono, documento, dirección, razón social, condición IVA.</p>
+
+<ul><li><strong>Número de socio</strong> — campo editable para asignar o modificar el número interno del socio. El número aparece como chip (#NNN) en la cabecera del perfil y en la lista de socios.</li><li><strong>Estado de membresía</strong> — selector en la cabecera del perfil para cambiar el estado: <strong>Activo</strong>, <strong>Pausado</strong>, <strong>Inactivo</strong>. También está disponible la opción <strong>Eliminar</strong> para desvincular al socio del club.</li></ul>
+<h4>Pestaña Embarcación</h4>
+
+<p>Muestra las embarcaciones del socio. Podés editar o eliminar cada una.</p>
+
+<p>Cada embarcación tiene su <strong>propio espacio asignado</strong>. Dentro de la tarjeta de cada embarcación hay un selector de espacio que muestra la amarra o cama actual. Podés asignar o cambiar el espacio directamente desde ahí, sin necesidad de ir a la sección Espacios. Si el socio tiene varias embarcaciones, cada una puede estar en un espacio diferente.</p>
+
+<h4>Pestaña Cuenta Corriente</h4>
+
+<p>Muestra los movimientos del socio: facturas, cobros y saldo.</p>
+
+<ul><li><strong>Agregar servicio</strong> — registrá un servicio o cargo adicional.</li><li><strong>Informar pago</strong> — registrá un pago recibido sin emitir factura (el saldo queda como "saldo a favor" en la cuenta).</li><li><strong>Marcar como pagadas</strong> — seleccioná una o más facturas con la casilla de verificación y hacé clic en este botón para registrarlas como cobradas. Te pedirá el medio de pago.</li></ul>
+<h4>Pestaña Comprobantes</h4>
+
+<p>Historial de comprobantes AFIP emitidos al socio (facturas y notas de crédito).</p>
+
+<h4>Pestaña Navegantes</h4>
+
+<p>Historial de accesos externos donde la persona fue autorizada como navegante por el socio. Cada registro muestra el nombre del navegante, el período autorizado (desde / hasta) y el estado:</p>
+
+<ul><li><strong>Autorizado</strong> — el acceso está activo.</li><li><strong>Ingresó</strong> — el navegante ya registró entrada en portería.</li><li><strong>Cancelado</strong> — el acceso fue revocado desde la app.</li></ul>
+<h4>Pestaña Salidas</h4>
+
+<p>Historial de salidas y entradas de la embarcación. Las salidas que el socio canceló desde la app mobile aparecen con el badge <strong>Cancelada</strong> en rojo.</p>
+
+<h4>Pestaña Documentación</h4>
+
+<ul><li><strong>Subir documento</strong> — seleccioná el tipo de documento y adjuntá el archivo.</li><li>Los documentos subidos aparecen listados con tipo, fecha y enlace para verlos.</li><li>Podés eliminar documentos desde esta misma pestaña.</li></ul>
+<h4>Pestaña Débito automático</h4>
+
+<p>Registrá y gestioná la tarjeta de crédito o débito del socio para el cobro automático mensual. Ver sección 13 para el flujo completo.</p>
+
+<hr>
+
+<h2>4. Usuarios — Carga masiva</h2>
+
+<p>Si tenés muchos socios o embarcaciones para cargar, podés hacerlo importando un archivo Excel.</p>
+
+<h3>Importar socios desde Excel</h3>
+
+<ol><li>En <strong>Usuarios → Socios</strong>, hacé clic en <strong>Importar socios</strong>.</li><li>Descargá la plantilla haciendo clic en <strong>Descargar plantilla</strong>. Abrí el archivo <code>.xlsx</code> y completá los datos de cada socio en una fila. La plantilla incluye una columna <strong>Número de socio</strong> (opcional); si la completás, se asigna ese número al socio; si la dejás vacía, el sistema asigna el siguiente número disponible automáticamente.</li><li>Guardá el archivo y volvé al panel. Hacé clic en <strong>Elegir archivo .xlsx</strong> y seleccioná tu archivo.</li><li>El sistema mostrará una vista previa con el resultado del análisis:</li></ol>   - <strong>A crear</strong> (verde) — socios nuevos que se van a agregar.
+<p>- <strong>A vincular</strong> (amarillo) — emails que ya existen en el sistema; el socio se va a vincular a tu club.</p>
+<p>- <strong>Se saltan</strong> (amarillo) — filas duplicadas o que ya están vinculadas.</p>
+<p>- <strong>Con error</strong> (rojo) — filas con datos inválidos; revisá el detalle para corregirlas.</p>
+<ol><li>Si el resultado es correcto, hacé clic en <strong>Confirmar importación</strong>.</li><li>Una vez completada, verás el resumen: Creados, Vinculados, Saltados.</li></ol>
+<blockquote>Si quedaron filas con error, corregí esas filas en el Excel y volvé a importar solo las filas corregidas.</blockquote>
+
+<h3>Importar embarcaciones desde Excel</h3>
+
+<blockquote>Antes de importar embarcaciones, asegurate de que los socios dueños ya estén cargados en el sistema.</blockquote>
+
+<ol><li>Hacé clic en <strong>Importar embarcaciones</strong>.</li><li>Descargá la plantilla y completá los datos. Cada embarcación debe tener el email del socio dueño.</li><li>Subí el archivo y revisá la vista previa:</li></ol>   - <strong>A crear</strong> — embarcaciones nuevas.
+<p>- <strong>Se saltan</strong> — embarcaciones ya existentes.</p>
+<p>- <strong>Con error</strong> — filas con datos inválidos o con email de socio no encontrado.</p>
+<ol><li>Confirmá la importación. Las embarcaciones quedan vinculadas a sus dueños <strong>sin amarra asignada</strong>; podés asignarlas desde la sección Espacios.</li></ol>
+<hr>
+
+<h2>5. Solicitudes de membresía</h2>
+
+<p>Cuando un usuario pide unirse al club desde la <strong>app mobile</strong>, la solicitud aparece aquí.</p>
+
+<h3>Ver solicitudes pendientes</h3>
+
+<ol><li>Entrá a <strong>Solicitudes</strong> desde el menú lateral.</li><li>La pestaña <strong>Pendientes</strong> muestra los pedidos sin resolver.</li><li>Cada solicitud muestra: nombre, email, teléfono, fecha del pedido y si el solicitante ya cargó su embarcación en la app.</li></ol>
+<blockquote>Si ves el aviso "No cargó embarcación en la app", pedile al solicitante que registre su embarcación en la app mobile antes de continuar. No es posible aprobar sin embarcación.</blockquote>
+
+<h3>Aprobar una solicitud</h3>
+
+<ol><li>Verificá los datos del solicitante.</li><li>Hacé clic en el botón con el tilde (<strong>Aprobar</strong>).</li><li>El sistema crea automáticamente el perfil de socio con los datos que el usuario cargó en la app, y le envía un email de bienvenida.</li></ol>
+<h3>Rechazar una solicitud</h3>
+
+<ol><li>Hacé clic en el botón con la <strong>X</strong> (<strong>Rechazar</strong>).</li><li>Escribí un motivo (opcional) — el solicitante lo verá en la app.</li><li>Hacé clic en <strong>Rechazar</strong> para confirmar.</li></ol>
+<h3>Ver solicitudes resueltas</h3>
+
+<p>La pestaña <strong>Resueltas</strong> muestra el historial de solicitudes aprobadas y rechazadas, con la fecha de resolución y el motivo de rechazo si corresponde.</p>
+
+<hr>
+
+<h2>6. Tareas</h2>
+
+<p>El tablero de Tareas organiza el trabajo operativo del equipo en columnas por estado.</p>
+
+<h3>Estados del tablero<table></h3>
+
+<thead><table><tbody><tr><th>Columna</th><th>Qué representa</th></tr></tbody></table></thead><tbody><table><tbody><tr><td>-----------------</td><td>------------------------------------</td></tr>
+<tr><td>Salida programada</td><td>Embarcaciones con salida planificada</td></tr>
+<tr><td>Preparar</td><td>Tareas en preparación</td></tr>
+<tr><td>Navegando</td><td>Embarcación actualmente en el agua</td></tr>
+<tr><td>Guardada</td><td>Embarcación de regreso y guardada</td></tr>
+<tr><td>Lavado</td><td>Solicitudes de lavado</td></tr></tbody></table></tbody></table>
+<h3>Crear una tarea</h3>
+
+<ol><li>Hacé clic en el botón <strong>+</strong> de la columna correspondiente, o en <strong>Nueva tarea</strong> (si lo tiene el header).</li><li>Completá el formulario:</li></ol>   - <strong>Descripción</strong> <em>(requerida)</em> — qué hay que hacer.
+<p>- <strong>Operario</strong> — a quién se le asigna (opcional; el operario la verá en su lista).</p>
+<p>- <strong>Embarcación</strong> — embarcación relacionada.</p>
+<p>- <strong>Estado</strong> — columna inicial del tablero.</p>
+<p>- <strong>Fecha y hora</strong> — cuándo debe realizarse.</p>
+<p>- <strong>Nota</strong> — información adicional para el operario.</p>
+<ol><li>Hacé clic en <strong>Guardar</strong>.</li></ol>
+<h3>Mover una tarea de estado</h3>
+
+<p>Desde la tarjeta de la tarea, usá el selector <strong>Mover a...</strong> para cambiar la columna.</p>
+
+<h3>Asignar o reasignar un operario</h3>
+
+<p>En la tarjeta de la tarea, usá el selector <strong>Operario</strong> para asignar o cambiar la persona responsable.</p>
+
+<h3>Tareas de lavado</h3>
+
+<p>Las solicitudes de lavado que llegan desde la app mobile aparecen en la columna <strong>Lavado</strong>.</p>
+
+<ul><li>La solicitud puede estar en estado: <strong>Pendiente</strong>, <strong>Aceptada</strong>, <strong>Lista</strong> o <strong>Cancelada</strong>.</li><li>Para cancelar una solicitud de lavado, hacé clic en la opción correspondiente e ingresá el motivo (ej. "No tenemos turno disponible para ese día").</li></ul>
+<hr>
+
+<h2>7. Espacios</h2>
+
+<p>Aquí gestionás la estructura física de tu club: amarras, camas y sus ocupantes.</p>
+
+<h3>Estructura de espacios</h3>
+
+<ul><li><strong>Marina</strong> → Peines → Amarras</li><li><strong>Nave</strong> → Lados → Pisos → Camas</li></ul>
+<h3>Buscar un espacio disponible</h3>
+
+<p>En la parte superior de la pantalla podés filtrar espacios por:</p>
+
+<ul><li><strong>Eslora</strong> y <strong>Manga</strong> del barco (con selector de unidad: Metros / Pies)</li><li><strong>Tipo</strong>: Marina o Nave</li><li><strong>Solo disponibles</strong> (casilla de verificación)</li></ul>
+<p>Los espacios se muestran con colores:</p>
+
+<ul><li><strong>Teal</strong> — disponible</li><li><strong>Rojo</strong> — ocupado</li><li><strong>Amarillo</strong> — reservado</li></ul>
+<h3>Crear una nueva área</h3>
+
+<ol><li>Hacé clic en <strong>Nueva área</strong>.</li><li>Seleccioná el tipo: <strong>Marina</strong> o <strong>Nave</strong>.</li><li>Para <strong>Marina</strong>: ingresá el nombre, la cantidad de peines y la cantidad de amarras por peine.</li><li>Para <strong>Nave</strong>: ingresá el nombre, los lados, los pisos por lado y la cantidad de camas por piso.</li><li>Confirmá. Los espacios se crean automáticamente.</li></ol>
+<h3>Asignar un espacio a un socio</h3>
+
+<ol><li>Hacé clic sobre el espacio disponible.</li><li>Seleccioná el socio y la embarcación.</li><li>Opcionalmente, asignale una tarifa.</li><li>Confirmá la asignación.</li></ol>
+<blockquote>Si el espacio tiene una tarifa con eslora/manga, el sistema valida que la embarcación sea compatible antes de confirmar un cambio de espacio. En el alta inicial no bloquea.</blockquote>
+
+<h3>Mover un socio a otro espacio (mudanza)</h3>
+
+<ol><li>Hacé clic en el espacio ocupado y seleccioná <strong>Cambiar ubicación</strong>.</li><li>Elegí el espacio destino (puede estar en otra marina o nave).</li><li>Confirmá. El socio conserva su fecha de asignación original y sus embarcaciones se mueven con él.</li></ol>
+<h3>Reordenar espacios</h3>
+
+<p>Podés arrastrar los espacios dentro de un peine o piso para cambiar el orden de visualización. El nuevo orden se guarda automáticamente.</p>
+
+<h3>Carga masiva de áreas</h3>
+
+<ol><li>Hacé clic en <strong>Importar áreas</strong>.</li><li>Descargá la plantilla y completá las áreas a crear (marinas con peines y amarras, o naves con lados, pisos y camas).</li><li>Subí el archivo, revisá la vista previa y confirmá.</li><li>Las áreas y sus espacios quedan creados listos para configurar tarifas y asignar ocupantes.</li></ol>
+<hr>
+
+<h2>8. Publicaciones</h2>
+
+<p>Desde esta sección publicás amarras y camas disponibles en tu club para que los usuarios de la app mobile las puedan ver. Las publicaciones <strong>no están ligadas a un espacio en particular</strong>: son avisos independientes con su propia foto, descripción y precio.</p>
+
+<h3>Límite según plan<table></h3>
+
+<thead><table><tbody><tr><th>Plan</th><th>Publicaciones permitidas por mes</th></tr></tbody></table></thead><tbody><table><tbody><tr><td>--------</td><td>--------------------------------</td></tr>
+<tr><td>Esencial</td><td>0 (no disponible)</td></tr>
+<tr><td>Premium</td><td>2 por mes</td></tr>
+<tr><td>Elite</td><td>5 por mes</td></tr></tbody></table></tbody></table>
+<p>El contador en la parte superior muestra cuántas publicaciones usaste del total disponible en el mes en curso. Al inicio de cada mes el conteo se reinicia.</p>
+
+<p>Si tu plan es Esencial, verás un aviso indicando que debés actualizar a Premium para usar esta sección.</p>
+
+<h3>Crear una publicación</h3>
+
+<ol><li>Hacé clic en <strong>Nueva publicación</strong>.</li><li>Elegí el tipo: <strong>Amarra</strong> o <strong>Cama</strong>.</li><li>Subí una o más fotos del espacio.</li><li>Completá los campos:</li></ol>   - <strong>Dirección / Ubicación</strong> — dirección física o referencia del lugar (ej: "Av. del Puerto 123, Tigre").
+<p>- <strong>Dimensiones</strong> — eslora y manga. Usá el toggle <strong>m / pies</strong> para elegir la unidad (metros o pies); la unidad queda guardada junto con el número.</p>
+<p>- <strong>Precio / mes</strong> y <strong>Expensas / mes</strong> — ambos opcionales.</p>
+<ol><li>Seleccioná los servicios e instalaciones disponibles (podés elegir varios): Agua potable, Conexión 220V, Abierto 24 hs, Combustible, Seguridad 24 hs, Vestuarios, Confitería, Lavadero, Aire libre, Bajo techo, Con arco.</li><li>Elegí el estado:</li></ol>   - <strong>Guardar borrador</strong> — se guarda pero no aparece en la app mobile todavía.
+<p>- <strong>Publicar</strong> — queda visible en la app de inmediato.</p>
+
+<h3>Editar o eliminar una publicación</h3>
+
+<ol><li>Hacé clic en <strong>EDITAR</strong> en la tarjeta de la publicación.</li><li>Modificá los campos que necesitás y hacé clic en <strong>Publicar</strong> o <strong>Guardar borrador</strong>.</li><li>Para eliminarla, hacé clic en <strong>Eliminar</strong> al pie del formulario y confirmá.</li></ol>
+<blockquote>Solo podés editar una publicación dentro de las <strong>24 horas</strong> siguientes a su creación. Pasado ese tiempo el botón de edición desaparece.</blockquote>
+
+<h3>Filtros y búsqueda</h3>
+
+<p>Podés filtrar las publicaciones por tipo (Amarras / Camas), por estado (Publicadas / Borradores) y ordenarlas por fecha o precio. También podés buscar por dirección usando el campo de búsqueda.</p>
+
+<hr>
+
+<h2>9. Comunicaciones</h2>
+
+<p>Desde esta sección enviás anuncios y novedades a los socios de tu club.</p>
+
+<h3>Límite según plan</h3>
+
+<p>Las comunicaciones tienen un límite mensual según el plan y el tipo:<table></p>
+
+<thead><table><tbody><tr><th>Plan</th><th>A socios del club</th><th>Públicas (landing)</th></tr></tbody></table></thead><tbody><table><tbody><tr><td>--------</td><td>-----------------</td><td>------------------</td></tr>
+<tr><td>Esencial</td><td>2 por mes</td><td>0 (no disponible)</td></tr>
+<tr><td>Premium</td><td>2 por mes</td><td>2 por mes</td></tr>
+<tr><td>Elite</td><td>5 por mes</td><td>5 por mes</td></tr></tbody></table></tbody></table>
+<p>El contador en la parte superior de cada tipo muestra el uso del mes en curso.</p>
+
+<h3>Ver comunicaciones existentes</h3>
+
+<p>La pantalla muestra el listado de comunicaciones con título, fecha, categoría, tipo y estado (publicada o borrador).</p>
+
+<p>Podés buscar por título usando la barra de búsqueda.</p>
+
+<h3>Crear una comunicación</h3>
+
+<ol><li>Hacé clic en <strong>Nueva comunicación</strong>.</li><li>Completá el formulario:</li></ol>   - <strong>Título</strong> — asunto del anuncio.
+<p>- <strong>Contenido</strong> — texto del mensaje.</p>
+<p>- <strong>Tipo</strong>: <strong>Socios</strong> (solo los socios de tu club la ven en la app) o <strong>Pública</strong> (visible en la landing pública).</p>
+<p>- <strong>Categoría</strong>: Información / Anuncio / Evento / Mantenimiento / Alerta.</p>
+<p>- <strong>Imágenes</strong> <em>(opcional)</em> — podés adjuntar imágenes en relación 16:9.</p>
+<ol><li>Elegí una acción:</li></ol>   - <strong>Guardar borrador</strong> — queda guardada pero no se publica todavía.
+<p>- <strong>Publicar</strong> — se publica de inmediato y los socios la ven en la app.</p>
+
+<h3>Editar o despublicar</h3>
+
+<p>Hacé clic en la comunicación en la lista para abrirla y editarla. Podés volver a guardarla como borrador si necesitás pausar su visibilidad.</p>
+
+<blockquote>Solo podés editar una comunicación dentro de las <strong>24 horas</strong> siguientes a su creación. Pasado ese tiempo el botón de edición desaparece.</blockquote>
+
+<hr>
+
+<h2>10. Comprobantes</h2>
+
+<p>Desde esta sección emitís y gestionás las facturas de tu club.</p>
+
+<blockquote>Para poder emitir facturas AFIP necesitás tener configurado el <strong>Punto de Venta</strong> y haber confirmado el <strong>Certificado AFIP</strong>. Podés hacerlo desde <strong>Configuración → Datos de facturación</strong>. Si la emisión está bloqueada, el panel muestra un aviso explicando qué falta. Los <strong>recibos internos</strong> se pueden emitir aunque el certificado todavía no esté configurado.</blockquote>
+
+<h3>Resumen de facturación</h3>
+
+<p>Las tarjetas superiores muestran:</p>
+
+<ul><li><strong>Pendientes de cobro</strong> — monto total de facturas sin cobrar.</li><li><strong>Pagadas este mes</strong> — monto cobrado en el mes.</li><li><strong>Vencidas</strong> — facturas que superaron su fecha de vencimiento sin cobro.</li><li><strong>Total facturado</strong> — acumulado histórico.</li></ul>
+<h3>Emitir una factura individual</h3>
+
+<ol><li>Hacé clic en <strong>Nueva factura</strong>.</li><li>Seleccioná el <strong>socio</strong> en el campo Cliente.</li><li>El sistema muestra automáticamente los <strong>conceptos pendientes</strong> del socio (movimientos mensuales sin facturar). Marcá los que querés incluir. Podés usar <strong>Todos</strong> o <strong>Ninguno</strong> para seleccionar rápido.</li><li>Completá los campos:</li></ol>   - <strong>Tipo de comprobante</strong> — se determina automáticamente según la condición IVA del club y del socio (campo de solo lectura):
+<p>- Club Monotributo → siempre <strong>Factura C</strong>.</p>
+<p>- Club Responsable Inscripto + Socio Responsable Inscripto → <strong>Factura A</strong>.</p>
+<p>- Club Responsable Inscripto + cualquier otra condición → <strong>Factura B</strong>.</p>
+<p>- <strong>Condición de venta</strong>: Contado, Transferencia bancaria, Tarjeta de crédito, Mercado Pago, etc.</p>
+<p>- <strong>Fecha</strong> y <strong>Vencimiento</strong>.</p>
+<p>- <strong>Período desde / hasta</strong>.</p>
+<ol><li>Hacé clic en <strong>Emitir factura</strong>. La factura se envía a AFIP y queda registrada.</li></ol>
+<blockquote>Solo aparecen en el selector los socios con <strong>Emite comprobante fiscal</strong> activado. Los socios sin ese flag no se muestran en este formulario.</blockquote>
+
+<h3>Emitir comprobante por ventanilla</h3>
+
+<p>Para facturar servicios puntuales que no están cargados como movimientos del socio:</p>
+
+<ol><li>Hacé clic en <strong>Ventanilla</strong>.</li><li>Seleccioná el socio. El <strong>tipo de comprobante</strong> se asigna automáticamente (igual que en la factura individual) y aparece como campo de solo lectura.</li><li>Agregá los ítems: descripción, cantidad y precio unitario de cada uno.</li><li>Completá condición de venta y fecha.</li><li>Hacé clic en <strong>Emitir</strong>. La factura se envía a AFIP de inmediato.</li></ol>
+<blockquote>Solo disponible si el POS y el certificado AFIP están configurados. Solo aparecen socios con <strong>Emite comprobante fiscal</strong> activado.</blockquote>
+
+<h3>Facturación en lote</h3>
+
+<p>Emití facturas para múltiples socios al mismo tiempo.</p>
+
+<ol><li>Hacé clic en <strong>Factura en lote</strong>.</li><li>El sistema lista los socios con conceptos pendientes (solo socios con <strong>Emite comprobante fiscal</strong> activado). Seleccioná los que querés facturar.</li><li>Revisá el resumen y confirmá.</li></ol>
+<p>El tipo de comprobante se determina automáticamente para cada socio según la condición IVA del club y de cada socio individualmente (igual que en la factura individual). La condición de venta es siempre <strong>Contado</strong>.</p>
+
+<blockquote>La facturación mensual automática corre el día del mes que configuraste en <strong>Configuración → Información general</strong> (campo "Día de facturación"). Solo aplica a socios que ya tuvieron al menos una factura emitida.</blockquote>
+
+<h3>Recibos internos</h3>
+
+<p>Los recibos internos son comprobantes de pago propios del club, sin intervención de AFIP. Son útiles para registrar cobros cuando todavía no tenés el certificado AFIP configurado, o para socios que no requieren factura fiscal.</p>
+
+<p>Para emitir uno:</p>
+
+<ol><li>En el perfil del socio → <strong>Cuenta Corriente</strong>, hacé clic en <strong>Informar pago</strong> y completá el formulario.</li><li>Al confirmar el pago, el sistema muestra una pantalla preguntando si querés emitir un recibo interno.</li><li>Hacé clic en <strong>Emitir recibo</strong> para generarlo. Queda disponible para imprimir o descargar.</li></ol>
+<p>Los recibos emitidos aparecen en <strong>Comprobantes → tab Recibos internos</strong>. No tienen CAE ni validez fiscal ante AFIP.</p>
+
+<h3>Emitir una nota de crédito</h3>
+
+<p>Si necesitás anular parcial o totalmente una factura ya emitida, podés emitir una nota de crédito:</p>
+
+<ol><li>Andá a <strong>Comprobantes</strong> en el menú lateral → tab <strong>Comprobantes AFIP</strong>.</li><li>Encontrá la factura original en la tabla y hacé clic en el ícono de flecha curva (↩) al final de la fila.</li><li>Seleccioná el motivo:</li></ol>   - <strong>Anulación total</strong> — anula la factura completa; el importe se toma automáticamente.
+<p>- <strong>Descuento parcial</strong> — acreditá un monto parcial; ingresás el importe manualmente.</p>
+<p>- <strong>Devolución de servicio</strong> — igual que descuento parcial, con un motivo descriptivo diferente.</p>
+<ol><li>Confirmá.</li></ol>
+<blockquote>El botón solo aparece en facturas tipo A, B o C que ya tienen <strong>CAE</strong> asignado. El CAE es el código que AFIP emite al autorizar una factura — sin él la factura no es válida fiscalmente ni puede tener nota de crédito asociada.</blockquote>
+
+<h3>Filtrar y exportar comprobantes</h3>
+
+<p>En el tab <strong>Comprobantes AFIP</strong> podés acotar la tabla con los siguientes filtros:</p>
+
+<ul><li><strong>Estado</strong>: Todos / Pendiente / Pagada / Vencida</li><li><strong>Tipo</strong>: Todos / Facturas AFIP / Notas de Crédito</li><li><strong>Período</strong>: fecha desde y fecha hasta</li></ul>
+<p>Para exportar los comprobantes actualmente visibles (respetando los filtros activos), hacé clic en <strong>Exportar</strong> — se descarga un archivo CSV.</p>
+
+<h3>Registrar un pago</h3>
+
+<p>Una vez que un socio abona, marcá la factura como pagada:</p>
+
+<ol><li>En la tabla de facturas, encontrá la factura correspondiente y hacé clic en la acción <strong>Marcar como pagada</strong> (o usá la casilla en el perfil del socio → Cuenta Corriente).</li><li>Seleccioná el <strong>medio de pago</strong>.</li><li>Confirmá.</li></ol>
+<hr>
+
+<h2>11. Tarifario</h2>
+
+<p>Desde aquí definís los precios de los servicios que ofrece tu club.</p>
+
+<h3>Ver las tarifas</h3>
+
+<p>Las tarifas están agrupadas por categoría. Podés filtrar usando los botones:</p>
+
+<ul><li><strong>Todas</strong> — muestra todo.</li><li><strong>Espacios</strong> — tarifas para amarras o camas (por metro/pie de eslora o manga).</li><li><strong>Cuota mensual</strong> — cuotas periódicas.</li><li><strong>Servicios Extra</strong> — servicios adicionales (lavado, amarre de pasada, etc.).</li></ul>
+<p>Cada tarifa muestra su concepto, período de vigencia, precio y estado. En la columna de precio se muestran dos valores:</p>
+
+<ul><li><strong>Precio c/IVA</strong> — el precio de lista (incluye IVA).</li><li><strong>Precio s/IVA</strong> — calculado automáticamente según la alícuota configurada (precio ÷ (1 + alícuota)). Si la alícuota es 0 %, aparece el texto "Sin IVA".</li></ul>
+<p>Si la fecha de vencimiento ya pasó, el estado aparece como <strong>Vencida</strong> (en ámbar) en lugar de Activa.</p>
+
+<h3>Crear una tarifa</h3>
+
+<ol><li>Hacé clic en <strong>Nueva tarifa</strong>.</li><li>Seleccioná la <strong>Categoría</strong>:</li></ol>   - <strong>Espacios</strong> — seleccioná si es para Camas o Amarra, la unidad de metraje (Metros o Pies), la eslora, la manga y opcionalmente un valor puntual.
+<p>- <strong>Cuota mensual</strong> — ingresá el concepto, la medida (rangos de eslora desde "Hasta 16" hasta "Hasta 105") y el precio.</p>
+<p>- <strong>Servicios Extra</strong> — ingresá el concepto y el precio.</p>
+<ol><li>Ingresá el <strong>Precio</strong> y la <strong>Alícuota de IVA</strong>: 0 %, 10,5 % o 21 %.</li><li>Definí la <strong>Vigencia</strong>:</li></ol>   - <strong>Vigencia desde</strong> — fecha a partir de la cual la tarifa está activa.
+<p>- <strong>Vencimiento</strong> — fecha hasta la que aplica.</p>
+<p>- No pueden existir dos tarifas del mismo concepto con fechas superpuestas.</p>
+<ol><li>Hacé clic en <strong>Guardar tarifa</strong>.</li></ol>
+<h3>Editar una tarifa</h3>
+
+<p>Hacé clic en el ícono de edición (lápiz) en la fila de la tarifa. Podés cambiar el precio, el concepto, la alícuota de IVA, las fechas de vigencia o desactivarla cambiando el <strong>Estado</strong> a "Inactivo".</p>
+
+<h3>Ajuste masivo de precios</h3>
+
+<p>Si necesitás actualizar todos los precios a la vez:</p>
+
+<ol><li>En la sección <strong>Ajuste Masivo de Tarifas</strong>, seleccioná:</li></ol>   - <strong>Tipo</strong>: Porcentaje o Monto fijo.
+<p>- <strong>Dirección</strong> (si es Porcentaje): Aumentar o Descontar.</p>
+<p>- <strong>Valor</strong> — el porcentaje o monto a aplicar.</p>
+<ol><li>Hacé clic en <strong>Aplicar a todas</strong>.</li></ol>
+<h3>Historial de cambios</h3>
+
+<p>Cada tarifa tiene un acordeón <strong>Historial de cambios</strong> donde podés ver los precios anteriores, la variación porcentual, la fecha del cambio, el origen (manual o ajuste masivo) y quién lo realizó.</p>
+
+<hr>
+
+<h2>12. Configuración</h2>
+
+<p>Desde <strong>Configuración</strong> administrás los datos de tu club y las integraciones.</p>
+
+<h3>Pestaña: Información general</h3>
+
+<p>Datos básicos del club y configuración de facturación, todo en una sola pestaña.</p>
+
+<p><strong>Datos del club:</strong></p>
+
+<ul><li><strong>Nombre del club / guardería</strong> <em>(requerido)</em></li><li><strong>CUIT</strong> <em>(requerido)</em></li><li><strong>Tipo</strong>: Club Náutico / Marina Privada / Guardería Náutica / Puerto Deportivo / Otro</li><li><strong>Dirección, Ciudad, Provincia, Código Postal</strong> <em>(requeridos)</em></li><li><strong>Teléfono operativo</strong> <em>(requerido)</em></li><li><strong>Email operativo</strong> <em>(requerido)</em></li><li><strong>Día de facturación</strong> — día del mes (1 al 28) en que corre la facturación automática mensual.</li></ul>
+<p><strong>Horarios de atención:</strong></p>
+<p>Para cada día de la semana podés configurar:</p>
+
+<ul><li>Horario de apertura y cierre.</li><li>Activar el toggle <strong>Cerrado</strong> si el club no abre ese día.</li></ul>
+<p><strong>Fotos del club:</strong></p>
+<p>Podés subir fotos que se muestran en el perfil público del club.</p>
+
+<p>Hacé clic en <strong>Guardar cambios</strong> al terminar.</p>
+
+<p><strong>Datos de facturación (AFIP):</strong></p>
+
+<p>Esta sección aparece debajo de las fotos. Configurá aquí el Punto de Venta para poder emitir facturas electrónicas.</p>
+
+<p><em>Paso 1 — Configurar el Punto de Venta:</em></p>
+
+<ol><li>Completá los datos:</li></ol>   - <strong>Número de Punto de Venta</strong> <em>(requerido)</em>
+<p>- <strong>Condición frente al IVA</strong> <em>(requerida)</em> — la de tu club.</p>
+<p>- <strong>Rubro</strong> <em>(requerido)</em></p>
+<p>- <strong>Razón social</strong> <em>(requerida)</em></p>
+<p>- <strong>Fecha de inicio de actividades</strong> <em>(requerida)</em></p>
+<ol><li>Hacé clic en <strong>Guardar</strong>.</li></ol>
+<p><em>Paso 2 — Certificado de enlace con AFIP:</em></p>
+
+<p>El certificado permite que el sistema emita facturas directamente a AFIP en nombre de tu club.</p>
+
+<ol><li>Hacé clic en <strong>Solicitar certificado AFIP</strong>. TusFacturas va a enviar las instrucciones al mail del administrador de la cuenta de TusFacturas.</li><li>Instalá el certificado en el portal de AFIP siguiendo las instrucciones recibidas.</li><li>Volvé al panel y hacé clic en <strong>Confirmar instalación</strong> para habilitar la emisión.</li></ol>
+<blockquote>Hasta que no confirmes la instalación del certificado, el botón "Nueva factura" aparece deshabilitado.</blockquote>
+
+<h3>Pestaña: Equipo</h3>
+
+<p>Gestioná el personal del club que tiene acceso al panel web o a la app mobile.</p>
+
+<p><strong>Agregar un miembro del equipo:</strong></p>
+
+<ol><li>Hacé clic en <strong>Agregar miembro</strong>.</li><li>Completá los datos:</li></ol>   - <strong>Nombre y Apellido</strong> <em>(requeridos)</em>
+<p>- <strong>Email</strong> <em>(requerido)</em> — será el usuario de acceso.</p>
+<p>- <strong>Rol</strong> <em>(requerido)</em>:</p>
+<p>- <strong>Admin</strong> — acceso total al panel web.</p>
+<p>- <strong>Administrativo</strong> — mismos permisos que Admin.</p>
+<p>- <strong>Operario</strong> — solo ve y resuelve las tareas asignadas.</p>
+<p>- <strong>Portería/Seguridad</strong> — opera exclusivamente desde la app mobile (ingreso y egreso de embarcaciones).</p>
+<p>- <strong>DNI</strong>, <strong>Teléfono</strong>, <strong>Sede</strong> <em>(opcionales)</em></p>
+<ol><li>Hacé clic en <strong>Guardar</strong>. El nuevo miembro recibe un email de invitación para activar su cuenta.</li></ol>
+<p><strong>Editar o eliminar un miembro:</strong></p>
+<p>Usá los íconos de edición y eliminación en la tarjeta del miembro.</p>
+
+<blockquote>Eliminar un miembro del equipo lo desvincula de tu club pero no borra su cuenta (puede estar en otro club). Si necesitás revocar el acceso completamente, contactá a soporte.</blockquote>
+
+<h3>Pestaña: Plan</h3>
+
+<p>Muestra tu plan actual y te permite cambiarlo.</p>
+
+<p>Los tres planes disponibles son <strong>Esencial</strong>, <strong>Premium</strong> y <strong>Élite</strong>. Cada uno incluye un conjunto diferente de funcionalidades.</p>
+
+<p><strong>Cambiar de plan:</strong></p>
+
+<ol><li>Hacé clic en <strong>Cambiar a [nombre del plan]</strong> bajo el plan deseado.</li><li>Confirmá el cambio en el modal.</li><li>El cambio es inmediato. Las funcionalidades del nuevo plan se habilitan al instante.</li></ol>
+<hr>
+
+<h2>13. Débito automático (Payway)</h2>
+
+<p>El débito automático permite cobrar la cuota mensual directamente desde la tarjeta de crédito o débito del socio, sin necesidad de que el socio realice ninguna acción. El cobro se genera automáticamente el día de facturación de tu club.</p>
+
+<h3>¿Cómo funciona?</h3>
+
+<ol><li>El admin configura las credenciales de Payway de tu club (una sola vez).</li><li>El admin registra la tarjeta de cada socio que quiera adherirse al débito automático.</li><li>Cada mes, el sistema genera la factura y cobra automáticamente desde la tarjeta.</li><li>Si un cobro falla, el admin puede reintentarlo desde el panel de comprobantes.</li></ol>
+<h3>Paso 1 — Configurar Payway en tu club</h3>
+
+<blockquote>Necesitás tener una cuenta en <strong>Payway (Decidir)</strong> y tus claves pública y privada. Si no las tenés, contactá a Payway para darlas de alta.</blockquote>
+
+<ol><li>Andá a <strong>Configuración</strong> en el menú lateral.</li><li>Hacé clic en la pestaña <strong>Payway</strong>.</li><li>Ingresá tu <strong>Clave pública</strong> y tu <strong>Clave privada</strong>.</li><li>Hacé clic en <strong>Guardar credenciales</strong>.</li></ol>
+<p>Una vez configurado, el tab muestra el estado <strong>Conectado</strong>.</p>
+
+<p>Para desconectar Payway, usá el botón <strong>Desconectar</strong> en esa misma pantalla. Esto no elimina las tarjetas de los socios, pero los cobros automáticos dejarán de procesarse.</p>
+
+<h3>Paso 2 — Registrar la tarjeta de un socio</h3>
+
+<ol><li>Andá a <strong>Usuarios</strong> y abrí el perfil del socio.</li><li>Hacé clic en la pestaña <strong>Débito automático</strong>.</li><li>Completá los datos de la tarjeta:</li></ol>   - Número de tarjeta
+<p>- Mes y año de vencimiento</p>
+<p>- Código de seguridad (CVV)</p>
+<p>- Nombre del titular (tal como figura en la tarjeta)</p>
+<ol><li>Hacé clic en <strong>Registrar tarjeta</strong>.</li></ol>
+<p>Una vez registrada, el tab muestra la tarjeta activa con los últimos 4 dígitos y la marca.</p>
+
+<p><strong>Para reemplazar una tarjeta:</strong> hacé clic en <strong>Reemplazar</strong> y completá los nuevos datos. El proceso es el mismo que el alta.</p>
+
+<p><strong>Para dar de baja el débito automático:</strong> hacé clic en <strong>Eliminar tarjeta</strong> al pie de la sección. Los cobros automáticos se detienen, pero los movimientos pendientes siguen en la cuenta del socio.</p>
+
+<h3>Paso 3 — Cobros mensuales automáticos</h3>
+
+<p>No hace falta hacer nada. El día de facturación configurado en tu club, el sistema:</p>
+
+<ol><li>Genera los movimientos mensuales de cada espacio asignado.</li><li>Emite la factura automáticamente (para socios que ya tuvieron al menos una factura).</li><li>Cobra via débito automático a todos los socios con tarjeta registrada.</li></ol>
+<p>Los movimientos cobrados quedan marcados como <strong>Pagados</strong> con forma de pago <strong>Débito automático</strong>.</p>
+
+<h3>Ver el historial de cobros</h3>
+
+<ol><li>Andá a <strong>Comprobantes</strong> en el menú lateral.</li><li>Hacé clic en la pestaña <strong>Débito automático</strong>.</li></ol>
+<p>Vas a ver:</p>
+
+<ul><li><strong>Total cobrado</strong> en el período.</li><li><strong>Cantidad de cobros aprobados y rechazados.</strong></li><li><strong>Tabla con cada cobro</strong>: socio, fecha, monto, estado y detalle del error si lo hubo.</li></ul>
+<h4>Estados posibles<table></h4>
+
+<thead><table><tbody><tr><th>Estado</th><th>Significado</th></tr></tbody></table></thead><tbody><table><tbody><tr><td>---------</td><td>----------------------------------------------------------------------------------</td></tr>
+<tr><td>Aprobado</td><td>El cobro fue procesado correctamente.</td></tr>
+<tr><td>Rechazado</td><td>Payway rechazó el cobro (fondos insuficientes, tarjeta vencida, etc.).</td></tr>
+<tr><td>Error</td><td>No se pudo conectar con Payway o hubo un error técnico.</td></tr>
+<tr><td>Pendiente</td><td>El cobro está en proceso (transitorio, no debería verse por más de unos segundos).</td></tr></tbody></table></tbody></table>
+<h3>Reintentar un cobro fallido</h3>
+
+<p>Si un cobro aparece como <strong>Rechazado</strong> o <strong>Error</strong>:</p>
+
+<ol><li>En la tabla de <strong>Débito automático</strong>, buscá el cobro fallido.</li><li>Hacé clic en <strong>Reintentar</strong>.</li><li>El sistema vuelve a intentar el cobro con la misma tarjeta registrada.</li><li>Si sale aprobado, los movimientos quedan marcados como pagados automáticamente.</li></ol>
+<blockquote>Si el cobro vuelve a fallar, probablemente la tarjeta tiene un problema. Comunicarte con el socio para actualizar los datos.</blockquote>
+
+<h3>Preguntas frecuentes sobre débito automático</h3>
+
+<p><strong>¿El socio recibe alguna notificación del cobro?</strong></p>
+<p>Payway envía la notificación directamente al banco del socio. La app no envía notificación adicional por el momento.</p>
+
+<p><strong>¿Qué pasa si el socio tiene deuda de meses anteriores?</strong></p>
+<p>El cron cobra el total de movimientos no pagados del socio en ese momento, no solo el mes corriente. Si tenía deuda acumulada, se cobra todo junto.</p>
+
+<p><strong>¿Se puede configurar un tope de monto?</strong></p>
+<p>No. Se cobra el total de los movimientos pendientes sin tope.</p>
+
+<p><strong>¿Qué pasa si el socio no tiene espacio asignado o no tiene movimientos ese mes?</strong></p>
+<p>No se genera ningún cobro. El débito automático solo se dispara si hay movimientos pendientes de pago.</p>
+
+<hr>
+
+<h2>Preguntas frecuentes</h2>
+
+<p><strong>¿Cómo agrego una embarcación a un socio que ya existe?</strong></p>
+<p>Entrá al perfil del socio → pestaña <strong>Embarcación</strong> → hacé clic en el botón de agregar embarcación.</p>
+
+<p><strong>¿Qué pasa si importo socios con emails que ya están en el sistema?</strong></p>
+<p>El sistema los detecta como "A vincular" (no los duplica). Los vincula a tu club manteniendo su cuenta existente.</p>
+
+<p><strong>¿Puedo asignar un espacio sin tarifa?</strong></p>
+<p>Sí. La tarifa es opcional al momento de asignar. Podés cargarla después; cuando lo hagas, el sistema genera el movimiento mensual correspondiente con cálculo proporcional desde la fecha de asignación.</p>
+
+<p><strong>¿La facturación automática mensual aplica a todos los socios?</strong></p>
+<p>Solo a los socios que ya tuvieron al menos una factura emitida. Los socios nuevos sin factura previa hay que facturarlos la primera vez de forma manual.</p>
+
+<p><strong>¿Cómo contacto a soporte?</strong></p>
+<p>Desde el menú lateral, hacé clic en <strong>¿Necesitás ayuda?</strong> para abrir el chat de soporte por WhatsApp.</p>
+
+</div>
+
+</body>
+</html>
