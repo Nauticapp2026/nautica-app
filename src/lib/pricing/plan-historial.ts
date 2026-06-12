@@ -1,4 +1,4 @@
-import { and, eq, gte, lt, sql } from 'drizzle-orm';
+import { and, eq, gte, isNotNull, lt, sql } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import { espacios, guarderias, guarderiaPlanHistorial, pricingPlans } from '@/lib/db/schema';
@@ -46,6 +46,43 @@ export async function recordPlanChange(input: {
   } catch (err) {
     console.error('[recordPlanChange] no se pudo grabar el historial', err);
   }
+}
+
+// Aplica los cambios de plan diferidos (plan_pendiente → plan). Se llama al
+// inicio del cron del día 1, antes del snapshot mensual, para que el snapshot
+// ya capture el plan nuevo.
+export type ApplyPendingResult = {
+  aplicados: number;
+  errores: { guarderiaId: string; mensaje: string }[];
+};
+
+export async function applyPendingPlanChanges(): Promise<ApplyPendingResult> {
+  const pendientes = await db
+    .select({ id: guarderias.id, planPendiente: guarderias.planPendiente })
+    .from(guarderias)
+    .where(isNotNull(guarderias.planPendiente));
+
+  const result: ApplyPendingResult = { aplicados: 0, errores: [] };
+
+  for (const g of pendientes) {
+    try {
+      const newPlan = g.planPendiente as PlanSlug;
+      await db
+        .update(guarderias)
+        .set({ plan: newPlan, planPendiente: null, updatedAt: new Date() })
+        .where(eq(guarderias.id, g.id));
+
+      await recordPlanChange({ guarderiaId: g.id, planSlug: newPlan });
+      result.aplicados++;
+    } catch (err) {
+      result.errores.push({
+        guarderiaId: g.id,
+        mensaje: err instanceof Error ? err.message : 'Error desconocido',
+      });
+    }
+  }
+
+  return result;
 }
 
 // Para el cron mensual: inserta un row por cada guardería con snapshot del

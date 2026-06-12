@@ -410,16 +410,25 @@ export async function updateGuarderiaPlanAction(plan: Plan): Promise<{ error?: s
 
   const guarderiaId = ctx.activeMembership.guarderiaId;
 
+  // El cambio se difiere al 1° del mes siguiente (cron aplicará plan_pendiente → plan).
   await db
     .update(guarderias)
-    .set({ plan, updatedAt: new Date() })
+    .set({ planPendiente: plan, updatedAt: new Date() })
     .where(eq(guarderias.id, guarderiaId));
 
-  await recordPlanChange({
-    guarderiaId,
-    planSlug: plan,
-    createdBy: ctx.profile.id,
-  });
+  revalidatePath('/configuracion');
+  return {};
+}
+
+export async function cancelPendingPlanAction(): Promise<{ error?: string }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+  if (!isAdmin(ctx)) return { error: 'Solo administradores pueden cancelar el cambio de plan.' };
+
+  await db
+    .update(guarderias)
+    .set({ planPendiente: null, updatedAt: new Date() })
+    .where(eq(guarderias.id, ctx.activeMembership.guarderiaId));
 
   revalidatePath('/configuracion');
   return {};

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { runMonthlyPlanSnapshot } from '@/lib/pricing/plan-historial';
+import { applyPendingPlanChanges, runMonthlyPlanSnapshot } from '@/lib/pricing/plan-historial';
 
 // Invocado el día 1 de cada mes por Vercel Cron (ver vercel.json: 0 3 1 * *,
 // que es 00:00 ART). Inserta un row del historial por cada guardería con
@@ -20,8 +20,11 @@ export async function GET(req: Request): Promise<Response> {
   }
 
   try {
-    const result = await runMonthlyPlanSnapshot();
-    return NextResponse.json({ ok: true, ...result });
+    // Primero aplicar cambios de plan diferidos, luego generar el snapshot
+    // para que el extracto mensual ya refleje el plan nuevo.
+    const pending = await applyPendingPlanChanges();
+    const snapshot = await runMonthlyPlanSnapshot();
+    return NextResponse.json({ ok: true, pending, ...snapshot });
   } catch (err) {
     console.error('[cron/historial-plan-mensual] error', err);
     return NextResponse.json(

@@ -27,6 +27,7 @@ import {
   solicitarCertificadoAfipAction,
   updateGuarderiaFeaturesAction,
   updateGuarderiaGeneralAction,
+  cancelPendingPlanAction,
   updateGuarderiaPlanAction,
   updateMiembroEquipoAction,
   uploadGuarderiaImagenAction,
@@ -162,6 +163,7 @@ export function ConfiguracionClient({
   payway,
   planes,
   currentPlan,
+  pendingPlan,
   initialTab = 'info',
   initialAltaEquipoOpen = false,
 }: {
@@ -173,6 +175,7 @@ export function ConfiguracionClient({
   payway: PaywayData;
   planes: PlanInfo[];
   currentPlan: PlanSlug;
+  pendingPlan: PlanSlug | null;
   initialTab?: TabKey;
   initialAltaEquipoOpen?: boolean;
 }) {
@@ -232,7 +235,9 @@ export function ConfiguracionClient({
           initialModalOpen={initialAltaEquipoOpen}
         />
       )}
-      {activeTab === 'plan' && <PlanTab planes={planes} currentPlan={currentPlan} />}
+      {activeTab === 'plan' && (
+        <PlanTab planes={planes} currentPlan={currentPlan} pendingPlan={pendingPlan} />
+      )}
       {activeTab === 'payway' && <PaywayTab initial={payway} />}
     </div>
   );
@@ -1207,10 +1212,26 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: () => void 
   );
 }
 
-function PlanTab({ planes, currentPlan }: { planes: PlanInfo[]; currentPlan: PlanSlug }) {
+function PlanTab({
+  planes,
+  currentPlan,
+  pendingPlan,
+}: {
+  planes: PlanInfo[];
+  currentPlan: PlanSlug;
+  pendingPlan: PlanSlug | null;
+}) {
   const router = useRouter();
   const [confirmTarget, setConfirmTarget] = useState<PlanInfo | null>(null);
   const [pending, startTransition] = useTransition();
+
+  const lastDayOfMonth = useMemo(() => {
+    const d = new Date();
+    d.setMonth(d.getMonth() + 1, 0);
+    return d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' });
+  }, []);
+
+  const pendingPlanInfo = pendingPlan ? planes.find((p) => p.slug === pendingPlan) : null;
 
   const handleChange = (target: PlanInfo) => {
     if (target.slug === currentPlan) return;
@@ -1219,8 +1240,20 @@ function PlanTab({ planes, currentPlan }: { planes: PlanInfo[]; currentPlan: Pla
       if (res.error) {
         toast.error(res.error);
       } else {
-        toast.success(`Plan cambiado a ${target.name}.`);
+        toast.success(`Cambio a ${target.name} programado para el ${lastDayOfMonth}.`);
         setConfirmTarget(null);
+        router.refresh();
+      }
+    });
+  };
+
+  const handleCancelPending = () => {
+    startTransition(async () => {
+      const res = await cancelPendingPlanAction();
+      if (res.error) {
+        toast.error(res.error);
+      } else {
+        toast.success('Cambio de plan cancelado.');
         router.refresh();
       }
     });
@@ -1241,12 +1274,30 @@ function PlanTab({ planes, currentPlan }: { planes: PlanInfo[]; currentPlan: Pla
         </p>
       </div>
 
+      {pendingPlanInfo && (
+        <div className="mb-5 flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm">
+          <span className="text-amber-800">
+            Cambio a <span className="font-semibold">{pendingPlanInfo.name}</span> programado para
+            el <span className="font-semibold">{lastDayOfMonth}</span>.
+          </span>
+          <button
+            type="button"
+            onClick={handleCancelPending}
+            disabled={pending}
+            className="ml-4 shrink-0 text-xs font-semibold text-amber-700 underline hover:text-amber-900 disabled:opacity-60"
+          >
+            Cancelar cambio
+          </button>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         {planes.map((plan) => (
           <PlanCard
             key={plan.slug}
             plan={plan}
             isCurrent={plan.slug === currentPlan}
+            isPending={plan.slug === pendingPlan}
             onSelect={() => setConfirmTarget(plan)}
           />
         ))}
@@ -1260,10 +1311,12 @@ function PlanTab({ planes, currentPlan }: { planes: PlanInfo[]; currentPlan: Pla
                 Cambiar a plan {confirmTarget.name}
               </h3>
               <p className="mt-2 text-sm text-gray-600">
-                Vas a cambiar tu plan a <span className="font-semibold">{confirmTarget.name}</span>{' '}
-                ($
-                {confirmTarget.rate.toLocaleString('es-AR')} por lugar de guarda al mes). El cambio
-                se aplica de inmediato.
+                Tu plan cambiará a <span className="font-semibold">{confirmTarget.name}</span> ($
+                {confirmTarget.rate.toLocaleString('es-AR')} por lugar de guarda al mes) el{' '}
+                <span className="font-semibold">
+                  último día del mes en curso ({lastDayOfMonth})
+                </span>
+                .
               </p>
             </div>
             <div className="flex justify-end gap-3 border-t border-gray-200 p-6">
@@ -1281,7 +1334,7 @@ function PlanTab({ planes, currentPlan }: { planes: PlanInfo[]; currentPlan: Pla
                 disabled={pending}
                 className="rounded-[10px] bg-[#175861] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#0f4249] disabled:opacity-60"
               >
-                {pending ? 'Cambiando…' : 'Confirmar cambio'}
+                {pending ? 'Guardando…' : 'Confirmar cambio'}
               </button>
             </div>
           </div>
@@ -1294,19 +1347,26 @@ function PlanTab({ planes, currentPlan }: { planes: PlanInfo[]; currentPlan: Pla
 function PlanCard({
   plan,
   isCurrent,
+  isPending,
   onSelect,
 }: {
   plan: PlanInfo;
   isCurrent: boolean;
+  isPending: boolean;
   onSelect: () => void;
 }) {
   const accent = PLAN_ACCENT[plan.slug];
   const features = plan.features;
+  const disabled = isCurrent || isPending;
 
   return (
     <div
       className={`flex flex-col rounded-[14px] border bg-white p-5 ${
-        isCurrent ? 'border-[#175861] ring-1 ring-[#175861]' : 'border-gray-200'
+        isCurrent
+          ? 'border-[#175861] ring-1 ring-[#175861]'
+          : isPending
+            ? 'border-amber-400 ring-1 ring-amber-300'
+            : 'border-gray-200'
       }`}
     >
       <div className="flex items-center justify-between">
@@ -1316,6 +1376,11 @@ function PlanCard({
         {isCurrent && (
           <span className="rounded-full bg-[#D9EBE9] px-2 py-0.5 text-xs font-semibold text-[#175861]">
             Plan actual
+          </span>
+        )}
+        {isPending && !isCurrent && (
+          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">
+            Cambio pendiente
           </span>
         )}
       </div>
@@ -1336,14 +1401,14 @@ function PlanCard({
       <button
         type="button"
         onClick={onSelect}
-        disabled={isCurrent}
+        disabled={disabled}
         className={`mt-5 rounded-[10px] px-4 py-2.5 text-sm font-semibold transition-colors ${
-          isCurrent
+          disabled
             ? 'cursor-not-allowed bg-gray-100 text-gray-400'
             : 'bg-[#175861] text-white hover:bg-[#0f4249]'
         }`}
       >
-        {isCurrent ? 'Tu plan actual' : `Cambiar a ${plan.name}`}
+        {isCurrent ? 'Tu plan actual' : isPending ? 'Cambio pendiente' : `Cambiar a ${plan.name}`}
       </button>
     </div>
   );

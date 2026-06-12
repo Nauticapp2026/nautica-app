@@ -69,6 +69,7 @@ export default async function ConfiguracionPage({ searchParams }: Props) {
       diaFacturacion: guarderias.diaFacturacion,
       certificadoAfipOk: guarderias.certificadoAfipOk,
       plan: guarderias.plan,
+      planPendiente: guarderias.planPendiente,
       paywayPublicKey: guarderias.paywayPublicKey,
       paywayPrivateKey: guarderias.paywayPrivateKey,
     })
@@ -202,6 +203,7 @@ export default async function ConfiguracionPage({ searchParams }: Props) {
       payway={payway}
       planes={planes}
       currentPlan={(guarderia?.plan ?? 'esencial') as PlanInfo['slug']}
+      pendingPlan={(guarderia?.planPendiente ?? null) as PlanInfo['slug'] | null}
       initialTab={initialTab}
       initialAltaEquipoOpen={initialAltaEquipoOpen}
     />
