@@ -304,8 +304,19 @@ function TablaTarifas({
                   {formatDate(t.vigenciaDesde)} – {formatDate(t.vigenciaHasta)}
                 </td>
                 <td className="px-5 py-3" style={{ color: '#101828' }}>
-                  {formatARS(t.precio)}
-                  <span className="block text-xs text-gray-400">IVA {t.alicuotaIva}%</span>
+                  <span className="block text-sm font-medium">
+                    {formatARS(t.precio)}
+                    <span className="ml-1.5 text-xs font-normal text-gray-400">c/IVA</span>
+                  </span>
+                  {t.alicuotaIva > 0 && (
+                    <span className="block text-xs text-gray-500">
+                      {formatARS(+(t.precio / (1 + t.alicuotaIva / 100)).toFixed(2))}
+                      <span className="ml-1 text-gray-400">s/IVA · {t.alicuotaIva}%</span>
+                    </span>
+                  )}
+                  {t.alicuotaIva === 0 && (
+                    <span className="block text-xs text-gray-400">Sin IVA</span>
+                  )}
                 </td>
                 <td className="px-5 py-3">
                   <EstadoBadge estado={t.estado} vigenciaHasta={t.vigenciaHasta} />

@@ -42,6 +42,8 @@ export default async function UsuariosPage({
       tipoDocumento: profiles.tipoDocumento,
       numeroDocumento: profiles.numeroDocumento,
       condicionIva: profiles.condicionIva,
+      membershipStatus: memberships.status,
+      numeroSocio: memberships.numeroSocio,
     })
     .from(memberships)
     .innerJoin(profiles, eq(profiles.id, memberships.userId))
@@ -49,7 +51,7 @@ export default async function UsuariosPage({
       and(
         eq(memberships.guarderiaId, gId),
         eq(memberships.rol, 'socio'),
-        eq(memberships.status, 'active'),
+        inArray(memberships.status, ['active', 'suspended', 'inactivo']),
       ),
     )
     .orderBy(desc(memberships.createdAt));
@@ -282,6 +284,8 @@ export default async function UsuariosPage({
       ...s,
       deuda: deuda.toFixed(2),
       estadoSocio: (morososSet.has(s.profileId) ? 'moroso' : 'activo') as 'moroso' | 'activo',
+      membershipStatus: s.membershipStatus as 'active' | 'suspended' | 'inactivo',
+      numeroSocio: s.numeroSocio,
       embarcacion: s.profileId ? (embByProfile[s.profileId] ?? null) : null,
       ubicacion: s.profileId ? (ubicacionByProfile[s.profileId] ?? null) : null,
       docsCompletos,

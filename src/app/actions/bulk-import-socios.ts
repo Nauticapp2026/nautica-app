@@ -2,7 +2,7 @@
 
 import ExcelJS from 'exceljs';
 import { revalidatePath } from 'next/cache';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, max } from 'drizzle-orm';
 import { z } from 'zod';
 
 import { db } from '@/lib/db';
@@ -166,6 +166,7 @@ export async function previewImportSociosAction(
       numeroDocumento: readCell(row, 'numero_documento'),
       razonSocial: readCell(row, 'razon_social'),
       condicionIva: readCell(row, 'condicion_iva'),
+      numeroSocio: readCell(row, 'numero_socio'),
     };
     if (rowIsEmpty(raw)) continue; // saltar filas vacías
     rawRows.push({ rowIndex: r, raw });
@@ -329,6 +330,14 @@ export async function confirmImportSociosAction(input: ConfirmInput): Promise<Co
   let saltados = 0;
   const falladas: { fila: number; email: string; mensaje: string }[] = [];
 
+  // Número de socio: leer el máximo actual para auto-incrementar los que no traigan número.
+  const [maxRow] = await db
+    .select({ max: max(memberships.numeroSocio) })
+    .from(memberships)
+    .where(and(eq(memberships.guarderiaId, gId), eq(memberships.rol, 'socio')));
+  let nextAutoNum = (Number(maxRow?.max) || 0) + 1;
+  const usedNums = new Set<number>();
+
   for (const row of input.rows) {
     // Las filas con error / bloqueadas / duplicadas / ya socio no se procesan
     if (
@@ -344,6 +353,20 @@ export async function confirmImportSociosAction(input: ConfirmInput): Promise<Co
     const email = row.raw.email.trim().toLowerCase();
     const tipoDoc = TIPO_DOCUMENTO_MAP[row.raw.tipoDocumento] ?? null;
     const condIva = CONDICION_IVA_MAP[row.raw.condicionIva] ?? null;
+
+    // Determinar número de socio: usar el del Excel si es un entero positivo único;
+    // si no, auto-asignar el siguiente correlativo.
+    let numeroSocio: number;
+    const nStr = row.raw.numeroSocio?.trim();
+    const nParsed = nStr ? parseInt(nStr, 10) : NaN;
+    if (!isNaN(nParsed) && nParsed > 0 && !usedNums.has(nParsed)) {
+      numeroSocio = nParsed;
+    } else {
+      while (usedNums.has(nextAutoNum)) nextAutoNum++;
+      numeroSocio = nextAutoNum;
+      nextAutoNum++;
+    }
+    usedNums.add(numeroSocio);
 
     try {
       if (row.status === 'nuevo') {
@@ -399,6 +422,7 @@ export async function confirmImportSociosAction(input: ConfirmInput): Promise<Co
           guarderiaId: gId,
           rol: 'socio',
           status: 'active',
+          numeroSocio,
         });
 
         creados++;
@@ -422,6 +446,7 @@ export async function confirmImportSociosAction(input: ConfirmInput): Promise<Co
           guarderiaId: gId,
           rol: 'socio',
           status: 'active',
+          numeroSocio,
         });
         vinculados++;
       }

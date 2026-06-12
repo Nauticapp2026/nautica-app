@@ -37,7 +37,12 @@ export const rolEnum = pgEnum('rol', [
 
 export const planEnum = pgEnum('plan', ['esencial', 'premium', 'elite']);
 
-export const membershipStatusEnum = pgEnum('membership_status', ['active', 'suspended', 'removed']);
+export const membershipStatusEnum = pgEnum('membership_status', [
+  'active',
+  'suspended',
+  'removed',
+  'inactivo',
+]);
 
 export const estadoSolicitudMembershipEnum = pgEnum('estado_solicitud_membership', [
   'pendiente',
@@ -394,6 +399,8 @@ export const memberships = pgTable(
       .references(() => guarderias.id, { onDelete: 'cascade' }),
     rol: rolEnum('rol').notNull().default('socio'),
     status: membershipStatusEnum('status').default('active').notNull(),
+    numeroSocio: integer('numero_socio'),
+    facturaFiscal: boolean('factura_fiscal').notNull().default(true),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },

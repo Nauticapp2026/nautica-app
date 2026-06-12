@@ -53,6 +53,8 @@ type Socio = {
   direccion: string | null;
   deuda: string | null;
   estadoSocio: 'activo' | 'moroso' | null;
+  membershipStatus: 'active' | 'suspended' | 'inactivo';
+  numeroSocio: number | null;
   embarcacion: string | null;
   ubicacion: string | null;
   docsCompletos: boolean;
@@ -115,7 +117,7 @@ const EMPTY_FORM = {
   embarcacionNombre: '',
   matricula: '',
   modelo: '',
-  seguro: '',
+  esloraM: '',
 };
 
 // ─── Field helper ────────────────────────────────────────────────────────────
@@ -140,12 +142,13 @@ function Field({
   );
 }
 
-function SectionHeader({ title }: { title: string }) {
+function SectionHeader({ title, action }: { title: string; action?: React.ReactNode }) {
   return (
-    <div className="border-b border-gray-100 pb-2">
+    <div className="flex items-center justify-between border-b border-gray-100 pb-2">
       <p className="text-sm font-bold" style={{ color: '#101828' }}>
         {title}
       </p>
+      {action}
     </div>
   );
 }
@@ -165,6 +168,8 @@ type AdjuntoInput = { file: File; tipo: TipoDocAdjunto };
 function CrearSocioModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const router = useRouter();
   const [form, setForm] = useState(EMPTY_FORM);
+  const [facturaFiscal, setFacturaFiscal] = useState(true);
+  const [esloraUnidad, setEsloraUnidad] = useState<'m' | 'ft'>('m');
   const [adjuntos, setAdjuntos] = useState<AdjuntoInput[]>([]);
   const [uploadProgress, setUploadProgress] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -184,10 +189,23 @@ function CrearSocioModal({ open, onClose }: { open: boolean; onClose: () => void
 
   function handleClose() {
     setForm(EMPTY_FORM);
+    setFacturaFiscal(true);
+    setEsloraUnidad('m');
     setAdjuntos([]);
     setUploadProgress(null);
     setError(null);
     onClose();
+  }
+
+  function switchEsloraUnidad(nueva: 'm' | 'ft') {
+    if (nueva === esloraUnidad) return;
+    setForm((f) => {
+      const n = parseFloat(f.esloraM);
+      if (!f.esloraM || isNaN(n)) return f;
+      const converted = nueva === 'ft' ? n * 3.28084 : n * 0.3048;
+      return { ...f, esloraM: converted.toFixed(2) };
+    });
+    setEsloraUnidad(nueva);
   }
 
   function addFiles(files: FileList | null) {
@@ -214,7 +232,15 @@ function CrearSocioModal({ open, onClose }: { open: boolean; onClose: () => void
     }
     setError(null);
     startTransition(async () => {
-      const res = await createSocioAction(form);
+      const esloraFinal =
+        esloraUnidad === 'ft' && form.esloraM
+          ? (parseFloat(form.esloraM) * 0.3048).toFixed(2)
+          : form.esloraM;
+      const res = await createSocioAction({
+        ...form,
+        esloraM: esloraFinal,
+        facturaFiscal,
+      });
       if (res.error) {
         setError(res.error);
         return;
@@ -328,11 +354,6 @@ function CrearSocioModal({ open, onClose }: { open: boolean; onClose: () => void
                   onChange={set('direccion')}
                 />
               </Field>
-            </div>
-
-            {/* Datos Impositivos */}
-            <div className="space-y-4">
-              <SectionHeader title="Datos Impositivos" />
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Field label="Tipo Documento">
                   <select
@@ -340,7 +361,7 @@ function CrearSocioModal({ open, onClose }: { open: boolean; onClose: () => void
                     value={form.tipoDocumento}
                     onChange={set('tipoDocumento')}
                   >
-                    <option value="">Seleccione una opción</option>
+                    <option value="">Seleccione...</option>
                     {TIPO_DOC_OPTS.map((o) => (
                       <option key={o.value} value={o.value}>
                         {o.label}
@@ -348,7 +369,7 @@ function CrearSocioModal({ open, onClose }: { open: boolean; onClose: () => void
                     ))}
                   </select>
                 </Field>
-                <Field label="Número">
+                <Field label="Número Documento">
                   <input
                     className={inputCls}
                     placeholder="32434..."
@@ -357,6 +378,24 @@ function CrearSocioModal({ open, onClose }: { open: boolean; onClose: () => void
                   />
                 </Field>
               </div>
+            </div>
+
+            {/* Datos Impositivos */}
+            <div className="space-y-4">
+              <SectionHeader
+                title="Datos Impositivos"
+                action={
+                  <label className="flex cursor-pointer items-center gap-1.5">
+                    <input
+                      type="checkbox"
+                      checked={facturaFiscal}
+                      onChange={(e) => setFacturaFiscal(e.target.checked)}
+                      className="h-3.5 w-3.5 cursor-pointer accent-[#175861]"
+                    />
+                    <span className="text-xs text-gray-500">Emite comprobante fiscal</span>
+                  </label>
+                }
+              />
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Field label="Razón social">
                   <input
@@ -415,13 +454,42 @@ function CrearSocioModal({ open, onClose }: { open: boolean; onClose: () => void
                     onChange={set('modelo')}
                   />
                 </Field>
-                <Field label="Seguro">
-                  <input
-                    className={inputCls}
-                    placeholder="Seguro"
-                    value={form.seguro}
-                    onChange={set('seguro')}
-                  />
+                <Field label="Eslora">
+                  <div className="flex gap-2">
+                    <input
+                      className={inputCls}
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder={esloraUnidad === 'm' ? 'ej: 9.50' : 'ej: 31.2'}
+                      value={form.esloraM}
+                      onChange={set('esloraM')}
+                    />
+                    <div className="flex shrink-0 overflow-hidden rounded-[10px] border border-gray-200">
+                      <button
+                        type="button"
+                        onClick={() => switchEsloraUnidad('m')}
+                        className={`px-3 text-xs font-semibold transition ${
+                          esloraUnidad === 'm'
+                            ? 'bg-[#175861] text-white'
+                            : 'bg-white text-gray-500 hover:bg-gray-50'
+                        }`}
+                      >
+                        m
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => switchEsloraUnidad('ft')}
+                        className={`px-3 text-xs font-semibold transition ${
+                          esloraUnidad === 'ft'
+                            ? 'bg-[#175861] text-white'
+                            : 'bg-white text-gray-500 hover:bg-gray-50'
+                        }`}
+                      >
+                        ft
+                      </button>
+                    </div>
+                  </div>
                 </Field>
               </div>
             </div>
@@ -739,6 +807,7 @@ export function UsuariosClient({
                 <thead>
                   <tr className="bg-gray-50 text-left text-xs font-semibold text-gray-500">
                     <th className="w-10 px-4 py-3" />
+                    <th className="w-14 px-4 py-3 text-center">#</th>
                     <SortableTh
                       label="Nombre"
                       sortKey="socio"
@@ -798,6 +867,9 @@ export function UsuariosClient({
                               )}
                             </button>
                           </td>
+                          <td className="w-14 px-4 py-3 text-center text-xs font-medium text-gray-400">
+                            {s.numeroSocio != null ? `#${s.numeroSocio}` : '—'}
+                          </td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-1.5">
                               <p className="font-medium" style={{ color: '#175861' }}>
@@ -816,15 +888,23 @@ export function UsuariosClient({
                           <td className="px-4 py-3 text-gray-500">{s.embarcacion ?? '—'}</td>
                           <td className="px-4 py-3 text-gray-500">{s.ubicacion ?? '—'}</td>
                           <td className="px-4 py-3 text-center">
-                            <span
-                              className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${
-                                s.estadoSocio === 'moroso'
-                                  ? 'bg-red-100 text-red-700'
-                                  : 'bg-green-100 text-green-700'
-                              }`}
-                            >
-                              {s.estadoSocio === 'moroso' ? 'Moroso' : 'Activo'}
-                            </span>
+                            {s.membershipStatus === 'suspended' ? (
+                              <span className="inline-block rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-700">
+                                Pausado
+                              </span>
+                            ) : s.membershipStatus === 'inactivo' ? (
+                              <span className="inline-block rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-500">
+                                Inactivo
+                              </span>
+                            ) : s.estadoSocio === 'moroso' ? (
+                              <span className="inline-block rounded-full bg-red-100 px-3 py-1 text-xs font-medium text-red-700">
+                                Moroso
+                              </span>
+                            ) : (
+                              <span className="inline-block rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-700">
+                                Activo
+                              </span>
+                            )}
                           </td>
                           <td
                             className="px-4 py-3 text-center font-medium"
@@ -879,7 +959,7 @@ export function UsuariosClient({
 
                         {isExpanded && (
                           <tr className="border-t border-gray-100 bg-gray-50/60">
-                            <td colSpan={7} className="px-6 pt-3 pb-4">
+                            <td colSpan={8} className="px-6 pt-3 pb-4">
                               <div className="flex flex-col gap-0">
                                 {/* Invitados autorizados */}
                                 <div className="pb-4">

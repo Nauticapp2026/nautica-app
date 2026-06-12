@@ -48,6 +48,8 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
       estadoSocio: profiles.estadoSocio,
       deuda: profiles.deuda,
       memberSince: memberships.createdAt,
+      membershipStatus: memberships.status,
+      numeroSocio: memberships.numeroSocio,
     })
     .from(profiles)
     .innerJoin(

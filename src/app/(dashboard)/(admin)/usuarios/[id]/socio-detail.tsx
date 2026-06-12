@@ -43,7 +43,9 @@ import { toast } from 'sonner';
 import {
   deleteSocioAction,
   deleteSocioDocumentoAction,
+  updateNumeroSocioAction,
   updateSocioAction,
+  updateSocioStatusAction,
   uploadSocioDocumentoAction,
 } from '@/app/actions/socios';
 import {
@@ -70,6 +72,8 @@ type SocioData = {
   estadoSocio: string | null;
   deuda: string | null;
   memberSince: string;
+  membershipStatus: 'active' | 'suspended' | 'removed' | 'inactivo' | null;
+  numeroSocio: number | null;
 };
 
 type Embarcacion = {
@@ -169,6 +173,18 @@ const ESTADO_BADGE: Record<string, string> = {
   pagado: 'bg-gray-100 text-gray-600',
   facturado: 'bg-amber-100 text-amber-700',
   no_pagado: 'bg-red-100 text-red-700',
+};
+
+const MEMBERSHIP_STATUS_CLASSES: Record<'active' | 'suspended' | 'inactivo', string> = {
+  active: 'border-green-200 bg-green-50 text-green-700',
+  suspended: 'border-amber-200 bg-amber-50 text-amber-700',
+  inactivo: 'border-gray-200 bg-gray-100 text-gray-500',
+};
+
+const MEMBERSHIP_STATUS_LABEL: Record<'active' | 'suspended' | 'inactivo', string> = {
+  active: 'Activo',
+  suspended: 'Pausado',
+  inactivo: 'Inactivo',
 };
 
 const ESTADO_LABEL: Record<string, string> = {
@@ -1948,12 +1964,21 @@ export function SocioDetail({
     direccion: socio.direccion ?? '',
     razonSocial: socio.razonSocial ?? '',
     condicionIva: socio.condicionIva ?? '',
+    numeroSocio: socio.numeroSocio != null ? String(socio.numeroSocio) : '',
   });
   const [editError, setEditError] = useState<string | null>(null);
   const [isSaving, startSaving] = useTransition();
   const [confirmEliminar, setConfirmEliminar] = useState(false);
   const [eliminarError, setEliminarError] = useState<string | null>(null);
   const [isEliminando, startEliminando] = useTransition();
+  const initialStatus =
+    socio.membershipStatus === 'suspended' || socio.membershipStatus === 'inactivo'
+      ? socio.membershipStatus
+      : 'active';
+  const [currentStatus, setCurrentStatus] = useState<'active' | 'suspended' | 'inactivo'>(
+    initialStatus,
+  );
+  const [isUpdatingStatus, startUpdatingStatus] = useTransition();
   const router = useRouter();
 
   function setField(k: keyof typeof editForm) {
@@ -1972,6 +1997,7 @@ export function SocioDetail({
       direccion: socio.direccion ?? '',
       razonSocial: socio.razonSocial ?? '',
       condicionIva: socio.condicionIva ?? '',
+      numeroSocio: socio.numeroSocio != null ? String(socio.numeroSocio) : '',
     });
     setEditError(null);
     setEditando(false);
@@ -1980,9 +2006,17 @@ export function SocioDetail({
   function handleGuardar() {
     setEditError(null);
     startSaving(async () => {
-      const res = await updateSocioAction({ socioId: socio.id, ...editForm });
-      if (res.error) {
-        setEditError(res.error);
+      const { numeroSocio: numStr, ...profileFields } = editForm;
+      const nuevoNumero = numStr.trim() ? parseInt(numStr.trim(), 10) : null;
+      const [profileRes, numRes] = await Promise.all([
+        updateSocioAction({ socioId: socio.id, ...profileFields }),
+        nuevoNumero !== socio.numeroSocio
+          ? updateNumeroSocioAction(socio.id, isNaN(nuevoNumero as number) ? null : nuevoNumero)
+          : Promise.resolve<{ error?: string }>({}),
+      ]);
+      const err = profileRes.error || numRes.error;
+      if (err) {
+        setEditError(err);
       } else {
         setEditando(false);
         router.refresh();
@@ -2000,6 +2034,27 @@ export function SocioDetail({
       }
       router.push('/usuarios');
     });
+  }
+
+  function handleStatusChange(newStatus: 'active' | 'suspended' | 'inactivo') {
+    startUpdatingStatus(async () => {
+      const res = await updateSocioStatusAction(socio.id, newStatus);
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+      setCurrentStatus(newStatus);
+      toast.success('Estado actualizado.');
+    });
+  }
+
+  function handleSelectChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const val = e.target.value;
+    if (val === '_eliminar') {
+      setConfirmEliminar(true);
+      return;
+    }
+    handleStatusChange(val as 'active' | 'suspended' | 'inactivo');
   }
 
   const nombre = [socio.nombre, socio.apellido].filter(Boolean).join(' ') || socio.email;
@@ -2066,19 +2121,40 @@ export function SocioDetail({
       </Link>
 
       {/* Avatar + name */}
-      <div className="mb-6 flex items-center gap-4">
-        <div
-          className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-xl font-bold text-white"
-          style={{ background: '#E87040' }}
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <div
+            className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-xl font-bold text-white"
+            style={{ background: '#E87040' }}
+          >
+            {inicial}
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-[18px] font-bold" style={{ color: '#101828' }}>
+                {nombre}
+              </h1>
+              {socio.numeroSocio != null && (
+                <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-500">
+                  #{socio.numeroSocio}
+                </span>
+              )}
+            </div>
+            <p className="text-sm text-gray-400">Socio desde {memberDate}</p>
+          </div>
+        </div>
+        <select
+          value={currentStatus}
+          onChange={handleSelectChange}
+          disabled={isUpdatingStatus}
+          aria-label="Estado del socio"
+          className={`focus:border-ring focus:ring-ring/50 h-9 cursor-pointer rounded-full border px-3 text-xs font-semibold transition focus:ring-[3px] focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 ${MEMBERSHIP_STATUS_CLASSES[currentStatus]}`}
         >
-          {inicial}
-        </div>
-        <div>
-          <h1 className="text-[18px] font-bold" style={{ color: '#101828' }}>
-            {nombre}
-          </h1>
-          <p className="text-sm text-gray-400">Usuario desde {memberDate}</p>
-        </div>
+          <option value="active">{MEMBERSHIP_STATUS_LABEL.active}</option>
+          <option value="suspended">{MEMBERSHIP_STATUS_LABEL.suspended}</option>
+          <option value="inactivo">{MEMBERSHIP_STATUS_LABEL.inactivo}</option>
+          <option value="_eliminar">Eliminar...</option>
+        </select>
       </div>
 
       {/* Tabs */}
@@ -2137,6 +2213,22 @@ export function SocioDetail({
           </div>
 
           <div className="space-y-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold text-gray-500">
+                  N.º de socio
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  className={inputCls}
+                  value={editForm.numeroSocio}
+                  onChange={setField('numeroSocio')}
+                  readOnly={!editando}
+                  placeholder="—"
+                />
+              </div>
+            </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <label className="mb-1.5 block text-xs font-semibold text-gray-500">Nombre</label>

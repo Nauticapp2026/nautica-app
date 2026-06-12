@@ -94,6 +94,7 @@ export default async function FacturacionPage() {
         email: profiles.email,
         razonSocial: profiles.razonSocial,
         numeroDocumento: profiles.numeroDocumento,
+        condicionIva: profiles.condicionIva,
         pendientes: sql<number>`count(${movimientosCuentaCorriente.id})::int`,
         pendienteTotal: sql<string>`coalesce(sum(${movimientosCuentaCorriente.debe}), '0')::text`,
       })
@@ -111,6 +112,7 @@ export default async function FacturacionPage() {
           eq(memberships.guarderiaId, gId),
           eq(memberships.rol, 'socio'),
           eq(memberships.status, 'active'),
+          eq(memberships.facturaFiscal, true),
         ),
       )
       .groupBy(profiles.id)
@@ -120,6 +122,7 @@ export default async function FacturacionPage() {
       .select({
         puntoDeVenta: guarderias.puntoDeVenta,
         certificadoAfipOk: guarderias.certificadoAfipOk,
+        condicionIva: guarderias.condicionIva,
       })
       .from(guarderias)
       .where(eq(guarderias.id, gId))
@@ -167,12 +170,14 @@ export default async function FacturacionPage() {
     nombre: [s.nombre, s.apellido].filter(Boolean).join(' ') || s.razonSocial || s.email,
     email: s.email,
     numeroDocumento: s.numeroDocumento ?? '',
+    condicionIva: s.condicionIva ?? null,
     pendientes: s.pendientes,
     pendienteTotal: s.pendienteTotal,
   }));
 
   const posConfigurado = guarderiaInfo?.puntoDeVenta != null;
   const certificadoOk = guarderiaInfo?.certificadoAfipOk ?? false;
+  const guarderiaCondicionIva = guarderiaInfo?.condicionIva ?? null;
 
   const cobrosPayway = cobrosLista.map((c) => ({
     id: c.id,
@@ -198,6 +203,7 @@ export default async function FacturacionPage() {
       posConfigurado={posConfigurado}
       certificadoOk={certificadoOk}
       cobrosPayway={cobrosPayway}
+      guarderiaCondicionIva={guarderiaCondicionIva}
     />
   );
 }

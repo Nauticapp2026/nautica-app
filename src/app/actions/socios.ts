@@ -6,7 +6,16 @@ import { documentos, embarcaciones, memberships, profiles } from '@/lib/db/schem
 import { getActiveMarina } from '@/lib/auth/session';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { translateInviteError } from '@/lib/auth/errors';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, max } from 'drizzle-orm';
+import { z } from 'zod';
+
+async function nextNumeroSocio(guarderiaId: string): Promise<number> {
+  const [row] = await db
+    .select({ max: max(memberships.numeroSocio) })
+    .from(memberships)
+    .where(and(eq(memberships.guarderiaId, guarderiaId), eq(memberships.rol, 'socio')));
+  return (Number(row?.max) || 0) + 1;
+}
 
 export type CreateSocioData = {
   nombre: string;
@@ -21,7 +30,8 @@ export type CreateSocioData = {
   embarcacionNombre: string;
   matricula: string;
   modelo: string;
-  seguro: string;
+  esloraM: string;
+  facturaFiscal: boolean;
 };
 
 export type SocioResult = { error?: string; socioId?: string };
@@ -116,22 +126,26 @@ export async function createSocioAction(data: CreateSocioData): Promise<SocioRes
     // 4. Create membership linking socio to this guardería.
     // El pre-check de arriba garantiza que NO hay membership existente en
     // esta guardería, así que el insert debe tener éxito sí o sí.
+    const numSocio = await nextNumeroSocio(gId);
     await db.insert(memberships).values({
       userId: profileId,
       guarderiaId: gId,
       rol: 'socio',
       status: 'active',
+      numeroSocio: numSocio,
+      facturaFiscal: data.facturaFiscal,
     });
 
     // 4. Create embarcación if provided
     if (data.embarcacionNombre.trim()) {
+      const esloraNum = parseFloat(data.esloraM);
       await db.insert(embarcaciones).values({
         guarderiaId: gId,
         profileId,
         nombre: data.embarcacionNombre.trim(),
         matricula: data.matricula.trim() || null,
         modelo: data.modelo.trim() || null,
-        seguro: data.seguro.trim() || null,
+        esloraM: isNaN(esloraNum) ? null : esloraNum.toFixed(2),
       });
     }
 
@@ -385,4 +399,82 @@ export async function deleteSocioDocumentoAction(documentoId: string): Promise<{
 
   if (doc.profileId) revalidatePath(`/usuarios/${doc.profileId}`);
   return {};
+}
+
+// ─── Cambiar número de socio ─────────────────────────────────────────────────
+
+const updateNumeroSocioSchema = z.object({
+  socioId: z.string().uuid(),
+  numeroSocio: z.number().int().positive().nullable(),
+});
+
+export async function updateNumeroSocioAction(
+  socioId: string,
+  numeroSocio: number | null,
+): Promise<{ error?: string }> {
+  const parsed = updateNumeroSocioSchema.safeParse({ socioId, numeroSocio });
+  if (!parsed.success) return { error: 'Número inválido.' };
+
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'Tu sesión expiró. Recargá la página e intentá de nuevo.' };
+
+  const gId = ctx.activeMembership.guarderiaId;
+
+  try {
+    await db
+      .update(memberships)
+      .set({ numeroSocio: parsed.data.numeroSocio })
+      .where(
+        and(
+          eq(memberships.userId, parsed.data.socioId),
+          eq(memberships.guarderiaId, gId),
+          eq(memberships.rol, 'socio'),
+        ),
+      );
+
+    revalidatePath('/usuarios');
+    revalidatePath(`/usuarios/${parsed.data.socioId}`);
+    return {};
+  } catch {
+    return { error: 'Error al actualizar el número. Puede que ya esté en uso.' };
+  }
+}
+
+// ─── Cambiar estado de membresía ─────────────────────────────────────────────
+
+const updateStatusSchema = z.object({
+  socioId: z.string().uuid(),
+  status: z.enum(['active', 'suspended', 'inactivo']),
+});
+
+export async function updateSocioStatusAction(
+  socioId: string,
+  newStatus: 'active' | 'suspended' | 'inactivo',
+): Promise<{ error?: string }> {
+  const parsed = updateStatusSchema.safeParse({ socioId, status: newStatus });
+  if (!parsed.success) return { error: 'Datos inválidos.' };
+
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'Tu sesión expiró. Recargá la página e intentá de nuevo.' };
+
+  const gId = ctx.activeMembership.guarderiaId;
+
+  try {
+    await db
+      .update(memberships)
+      .set({ status: parsed.data.status })
+      .where(
+        and(
+          eq(memberships.userId, parsed.data.socioId),
+          eq(memberships.guarderiaId, gId),
+          eq(memberships.rol, 'socio'),
+        ),
+      );
+
+    revalidatePath('/usuarios');
+    revalidatePath(`/usuarios/${parsed.data.socioId}`);
+    return {};
+  } catch {
+    return { error: 'Error al actualizar el estado.' };
+  }
 }

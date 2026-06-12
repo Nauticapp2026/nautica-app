@@ -20,6 +20,7 @@ export type ImportRowRaw = {
   numeroDocumento: string;
   razonSocial: string;
   condicionIva: string;
+  numeroSocio: string;
 };
 
 export type ImportRowPreview = {

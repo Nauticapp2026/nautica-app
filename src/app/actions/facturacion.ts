@@ -85,8 +85,6 @@ export type CreateInvoiceData = {
 
 export type CreateBatchInvoiceData = {
   socioIds: string[];
-  tipoFactura: TipoFactura;
-  condicionVenta: CondicionVenta;
   medioPago: MedioPago;
   fecha: string;
   vencimiento: string;
@@ -95,6 +93,15 @@ export type CreateBatchInvoiceData = {
 };
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
+
+function derivarTipoFactura(
+  guarderiaCondicion: string | null,
+  socioCondicion: string | null,
+): TipoFactura {
+  if (guarderiaCondicion !== 'responsable_inscripto') return 'factura_c';
+  if (socioCondicion === 'responsable_inscripto') return 'factura_a';
+  return 'factura_b';
+}
 
 function alicuotaPara(tipo: TipoFactura): string {
   // Factura C (Monotributo) → sin IVA discriminado
@@ -486,10 +493,19 @@ export async function createBatchInvoicesAction(
 
   const gId = ctx.activeMembership.guarderiaId;
 
-  // Filtrar socioIds a solo los que son miembros activos de la guardería actual
+  // Traer condicionIva de la guardería (para derivar tipo de factura)
+  const [gInfo] = await db
+    .select({ condicionIva: guarderias.condicionIva })
+    .from(guarderias)
+    .where(eq(guarderias.id, gId))
+    .limit(1);
+  const guarderiaCondicion = gInfo?.condicionIva ?? null;
+
+  // Filtrar socioIds a solo los que son miembros activos + traer condicionIva
   const validos = await db
-    .select({ userId: memberships.userId })
+    .select({ userId: memberships.userId, condicionIva: profiles.condicionIva })
     .from(memberships)
+    .innerJoin(profiles, eq(profiles.id, memberships.userId))
     .where(
       and(
         inArray(memberships.userId, data.socioIds),
@@ -497,15 +513,17 @@ export async function createBatchInvoicesAction(
         eq(memberships.status, 'active'),
       ),
     );
-  const validSocioIds = new Set(validos.map((v) => v.userId));
+  const validSocioMap = new Map(validos.map((v) => [v.userId, v.condicionIva]));
 
   const result: BatchResult = { succeeded: [], skipped: [], failed: [] };
 
   for (const socioId of data.socioIds) {
-    if (!validSocioIds.has(socioId)) {
+    if (!validSocioMap.has(socioId)) {
       result.skipped.push({ socioId, reason: 'Socio fuera de la guardería activa' });
       continue;
     }
+
+    const tipoFactura = derivarTipoFactura(guarderiaCondicion, validSocioMap.get(socioId) ?? null);
 
     // Traer movimientos no pagados / no facturados del socio
     const movs = await db
@@ -525,8 +543,8 @@ export async function createBatchInvoicesAction(
 
     const res = await createInvoiceAction({
       socioId,
-      tipoFactura: data.tipoFactura,
-      condicionVenta: data.condicionVenta,
+      tipoFactura,
+      condicionVenta: 'contado',
       medioPago: data.medioPago,
       fecha: data.fecha,
       vencimiento: data.vencimiento,

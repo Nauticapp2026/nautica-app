@@ -61,6 +61,7 @@ type Socio = {
   nombre: string;
   email: string;
   numeroDocumento: string;
+  condicionIva: string | null;
   pendientes: number;
   pendienteTotal: string;
 };
@@ -106,6 +107,15 @@ const TIPO_FACTURA_OPTS = [
   { value: 'factura_b', label: 'Factura B (Consumidor Final)' },
   { value: 'factura_a', label: 'Factura A (Responsable Inscripto)' },
 ];
+
+function derivarTipoFactura(
+  guarderiaCondicion: string | null,
+  socioCondicion: string | null,
+): string {
+  if (guarderiaCondicion !== 'responsable_inscripto') return 'factura_c';
+  if (socioCondicion === 'responsable_inscripto') return 'factura_a';
+  return 'factura_b';
+}
 
 const CONDICION_VENTA_OPTS = [
   { value: 'contado', label: 'Contado' },
@@ -190,10 +200,12 @@ function NuevaFacturaModal({
   open,
   onClose,
   socios,
+  guarderiaCondicionIva,
 }: {
   open: boolean;
   onClose: () => void;
   socios: Socio[];
+  guarderiaCondicionIva: string | null;
 }) {
   const router = useRouter();
   const [form, setForm] = useState({
@@ -217,7 +229,9 @@ function NuevaFacturaModal({
 
   function handleSocioChange(e: React.ChangeEvent<HTMLSelectElement>) {
     const socioId = e.target.value;
-    setForm((f) => ({ ...f, socioId }));
+    const socio = socios.find((s) => s.id === socioId);
+    const tipoFactura = derivarTipoFactura(guarderiaCondicionIva, socio?.condicionIva ?? null);
+    setForm((f) => ({ ...f, socioId, tipoFactura }));
     setMovimientos([]);
     setSelectedMovs(new Set());
     setError(null);
@@ -436,15 +450,16 @@ function NuevaFacturaModal({
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
-                Tipo de comprobante*
+                Tipo de comprobante
               </label>
-              <select className={inputCls} value={form.tipoFactura} onChange={set('tipoFactura')}>
-                {TIPO_FACTURA_OPTS.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
+              <input
+                className={`${inputCls} cursor-not-allowed bg-gray-50 text-gray-700`}
+                value={
+                  TIPO_FACTURA_OPTS.find((o) => o.value === form.tipoFactura)?.label ??
+                  form.tipoFactura
+                }
+                readOnly
+              />
             </div>
             <div>
               <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
@@ -601,8 +616,6 @@ function LoteModal({
   const elegibles = useMemo(() => socios.filter((s) => s.pendientes > 0), [socios]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [form, setForm] = useState({
-    tipoFactura: 'factura_c',
-    condicionVenta: 'contado',
     medioPago: 'efectivo',
     fecha: todayIso(),
     vencimiento: addDays(todayIso(), 30),
@@ -656,8 +669,6 @@ function LoteModal({
     startTransition(async () => {
       const res = await createBatchInvoicesAction({
         socioIds: Array.from(selectedIds),
-        tipoFactura: form.tipoFactura as never,
-        condicionVenta: form.condicionVenta as never,
         medioPago: form.medioPago as never,
         fecha: form.fecha,
         vencimiento: form.vencimiento,
@@ -698,47 +709,6 @@ function LoteModal({
         <div className="flex-1 space-y-4 overflow-y-auto p-6">
           {!result ? (
             <>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div>
-                  <label
-                    className="mb-1.5 block text-xs font-semibold"
-                    style={{ color: '#101828' }}
-                  >
-                    Tipo de comprobante
-                  </label>
-                  <select
-                    className={inputCls}
-                    value={form.tipoFactura}
-                    onChange={set('tipoFactura')}
-                  >
-                    {TIPO_FACTURA_OPTS.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label
-                    className="mb-1.5 block text-xs font-semibold"
-                    style={{ color: '#101828' }}
-                  >
-                    Condición de venta
-                  </label>
-                  <select
-                    className={inputCls}
-                    value={form.condicionVenta}
-                    onChange={set('condicionVenta')}
-                  >
-                    {CONDICION_VENTA_OPTS.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <label
@@ -1220,14 +1190,18 @@ function VentanillaModal({
   open,
   onClose,
   socios,
+  guarderiaCondicionIva,
 }: {
   open: boolean;
   onClose: () => void;
   socios: Socio[];
+  guarderiaCondicionIva: string | null;
 }) {
   const router = useRouter();
   const [socioId, setSocioId] = useState('');
-  const [tipoFactura, setTipoFactura] = useState('factura_c');
+  const [tipoFactura, setTipoFactura] = useState(() =>
+    derivarTipoFactura(guarderiaCondicionIva, null),
+  );
   const [condicionVenta, setCondicionVenta] = useState('contado');
   const [medioPago, setMedioPago] = useState('efectivo');
   const [fecha, setFecha] = useState(todayIso);
@@ -1363,7 +1337,14 @@ function VentanillaModal({
                   <select
                     className={inputCls}
                     value={socioId}
-                    onChange={(e) => setSocioId(e.target.value)}
+                    onChange={(e) => {
+                      const id = e.target.value;
+                      setSocioId(id);
+                      const socio = socios.find((s) => s.id === id);
+                      setTipoFactura(
+                        derivarTipoFactura(guarderiaCondicionIva, socio?.condicionIva ?? null),
+                      );
+                    }}
                   >
                     <option value="">Seleccioná un socio...</option>
                     {socios.map((s) => (
@@ -1380,17 +1361,13 @@ function VentanillaModal({
                   >
                     Tipo de comprobante
                   </label>
-                  <select
-                    className={inputCls}
-                    value={tipoFactura}
-                    onChange={(e) => setTipoFactura(e.target.value)}
-                  >
-                    {TIPO_FACTURA_OPTS.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
+                  <input
+                    className={`${inputCls} cursor-not-allowed bg-gray-50 text-gray-700`}
+                    value={
+                      TIPO_FACTURA_OPTS.find((o) => o.value === tipoFactura)?.label ?? tipoFactura
+                    }
+                    readOnly
+                  />
                 </div>
                 <div>
                   <label
@@ -1562,6 +1539,7 @@ export function FacturacionClient({
   posConfigurado,
   certificadoOk,
   cobrosPayway,
+  guarderiaCondicionIva,
 }: {
   facturas: Factura[];
   socios: Socio[];
@@ -1569,6 +1547,7 @@ export function FacturacionClient({
   posConfigurado: boolean;
   certificadoOk: boolean;
   cobrosPayway: CobroPayway[];
+  guarderiaCondicionIva: string | null;
 }) {
   const [activeTab, setActiveTab] = useState<'afip' | 'recibos' | 'payway'>('afip');
   const [search, setSearch] = useState('');
@@ -1705,7 +1684,12 @@ export function FacturacionClient({
 
   return (
     <div className="space-y-6 p-4 md:p-8">
-      <NuevaFacturaModal open={nuevaOpen} onClose={() => setNuevaOpen(false)} socios={socios} />
+      <NuevaFacturaModal
+        open={nuevaOpen}
+        onClose={() => setNuevaOpen(false)}
+        socios={socios}
+        guarderiaCondicionIva={guarderiaCondicionIva}
+      />
       <LoteModal open={loteOpen} onClose={() => setLoteOpen(false)} socios={socios} />
       <MarcarPagadaModal
         open={!!pagarFactura}
@@ -1717,6 +1701,7 @@ export function FacturacionClient({
         open={ventanillaOpen}
         onClose={() => setVentanillaOpen(false)}
         socios={socios}
+        guarderiaCondicionIva={guarderiaCondicionIva}
       />
 
       {/* Header */}
