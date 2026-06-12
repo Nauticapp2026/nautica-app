@@ -97,9 +97,11 @@ Desde **Usuarios → Socios** gestionás el padrón de socios de tu club.
 
 ### Ver la lista de socios
 
-La tabla muestra: número de socio, nombre, email, embarcación asignada, ubicación, estado y deuda.
+La tabla muestra: número de socio (#), nombre, email, embarcación asignada, ubicación, fecha de ingreso, estado y deuda.
 
 - Usá la barra de búsqueda para filtrar por nombre o email.
+- Hacé clic en el encabezado **#** para ordenar la lista por número de socio (ascendente o descendente).
+- La columna **Ingreso** muestra la fecha en que se incorporó el socio al club.
 - El **número de socio** (#NNN) aparece como un chip junto al nombre. Podés editarlo en el perfil del socio → pestaña **Generales**.
 - El **estado** de la membresía se indica con un badge de color:
   - **Verde (Activo)** — socio con membresía vigente.
@@ -120,13 +122,13 @@ La tabla muestra: número de socio, nombre, email, embarcación asignada, ubicac
    - Nombre y apellido
    - Email _(requerido)_
    - Teléfono
-   - Tipo de documento: DNI / CUIT / CUIL / Pasaporte / CDI
-   - Número de documento
+   - Tipo de documento _(requerido)_: DNI / CUIT / CUIL / Pasaporte / CDI
+   - Número de documento _(requerido)_
 
    **Datos impositivos**
-   - **Emite comprobante fiscal** — si está marcado, el socio aparece en los selectores de facturación (individual, ventanilla y lote). Desmarcalo si el socio no requiere factura fiscal — no aparecerá en ningún flujo de emisión de comprobantes AFIP.
-   - Razón social (si corresponde)
-   - Condición frente al IVA: Consumidor Final / Responsable Monotributo / IVA Responsable Inscripto / IVA Sujeto Exento / Proveedor del Exterior / Cliente del Exterior / IVA No Alcanzado
+   - **Emite comprobante fiscal** — si está marcado, el socio aparece en los selectores de facturación (individual, ventanilla y lote) y se habilitan los campos de Razón social y Condición frente al IVA. Desmarcalo si el socio no requiere factura fiscal — esos campos se desactivan y el socio no aparecerá en ningún flujo de emisión de comprobantes AFIP.
+   - Razón social _(disponible solo si marcaste "Emite comprobante fiscal")_
+   - Condición frente al IVA _(disponible solo si marcaste "Emite comprobante fiscal")_: Consumidor Final / Responsable Monotributo / IVA Responsable Inscripto / IVA Sujeto Exento / Proveedor del Exterior / Cliente del Exterior / IVA No Alcanzado
    - Dirección, ciudad, código postal
 
    **Datos de embarcación** _(opcional al momento del alta)_
@@ -156,7 +158,7 @@ Mostrá y editá los datos personales: nombre, apellido, email, teléfono, docum
 
 Muestra las embarcaciones del socio. Podés editar o eliminar cada una.
 
-El card **Espacio asignado** muestra la amarra o cama actual del socio. Desde ahí también podés reasignarle un espacio diferente: seleccioná el destino en el selector y confirmá la mudanza — sin necesidad de ir a la sección Espacios.
+Cada embarcación tiene su **propio espacio asignado**. Dentro de la tarjeta de cada embarcación hay un selector de espacio que muestra la amarra o cama actual. Podés asignar o cambiar el espacio directamente desde ahí, sin necesidad de ir a la sección Espacios. Si el socio tiene varias embarcaciones, cada una puede estar en un espacio diferente.
 
 #### Pestaña Cuenta Corriente
 

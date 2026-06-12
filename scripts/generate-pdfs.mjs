@@ -167,11 +167,17 @@ function buildHtml(title, body, subtitle) {
     letter-spacing: 1px;
   }
 
+  /* Page margins — ensures consistent whitespace on all four sides across every
+     page. Without this Chrome headless applies its own defaults unevenly. */
+  @page {
+    margin: 18mm 16mm;
+  }
+
   /* Content */
   .content {
     max-width: 740px;
     margin: 0 auto;
-    padding: 60px 80px;
+    padding: 12px 40px;
   }
 
   h1 {
