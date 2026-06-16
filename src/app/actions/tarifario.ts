@@ -71,11 +71,15 @@ type UnidadMetraje = (typeof UNIDADES)[number];
 const ALICUOTAS_IVA = [0, 10.5, 21] as const;
 type AlicuotaIva = (typeof ALICUOTAS_IVA)[number];
 
+const PLAZOS_PAGO = [0, 5, 10, 15, 20, 30] as const;
+type PlazoPagoDias = (typeof PLAZOS_PAGO)[number];
+
 export type TarifaInputBase = {
   nombre: string;
   tipoCobro: TipoCobro;
   precio: number;
   alicuotaIva: AlicuotaIva;
+  plazoPagoDias: PlazoPagoDias;
   vigenciaDesde: string;
   vigenciaHasta: string;
 };
@@ -120,6 +124,9 @@ function validar(data: CreateTarifaData): string | null {
   if (!data.nombre.trim()) return 'El concepto es obligatorio.';
   if (!TIPOS.includes(data.tipo)) return 'Categoría inválida.';
   if (!TIPOS_COBRO.includes(data.tipoCobro)) return 'Tipo de cobro inválido.';
+  if (!(PLAZOS_PAGO as readonly number[]).includes(data.plazoPagoDias)) {
+    return 'Plazo de pago inválido.';
+  }
   if (!Number.isFinite(data.precio) || data.precio < 0) {
     return 'El precio debe ser un número mayor o igual a 0.';
   }
@@ -196,6 +203,7 @@ function buildValues(data: CreateTarifaData) {
     tipoCobro: data.tipoCobro,
     precio: data.precio.toFixed(2),
     alicuotaIva: data.alicuotaIva.toFixed(2),
+    plazoPagoDias: data.plazoPagoDias,
     vigenciaDesde: data.vigenciaDesde,
     vigenciaHasta: data.vigenciaHasta,
   };

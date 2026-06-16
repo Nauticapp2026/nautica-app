@@ -66,6 +66,7 @@ export type Tarifa = {
   vigenciaDesde: string;
   vigenciaHasta: string;
   alicuotaIva: number;
+  plazoPagoDias: number;
 };
 
 const MEDIDAS: MedidaTarifa[] = [
@@ -335,7 +336,7 @@ function TablaTarifas({
                     </span>
                   )}
                   {t.alicuotaIva === 0 && (
-                    <span className="block text-xs text-gray-400">Sin IVA</span>
+                    <span className="block text-xs text-gray-400">Exento / No gravado</span>
                   )}
                 </td>
                 <td className="px-5 py-3">
@@ -406,6 +407,7 @@ function TarifaModal({
   const [nombre, setNombre] = useState(initial?.nombre ?? '');
   const [precio, setPrecio] = useState<string>(initial ? String(initial.precio) : '');
   const [alicuotaIva, setAlicuotaIva] = useState<number>(initial?.alicuotaIva ?? 21);
+  const [plazoPagoDias, setPlazoPagoDias] = useState<number>(initial?.plazoPagoDias ?? 0);
   const [estado, setEstado] = useState<EstadoTarifa>(initial?.estado ?? 'activo');
   const [vigenciaDesde, setVigenciaDesde] = useState<string>(initial?.vigenciaDesde ?? '');
   const [vigenciaHasta, setVigenciaHasta] = useState<string>(initial?.vigenciaHasta ?? '');
@@ -481,6 +483,7 @@ function TarifaModal({
         nombre: nombre.trim(),
         precio: precioNum,
         alicuotaIva: alicuotaIva as 0 | 10.5 | 21,
+        plazoPagoDias: plazoPagoDias as 0 | 5 | 10 | 15 | 20 | 30,
         locacion,
         unidadMetraje,
         eslora: toNumOrNull(eslora),
@@ -501,6 +504,7 @@ function TarifaModal({
         nombre: nombre.trim(),
         precio: precioNum,
         alicuotaIva: alicuotaIva as 0 | 10.5 | 21,
+        plazoPagoDias: plazoPagoDias as 0 | 5 | 10 | 15 | 20 | 30,
         vigenciaDesde,
         vigenciaHasta,
       };
@@ -700,9 +704,26 @@ function TarifaModal({
                 value={alicuotaIva}
                 onChange={(e) => setAlicuotaIva(Number(e.target.value))}
               >
-                <option value={0}>0%</option>
+                <option value={0}>Exento / No gravado</option>
                 <option value={10.5}>10,5%</option>
                 <option value={21}>21%</option>
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-semibold text-gray-700">
+                Plazo de pago
+              </label>
+              <select
+                className={inputCls}
+                value={plazoPagoDias}
+                onChange={(e) => setPlazoPagoDias(Number(e.target.value))}
+              >
+                <option value={0}>Contado</option>
+                <option value={5}>5 días</option>
+                <option value={10}>10 días</option>
+                <option value={15}>15 días</option>
+                <option value={20}>20 días</option>
+                <option value={30}>30 días</option>
               </select>
             </div>
           </div>
@@ -721,7 +742,7 @@ function TarifaModal({
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-semibold text-gray-700">Vencimiento</label>
+              <label className="mb-1 block text-sm font-semibold text-gray-700">Hasta</label>
               <input
                 className={inputCls}
                 type="date"

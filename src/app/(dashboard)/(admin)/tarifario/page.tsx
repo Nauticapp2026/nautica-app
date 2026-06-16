@@ -36,6 +36,7 @@ export default async function TarifarioPage() {
       vigenciaDesde: servicios.vigenciaDesde,
       vigenciaHasta: servicios.vigenciaHasta,
       alicuotaIva: servicios.alicuotaIva,
+      plazoPagoDias: servicios.plazoPagoDias,
     })
     .from(servicios)
     .where(eq(servicios.guarderiaId, guarderiaId))
@@ -59,6 +60,7 @@ export default async function TarifarioPage() {
     vigenciaDesde: r.vigenciaDesde,
     vigenciaHasta: r.vigenciaHasta,
     alicuotaIva: r.alicuotaIva != null ? Number(r.alicuotaIva) : 21,
+    plazoPagoDias: r.plazoPagoDias ?? 0,
   }));
 
   return <TarifarioClient tarifas={tarifas} />;
