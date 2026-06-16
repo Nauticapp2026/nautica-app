@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Débito Automático con Payway</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 10.5pt;
+    line-height: 1.65;
+    color: #1a1a2e;
+    background: #fff;
+  }
+
+  /* Cover page */
+  .cover {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 80px;
+    background: linear-gradient(135deg, #0d3d45 0%, #175861 60%, #1e7a87 100%);
+    color: white;
+    page-break-after: always;
+  }
+  .cover-badge {
+    font-size: 9pt;
+    font-weight: 600;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.6);
+    margin-bottom: 24px;
+  }
+  .cover h1 {
+    font-size: 36pt;
+    font-weight: 700;
+    line-height: 1.2;
+    color: white;
+    border: none;
+    padding: 0;
+    margin: 0 0 16px 0;
+  }
+  .cover-subtitle {
+    font-size: 14pt;
+    color: rgba(255,255,255,0.75);
+    margin-bottom: 60px;
+    max-width: 500px;
+    line-height: 1.5;
+  }
+  .cover-divider {
+    width: 60px;
+    height: 4px;
+    background: rgba(255,255,255,0.4);
+    border-radius: 2px;
+    margin-bottom: 40px;
+  }
+  .cover-meta {
+    font-size: 9pt;
+    color: rgba(255,255,255,0.5);
+    letter-spacing: 1px;
+  }
+
+  /* Page margins — ensures consistent whitespace on all four sides across every
+     page. Without this Chrome headless applies its own defaults unevenly. */
+  @page {
+    margin: 18mm 16mm;
+  }
+
+  /* Content */
+  .content {
+    max-width: 740px;
+    margin: 0 auto;
+    padding: 12px 40px;
+  }
+
+  h1 {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 20pt;
+    font-weight: bold;
+    color: #175861;
+    margin: 48px 0 16px;
+    padding-bottom: 10px;
+    border-bottom: 2.5px solid #175861;
+    page-break-after: avoid;
+  }
+  h2 {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 14pt;
+    font-weight: bold;
+    color: #175861;
+    margin: 40px 0 12px;
+    padding-bottom: 6px;
+    border-bottom: 1.5px solid #d4eaed;
+    page-break-after: avoid;
+  }
+  h3 {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 12pt;
+    font-weight: bold;
+    color: #0d3d45;
+    margin: 28px 0 8px;
+    page-break-after: avoid;
+  }
+  h4 {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 11pt;
+    font-weight: bold;
+    color: #175861;
+    margin: 20px 0 6px;
+    page-break-after: avoid;
+  }
+  h5, h6 {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 10pt;
+    font-weight: bold;
+    color: #444;
+    margin: 16px 0 4px;
+  }
+
+  p {
+    margin: 8px 0;
+    color: #333;
+  }
+
+  strong { color: #111; }
+
+  a { color: #175861; text-decoration: underline; }
+
+  ul, ol {
+    margin: 8px 0 8px 24px;
+    color: #333;
+  }
+  ul.nested {
+    margin-left: 36px;
+    margin-top: 4px;
+  }
+  li { margin: 4px 0; }
+
+  blockquote {
+    margin: 14px 0;
+    padding: 12px 16px;
+    border-left: 4px solid #175861;
+    background: #f0f8f9;
+    border-radius: 0 6px 6px 0;
+    color: #1a4a52;
+    font-size: 10.5pt;
+  }
+
+  code {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 9.5pt;
+    background: #f4f6f8;
+    padding: 1px 5px;
+    border-radius: 3px;
+    color: #0d3d45;
+  }
+
+  pre {
+    background: #f4f6f8;
+    border: 1px solid #e0e6e8;
+    border-radius: 6px;
+    padding: 14px 16px;
+    margin: 12px 0;
+    overflow-x: auto;
+    font-family: 'Courier New', Courier, monospace;
+  }
+  pre code {
+    background: none;
+    padding: 0;
+    font-size: 9pt;
+    color: #1a1a2e;
+    font-family: 'Courier New', Courier, monospace;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 14px 0;
+    font-size: 10pt;
+    page-break-inside: avoid;
+  }
+  th {
+    background: #175861;
+    color: white;
+    padding: 8px 12px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 9.5pt;
+  }
+  td {
+    padding: 7px 12px;
+    border-bottom: 1px solid #e8eef0;
+    color: #333;
+    vertical-align: top;
+  }
+  tr:nth-child(even) td { background: #f8fbfc; }
+  tr:hover td { background: #eef5f6; }
+
+  hr {
+    border: none;
+    border-top: 1px solid #e0e8ea;
+    margin: 32px 0;
+  }
+
+  @media print {
+    body { font-size: 10.5pt; }
+    .cover { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    tr:nth-child(even) td { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    blockquote { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    h2, h3, h4 { page-break-after: avoid; }
+    table, pre, blockquote { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <div class="cover-badge">NauticApp · Documentación</div>
+  <h1>Débito Automático con Payway</h1>
+  <div class="cover-divider"></div>
+  <div class="cover-subtitle">Guía para configurar el débito automático mensual con Payway en NauticApp.</div>
+  <div class="cover-meta">Versión actualizada · Junio 2026</div>
+</div>
+
+<div class="content">
+<h1>Cómo configurar el débito automático (Payway)</h1>
+
+<hr>
+
+<h2>Antes de empezar</h2>
+
+<p>Vas a necesitar acceso a:</p>
+
+<ul><li>Tu cuenta de Payway.</li><li>El panel web de NauticApp con permisos de admin.</li></ul>
+<hr>
+
+<h2>Paso 1 — Obtener las credenciales de Payway</h2>
+
+<ol><li>Ingresá a tu cuenta en ventasonline.payway.com.ar.</li><li>Andá a <strong>Integración</strong> → <strong>Credenciales</strong>.</li><li>Vas a ver dos claves:</li></ol>   - <strong>Public Key</strong> (clave pública)
+<p>- <strong>Private Key</strong> (clave privada)</p>
+
+<blockquote>Copiá ambas claves. Las vas a usar en el siguiente paso.</blockquote>
+
+<hr>
+
+<h2>Paso 2 — Configurar Payway en NauticApp</h2>
+
+<ol><li>En el panel web, andá a <strong>Configuración</strong> (menú lateral).</li><li>Hacé clic en la pestaña <strong>Payway</strong>.</li><li>Pegá la <strong>Public Key</strong> y la <strong>Private Key</strong> en los campos correspondientes.</li><li>Hacé clic en <strong>Guardar credenciales</strong>.</li></ol>
+<p>Listo. A partir de acá ya podés registrar tarjetas de socios.</p>
+
+<hr>
+
+<h2>Paso 3 — Registrar la tarjeta de un socio</h2>
+
+<p>Esto se hace una sola vez por socio. Después, el sistema cobra solo cada mes.</p>
+
+<ol><li>Andá a <strong>Usuarios</strong> y abrí el perfil del socio.</li><li>Hacé clic en la pestaña <strong>Débito automático</strong>.</li><li>Completá los datos de la tarjeta:</li></ol>   - Número de tarjeta
+<p>- Mes y año de vencimiento</p>
+<p>- Código de seguridad (CVV)</p>
+<p>- Nombre del titular (tal como figura en la tarjeta)</p>
+<ol><li>Hacé clic en <strong>Registrar tarjeta</strong>.</li></ol>
+<p>El sistema confirma que la tarjeta quedó registrada mostrando los últimos 4 dígitos y la marca.</p>
+
+<hr>
+
+<h2>Paso 4 — Cobros mensuales automáticos</h2>
+
+<p>No hace falta hacer nada. El día de facturación configurado en tu club, el sistema:</p>
+
+<ol><li>Genera los movimientos del mes.</li><li>Emite la factura automáticamente.</li><li>Cobra desde la tarjeta de cada socio que tenga débito registrado.</li></ol>
+<p>Los movimientos cobrados quedan marcados como <strong>Pagados</strong>.</p>
+
+<blockquote><strong>Importante:</strong> el sistema cobra <strong>todos los movimientos pendientes del socio</strong>, no solo los del mes actual. Si el socio tenía deuda anterior al momento de registrar la tarjeta, ese monto se sumará al próximo cobro automático. Revisá la cuenta corriente del socio antes de registrar la tarjeta si querés evitar un cobro de golpe por deuda acumulada.</blockquote>
+
+<hr>
+
+<h2>Si un cobro falla</h2>
+
+<ol><li>Andá a <strong>Comprobantes</strong> → <strong>Débito automático</strong>.</li><li>Buscá el cobro con estado <strong>Rechazado</strong> o <strong>Error</strong>.</li><li>Hacé clic en <strong>Reintentar</strong>.</li></ol>
+<blockquote>Si el cobro vuelve a fallar, comunicate con el socio para actualizar los datos de la tarjeta o con el soporte de Payway.</blockquote>
+
+<hr>
+
+<h2>¿Por qué se cobra $1 al registrar la tarjeta?</h2>
+
+<p>Payway no tiene un modo de "guardar tarjeta sin cobrar". Para obtener el token que permite los débitos automáticos futuros, el sistema necesita procesar una transacción real. Sin esa transacción inicial, Payway no devuelve el token y los cobros mensuales nunca pueden ejecutarse.</p>
+
+<p>El $1 cumple dos funciones: confirma que la tarjeta está activa y válida, y dispara la devolución del token que queda guardado para todos los cobros posteriores. El importe es el mínimo viable. No representa una cuota ni un cargo por el servicio.</p>
+
+<p>Ese $1 aparece como "Alta débito automático - NauticApp" en el resumen de la tarjeta del socio.</p>
+
+</div>
+
+</body>
+</html>

@@ -378,4 +378,11 @@ processFile(
   'Guía completa para gestionar tu club o guardería náutica desde el panel web de NauticApp.'
 );
 
+processFile(
+  'manual-payway.md',
+  'manual-payway',
+  'Débito Automático con Payway',
+  'Guía para configurar el débito automático mensual con Payway en NauticApp.'
+);
+
 console.log('\nListo.');
