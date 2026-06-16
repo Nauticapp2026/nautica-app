@@ -909,14 +909,18 @@ export function UsuariosClient({
                     return (
                       <Fragment key={s.membresiaId}>
                         <tr
-                          className={`border-t border-gray-100 transition hover:bg-gray-50/50 ${
+                          className={`cursor-pointer border-t border-gray-100 transition hover:bg-gray-50/80 ${
                             isExpanded ? 'bg-gray-50/40' : ''
                           }`}
+                          onClick={() => router.push(`/usuarios/${s.profileId}`)}
                         >
                           <td className="w-10 px-4 py-3">
                             <button
                               type="button"
-                              onClick={() => toggleExpand(s.profileId)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleExpand(s.profileId);
+                              }}
                               title={isExpanded ? 'Ocultar detalle' : 'Ver invitados y accesos'}
                               className="text-gray-400 transition hover:text-[#175861]"
                             >
@@ -975,7 +979,7 @@ export function UsuariosClient({
                           >
                             ${deuda.toLocaleString('es-AR')}
                           </td>
-                          <td className="px-4 py-3 text-right">
+                          <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                             <div className="inline-flex items-center gap-3">
                               <a
                                 href={`mailto:${s.email}`}
@@ -1008,14 +1012,6 @@ export function UsuariosClient({
                                   </span>
                                 );
                               })()}
-                              <Link
-                                href={`/usuarios/${s.profileId}`}
-                                className="inline-flex items-center gap-1.5 text-xs font-medium transition hover:opacity-70"
-                                style={{ color: '#669E9D' }}
-                              >
-                                <Eye className="h-3.5 w-3.5" />
-                                Ver
-                              </Link>
                             </div>
                           </td>
                         </tr>
