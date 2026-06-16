@@ -727,6 +727,8 @@ El débito automático permite cobrar la cuota mensual directamente desde la tar
 
 > Necesitás tener una cuenta en **Payway (Decidir)** y tus claves pública y privada. Si no las tenés, contactá a Payway para darlas de alta.
 
+> **Requisito previo:** el débito automático requiere que Payway habilite la funcionalidad "Store Credential / MIT" en tu cuenta. Solicitalo a tu ejecutivo de cuentas o al soporte de Payway antes de empezar. Sin esta habilitación el sistema no puede generar los tokens para cobrar mensualmente.
+
 1. Andá a **Configuración** en el menú lateral.
 2. Hacé clic en la pestaña **Payway**.
 3. Ingresá tu **Clave pública** y tu **Clave privada**.
