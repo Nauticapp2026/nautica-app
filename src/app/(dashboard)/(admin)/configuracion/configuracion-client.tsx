@@ -1231,6 +1231,12 @@ function PlanTab({
     return d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' });
   }, []);
 
+  const firstDayNextMonth = useMemo(() => {
+    const d = new Date();
+    d.setMonth(d.getMonth() + 1, 1);
+    return d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' });
+  }, []);
+
   const pendingPlanInfo = pendingPlan ? planes.find((p) => p.slug === pendingPlan) : null;
 
   const handleChange = (target: PlanInfo) => {
@@ -1240,7 +1246,9 @@ function PlanTab({
       if (res.error) {
         toast.error(res.error);
       } else {
-        toast.success(`Cambio a ${target.name} programado para el ${lastDayOfMonth}.`);
+        toast.success(
+          `Cambio a ${target.name} programado. Entrará en vigencia el ${firstDayNextMonth}.`,
+        );
         setConfirmTarget(null);
         router.refresh();
       }
@@ -1277,8 +1285,8 @@ function PlanTab({
       {pendingPlanInfo && (
         <div className="mb-5 flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm">
           <span className="text-amber-800">
-            Cambio a <span className="font-semibold">{pendingPlanInfo.name}</span> programado para
-            el <span className="font-semibold">{lastDayOfMonth}</span>.
+            Cambio a <span className="font-semibold">{pendingPlanInfo.name}</span> programado.
+            Entrará en vigencia el <span className="font-semibold">{firstDayNextMonth}</span>.
           </span>
           <button
             type="button"
@@ -1312,9 +1320,10 @@ function PlanTab({
               </h3>
               <p className="mt-2 text-sm text-gray-600">
                 Tu plan cambiará a <span className="font-semibold">{confirmTarget.name}</span> ($
-                {confirmTarget.rate.toLocaleString('es-AR')} por lugar de guarda al mes) el{' '}
+                {confirmTarget.rate.toLocaleString('es-AR')} / lugar de guarda al mes) y entrará en
+                vigencia el{' '}
                 <span className="font-semibold">
-                  último día del mes en curso ({lastDayOfMonth})
+                  primer día del mes siguiente ({firstDayNextMonth})
                 </span>
                 .
               </p>
