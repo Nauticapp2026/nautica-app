@@ -145,7 +145,7 @@ export default async function EspaciosPage() {
       .where(
         and(
           eq(servicios.guarderiaId, guarderiaId),
-          eq(servicios.tipo, 'espacios'),
+          eq(servicios.tipo, 'espacio_guarda'),
           eq(servicios.estado, 'activo'),
         ),
       )

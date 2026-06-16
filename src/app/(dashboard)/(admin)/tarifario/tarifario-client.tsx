@@ -15,7 +15,13 @@ import {
 } from '@/app/actions/tarifario';
 import { EmptyState } from '@/components/shared/empty-state';
 
-export type TipoTarifa = 'cuota_mensual' | 'servicios' | 'espacios';
+export type TipoTarifa =
+  | 'espacio_guarda'
+  | 'cuota_social'
+  | 'membresia'
+  | 'expensas_ordinarias'
+  | 'expensas_extraordinarias'
+  | 'servicio_extra';
 export type EstadoTarifa = 'activo' | 'inactivo';
 
 export type MedidaTarifa =
@@ -94,18 +100,31 @@ type FiltroCategoria = 'todas' | TipoTarifa;
 
 const CATEGORIAS: { key: FiltroCategoria; label: string }[] = [
   { key: 'todas', label: 'Todas' },
-  { key: 'espacios', label: 'Espacios' },
-  { key: 'cuota_mensual', label: 'Cuota mensual' },
-  { key: 'servicios', label: 'Servicios Extra' },
+  { key: 'espacio_guarda', label: 'Espacio de guarda' },
+  { key: 'cuota_social', label: 'Cuota social' },
+  { key: 'membresia', label: 'Membresía' },
+  { key: 'expensas_ordinarias', label: 'Expensas ordinarias' },
+  { key: 'expensas_extraordinarias', label: 'Expensas extraordinarias' },
+  { key: 'servicio_extra', label: 'Servicio extra' },
 ];
 
 const TIPO_LABELS: Record<TipoTarifa, string> = {
-  cuota_mensual: 'Cuota mensual',
-  servicios: 'Servicios Extra',
-  espacios: 'Espacios',
+  espacio_guarda: 'Espacio de guarda',
+  cuota_social: 'Cuota social',
+  membresia: 'Membresía',
+  expensas_ordinarias: 'Expensas ordinarias',
+  expensas_extraordinarias: 'Expensas extraordinarias',
+  servicio_extra: 'Servicio extra',
 };
 
-const GRUPO_ORDER: TipoTarifa[] = ['espacios', 'cuota_mensual', 'servicios'];
+const GRUPO_ORDER: TipoTarifa[] = [
+  'espacio_guarda',
+  'cuota_social',
+  'membresia',
+  'expensas_ordinarias',
+  'expensas_extraordinarias',
+  'servicio_extra',
+];
 
 const inputCls =
   'h-11 w-full rounded-[10px] border border-gray-200 bg-white px-4 text-sm text-[#101828] focus:border-[#175861] focus:outline-none focus:ring-1 focus:ring-[#175861]';
@@ -455,20 +474,9 @@ function TarifaModal({
     };
 
     let payload;
-    if (tipo === 'cuota_mensual') {
+    if (tipo === 'espacio_guarda') {
       payload = {
-        tipo: 'cuota_mensual' as const,
-        tipoCobro,
-        nombre: nombre.trim(),
-        precio: precioNum,
-        alicuotaIva: alicuotaIva as 0 | 10.5 | 21,
-        medida: medida === '' ? null : medida,
-        vigenciaDesde,
-        vigenciaHasta,
-      };
-    } else if (tipo === 'espacios') {
-      payload = {
-        tipo: 'espacios' as const,
+        tipo: 'espacio_guarda' as const,
         tipoCobro,
         nombre: nombre.trim(),
         precio: precioNum,
@@ -483,7 +491,12 @@ function TarifaModal({
       };
     } else {
       payload = {
-        tipo: 'servicios' as const,
+        tipo: tipo as
+          | 'cuota_social'
+          | 'membresia'
+          | 'expensas_ordinarias'
+          | 'expensas_extraordinarias'
+          | 'servicio_extra',
         tipoCobro,
         nombre: nombre.trim(),
         precio: precioNum,
@@ -557,13 +570,16 @@ function TarifaModal({
               onChange={(e) => setTipo(e.target.value as TipoTarifa)}
             >
               <option value="">Seleccione una opción…</option>
-              <option value="espacios">Espacios</option>
-              <option value="cuota_mensual">Cuota mensual</option>
-              <option value="servicios">Servicios Extra</option>
+              <option value="espacio_guarda">Espacio de guarda</option>
+              <option value="cuota_social">Cuota social</option>
+              <option value="membresia">Membresía</option>
+              <option value="expensas_ordinarias">Expensas ordinarias</option>
+              <option value="expensas_extraordinarias">Expensas extraordinarias</option>
+              <option value="servicio_extra">Servicio extra</option>
             </select>
           </div>
 
-          {tipo === 'espacios' && (
+          {tipo === 'espacio_guarda' && (
             <>
               <div>
                 <label className="mb-1 block text-sm font-semibold text-gray-700">Locación</label>
@@ -652,47 +668,17 @@ function TarifaModal({
             </>
           )}
 
-          {tipo !== 'espacios' && (
-            <div>
-              <label className="mb-1 block text-sm font-semibold text-gray-700">Concepto</label>
-              <input
-                className={inputCls}
-                placeholder="Ej: Mantenimiento mensual"
-                value={nombre}
-                onChange={(e) => setNombre(e.target.value)}
-              />
-            </div>
-          )}
-
-          {tipo === 'espacios' && (
-            <div>
-              <label className="mb-1 block text-sm font-semibold text-gray-700">Concepto</label>
-              <input
-                className={inputCls}
-                placeholder="Ej: Amarra 10m"
-                value={nombre}
-                onChange={(e) => setNombre(e.target.value)}
-              />
-            </div>
-          )}
-
-          {tipo === 'cuota_mensual' && (
-            <div>
-              <label className="mb-1 block text-sm font-semibold text-gray-700">Medida</label>
-              <select
-                className={inputCls}
-                value={medida}
-                onChange={(e) => setMedida(e.target.value as MedidaTarifa | '')}
-              >
-                <option value="">Seleccione una opción…</option>
-                {MEDIDAS.map((m) => (
-                  <option key={m} value={m}>
-                    {medidaLabel(m)}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+          <div>
+            <label className="mb-1 block text-sm font-semibold text-gray-700">Concepto</label>
+            <input
+              className={inputCls}
+              placeholder={
+                tipo === 'espacio_guarda' ? 'Ej: Amarra 10m' : 'Ej: Mantenimiento mensual'
+              }
+              value={nombre}
+              onChange={(e) => setNombre(e.target.value)}
+            />
+          </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>

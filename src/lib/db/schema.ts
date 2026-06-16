@@ -159,7 +159,14 @@ export const tipoFacturaEnum = pgEnum('tipo_factura', [
 
 export const tipoCuentaCorrienteEnum = pgEnum('tipo_cta_cte', ['mensual', 'espacio', 'otro']);
 
-export const tipoServicioEnum = pgEnum('tipo_servicio', ['cuota_mensual', 'servicios', 'espacios']);
+export const tipoServicioEnum = pgEnum('tipo_servicio', [
+  'espacio_guarda',
+  'cuota_social',
+  'membresia',
+  'expensas_ordinarias',
+  'expensas_extraordinarias',
+  'servicio_extra',
+]);
 
 export const tipoCobroServicioEnum = pgEnum('tipo_cobro_servicio', ['fijo', 'variable']);
 

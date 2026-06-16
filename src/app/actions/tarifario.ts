@@ -21,7 +21,14 @@ async function setOrigenGUC(
   await tx.execute(sql`SELECT set_config('app.usuario_id', ${usuarioId}, true)`);
 }
 
-const TIPOS = ['cuota_mensual', 'servicios', 'espacios'] as const;
+const TIPOS = [
+  'espacio_guarda',
+  'cuota_social',
+  'membresia',
+  'expensas_ordinarias',
+  'expensas_extraordinarias',
+  'servicio_extra',
+] as const;
 type Tipo = (typeof TIPOS)[number];
 
 const TIPOS_COBRO = ['fijo', 'variable'] as const;
@@ -73,17 +80,8 @@ export type TarifaInputBase = {
   vigenciaHasta: string;
 };
 
-export type TarifaCuotaMensualInput = TarifaInputBase & {
-  tipo: 'cuota_mensual';
-  medida: Medida | null;
-};
-
-export type TarifaServiciosInput = TarifaInputBase & {
-  tipo: 'servicios';
-};
-
-export type TarifaEspaciosInput = TarifaInputBase & {
-  tipo: 'espacios';
+export type TarifaEspacioGuardaInput = TarifaInputBase & {
+  tipo: 'espacio_guarda';
   locacion: Locacion;
   unidadMetraje: UnidadMetraje;
   eslora: number | null;
@@ -91,7 +89,16 @@ export type TarifaEspaciosInput = TarifaInputBase & {
   puntual: number | null;
 };
 
-export type CreateTarifaData = TarifaCuotaMensualInput | TarifaServiciosInput | TarifaEspaciosInput;
+export type TarifaBaseInput = TarifaInputBase & {
+  tipo:
+    | 'cuota_social'
+    | 'membresia'
+    | 'expensas_ordinarias'
+    | 'expensas_extraordinarias'
+    | 'servicio_extra';
+};
+
+export type CreateTarifaData = TarifaEspacioGuardaInput | TarifaBaseInput;
 
 export type UpdateTarifaData = CreateTarifaData & { id: string; estado: Estado };
 
@@ -128,10 +135,7 @@ function validar(data: CreateTarifaData): string | null {
   if (data.vigenciaDesde > data.vigenciaHasta) {
     return 'La fecha de inicio debe ser anterior o igual al vencimiento.';
   }
-  if (data.tipo === 'cuota_mensual' && data.medida && !MEDIDAS.includes(data.medida)) {
-    return 'Medida inválida.';
-  }
-  if (data.tipo === 'espacios') {
+  if (data.tipo === 'espacio_guarda') {
     if (!LOCACIONES.includes(data.locacion)) return 'Locación inválida.';
     if (!UNIDADES.includes(data.unidadMetraje)) return 'Unidad de metraje inválida.';
     for (const [k, v] of Object.entries({
@@ -152,10 +156,7 @@ async function checkVigenciaOverlap(
   data: CreateTarifaData,
   excludeId?: string,
 ): Promise<string | null> {
-  const medidaCondition =
-    data.tipo === 'cuota_mensual' && data.medida
-      ? eq(servicios.medida, data.medida)
-      : isNull(servicios.medida);
+  const medidaCondition = isNull(servicios.medida);
 
   const conditions = and(
     eq(servicios.guarderiaId, guarderiaId),
@@ -199,10 +200,7 @@ function buildValues(data: CreateTarifaData) {
     vigenciaHasta: data.vigenciaHasta,
   };
 
-  if (data.tipo === 'cuota_mensual') {
-    return { ...base, medida: data.medida };
-  }
-  if (data.tipo === 'espacios') {
+  if (data.tipo === 'espacio_guarda') {
     return {
       ...base,
       locacion: data.locacion,
@@ -268,25 +266,18 @@ export async function updateTarifaAction(data: UpdateTarifaData): Promise<{ erro
   // Limpieza: cuando el tipo es "servicios" o cambia de tipo, reseteamos los campos
   // que no aplican a ese tipo para que no queden datos colgados.
   const base = buildValues(data);
+  // Si no es espacio_guarda, limpiar los campos espaciales.
   const extras =
-    data.tipo === 'cuota_mensual'
-      ? {
+    data.tipo === 'espacio_guarda'
+      ? { medida: null }
+      : {
+          medida: null,
           locacion: null,
           unidadMetraje: null,
           eslora: null,
           manga: null,
           puntual: null,
-        }
-      : data.tipo === 'espacios'
-        ? { medida: null }
-        : {
-            medida: null,
-            locacion: null,
-            unidadMetraje: null,
-            eslora: null,
-            manga: null,
-            puntual: null,
-          };
+        };
 
   await db.transaction(async (tx) => {
     await setOrigenGUC(tx, 'manual', ctx.profile.id);
