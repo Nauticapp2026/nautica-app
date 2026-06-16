@@ -2,12 +2,11 @@
 
 import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronDown, ChevronUp, Edit3, History, Plus, Tag, Trash2, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Edit3, History, Plus, Tag, X } from 'lucide-react';
 
 import {
   ajusteMasivoTarifasAction,
   createTarifaAction,
-  deleteTarifaAction,
   getHistorialTarifaAction,
   updateTarifaAction,
   type AjusteMasivoData,
@@ -150,9 +149,6 @@ export function TarifarioClient({ tarifas }: { tarifas: Tarifa[] }) {
   const router = useRouter();
   const [filtro, setFiltro] = useState<FiltroCategoria>('todas');
   const [modal, setModal] = useState<ModalState>(null);
-  const [confirmDelete, setConfirmDelete] = useState<Tarifa | null>(null);
-  const [deleting, startDelete] = useTransition();
-  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const grupos = useMemo(() => {
     const filtered = filtro === 'todas' ? tarifas : tarifas.filter((t) => t.tipo === filtro);
@@ -166,19 +162,6 @@ export function TarifarioClient({ tarifas }: { tarifas: Tarifa[] }) {
       tarifas: map.get(tipo)!,
     }));
   }, [tarifas, filtro]);
-
-  const handleDelete = () => {
-    if (!confirmDelete) return;
-    setDeleteError(null);
-    startDelete(async () => {
-      const res = await deleteTarifaAction(confirmDelete.id);
-      if (res.error) setDeleteError(res.error);
-      else {
-        setConfirmDelete(null);
-        router.refresh();
-      }
-    });
-  };
 
   return (
     <div className="p-4 md:p-8">
@@ -249,14 +232,7 @@ export function TarifarioClient({ tarifas }: { tarifas: Tarifa[] }) {
               <Tag className="h-4 w-4" style={{ color: '#669E9D' }} />
               {TIPO_LABELS[tipo]}
             </h3>
-            <TablaTarifas
-              items={list}
-              onEdit={(t) => setModal({ mode: 'edit', tarifa: t })}
-              onDelete={(t) => {
-                setDeleteError(null);
-                setConfirmDelete(t);
-              }}
-            />
+            <TablaTarifas items={list} onEdit={(t) => setModal({ mode: 'edit', tarifa: t })} />
           </section>
         ))
       )}
@@ -271,29 +247,11 @@ export function TarifarioClient({ tarifas }: { tarifas: Tarifa[] }) {
           }}
         />
       )}
-
-      {confirmDelete && (
-        <ConfirmDeleteModal
-          tarifa={confirmDelete}
-          pending={deleting}
-          error={deleteError}
-          onCancel={() => setConfirmDelete(null)}
-          onConfirm={handleDelete}
-        />
-      )}
     </div>
   );
 }
 
-function TablaTarifas({
-  items,
-  onEdit,
-  onDelete,
-}: {
-  items: Tarifa[];
-  onEdit: (t: Tarifa) => void;
-  onDelete: (t: Tarifa) => void;
-}) {
+function TablaTarifas({ items, onEdit }: { items: Tarifa[]; onEdit: (t: Tarifa) => void }) {
   return (
     <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
       <div className="overflow-x-auto">
@@ -351,14 +309,6 @@ function TablaTarifas({
                       className="rounded-[8px] p-1.5 text-[#669E9D] hover:bg-gray-100"
                     >
                       <Edit3 className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onDelete(t)}
-                      title="Eliminar tarifa"
-                      className="rounded-[8px] p-1.5 text-red-500 hover:bg-red-50"
-                    >
-                      <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
                 </td>
@@ -1079,54 +1029,5 @@ function AjusteMasivoSection({
         </div>
       )}
     </>
-  );
-}
-
-function ConfirmDeleteModal({
-  tarifa,
-  pending,
-  error,
-  onCancel,
-  onConfirm,
-}: {
-  tarifa: Tarifa;
-  pending: boolean;
-  error: string | null;
-  onCancel: () => void;
-  onConfirm: () => void;
-}) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="flex w-full max-w-md flex-col rounded-2xl bg-white shadow-2xl">
-        <div className="p-6">
-          <h2 className="text-lg font-bold" style={{ color: '#101828' }}>
-            Eliminar tarifa
-          </h2>
-          <p className="mt-2 text-sm text-gray-600">
-            ¿Seguro querés eliminar <strong>{tarifa.nombre}</strong>? Esta acción no se puede
-            deshacer.
-          </p>
-          {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
-        </div>
-        <div className="flex justify-end gap-3 border-t border-gray-200 p-6">
-          <button
-            type="button"
-            onClick={onCancel}
-            disabled={pending}
-            className="rounded-[10px] border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-[#101828] hover:bg-gray-50 disabled:opacity-60"
-          >
-            Cancelar
-          </button>
-          <button
-            type="button"
-            onClick={onConfirm}
-            disabled={pending}
-            className="rounded-[10px] bg-red-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
-          >
-            {pending ? 'Eliminando…' : 'Eliminar'}
-          </button>
-        </div>
-      </div>
-    </div>
   );
 }
