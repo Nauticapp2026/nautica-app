@@ -1012,6 +1012,14 @@ export function UsuariosClient({
                                   </span>
                                 );
                               })()}
+                              <Link
+                                href={`/usuarios/${s.profileId}`}
+                                className="inline-flex items-center gap-1.5 text-xs font-medium transition hover:opacity-70"
+                                style={{ color: '#669E9D' }}
+                              >
+                                <Eye className="h-3.5 w-3.5" />
+                                Ver
+                              </Link>
                             </div>
                           </td>
                         </tr>
