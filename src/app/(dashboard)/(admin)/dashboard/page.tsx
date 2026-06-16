@@ -414,14 +414,6 @@ export default async function DashboardPage() {
                 Operarios
               </h2>
             </div>
-            <Link
-              href="/configuracion?tab=equipo&nuevo=1"
-              className="flex items-center gap-1.5 rounded-[10px] px-3 py-2 text-sm font-semibold text-white transition hover:opacity-90"
-              style={{ background: '#175861' }}
-            >
-              <Plus className="h-3.5 w-3.5" />
-              Nuevo operario
-            </Link>
           </div>
           {operariosList.length === 0 ? (
             <EmptyState
