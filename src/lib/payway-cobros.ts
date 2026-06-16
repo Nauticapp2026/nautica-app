@@ -19,6 +19,7 @@ import {
   movimientosCuentaCorriente,
   paywayCobros,
   paywayTokens,
+  profiles,
 } from '@/lib/db/schema';
 import { formatPaywayError } from '@/lib/payway/format-error';
 
@@ -101,8 +102,10 @@ export async function runPaywayCharges(guarderiaIds: string[]): Promise<PaywayCh
         customerToken: paywayTokens.customerToken,
         paymentMethodId: paywayTokens.paymentMethodId,
         bin: paywayTokens.bin,
+        email: profiles.email,
       })
       .from(paywayTokens)
+      .innerJoin(profiles, eq(profiles.id, paywayTokens.socioId))
       .where(and(eq(paywayTokens.guarderiaId, g.id), eq(paywayTokens.activo, true)));
 
     if (!tokens.length) continue;
@@ -162,6 +165,7 @@ export async function runPaywayCharges(guarderiaIds: string[]): Promise<PaywayCh
           description: 'Cuota mensual — NauticaApp',
           payment_type: 'recurrente',
           sub_payments: [],
+          customer: { id: token.socioId, email: token.email },
           store_credential: true,
           fraud_detection: { send_to_cs: false },
         });

@@ -218,14 +218,16 @@ export async function reintentarCobroPaywayAction(cobroId: string): Promise<{ er
   const totalPesos = movsPendientes.reduce((acc, m) => acc + parseFloat(m.debe ?? '0'), 0);
   if (totalPesos < 0.01) return { error: 'El monto a cobrar es cero.' };
 
-  // Token del socio
+  // Token del socio + email para customer
   const [token] = await db
     .select({
       customerToken: paywayTokens.customerToken,
       paymentMethodId: paywayTokens.paymentMethodId,
       bin: paywayTokens.bin,
+      email: profiles.email,
     })
     .from(paywayTokens)
+    .innerJoin(profiles, eq(profiles.id, paywayTokens.socioId))
     .where(
       and(
         eq(paywayTokens.socioId, cobro.socioId),
@@ -278,6 +280,7 @@ export async function reintentarCobroPaywayAction(cobroId: string): Promise<{ er
       description: 'Cuota mensual (reintento) — NauticaApp',
       payment_type: 'recurrente',
       sub_payments: [],
+      customer: { id: cobro.socioId, email: token.email },
       fraud_detection: { send_to_cs: false },
       store_credential: true,
     });
