@@ -9,6 +9,7 @@ import {
   movimientosCuentaCorriente,
   paywayCobros,
   profiles,
+  servicios,
 } from '@/lib/db/schema';
 
 import { FacturacionClient } from './facturacion-client';
@@ -31,6 +32,7 @@ export default async function FacturacionPage() {
     sociosList,
     [guarderiaInfo],
     cobrosLista,
+    movsPendientesList,
   ] = await Promise.all([
     db
       .select({ pendientesCount: count() })
@@ -145,6 +147,31 @@ export default async function FacturacionPage() {
       .where(eq(paywayCobros.guarderiaId, gId))
       .orderBy(desc(paywayCobros.createdAt))
       .limit(200),
+
+    // Movimientos pendientes individuales para el lote (con tipo de servicio)
+    db
+      .select({
+        id: movimientosCuentaCorriente.id,
+        socioId: movimientosCuentaCorriente.socioId,
+        concepto: movimientosCuentaCorriente.concepto,
+        debe: movimientosCuentaCorriente.debe,
+        servicioNombre: servicios.nombre,
+        tipoServicio: servicios.tipo,
+      })
+      .from(movimientosCuentaCorriente)
+      .innerJoin(
+        memberships,
+        and(
+          eq(memberships.userId, movimientosCuentaCorriente.socioId),
+          eq(memberships.guarderiaId, gId),
+          eq(memberships.rol, 'socio'),
+          eq(memberships.status, 'active'),
+          eq(memberships.facturaFiscal, true),
+        ),
+      )
+      .leftJoin(servicios, eq(servicios.id, movimientosCuentaCorriente.servicioId))
+      .where(eq(movimientosCuentaCorriente.estado, 'no_pagado'))
+      .orderBy(movimientosCuentaCorriente.fecha),
   ]);
 
   const facturas = lista.map((f) => ({
@@ -165,6 +192,27 @@ export default async function FacturacionPage() {
     socioNombre: [f.socioNombre, f.socioApellido].filter(Boolean).join(' ') || f.socioEmail || '—',
   }));
 
+  const movsBySocio = new Map<
+    string,
+    {
+      id: string;
+      concepto: string | null;
+      debe: string | null;
+      servicioNombre: string | null;
+      tipoServicio: string | null;
+    }[]
+  >();
+  for (const m of movsPendientesList) {
+    if (!movsBySocio.has(m.socioId)) movsBySocio.set(m.socioId, []);
+    movsBySocio.get(m.socioId)!.push({
+      id: m.id,
+      concepto: m.concepto,
+      debe: m.debe,
+      servicioNombre: m.servicioNombre,
+      tipoServicio: m.tipoServicio,
+    });
+  }
+
   const socios = sociosList.map((s) => ({
     id: s.profileId,
     nombre: [s.nombre, s.apellido].filter(Boolean).join(' ') || s.razonSocial || s.email,
@@ -173,6 +221,7 @@ export default async function FacturacionPage() {
     condicionIva: s.condicionIva ?? null,
     pendientes: s.pendientes,
     pendienteTotal: s.pendienteTotal,
+    movimientos: movsBySocio.get(s.profileId) ?? [],
   }));
 
   const posConfigurado = guarderiaInfo?.puntoDeVenta != null;

@@ -84,12 +84,9 @@ export type CreateInvoiceData = {
 };
 
 export type CreateBatchInvoiceData = {
-  socioIds: string[];
+  socioMovimientos: { socioId: string; movimientoIds: string[] }[];
   medioPago: MedioPago;
   fecha: string;
-  vencimiento: string;
-  desde: string;
-  hasta: string;
 };
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -489,11 +486,26 @@ export async function createBatchInvoicesAction(
   const ctx = await getActiveMarina();
   if (!ctx) return { error: 'No autenticado' };
 
-  if (!data.socioIds.length) return { error: 'Seleccioná al menos un socio.' };
+  if (!data.socioMovimientos.length) return { error: 'Seleccioná al menos un socio.' };
+
+  // Validar que la fecha no sea más de 5 días atrás.
+  const fechaDate = new Date(data.fecha + 'T00:00:00');
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  const diff = Math.floor((hoy.getTime() - fechaDate.getTime()) / 86400000);
+  if (diff > 5) return { error: 'La fecha no puede ser más de 5 días anterior a hoy.' };
+
+  // Calcular vencimiento y período a partir de la fecha.
+  const vencimiento = data.fecha;
+  const [year, month] = data.fecha.split('-').map(Number);
+  const desde = `${year}-${String(month).padStart(2, '0')}-01`;
+  const lastDay = new Date(year, month, 0).getDate();
+  const hasta = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
 
   const gId = ctx.activeMembership.guarderiaId;
+  const socioIds = data.socioMovimientos.map((s) => s.socioId);
 
-  // Traer condicionIva de la guardería (para derivar tipo de factura)
+  // Traer condicionIva de la guardería
   const [gInfo] = await db
     .select({ condicionIva: guarderias.condicionIva })
     .from(guarderias)
@@ -501,14 +513,14 @@ export async function createBatchInvoicesAction(
     .limit(1);
   const guarderiaCondicion = gInfo?.condicionIva ?? null;
 
-  // Filtrar socioIds a solo los que son miembros activos + traer condicionIva
+  // Verificar que los socios pertenezcan a esta guardería
   const validos = await db
     .select({ userId: memberships.userId, condicionIva: profiles.condicionIva })
     .from(memberships)
     .innerJoin(profiles, eq(profiles.id, memberships.userId))
     .where(
       and(
-        inArray(memberships.userId, data.socioIds),
+        inArray(memberships.userId, socioIds),
         eq(memberships.guarderiaId, gId),
         eq(memberships.status, 'active'),
       ),
@@ -517,29 +529,17 @@ export async function createBatchInvoicesAction(
 
   const result: BatchResult = { succeeded: [], skipped: [], failed: [] };
 
-  for (const socioId of data.socioIds) {
+  for (const { socioId, movimientoIds } of data.socioMovimientos) {
     if (!validSocioMap.has(socioId)) {
       result.skipped.push({ socioId, reason: 'Socio fuera de la guardería activa' });
       continue;
     }
-
-    const tipoFactura = derivarTipoFactura(guarderiaCondicion, validSocioMap.get(socioId) ?? null);
-
-    // Traer movimientos no pagados / no facturados del socio
-    const movs = await db
-      .select({ id: movimientosCuentaCorriente.id })
-      .from(movimientosCuentaCorriente)
-      .where(
-        and(
-          eq(movimientosCuentaCorriente.socioId, socioId),
-          eq(movimientosCuentaCorriente.estado, 'no_pagado'),
-        ),
-      );
-
-    if (movs.length === 0) {
-      result.skipped.push({ socioId, reason: 'Sin movimientos pendientes' });
+    if (!movimientoIds.length) {
+      result.skipped.push({ socioId, reason: 'Sin movimientos seleccionados' });
       continue;
     }
+
+    const tipoFactura = derivarTipoFactura(guarderiaCondicion, validSocioMap.get(socioId) ?? null);
 
     const res = await createInvoiceAction({
       socioId,
@@ -547,10 +547,10 @@ export async function createBatchInvoicesAction(
       condicionVenta: 'contado',
       medioPago: data.medioPago,
       fecha: data.fecha,
-      vencimiento: data.vencimiento,
-      desde: data.desde,
-      hasta: data.hasta,
-      movimientoIds: movs.map((m) => m.id),
+      vencimiento,
+      desde,
+      hasta,
+      movimientoIds,
     });
 
     if (res.error) {

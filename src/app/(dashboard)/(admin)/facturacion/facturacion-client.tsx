@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import {
   AlertCircle,
   CheckCircle2,
+  ChevronDown,
+  ChevronRight,
   CornerDownLeft,
   CreditCard,
   Download,
@@ -56,6 +58,14 @@ type Factura = {
   facturaOriginalId: string | null;
 };
 
+type LoteMovimiento = {
+  id: string;
+  concepto: string | null;
+  debe: string | null;
+  servicioNombre: string | null;
+  tipoServicio: string | null;
+};
+
 type Socio = {
   id: string;
   nombre: string;
@@ -64,6 +74,7 @@ type Socio = {
   condicionIva: string | null;
   pendientes: number;
   pendienteTotal: string;
+  movimientos: LoteMovimiento[];
 };
 
 type CobroPayway = {
@@ -603,6 +614,15 @@ function NuevaFacturaModal({
 
 // ─── Modal: Factura en lote ─────────────────────────────────────────────────
 
+const CONCEPTO_OPTS: { value: string; label: string }[] = [
+  { value: 'espacio_guarda', label: 'Espacio de guarda' },
+  { value: 'cuota_social', label: 'Cuota social' },
+  { value: 'membresia', label: 'Membresía' },
+  { value: 'expensas_ordinarias', label: 'Expensas ordinarias' },
+  { value: 'expensas_extraordinarias', label: 'Expensas extraordinarias' },
+  { value: 'servicio_extra', label: 'Servicios extra' },
+];
+
 function LoteModal({
   open,
   onClose,
@@ -613,30 +633,61 @@ function LoteModal({
   socios: Socio[];
 }) {
   const router = useRouter();
-  const elegibles = useMemo(() => socios.filter((s) => s.pendientes > 0), [socios]);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+
   const [form, setForm] = useState({
     medioPago: 'efectivo',
     fecha: todayIso(),
-    vencimiento: addDays(todayIso(), 30),
-    desde: firstOfMonthIso(),
-    hasta: lastOfMonthIso(),
   });
+  // null = todos los conceptos; set = solo esos
+  const [filterTipos, setFilterTipos] = useState<Set<string> | null>(null);
+  // deselected: movimientos que el usuario desmarcó explícitamente (por defecto todo está seleccionado)
+  const [deselected, setDeselected] = useState<Map<string, Set<string>>>(() => new Map());
+  const [expandedSocios, setExpandedSocios] = useState<Set<string>>(() => new Set());
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<BatchResult | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const set =
-    <K extends keyof typeof form>(k: K) =>
-    (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-      setForm((f) => ({ ...f, [k]: e.target.value }));
+  const minFecha = addDays(todayIso(), -5);
 
-  const totalEstimado = elegibles
-    .filter((s) => selectedIds.has(s.id))
-    .reduce((sum, s) => sum + parseFloat(s.pendienteTotal || '0'), 0);
+  // Socios filtrados por concepto y con al menos 1 movimiento
+  const elegibles = useMemo(() => {
+    return socios
+      .map((s) => {
+        const movsFiltrados =
+          filterTipos === null
+            ? s.movimientos
+            : s.movimientos.filter((m) => m.tipoServicio && filterTipos.has(m.tipoServicio));
+        return { ...s, movsFiltrados };
+      })
+      .filter((s) => s.movsFiltrados.length > 0);
+  }, [socios, filterTipos]);
 
-  function toggle(id: string) {
-    setSelectedIds((prev) => {
+  function isMovSel(socioId: string, movId: string) {
+    return !deselected.get(socioId)?.has(movId);
+  }
+
+  function toggleConcepto(tipo: string) {
+    // Resetear deselecciones al cambiar el filtro (todo queda seleccionado)
+    setDeselected(new Map());
+    setFilterTipos((prev) => {
+      const next = new Set(prev ?? CONCEPTO_OPTS.map((o) => o.value));
+      if (next.has(tipo)) {
+        next.delete(tipo);
+        if (next.size === 0) return null;
+      } else {
+        next.add(tipo);
+        if (next.size === CONCEPTO_OPTS.length) return null;
+      }
+      return next;
+    });
+  }
+
+  function isConceptoActive(tipo: string) {
+    return filterTipos === null || filterTipos.has(tipo);
+  }
+
+  function toggleExpandSocio(id: string) {
+    setExpandedSocios((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -644,36 +695,90 @@ function LoteModal({
     });
   }
 
+  function toggleSocio(socioId: string, movsFiltrados: LoteMovimiento[]) {
+    const allSel = movsFiltrados.every((m) => isMovSel(socioId, m.id));
+    setDeselected((prev) => {
+      const next = new Map(prev);
+      if (allSel) {
+        next.set(socioId, new Set(movsFiltrados.map((m) => m.id)));
+      } else {
+        next.delete(socioId);
+      }
+      return next;
+    });
+  }
+
+  function toggleMov(socioId: string, movId: string) {
+    setDeselected((prev) => {
+      const next = new Map(prev);
+      const socioSet = new Set(next.get(socioId) ?? []);
+      if (socioSet.has(movId)) socioSet.delete(movId);
+      else socioSet.add(movId);
+      next.set(socioId, socioSet);
+      return next;
+    });
+  }
+
+  const totalSeleccionado = useMemo(() => {
+    return elegibles.reduce((sum, s) => {
+      return (
+        sum +
+        s.movsFiltrados
+          .filter((m) => isMovSel(s.id, m.id))
+          .reduce((s2, m) => s2 + parseFloat(m.debe ?? '0'), 0)
+      );
+    }, 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deselected, elegibles]);
+
+  const sociosConSel = useMemo(
+    () => elegibles.filter((s) => s.movsFiltrados.some((m) => isMovSel(s.id, m.id))).length,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [deselected, elegibles],
+  );
+
+  const allSelected = elegibles.every((s) => s.movsFiltrados.every((m) => isMovSel(s.id, m.id)));
+
   function toggleAll() {
-    if (selectedIds.size === elegibles.length) {
-      setSelectedIds(new Set());
+    if (allSelected) {
+      const next = new Map<string, Set<string>>();
+      for (const s of elegibles) {
+        next.set(s.id, new Set(s.movsFiltrados.map((m) => m.id)));
+      }
+      setDeselected(next);
     } else {
-      setSelectedIds(new Set(elegibles.map((s) => s.id)));
+      setDeselected(new Map());
     }
   }
 
   function handleClose() {
     setError(null);
     setResult(null);
-    setSelectedIds(new Set());
+    setFilterTipos(null);
+    setDeselected(new Map());
+    setExpandedSocios(new Set());
     onClose();
   }
 
   function handleSubmit() {
-    if (selectedIds.size === 0) {
-      setError('Seleccioná al menos un socio con pendientes.');
+    if (sociosConSel === 0) {
+      setError('Seleccioná al menos un movimiento para emitir.');
       return;
     }
     setError(null);
     setResult(null);
     startTransition(async () => {
+      const socioMovimientos = elegibles
+        .map((s) => ({
+          socioId: s.id,
+          movimientoIds: s.movsFiltrados.filter((m) => isMovSel(s.id, m.id)).map((m) => m.id),
+        }))
+        .filter((s) => s.movimientoIds.length > 0);
+
       const res = await createBatchInvoicesAction({
-        socioIds: Array.from(selectedIds),
+        socioMovimientos,
         medioPago: form.medioPago as never,
         fecha: form.fecha,
-        vencimiento: form.vencimiento,
-        desde: form.desde,
-        hasta: form.hasta,
       });
       if (res.error) setError(res.error);
       else if (res.result) {
@@ -709,6 +814,7 @@ function LoteModal({
         <div className="flex-1 space-y-4 overflow-y-auto p-6">
           {!result ? (
             <>
+              {/* Fecha + Medio de pago */}
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <label
@@ -721,7 +827,8 @@ function LoteModal({
                     type="date"
                     className={inputCls}
                     value={form.fecha}
-                    onChange={set('fecha')}
+                    min={minFecha}
+                    onChange={(e) => setForm((f) => ({ ...f, fecha: e.target.value }))}
                   />
                 </div>
                 <div>
@@ -729,48 +836,49 @@ function LoteModal({
                     className="mb-1.5 block text-xs font-semibold"
                     style={{ color: '#101828' }}
                   >
-                    Vencimiento
+                    Forma de pago
                   </label>
-                  <input
-                    type="date"
+                  <select
                     className={inputCls}
-                    value={form.vencimiento}
-                    onChange={set('vencimiento')}
-                  />
+                    value={form.medioPago}
+                    onChange={(e) => setForm((f) => ({ ...f, medioPago: e.target.value }))}
+                  >
+                    {MEDIO_PAGO_OPTS.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div>
-                  <label
-                    className="mb-1.5 block text-xs font-semibold"
-                    style={{ color: '#101828' }}
-                  >
-                    Período desde
-                  </label>
-                  <input
-                    type="date"
-                    className={inputCls}
-                    value={form.desde}
-                    onChange={set('desde')}
-                  />
-                </div>
-                <div>
-                  <label
-                    className="mb-1.5 block text-xs font-semibold"
-                    style={{ color: '#101828' }}
-                  >
-                    Período hasta
-                  </label>
-                  <input
-                    type="date"
-                    className={inputCls}
-                    value={form.hasta}
-                    onChange={set('hasta')}
-                  />
+              {/* Filtro por concepto */}
+              <div>
+                <p className="mb-2 text-xs font-semibold" style={{ color: '#101828' }}>
+                  Filtrar por concepto
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {CONCEPTO_OPTS.map((o) => {
+                    const active = isConceptoActive(o.value);
+                    return (
+                      <button
+                        key={o.value}
+                        type="button"
+                        onClick={() => toggleConcepto(o.value)}
+                        className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
+                          active
+                            ? 'border-[#175861] bg-[#175861] text-white'
+                            : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'
+                        }`}
+                      >
+                        {o.label}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
+              {/* Lista de socios */}
               <div className="rounded-[10px] border border-gray-100 bg-white">
                 <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
                   <div>
@@ -778,7 +886,7 @@ function LoteModal({
                       Socios con pendientes ({elegibles.length})
                     </p>
                     <p className="text-xs text-gray-400">
-                      Seleccionados: {selectedIds.size} — Total estimado: {fmtMoney(totalEstimado)}
+                      Seleccionados: {sociosConSel} — Total: {fmtMoney(totalSeleccionado)}
                     </p>
                   </div>
                   {elegibles.length > 0 && (
@@ -787,43 +895,88 @@ function LoteModal({
                       className="text-xs font-medium underline underline-offset-2"
                       style={{ color: '#175861' }}
                     >
-                      {selectedIds.size === elegibles.length ? 'Ninguno' : 'Todos'}
+                      {allSelected ? 'Ninguno' : 'Todos'}
                     </button>
                   )}
                 </div>
                 {elegibles.length === 0 ? (
                   <p className="px-4 py-6 text-center text-sm text-gray-400">
-                    No hay socios con movimientos pendientes.
+                    No hay socios con movimientos para los conceptos seleccionados.
                   </p>
                 ) : (
-                  <div className="max-h-64 overflow-y-auto">
-                    {elegibles.map((s) => (
-                      <label
-                        key={s.id}
-                        className="flex cursor-pointer items-center gap-3 border-b border-gray-50 px-4 py-2.5 text-sm last:border-0 hover:bg-gray-50"
-                      >
-                        <input
-                          type="checkbox"
-                          className="h-4 w-4 cursor-pointer rounded accent-[#175861]"
-                          checked={selectedIds.has(s.id)}
-                          onChange={() => toggle(s.id)}
-                        />
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate font-medium" style={{ color: '#101828' }}>
-                            {s.nombre}
-                          </p>
-                          <p className="truncate text-xs text-gray-400">{s.email}</p>
+                  <div className="max-h-72 overflow-y-auto">
+                    {elegibles.map((s) => {
+                      const expanded = expandedSocios.has(s.id);
+                      const totalSocio = s.movsFiltrados
+                        .filter((m) => isMovSel(s.id, m.id))
+                        .reduce((sum, m) => sum + parseFloat(m.debe ?? '0'), 0);
+                      const allMovSel = s.movsFiltrados.every((m) => isMovSel(s.id, m.id));
+                      const selCount = s.movsFiltrados.filter((m) => isMovSel(s.id, m.id)).length;
+
+                      return (
+                        <div key={s.id} className="border-b border-gray-50 last:border-0">
+                          {/* Fila del socio */}
+                          <div className="flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-gray-50">
+                            <input
+                              type="checkbox"
+                              className="h-4 w-4 cursor-pointer rounded accent-[#175861]"
+                              checked={allMovSel}
+                              onChange={() => toggleSocio(s.id, s.movsFiltrados)}
+                            />
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate font-medium" style={{ color: '#101828' }}>
+                                {s.nombre}
+                              </p>
+                              <p className="truncate text-xs text-gray-400">{s.email}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-sm font-medium" style={{ color: '#175861' }}>
+                                {fmtMoney(totalSocio)}
+                              </p>
+                              <p className="text-xs text-gray-400">
+                                {selCount}/{s.movsFiltrados.length} mov.
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => toggleExpandSocio(s.id)}
+                              className="shrink-0 rounded-[6px] p-1 text-gray-400 hover:bg-gray-100"
+                              title={expanded ? 'Ocultar consumos' : 'Ver consumos'}
+                            >
+                              {expanded ? (
+                                <ChevronDown className="h-4 w-4" />
+                              ) : (
+                                <ChevronRight className="h-4 w-4" />
+                              )}
+                            </button>
+                          </div>
+                          {/* Consumos expandidos */}
+                          {expanded && (
+                            <div className="bg-gray-50 pb-1">
+                              {s.movsFiltrados.map((m) => (
+                                <label
+                                  key={m.id}
+                                  className="flex cursor-pointer items-center gap-3 border-b border-gray-100 py-2 pr-4 pl-11 text-sm last:border-0 hover:bg-gray-100"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    className="h-3.5 w-3.5 cursor-pointer rounded accent-[#175861]"
+                                    checked={isMovSel(s.id, m.id)}
+                                    onChange={() => toggleMov(s.id, m.id)}
+                                  />
+                                  <span className="min-w-0 flex-1 truncate text-xs text-gray-700">
+                                    {m.concepto ?? m.servicioNombre ?? 'Servicio'}
+                                  </span>
+                                  <span className="shrink-0 text-xs font-medium text-gray-600">
+                                    {fmtMoney(m.debe)}
+                                  </span>
+                                </label>
+                              ))}
+                            </div>
+                          )}
                         </div>
-                        <div className="text-right">
-                          <p className="text-sm font-medium" style={{ color: '#175861' }}>
-                            {fmtMoney(s.pendienteTotal)}
-                          </p>
-                          <p className="text-xs text-gray-400">
-                            {s.pendientes} movimiento{s.pendientes > 1 ? 's' : ''}
-                          </p>
-                        </div>
-                      </label>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -875,13 +1028,13 @@ function LoteModal({
             {!result && (
               <button
                 onClick={handleSubmit}
-                disabled={isPending || selectedIds.size === 0}
+                disabled={isPending || sociosConSel === 0}
                 className="flex-1 rounded-[10px] py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
                 style={{ background: '#175861' }}
               >
                 {isPending
                   ? 'Emitiendo...'
-                  : `Emitir ${selectedIds.size} comprobante${selectedIds.size === 1 ? '' : 's'}`}
+                  : `Emitir ${sociosConSel} comprobante${sociosConSel === 1 ? '' : 's'}`}
               </button>
             )}
           </div>
