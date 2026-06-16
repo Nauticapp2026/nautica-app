@@ -711,6 +711,7 @@ export const embarcaciones = pgTable(
     espacioId: uuid('espacio_id').references(() => espacios.id, { onDelete: 'set null' }),
     nombre: text('nombre').notNull(),
     matricula: text('matricula'),
+    astillero: text('astillero'),
     modelo: text('modelo'),
     seguro: text('seguro'),
     esloraM: numeric('eslora_m', { precision: 6, scale: 2 }),

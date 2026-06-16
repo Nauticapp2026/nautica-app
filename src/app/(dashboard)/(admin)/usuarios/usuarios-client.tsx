@@ -26,6 +26,7 @@ import { formatArgentinaDate } from '@/lib/dates';
 import { EmptyState } from '@/components/shared/empty-state';
 import { ImportSociosModal } from './import-socios-modal';
 import { ImportEmbarcacionesModal } from './import-embarcaciones-modal';
+import { ASTILLEROS } from './astilleros';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -117,6 +118,7 @@ const EMPTY_FORM = {
   condicionIva: '',
   embarcacionNombre: '',
   matricula: '',
+  astillero: '',
   modelo: '',
   esloraM: '',
 };
@@ -171,6 +173,7 @@ function CrearSocioModal({ open, onClose }: { open: boolean; onClose: () => void
   const [form, setForm] = useState(EMPTY_FORM);
   const [facturaFiscal, setFacturaFiscal] = useState(true);
   const [esloraUnidad, setEsloraUnidad] = useState<'m' | 'ft'>('m');
+  const [astilleroSel, setAstilleroSel] = useState('');
   const [adjuntos, setAdjuntos] = useState<AdjuntoInput[]>([]);
   const [uploadProgress, setUploadProgress] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -194,6 +197,7 @@ function CrearSocioModal({ open, onClose }: { open: boolean; onClose: () => void
     setForm(EMPTY_FORM);
     setFacturaFiscal(true);
     setEsloraUnidad('m');
+    setAstilleroSel('');
     setAdjuntos([]);
     setUploadProgress(null);
     setError(null);
@@ -453,6 +457,40 @@ function CrearSocioModal({ open, onClose }: { open: boolean; onClose: () => void
                     }
                   />
                 </Field>
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="sm:col-span-2">
+                  <Field label="Astillero">
+                    <select
+                      className={inputCls}
+                      value={astilleroSel}
+                      onChange={(e) => {
+                        setAstilleroSel(e.target.value);
+                        if (e.target.value !== 'Otro') {
+                          setForm((f) => ({ ...f, astillero: e.target.value }));
+                        } else {
+                          setForm((f) => ({ ...f, astillero: '' }));
+                        }
+                      }}
+                    >
+                      <option value="">Seleccione...</option>
+                      {ASTILLEROS.map((a) => (
+                        <option key={a} value={a}>
+                          {a}
+                        </option>
+                      ))}
+                      <option value="Otro">Otro</option>
+                    </select>
+                    {astilleroSel === 'Otro' && (
+                      <input
+                        className={`${inputCls} mt-2`}
+                        placeholder="Nombre del astillero"
+                        value={form.astillero}
+                        onChange={set('astillero')}
+                      />
+                    )}
+                  </Field>
+                </div>
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Field label="Modelo">

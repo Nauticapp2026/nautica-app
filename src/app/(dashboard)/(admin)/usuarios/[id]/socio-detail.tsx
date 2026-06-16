@@ -54,6 +54,7 @@ import {
   type GuardarTarjetaData,
 } from '@/app/actions/payway';
 import { formatArgentinaDate, formatArgentinaDateTime, formatNaiveDateTime } from '@/lib/dates';
+import { ASTILLEROS } from '../astilleros';
 import { EmptyState } from '@/components/shared/empty-state';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -80,6 +81,7 @@ type Embarcacion = {
   id: string;
   nombre: string;
   matricula: string | null;
+  astillero: string | null;
   modelo: string | null;
   seguro: string | null;
   esloraM: string | null;
@@ -1287,7 +1289,14 @@ function EspacioEmbarcacionRow({
   );
 }
 
-const EMBARCACION_VACIA = { nombre: '', matricula: '', modelo: '', seguro: '', esloraM: '' };
+const EMBARCACION_VACIA = {
+  nombre: '',
+  matricula: '',
+  astillero: '',
+  modelo: '',
+  seguro: '',
+  esloraM: '',
+};
 
 function EmbarcacionesTab({
   socioId,
@@ -1303,6 +1312,7 @@ function EmbarcacionesTab({
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [agregando, setAgregando] = useState(false);
   const [form, setForm] = useState(EMBARCACION_VACIA);
+  const [astilleroSel, setAstilleroSel] = useState('');
   const [esPrincipalNueva, setEsPrincipalNueva] = useState(false);
   const [esloraUnidad, setEsloraUnidad] = useState<'m' | 'ft'>('m');
   const [error, setError] = useState<string | null>(null);
@@ -1315,9 +1325,13 @@ function EmbarcacionesTab({
     setEditandoId(e.id);
     setAgregando(false);
     setEsloraUnidad('m');
+    const ast = e.astillero ?? '';
+    const sel = ASTILLEROS.includes(ast as (typeof ASTILLEROS)[number]) ? ast : ast ? 'Otro' : '';
+    setAstilleroSel(sel);
     setForm({
       nombre: e.nombre,
       matricula: e.matricula ?? '',
+      astillero: ast,
       modelo: e.modelo ?? '',
       seguro: e.seguro ?? '',
       esloraM: e.esloraM ?? '',
@@ -1328,6 +1342,7 @@ function EmbarcacionesTab({
     setEditandoId(null);
     setAgregando(false);
     setForm(EMBARCACION_VACIA);
+    setAstilleroSel('');
     setEsloraUnidad('m');
     setEsPrincipalNueva(false);
     setError(null);
@@ -1434,6 +1449,35 @@ function EmbarcacionesTab({
       <div>
         <label className="mb-1.5 block text-xs font-semibold text-gray-500">Matrícula</label>
         <input className={inputCls} value={form.matricula} onChange={setField('matricula')} />
+      </div>
+      <div className="sm:col-span-2">
+        <label className="mb-1.5 block text-xs font-semibold text-gray-500">Astillero</label>
+        <select
+          className={inputCls}
+          value={astilleroSel}
+          onChange={(e) => {
+            const v = e.target.value;
+            setAstilleroSel(v);
+            if (v !== 'Otro') setForm((f) => ({ ...f, astillero: v }));
+            else setForm((f) => ({ ...f, astillero: '' }));
+          }}
+        >
+          <option value="">Seleccionar…</option>
+          {ASTILLEROS.map((a) => (
+            <option key={a} value={a}>
+              {a}
+            </option>
+          ))}
+          <option value="Otro">Otro</option>
+        </select>
+        {astilleroSel === 'Otro' && (
+          <input
+            className={`${inputCls} mt-2`}
+            placeholder="Escribí el astillero"
+            value={form.astillero}
+            onChange={(e) => setForm((f) => ({ ...f, astillero: e.target.value }))}
+          />
+        )}
       </div>
       <div>
         <label className="mb-1.5 block text-xs font-semibold text-gray-500">Modelo</label>
@@ -1558,6 +1602,14 @@ function EmbarcacionesTab({
                     </label>
                     <p className="text-sm" style={{ color: '#101828' }}>
                       {emb.matricula ?? '—'}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-xs font-semibold text-gray-500">
+                      Astillero
+                    </label>
+                    <p className="text-sm" style={{ color: '#101828' }}>
+                      {emb.astillero ?? '—'}
                     </p>
                   </div>
                   <div>

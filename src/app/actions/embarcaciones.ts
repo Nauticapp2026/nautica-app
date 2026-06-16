@@ -9,6 +9,7 @@ import { getActiveMarina } from '@/lib/auth/session';
 export type EmbarcacionInput = {
   nombre: string;
   matricula: string;
+  astillero: string;
   modelo: string;
   seguro: string;
   esloraM: string;
@@ -64,6 +65,7 @@ export async function createEmbarcacionAction(
         profileId: data.socioId,
         nombre: data.nombre.trim(),
         matricula: norm(data.matricula),
+        astillero: norm(data.astillero),
         modelo: norm(data.modelo),
         seguro: norm(data.seguro),
         esloraM: norm(data.esloraM),
@@ -101,6 +103,7 @@ export async function updateEmbarcacionAction(
       .set({
         nombre: data.nombre.trim(),
         matricula: norm(data.matricula),
+        astillero: norm(data.astillero),
         modelo: norm(data.modelo),
         seguro: norm(data.seguro),
         esloraM: norm(data.esloraM),

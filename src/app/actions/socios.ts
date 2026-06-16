@@ -29,6 +29,7 @@ export type CreateSocioData = {
   condicionIva: string;
   embarcacionNombre: string;
   matricula: string;
+  astillero: string;
   modelo: string;
   esloraM: string;
   facturaFiscal: boolean;
@@ -144,6 +145,7 @@ export async function createSocioAction(data: CreateSocioData): Promise<SocioRes
         profileId,
         nombre: data.embarcacionNombre.trim(),
         matricula: data.matricula.trim() || null,
+        astillero: data.astillero.trim() || null,
         modelo: data.modelo.trim() || null,
         esloraM: isNaN(esloraNum) ? null : esloraNum.toFixed(2),
       });

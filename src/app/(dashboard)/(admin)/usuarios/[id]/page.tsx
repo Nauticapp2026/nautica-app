@@ -84,6 +84,7 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
         id: embarcaciones.id,
         nombre: embarcaciones.nombre,
         matricula: embarcaciones.matricula,
+        astillero: embarcaciones.astillero,
         modelo: embarcaciones.modelo,
         seguro: embarcaciones.seguro,
         esloraM: embarcaciones.esloraM,
