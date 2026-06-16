@@ -24,6 +24,9 @@ async function setOrigenGUC(
 const TIPOS = ['cuota_mensual', 'servicios', 'espacios'] as const;
 type Tipo = (typeof TIPOS)[number];
 
+const TIPOS_COBRO = ['fijo', 'variable'] as const;
+type TipoCobro = (typeof TIPOS_COBRO)[number];
+
 const ESTADOS = ['activo', 'inactivo'] as const;
 type Estado = (typeof ESTADOS)[number];
 
@@ -63,6 +66,7 @@ type AlicuotaIva = (typeof ALICUOTAS_IVA)[number];
 
 export type TarifaInputBase = {
   nombre: string;
+  tipoCobro: TipoCobro;
   precio: number;
   alicuotaIva: AlicuotaIva;
   vigenciaDesde: string;
@@ -108,6 +112,7 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 function validar(data: CreateTarifaData): string | null {
   if (!data.nombre.trim()) return 'El concepto es obligatorio.';
   if (!TIPOS.includes(data.tipo)) return 'Categoría inválida.';
+  if (!TIPOS_COBRO.includes(data.tipoCobro)) return 'Tipo de cobro inválido.';
   if (!Number.isFinite(data.precio) || data.precio < 0) {
     return 'El precio debe ser un número mayor o igual a 0.';
   }
@@ -187,6 +192,7 @@ function buildValues(data: CreateTarifaData) {
   const base = {
     nombre: data.nombre.trim(),
     tipo: data.tipo,
+    tipoCobro: data.tipoCobro,
     precio: data.precio.toFixed(2),
     alicuotaIva: data.alicuotaIva.toFixed(2),
     vigenciaDesde: data.vigenciaDesde,

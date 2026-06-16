@@ -48,6 +48,7 @@ export type Tarifa = {
   id: string;
   nombre: string;
   tipo: TipoTarifa;
+  tipoCobro: 'fijo' | 'variable';
   precio: number;
   estado: EstadoTarifa;
   medida: MedidaTarifa | null;
@@ -381,6 +382,7 @@ function TarifaModal({
   const isEdit = state.mode === 'edit';
   const initial = isEdit ? state.tarifa : null;
 
+  const [tipoCobro, setTipoCobro] = useState<'fijo' | 'variable'>(initial?.tipoCobro ?? 'fijo');
   const [tipo, setTipo] = useState<TipoTarifa | ''>(initial?.tipo ?? '');
   const [nombre, setNombre] = useState(initial?.nombre ?? '');
   const [precio, setPrecio] = useState<string>(initial ? String(initial.precio) : '');
@@ -456,6 +458,7 @@ function TarifaModal({
     if (tipo === 'cuota_mensual') {
       payload = {
         tipo: 'cuota_mensual' as const,
+        tipoCobro,
         nombre: nombre.trim(),
         precio: precioNum,
         alicuotaIva: alicuotaIva as 0 | 10.5 | 21,
@@ -466,6 +469,7 @@ function TarifaModal({
     } else if (tipo === 'espacios') {
       payload = {
         tipo: 'espacios' as const,
+        tipoCobro,
         nombre: nombre.trim(),
         precio: precioNum,
         alicuotaIva: alicuotaIva as 0 | 10.5 | 21,
@@ -480,6 +484,7 @@ function TarifaModal({
     } else {
       payload = {
         tipo: 'servicios' as const,
+        tipoCobro,
         nombre: nombre.trim(),
         precio: precioNum,
         alicuotaIva: alicuotaIva as 0 | 10.5 | 21,
@@ -520,6 +525,30 @@ function TarifaModal({
         <div className="border-t border-gray-200" />
 
         <div className="flex-1 space-y-4 overflow-y-auto p-6">
+          <div>
+            <label className="mb-1 block text-sm font-semibold text-gray-700">
+              Tipo de servicio
+            </label>
+            <div className="flex gap-5">
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="radio"
+                  checked={tipoCobro === 'fijo'}
+                  onChange={() => setTipoCobro('fijo')}
+                />
+                Servicio fijo
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="radio"
+                  checked={tipoCobro === 'variable'}
+                  onChange={() => setTipoCobro('variable')}
+                />
+                Servicio variable
+              </label>
+            </div>
+          </div>
+
           <div>
             <label className="mb-1 block text-sm font-semibold text-gray-700">Categoría</label>
             <select

@@ -161,6 +161,8 @@ export const tipoCuentaCorrienteEnum = pgEnum('tipo_cta_cte', ['mensual', 'espac
 
 export const tipoServicioEnum = pgEnum('tipo_servicio', ['cuota_mensual', 'servicios', 'espacios']);
 
+export const tipoCobroServicioEnum = pgEnum('tipo_cobro_servicio', ['fijo', 'variable']);
+
 export const tipoComunicacionEnum = pgEnum('tipo_comunicacion', ['socios', 'publica']);
 
 export const tamanoPublicidadEnum = pgEnum('tamano_publicidad', ['350x300', '353x119']);
@@ -584,6 +586,7 @@ export const servicios = pgTable(
     }),
     nombre: text('nombre').notNull(),
     tipo: tipoServicioEnum('tipo').notNull(),
+    tipoCobro: tipoCobroServicioEnum('tipo_cobro').notNull().default('fijo'),
     estado: estadoServicioEnum('estado').default('activo'),
     precio: numeric('precio', { precision: 12, scale: 2 }),
     eslora: numeric('eslora', { precision: 8, scale: 2 }),
