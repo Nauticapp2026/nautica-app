@@ -149,6 +149,7 @@ export function TarifarioClient({ tarifas }: { tarifas: Tarifa[] }) {
   const router = useRouter();
   const [filtro, setFiltro] = useState<FiltroCategoria>('todas');
   const [modal, setModal] = useState<ModalState>(null);
+  const [ajusteOpen, setAjusteOpen] = useState(false);
 
   const grupos = useMemo(() => {
     const filtered = filtro === 'todas' ? tarifas : tarifas.filter((t) => t.tipo === filtro);
@@ -170,17 +171,24 @@ export function TarifarioClient({ tarifas }: { tarifas: Tarifa[] }) {
           <h1 className="page-title">Tarifario</h1>
           <p className="page-subtitle mt-1">Gestiona y actualiza las tarifas de servicios</p>
         </div>
-        <button
-          type="button"
-          onClick={() => setModal({ mode: 'create' })}
-          className="flex shrink-0 items-center justify-center gap-2 rounded-[10px] bg-[#175861] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#0f4249]"
-        >
-          <Plus className="h-4 w-4" />
-          Nueva tarifa
-        </button>
+        <div className="flex shrink-0 gap-2">
+          <button
+            type="button"
+            onClick={() => setAjusteOpen(true)}
+            className="flex items-center justify-center gap-2 rounded-[10px] border border-[#175861] px-4 py-2.5 text-sm font-semibold text-[#175861] transition-colors hover:bg-[#f0f7f7]"
+          >
+            Ajuste masivo
+          </button>
+          <button
+            type="button"
+            onClick={() => setModal({ mode: 'create' })}
+            className="flex items-center justify-center gap-2 rounded-[10px] bg-[#175861] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#0f4249]"
+          >
+            <Plus className="h-4 w-4" />
+            Nueva tarifa
+          </button>
+        </div>
       </header>
-
-      <AjusteMasivoSection totalTarifas={tarifas.length} onApplied={() => router.refresh()} />
 
       <section className="mb-6">
         <div
@@ -243,6 +251,17 @@ export function TarifarioClient({ tarifas }: { tarifas: Tarifa[] }) {
           onClose={() => setModal(null)}
           onSaved={() => {
             setModal(null);
+            router.refresh();
+          }}
+        />
+      )}
+
+      {ajusteOpen && (
+        <AjusteMasivoModal
+          totalTarifas={tarifas.length}
+          onClose={() => setAjusteOpen(false)}
+          onApplied={() => {
+            setAjusteOpen(false);
             router.refresh();
           }}
         />
@@ -854,34 +873,60 @@ function HistorialAccordion({ servicioId }: { servicioId: string }) {
   );
 }
 
-function AjusteMasivoSection({
+const CATEGORIAS_AJUSTE = [
+  { value: 'todos', label: 'Todos' },
+  { value: 'espacio_guarda', label: 'Espacio de guarda' },
+  { value: 'cuota_social', label: 'Cuota social' },
+  { value: 'membresia', label: 'Membresía' },
+  { value: 'expensas_ordinarias', label: 'Expensas ordinarias' },
+  { value: 'expensas_extraordinarias', label: 'Expensas extraordinarias' },
+  { value: 'servicio_extra', label: 'Servicio extra' },
+] as const;
+
+function AjusteMasivoModal({
   totalTarifas,
   onApplied,
+  onClose,
 }: {
   totalTarifas: number;
   onApplied: () => void;
+  onClose: () => void;
 }) {
+  const today = new Date().toISOString().slice(0, 10);
+  const [categoria, setCategoria] = useState<string>('todos');
   const [tipo, setTipo] = useState<'' | AjusteMasivoData['tipo']>('');
   const [direccion, setDireccion] = useState<'aumento' | 'descuento'>('aumento');
   const [valor, setValor] = useState<string>('');
+  const [vigenciaDesde, setVigenciaDesde] = useState<string>(today);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [feedback, setFeedback] = useState<{ type: 'error' | 'success'; msg: string } | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   const valorNum = Number(valor);
   const sobrepasa100 = tipo === 'porcentaje' && direccion === 'descuento' && valorNum > 100;
   const valido =
-    Boolean(tipo) && Number.isFinite(valorNum) && valorNum >= 0 && valor !== '' && !sobrepasa100;
-  const sinTarifas = totalTarifas === 0;
+    Boolean(tipo) &&
+    Number.isFinite(valorNum) &&
+    valorNum >= 0 &&
+    valor !== '' &&
+    !sobrepasa100 &&
+    Boolean(vigenciaDesde);
+
+  const categoriaLabel = CATEGORIAS_AJUSTE.find((c) => c.value === categoria)?.label ?? 'Todos';
+
+  const previewTexto =
+    tipo === 'porcentaje'
+      ? `${direccion === 'aumento' ? 'un aumento' : 'un descuento'} de ${valor}%`
+      : `el monto fijo $${valor} (reemplaza el precio actual)`;
 
   const handleAplicar = () => {
-    setFeedback(null);
+    setError(null);
     if (sobrepasa100) {
-      setFeedback({ type: 'error', msg: 'El descuento no puede superar el 100%.' });
+      setError('El descuento no puede superar el 100%.');
       return;
     }
     if (!valido) {
-      setFeedback({ type: 'error', msg: 'Elegí tipo de ajuste y un valor ≥ 0.' });
+      setError('Completá todos los campos.');
       return;
     }
     setConfirmOpen(true);
@@ -889,122 +934,167 @@ function AjusteMasivoSection({
 
   const handleConfirm = () => {
     if (!tipo || !Number.isFinite(valorNum)) return;
-    setFeedback(null);
+    setError(null);
     startTransition(async () => {
       const payload: AjusteMasivoData =
         tipo === 'porcentaje'
-          ? { tipo: 'porcentaje', direccion, valor: valorNum }
-          : { tipo: 'monto', valor: valorNum };
+          ? {
+              tipo: 'porcentaje',
+              direccion,
+              valor: valorNum,
+              categoria: categoria as AjusteMasivoData['categoria'],
+              vigenciaDesde,
+            }
+          : {
+              tipo: 'monto',
+              valor: valorNum,
+              categoria: categoria as AjusteMasivoData['categoria'],
+              vigenciaDesde,
+            };
       const res = await ajusteMasivoTarifasAction(payload);
       if (res.error) {
-        setFeedback({ type: 'error', msg: res.error });
+        setError(res.error);
         setConfirmOpen(false);
       } else {
-        setConfirmOpen(false);
-        setValor('');
-        setTipo('');
-        setDireccion('aumento');
-        setFeedback({
-          type: 'success',
-          msg: `Ajuste aplicado a ${res.afectadas ?? 0} tarifa(s).`,
-        });
         onApplied();
       }
     });
   };
 
-  const previewTexto =
-    tipo === 'porcentaje'
-      ? `${direccion === 'aumento' ? 'un aumento' : 'un descuento'} de ${valor}%`
-      : tipo === 'monto'
-        ? `el monto fijo $${valor} (se reemplaza el precio actual)`
-        : '';
-
   return (
-    <>
-      <section className="mb-6 rounded-2xl border border-gray-200 bg-[#F3F6F6] p-5">
-        <h2 className="mb-1 text-sm font-bold" style={{ color: '#101828' }}>
-          Ajuste Masivo de Tarifas
-        </h2>
-        <p className="mb-4 text-xs text-gray-500">
-          Se aplicará a todas las tarifas ({totalTarifas}) sin importar el filtro.
-        </p>
-
-        <div className="flex flex-wrap items-center gap-3">
-          <select
-            className={`${inputCls} max-w-[220px]`}
-            value={tipo}
-            onChange={(e) => {
-              const next = e.target.value as '' | AjusteMasivoData['tipo'];
-              setTipo(next);
-              if (next !== 'porcentaje') setDireccion('aumento');
-              setFeedback(null);
-            }}
-          >
-            <option value="">Seleccione una opción…</option>
-            <option value="porcentaje">Porcentaje</option>
-            <option value="monto">Monto</option>
-          </select>
-
-          {tipo === 'porcentaje' && (
-            <select
-              className={`${inputCls} max-w-[180px]`}
-              value={direccion}
-              onChange={(e) => {
-                setDireccion(e.target.value as 'aumento' | 'descuento');
-                setFeedback(null);
-              }}
-            >
-              <option value="aumento">Aumentar</option>
-              <option value="descuento">Descontar</option>
-            </select>
-          )}
-
-          {tipo && (
-            <input
-              className={`${inputCls} max-w-[180px]`}
-              type="number"
-              min={0}
-              step={tipo === 'porcentaje' ? '0.1' : '0.01'}
-              placeholder={tipo === 'porcentaje' ? 'Ej: 10' : 'Ej: 500'}
-              value={valor}
-              onChange={(e) => {
-                setValor(e.target.value);
-                setFeedback(null);
-              }}
-            />
-          )}
-
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="flex w-full max-w-lg flex-col rounded-2xl bg-white shadow-2xl">
+        <div className="flex items-center justify-between border-b border-gray-100 p-6">
+          <h2 className="text-lg font-bold" style={{ color: '#101828' }}>
+            Ajuste masivo de tarifas
+          </h2>
           <button
             type="button"
-            onClick={handleAplicar}
-            disabled={!valido || sinTarifas || pending}
-            className="rounded-[10px] bg-[#175861] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#0f4249] disabled:cursor-not-allowed disabled:opacity-60"
+            onClick={onClose}
+            className="rounded-[8px] p-1.5 text-gray-400 hover:bg-gray-100"
           >
-            Aplicar a todas
+            <X className="h-4 w-4" />
           </button>
         </div>
 
-        {feedback && (
-          <p
-            className={`mt-3 text-sm ${feedback.type === 'error' ? 'text-red-600' : 'text-green-700'}`}
+        <div className="flex flex-col gap-4 p-6">
+          <div>
+            <label className="mb-1 block text-sm font-semibold text-gray-700">Concepto</label>
+            <select
+              className={inputCls}
+              value={categoria}
+              onChange={(e) => setCategoria(e.target.value)}
+            >
+              {CATEGORIAS_AJUSTE.map((c) => (
+                <option key={c.value} value={c.value}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-sm font-semibold text-gray-700">
+                Tipo de ajuste
+              </label>
+              <select
+                className={inputCls}
+                value={tipo}
+                onChange={(e) => {
+                  const next = e.target.value as '' | AjusteMasivoData['tipo'];
+                  setTipo(next);
+                  if (next !== 'porcentaje') setDireccion('aumento');
+                  setError(null);
+                }}
+              >
+                <option value="">Seleccionar…</option>
+                <option value="porcentaje">Porcentaje</option>
+                <option value="monto">Monto fijo</option>
+              </select>
+            </div>
+
+            {tipo === 'porcentaje' && (
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-gray-700">Dirección</label>
+                <select
+                  className={inputCls}
+                  value={direccion}
+                  onChange={(e) => setDireccion(e.target.value as 'aumento' | 'descuento')}
+                >
+                  <option value="aumento">Aumentar</option>
+                  <option value="descuento">Descontar</option>
+                </select>
+              </div>
+            )}
+          </div>
+
+          {tipo && (
+            <div>
+              <label className="mb-1 block text-sm font-semibold text-gray-700">
+                {tipo === 'porcentaje' ? 'Porcentaje (%)' : 'Monto ($)'}
+              </label>
+              <input
+                className={inputCls}
+                type="number"
+                min={0}
+                step={tipo === 'porcentaje' ? '0.1' : '0.01'}
+                placeholder={tipo === 'porcentaje' ? 'Ej: 10' : 'Ej: 500'}
+                value={valor}
+                onChange={(e) => {
+                  setValor(e.target.value);
+                  setError(null);
+                }}
+              />
+            </div>
+          )}
+
+          <div>
+            <label className="mb-1 block text-sm font-semibold text-gray-700">Vigencia desde</label>
+            <input
+              className={inputCls}
+              type="date"
+              value={vigenciaDesde}
+              onChange={(e) => setVigenciaDesde(e.target.value)}
+            />
+          </div>
+
+          {error && <p className="text-sm text-red-600">{error}</p>}
+        </div>
+
+        <div className="flex justify-end gap-3 border-t border-gray-200 p-6">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-[10px] border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-[#101828] hover:bg-gray-50"
           >
-            {feedback.msg}
-          </p>
-        )}
-      </section>
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={handleAplicar}
+            disabled={!valido || totalTarifas === 0 || pending}
+            className="rounded-[10px] bg-[#175861] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#0f4249] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Aplicar
+          </button>
+        </div>
+      </div>
 
       {confirmOpen && tipo && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4">
           <div className="flex w-full max-w-md flex-col rounded-2xl bg-white shadow-2xl">
             <div className="p-6">
               <h2 className="text-lg font-bold" style={{ color: '#101828' }}>
                 Confirmar ajuste masivo
               </h2>
               <p className="mt-2 text-sm text-gray-600">
-                Se va a aplicar <strong>{previewTexto}</strong> a las{' '}
-                <strong>{totalTarifas}</strong> tarifa(s) de tu guardería. Esta acción no se puede
-                deshacer con un solo clic.
+                Se va a aplicar <strong>{previewTexto}</strong> a{' '}
+                <strong>
+                  {categoriaLabel === 'Todos' ? 'todas las categorías' : categoriaLabel}
+                </strong>{' '}
+                con vigencia desde <strong>{vigenciaDesde}</strong>. Esta acción no se puede
+                deshacer.
               </p>
             </div>
             <div className="flex justify-end gap-3 border-t border-gray-200 p-6">
@@ -1028,6 +1118,6 @@ function AjusteMasivoSection({
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 }

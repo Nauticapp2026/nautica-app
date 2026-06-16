@@ -107,8 +107,14 @@ export type CreateTarifaData = TarifaEspacioGuardaInput | TarifaBaseInput;
 export type UpdateTarifaData = CreateTarifaData & { id: string; estado: Estado };
 
 export type AjusteMasivoData =
-  | { tipo: 'porcentaje'; direccion: 'aumento' | 'descuento'; valor: number }
-  | { tipo: 'monto'; valor: number };
+  | {
+      tipo: 'porcentaje';
+      direccion: 'aumento' | 'descuento';
+      valor: number;
+      categoria: Tipo | 'todos';
+      vigenciaDesde: string;
+    }
+  | { tipo: 'monto'; valor: number; categoria: Tipo | 'todos'; vigenciaDesde: string };
 
 function isAdmin(ctx: NonNullable<Awaited<ReturnType<typeof getActiveMarina>>>): boolean {
   return (
@@ -322,6 +328,12 @@ export async function ajusteMasivoTarifasAction(
       return { error: 'El descuento no puede ser mayor a 100%.' };
     }
   }
+  if (data.categoria !== 'todos' && !TIPOS.includes(data.categoria)) {
+    return { error: 'Categoría inválida.' };
+  }
+  if (!data.vigenciaDesde || !DATE_RE.test(data.vigenciaDesde)) {
+    return { error: 'La fecha de vigencia es obligatoria.' };
+  }
 
   const guarderiaId = ctx.activeMembership.guarderiaId;
   const origen: Origen = data.tipo === 'porcentaje' ? 'masivo_porcentaje' : 'masivo_monto';
@@ -332,7 +344,12 @@ export async function ajusteMasivoTarifasAction(
     const rows = await tx
       .select({ id: servicios.id, precio: servicios.precio })
       .from(servicios)
-      .where(eq(servicios.guarderiaId, guarderiaId));
+      .where(
+        and(
+          eq(servicios.guarderiaId, guarderiaId),
+          data.categoria !== 'todos' ? eq(servicios.tipo, data.categoria) : undefined,
+        ),
+      );
 
     let count = 0;
     const now = new Date();
@@ -351,7 +368,7 @@ export async function ajusteMasivoTarifasAction(
 
       await tx
         .update(servicios)
-        .set({ precio: nuevo.toFixed(2), updatedAt: now })
+        .set({ precio: nuevo.toFixed(2), vigenciaDesde: data.vigenciaDesde, updatedAt: now })
         .where(eq(servicios.id, row.id));
       count++;
     }
