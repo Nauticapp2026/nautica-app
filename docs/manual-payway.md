@@ -9,6 +9,8 @@ Vas a necesitar acceso a:
 - Tu cuenta de Payway.
 - El panel web de NauticApp con permisos de admin.
 
+> **Requisito previo — activar débito automático en tu cuenta Payway:** el débito automático requiere que Payway habilite la funcionalidad "Store Credential / MIT" en tu cuenta productiva. Esto no es automático: tenés que solicitarlo explícitamente a tu ejecutivo de cuentas o al soporte de Payway antes de empezar. Sin esta habilitación, el sistema no puede generar los tokens necesarios para cobrar mensualmente.
+
 ---
 
 ## Paso 1 — Obtener las credenciales de Payway
