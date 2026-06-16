@@ -2256,7 +2256,7 @@ export function SocioDetail({
         style={{ color: '#669E9D' }}
       >
         <ArrowLeft className="h-4 w-4" />
-        Volver a Usuarios
+        Volver a Socios
       </Link>
 
       {/* Avatar + name */}

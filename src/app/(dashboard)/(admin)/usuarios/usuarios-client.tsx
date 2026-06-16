@@ -860,7 +860,7 @@ export function UsuariosClient({
                   <tr className="bg-gray-50 text-left text-xs font-semibold text-gray-500">
                     <th className="w-10 px-4 py-3" />
                     <SortableTh
-                      label="#"
+                      label="Nº Socio"
                       sortKey="numero"
                       activeKey={sortKey}
                       dir={sortDir}

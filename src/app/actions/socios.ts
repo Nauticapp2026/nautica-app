@@ -422,6 +422,24 @@ export async function updateNumeroSocioAction(
 
   const gId = ctx.activeMembership.guarderiaId;
 
+  // Verificar duplicado antes de intentar el update.
+  if (parsed.data.numeroSocio !== null) {
+    const [duplicate] = await db
+      .select({ userId: memberships.userId })
+      .from(memberships)
+      .where(
+        and(
+          eq(memberships.guarderiaId, gId),
+          eq(memberships.rol, 'socio'),
+          eq(memberships.numeroSocio, parsed.data.numeroSocio),
+        ),
+      )
+      .limit(1);
+    if (duplicate && duplicate.userId !== parsed.data.socioId) {
+      return { error: `El Nº de Socio ${parsed.data.numeroSocio} ya está asignado a otro socio.` };
+    }
+  }
+
   try {
     await db
       .update(memberships)
@@ -438,7 +456,7 @@ export async function updateNumeroSocioAction(
     revalidatePath(`/usuarios/${parsed.data.socioId}`);
     return {};
   } catch {
-    return { error: 'Error al actualizar el número. Puede que ya esté en uso.' };
+    return { error: 'Error al actualizar el número de socio.' };
   }
 }
 
