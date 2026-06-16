@@ -19,6 +19,7 @@ import {
   Star,
   TrendingUp,
   AlertTriangle,
+  Eye,
   Paperclip,
   Plus,
   Trash2,
@@ -101,6 +102,7 @@ type Movimiento = {
   servicioNombre: string | null;
   servicioId: string | null;
   facturaCodigo: string | null;
+  facturaArchivo: string | null;
 };
 
 type Servicio = {
@@ -174,9 +176,10 @@ function fmt(amount: number) {
 const fmtDate = formatArgentinaDate;
 
 const ESTADO_BADGE: Record<string, string> = {
-  pagado: 'bg-gray-100 text-gray-600',
-  facturado: 'bg-amber-100 text-amber-700',
-  no_pagado: 'bg-red-100 text-red-700',
+  pagado: 'bg-gray-100 text-gray-700',
+  facturado: 'bg-green-100 text-green-700',
+  no_pagado: 'bg-green-100 text-green-700',
+  vencido: 'bg-red-100 text-red-700',
 };
 
 const MEMBERSHIP_STATUS_CLASSES: Record<'active' | 'suspended' | 'inactivo', string> = {
@@ -193,8 +196,9 @@ const MEMBERSHIP_STATUS_LABEL: Record<'active' | 'suspended' | 'inactivo', strin
 
 const ESTADO_LABEL: Record<string, string> = {
   pagado: 'Pagado',
-  facturado: 'Facturado',
-  no_pagado: 'Pendiente',
+  facturado: 'En Plazo',
+  no_pagado: 'En Plazo',
+  vencido: 'Vencido',
 };
 
 // ─── Field helper ─────────────────────────────────────────────────────────────
@@ -2641,84 +2645,104 @@ export function SocioDetail({
             />
           ) : (
             <>
-              {/* Marcar como pagadas */}
-              {selectedIds.size > 0 && (
-                <div className="mb-3 flex justify-end">
-                  <button
-                    onClick={() => setModalPagoOpen(true)}
-                    className="text-sm font-medium underline underline-offset-2 transition hover:opacity-70"
-                    style={{ color: '#175861' }}
-                  >
-                    Marcar como pagadas
-                  </button>
-                </div>
-              )}
-
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[640px] text-sm">
                   <thead>
                     <tr className="bg-gray-50 text-left text-xs font-semibold text-gray-500">
-                      <th className="w-10 px-4 py-3"></th>
                       <th className="px-4 py-3">Fecha</th>
                       <th className="px-4 py-3">Detalle</th>
-                      <th className="px-4 py-3">Nº comprobante</th>
-                      <th className="px-4 py-3 text-right">Total</th>
+                      <th className="px-4 py-3">Nº Comprobante</th>
+                      <th className="px-4 py-3 text-right">Ventas</th>
+                      <th className="px-4 py-3 text-right">Cobranzas</th>
+                      <th className="px-4 py-3 text-right">Saldo</th>
                       <th className="px-4 py-3 text-right">Estado</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {movimientos.map((m) => {
-                      const haber = parseFloat(m.haber ?? '0');
-                      const debe = parseFloat(m.debe ?? '0');
-                      const esPago = haber > 0 && debe === 0;
-                      const detalle = esPago
-                        ? m.concepto?.trim() || 'Pago a cuenta'
-                        : [m.servicioNombre, m.concepto?.trim()].filter(Boolean).join(' — ') || '—';
-                      return (
-                        <tr
-                          key={m.id}
-                          className={`border-t border-gray-100 transition hover:bg-gray-50/50 ${
-                            selectedIds.has(m.id) ? 'bg-teal-50/40' : ''
-                          }`}
-                        >
-                          <td className="px-4 py-3">
-                            {esPago ? null : (
-                              <input
-                                type="checkbox"
-                                className="h-4 w-4 cursor-pointer rounded accent-[#175861]"
-                                checked={selectedIds.has(m.id)}
-                                onChange={() => toggleId(m.id)}
-                              />
-                            )}
-                          </td>
-                          <td className="px-4 py-3 text-gray-500">{fmtDate(m.fecha)}</td>
-                          <td className="px-4 py-3 font-medium" style={{ color: '#175861' }}>
-                            {detalle}
-                          </td>
-                          <td className="px-4 py-3 text-gray-500">{m.facturaCodigo ?? '—'}</td>
-                          <td
-                            className="px-4 py-3 text-right font-medium"
-                            style={{ color: esPago ? '#1B9A5A' : '#101828' }}
+                    {(() => {
+                      // Calcular saldo acumulado de más viejo a más nuevo.
+                      // movimientos viene ordenado más nuevo primero (desc fecha),
+                      // así que invertimos para acumular y luego volvemos a invertir.
+                      const asc = [...movimientos].reverse();
+                      let acum = 0;
+                      const conSaldo = asc.map((m) => {
+                        const venta = parseFloat(m.debe ?? '0');
+                        const cobranza = parseFloat(m.haber ?? '0');
+                        acum = acum + venta - cobranza;
+                        return { ...m, saldo: acum };
+                      });
+                      return conSaldo.reverse().map((m) => {
+                        const venta = parseFloat(m.debe ?? '0');
+                        const cobranza = parseFloat(m.haber ?? '0');
+                        const esPago = cobranza > 0 && venta === 0;
+                        const detalle = esPago
+                          ? m.concepto?.trim() || 'Pago a cuenta'
+                          : [m.servicioNombre, m.concepto?.trim()].filter(Boolean).join(' — ') ||
+                            '—';
+                        return (
+                          <tr
+                            key={m.id}
+                            className="border-t border-gray-100 transition hover:bg-gray-50/50"
                           >
-                            {esPago ? `−${fmt(haber)}` : fmt(debe)}
-                          </td>
-                          <td className="px-4 py-3 text-right">
-                            <div className="flex items-center justify-end gap-2">
-                              <span
-                                className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${
-                                  ESTADO_BADGE[m.estado ?? ''] ?? 'bg-gray-100 text-gray-500'
-                                }`}
-                              >
-                                {ESTADO_LABEL[m.estado ?? ''] ?? m.estado ?? '—'}
-                              </span>
-                              {esPago && (
-                                <EliminarPagoButton movimientoId={m.id} socioId={socio.id} />
+                            <td className="px-4 py-3 text-gray-500">{fmtDate(m.fecha)}</td>
+                            <td className="px-4 py-3 font-medium" style={{ color: '#175861' }}>
+                              {detalle}
+                            </td>
+                            <td className="px-4 py-3 text-gray-500">
+                              <div className="flex items-center gap-1.5">
+                                <span>{m.facturaCodigo ?? '—'}</span>
+                                {m.facturaArchivo && (
+                                  <a
+                                    href={m.facturaArchivo}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    title="Ver comprobante"
+                                    className="shrink-0 text-gray-400 hover:text-[#175861]"
+                                  >
+                                    <Eye className="h-4 w-4" />
+                                  </a>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-right font-medium text-[#101828]">
+                              {venta > 0 ? fmt(venta) : '—'}
+                            </td>
+                            <td className="px-4 py-3 text-right font-medium text-green-700">
+                              {cobranza > 0 ? fmt(cobranza) : '—'}
+                            </td>
+                            <td
+                              className="px-4 py-3 text-right font-semibold"
+                              style={{
+                                color:
+                                  m.saldo < 0 ? '#1B9A5A' : m.saldo > 0 ? '#101828' : '#6B7280',
+                              }}
+                            >
+                              {fmt(Math.abs(m.saldo))}
+                              {m.saldo < 0 && (
+                                <span className="ml-1 text-xs font-normal text-green-600">
+                                  a favor
+                                </span>
                               )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              <div className="flex items-center justify-end gap-2">
+                                {esPago ? (
+                                  <EliminarPagoButton movimientoId={m.id} socioId={socio.id} />
+                                ) : (
+                                  <span
+                                    className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${
+                                      ESTADO_BADGE[m.estado ?? ''] ?? 'bg-gray-100 text-gray-500'
+                                    }`}
+                                  >
+                                    {ESTADO_LABEL[m.estado ?? ''] ?? m.estado ?? '—'}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      });
+                    })()}
                   </tbody>
                 </table>
               </div>

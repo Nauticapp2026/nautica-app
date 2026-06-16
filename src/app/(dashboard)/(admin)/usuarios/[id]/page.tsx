@@ -248,12 +248,16 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
   // hacemos en una query separada para no duplicar filas con el JOIN M:N
   // (facturacion_item_movimientos puede tener varios matches por movimiento).
   const movimientoIds = movimientosList.map((m) => m.id);
-  const facturasPorMovimiento = new Map<string, string>();
+  const facturasPorMovimiento = new Map<
+    string,
+    { codigo: string | null; archivo: string | null }
+  >();
   if (movimientoIds.length > 0) {
     const rows = await db
       .selectDistinct({
         movimientoId: facturacionItemMovimientos.movimientoId,
         codigo: facturacion.codigo,
+        archivo: facturacion.archivo,
       })
       .from(facturacionItemMovimientos)
       .innerJoin(
@@ -263,7 +267,7 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
       .innerJoin(facturacion, eq(facturacion.id, facturacionItems.facturacionId))
       .where(inArray(facturacionItemMovimientos.movimientoId, movimientoIds));
     for (const r of rows) {
-      if (r.codigo) facturasPorMovimiento.set(r.movimientoId, r.codigo);
+      facturasPorMovimiento.set(r.movimientoId, { codigo: r.codigo, archivo: r.archivo });
     }
   }
 
@@ -378,7 +382,8 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
       movimientos={movimientosList.map((m) => ({
         ...m,
         fecha: m.fecha?.toISOString() ?? null,
-        facturaCodigo: facturasPorMovimiento.get(m.id) ?? null,
+        facturaCodigo: facturasPorMovimiento.get(m.id)?.codigo ?? null,
+        facturaArchivo: facturasPorMovimiento.get(m.id)?.archivo ?? null,
       }))}
       servicios={serviciosList}
       navegantes={navegantesList.map((n) => ({

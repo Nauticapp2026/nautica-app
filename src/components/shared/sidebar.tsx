@@ -25,6 +25,8 @@ import {
   Megaphone,
   Scale,
   Shield,
+  ShoppingCart,
+  Wallet,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -56,6 +58,8 @@ const NAV_BY_VARIANT: Record<SidebarVariant, SidebarItem[]> = {
   dashboard: [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { href: '/usuarios', label: 'Socios', icon: Users },
+    { href: '/ventas', label: 'Ventas', icon: ShoppingCart },
+    { href: '/cobranzas', label: 'Cobranzas', icon: Wallet },
     { href: '/solicitudes-socio', label: 'Solicitudes', icon: UserPlus },
     { href: '/tareas', label: 'Tareas', icon: ClipboardList },
     { href: '/espacios', label: 'Espacios', icon: Anchor },
