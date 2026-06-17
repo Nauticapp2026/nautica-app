@@ -253,15 +253,11 @@ function fmtRelative(iso: string): string {
 
 function fmtDelayFromHasta(hastaIso: string): string {
   const hastaMs = new Date(hastaIso).getTime();
-  const now = new Date();
-  const nowNaiveMs = Date.UTC(
-    now.getFullYear(),
-    now.getMonth(),
-    now.getDate(),
-    now.getHours(),
-    now.getMinutes(),
-    now.getSeconds(),
-  );
+  // porteria.hasta es naive: hora AR almacenada como UTC.
+  // Construimos "ahora" en el mismo dominio naive: tomamos la hora AR actual
+  // y la tratamos como UTC para comparar manzanas con manzanas.
+  const arNow = new Date().toLocaleString('sv-SE', { timeZone: 'America/Argentina/Buenos_Aires' });
+  const nowNaiveMs = new Date(arNow.replace(' ', 'T') + 'Z').getTime();
   const diff = nowNaiveMs - hastaMs;
   const mins = Math.floor(diff / 60000);
   if (mins < 0) return '—';

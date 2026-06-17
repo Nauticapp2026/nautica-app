@@ -38,17 +38,17 @@ export const STAFF_ROLES: Rol[] = [
 // Roles asignables como membership en una guardería desde el panel super
 // admin. `super_admin` se modela aparte vía `profiles.is_super_admin`.
 export const MEMBERSHIP_ROLES = [
-  ROLES.ADMINISTRADOR_GENERAL,
-  ROLES.ADMINISTRATIVO,
-  ROLES.OPERARIO,
-  ROLES.CONTABLE,
-  ROLES.MANTENIMIENTO,
-  ROLES.COMUNICACIONES,
-  ROLES.RESTAURANTES,
-  ROLES.SEGURIDAD,
-  ROLES.SOCIO,
-  ROLES.INVITADO,
-  ROLES.PROVEEDOR,
+  ROLES.ADMINISTRADOR_GENERAL, // Admin
+  ROLES.ADMINISTRATIVO, // Administrativo
+  ROLES.COMUNICACIONES, // Comunicaciones
+  ROLES.CONTABLE, // Contable
+  ROLES.INVITADO, // Invitado
+  ROLES.MANTENIMIENTO, // Mantenimiento
+  ROLES.OPERARIO, // Operario
+  ROLES.SEGURIDAD, // Portería / Seguridad
+  ROLES.PROVEEDOR, // Proveedor
+  ROLES.RESTAURANTES, // Restaurantes
+  ROLES.SOCIO, // Socio
 ] as const;
 
 export const ROL_LABELS: Record<Rol, string> = {

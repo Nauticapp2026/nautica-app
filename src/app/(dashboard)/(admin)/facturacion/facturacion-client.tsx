@@ -170,24 +170,25 @@ function fmtMoney(value: string | number | null): string {
 
 const fmtDate = formatArgentinaDate;
 
+const TZ_AR = 'America/Argentina/Buenos_Aires';
+
 function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
+  return new Intl.DateTimeFormat('en-CA', { timeZone: TZ_AR }).format(new Date());
 }
 
 function addDays(iso: string, days: number): string {
-  const d = new Date(iso);
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
 }
 
 function firstOfMonthIso(): string {
-  const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+  return todayIso().slice(0, 7) + '-01';
 }
 
 function lastOfMonthIso(): string {
-  const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
+  const [y, m] = todayIso().split('-').map(Number);
+  const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  return `${y}-${String(m).padStart(2, '0')}-${String(last).padStart(2, '0')}`;
 }
 
 // ─── KPI Card ───────────────────────────────────────────────────────────────

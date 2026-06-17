@@ -3,6 +3,7 @@ import { and, count, eq } from 'drizzle-orm';
 import { getActiveMarina, getPostLoginRedirect } from '@/lib/auth/session';
 import { yaAceptoVersionVigente } from '@/lib/auth/terminos';
 import { Sidebar } from '@/components/shared/sidebar';
+import { RealtimeRefresher } from '@/components/shared/realtime-refresher';
 import { GuarderiaInactivaScreen } from '@/components/shared/guarderia-inactiva-screen';
 import { db } from '@/lib/db';
 import { alertas, solicitudesMembership } from '@/lib/db/schema';
@@ -75,7 +76,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
         pendingSolicitudes={pendientes}
         pendingAlertas={alertasPendientes}
       />
-      <main className="min-w-0 flex-1 overflow-auto">{children}</main>
+      <main className="min-w-0 flex-1 overflow-auto">
+        <RealtimeRefresher guarderiaId={activeMembership.guarderiaId} />
+        {children}
+      </main>
     </div>
   );
 }
