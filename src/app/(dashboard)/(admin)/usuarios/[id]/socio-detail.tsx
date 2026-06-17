@@ -69,6 +69,10 @@ type SocioData = {
   tipoDocumento: string | null;
   numeroDocumento: string | null;
   direccion: string | null;
+  ciudad: string | null;
+  provincia: string | null;
+  codigoPostal: string | null;
+  contactoEmergencia: string | null;
   razonSocial: string | null;
   condicionIva: string | null;
   estadoSocio: string | null;
@@ -2101,6 +2105,10 @@ export function SocioDetail({
     tipoDocumento: socio.tipoDocumento ?? '',
     numeroDocumento: socio.numeroDocumento ?? '',
     direccion: socio.direccion ?? '',
+    ciudad: socio.ciudad ?? '',
+    provincia: socio.provincia ?? '',
+    codigoPostal: socio.codigoPostal ?? '',
+    contactoEmergencia: socio.contactoEmergencia ?? '',
     razonSocial: socio.razonSocial ?? '',
     condicionIva: socio.condicionIva ?? '',
     numeroSocio: socio.numeroSocio != null ? String(socio.numeroSocio) : '',
@@ -2134,6 +2142,10 @@ export function SocioDetail({
       tipoDocumento: socio.tipoDocumento ?? '',
       numeroDocumento: socio.numeroDocumento ?? '',
       direccion: socio.direccion ?? '',
+      ciudad: socio.ciudad ?? '',
+      provincia: socio.provincia ?? '',
+      codigoPostal: socio.codigoPostal ?? '',
+      contactoEmergencia: socio.contactoEmergencia ?? '',
       razonSocial: socio.razonSocial ?? '',
       condicionIva: socio.condicionIva ?? '',
       numeroSocio: socio.numeroSocio != null ? String(socio.numeroSocio) : '',
@@ -2445,6 +2457,52 @@ export function SocioDetail({
                 value={editForm.direccion}
                 onChange={setField('direccion')}
                 readOnly={!editando}
+              />
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold text-gray-500">Ciudad</label>
+                <input
+                  className={inputCls}
+                  value={editForm.ciudad}
+                  onChange={setField('ciudad')}
+                  readOnly={!editando}
+                  placeholder="—"
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold text-gray-500">
+                  Provincia
+                </label>
+                <input
+                  className={inputCls}
+                  value={editForm.provincia}
+                  onChange={setField('provincia')}
+                  readOnly={!editando}
+                  placeholder="—"
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold text-gray-500">C.P.</label>
+                <input
+                  className={inputCls}
+                  value={editForm.codigoPostal}
+                  onChange={setField('codigoPostal')}
+                  readOnly={!editando}
+                  placeholder="—"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold text-gray-500">
+                Contacto de emergencia
+              </label>
+              <input
+                className={inputCls}
+                value={editForm.contactoEmergencia}
+                onChange={setField('contactoEmergencia')}
+                readOnly={!editando}
+                placeholder="—"
               />
             </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

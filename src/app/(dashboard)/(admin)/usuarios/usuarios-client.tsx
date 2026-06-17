@@ -112,6 +112,10 @@ const EMPTY_FORM = {
   email: '',
   telefono: '',
   direccion: '',
+  ciudad: '',
+  provincia: '',
+  codigoPostal: '',
+  contactoEmergencia: '',
   tipoDocumento: '',
   numeroDocumento: '',
   razonSocial: '',
@@ -335,33 +339,6 @@ function CrearSocioModal({ open, onClose }: { open: boolean; onClose: () => void
                 </Field>
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Field label="Email" required>
-                  <input
-                    className={inputCls}
-                    type="email"
-                    placeholder="email@ejemplo.com"
-                    value={form.email}
-                    onChange={set('email')}
-                  />
-                </Field>
-                <Field label="Teléfono" required>
-                  <input
-                    className={inputCls}
-                    placeholder="+54 11..."
-                    value={form.telefono}
-                    onChange={set('telefono')}
-                  />
-                </Field>
-              </div>
-              <Field label="Dirección" required>
-                <input
-                  className={inputCls}
-                  placeholder="Av. Libertador 1234"
-                  value={form.direccion}
-                  onChange={set('direccion')}
-                />
-              </Field>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Field label="Tipo Documento" required>
                   <select
                     className={inputCls}
@@ -385,6 +362,67 @@ function CrearSocioModal({ open, onClose }: { open: boolean; onClose: () => void
                   />
                 </Field>
               </div>
+              <Field label="Dirección" required>
+                <input
+                  className={inputCls}
+                  placeholder="Av. Libertador 1234"
+                  value={form.direccion}
+                  onChange={set('direccion')}
+                />
+              </Field>
+              <div className="grid grid-cols-3 gap-3">
+                <Field label="Ciudad">
+                  <input
+                    className={inputCls}
+                    placeholder="Buenos Aires"
+                    value={form.ciudad}
+                    onChange={set('ciudad')}
+                  />
+                </Field>
+                <Field label="Provincia">
+                  <input
+                    className={inputCls}
+                    placeholder="CABA"
+                    value={form.provincia}
+                    onChange={set('provincia')}
+                  />
+                </Field>
+                <Field label="C.P.">
+                  <input
+                    className={inputCls}
+                    placeholder="1425"
+                    value={form.codigoPostal}
+                    onChange={set('codigoPostal')}
+                  />
+                </Field>
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <Field label="Email" required>
+                  <input
+                    className={inputCls}
+                    type="email"
+                    placeholder="email@ejemplo.com"
+                    value={form.email}
+                    onChange={set('email')}
+                  />
+                </Field>
+                <Field label="Teléfono" required>
+                  <input
+                    className={inputCls}
+                    placeholder="+54 11..."
+                    value={form.telefono}
+                    onChange={set('telefono')}
+                  />
+                </Field>
+              </div>
+              <Field label="Contacto de emergencia">
+                <input
+                  className={inputCls}
+                  placeholder="Nombre y teléfono"
+                  value={form.contactoEmergencia}
+                  onChange={set('contactoEmergencia')}
+                />
+              </Field>
             </div>
 
             {/* Datos Impositivos */}

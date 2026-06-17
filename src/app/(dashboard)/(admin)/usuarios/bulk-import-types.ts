@@ -16,6 +16,10 @@ export type ImportRowRaw = {
   email: string;
   telefono: string;
   direccion: string;
+  ciudad: string;
+  provincia: string;
+  codigoPostal: string;
+  contactoEmergencia: string;
   tipoDocumento: string;
   numeroDocumento: string;
   razonSocial: string;

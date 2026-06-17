@@ -23,6 +23,10 @@ export type CreateSocioData = {
   email: string;
   telefono: string;
   direccion: string;
+  ciudad: string;
+  provincia: string;
+  codigoPostal: string;
+  contactoEmergencia: string;
   tipoDocumento: string;
   numeroDocumento: string;
   razonSocial: string;
@@ -101,6 +105,10 @@ export async function createSocioAction(data: CreateSocioData): Promise<SocioRes
           apellido: data.apellido.trim() || null,
           telefono: data.telefono.trim() || null,
           direccion: data.direccion.trim() || null,
+          ciudad: data.ciudad.trim() || null,
+          provincia: data.provincia.trim() || null,
+          codigoPostal: data.codigoPostal.trim() || null,
+          contactoEmergencia: data.contactoEmergencia.trim() || null,
           tipoDocumento: (data.tipoDocumento || null) as never,
           numeroDocumento: data.numeroDocumento.trim() || null,
           razonSocial: data.razonSocial.trim() || null,
@@ -115,6 +123,10 @@ export async function createSocioAction(data: CreateSocioData): Promise<SocioRes
             apellido: data.apellido.trim() || null,
             telefono: data.telefono.trim() || null,
             direccion: data.direccion.trim() || null,
+            ciudad: data.ciudad.trim() || null,
+            provincia: data.provincia.trim() || null,
+            codigoPostal: data.codigoPostal.trim() || null,
+            contactoEmergencia: data.contactoEmergencia.trim() || null,
             tipoDocumento: (data.tipoDocumento || null) as never,
             numeroDocumento: data.numeroDocumento.trim() || null,
             razonSocial: data.razonSocial.trim() || null,
@@ -169,6 +181,10 @@ export type UpdateSocioData = {
   tipoDocumento: string;
   numeroDocumento: string;
   direccion: string;
+  ciudad: string;
+  provincia: string;
+  codigoPostal: string;
+  contactoEmergencia: string;
   razonSocial: string;
   condicionIva: string;
 };
@@ -227,6 +243,10 @@ export async function updateSocioAction(data: UpdateSocioData): Promise<{ error?
         tipoDocumento: (data.tipoDocumento || null) as never,
         numeroDocumento: data.numeroDocumento.trim() || null,
         direccion: data.direccion.trim() || null,
+        ciudad: data.ciudad.trim() || null,
+        provincia: data.provincia.trim() || null,
+        codigoPostal: data.codigoPostal.trim() || null,
+        contactoEmergencia: data.contactoEmergencia.trim() || null,
         razonSocial: data.razonSocial.trim() || null,
         condicionIva: (data.condicionIva || null) as never,
       })
