@@ -119,13 +119,6 @@ type Servicio = {
   precio: string | null;
 };
 
-type ServiciosContratado = {
-  embarcacionNombre: string;
-  espacioLabel: string;
-  servicioNombre: string | null;
-  precio: string | null;
-};
-
 type Navegante = {
   id: string;
   nombre: string;
@@ -2115,7 +2108,6 @@ export function SocioDetail({
   documentos = [],
   salidas = [],
   espaciosDisponibles,
-  serviciosContratados = [],
   paywayPublicKey = null,
   paywayToken = null,
 }: {
@@ -2127,7 +2119,6 @@ export function SocioDetail({
   documentos?: DocumentoItem[];
   salidas?: SalidaItem[];
   espaciosDisponibles: EspacioOption[];
-  serviciosContratados?: ServiciosContratado[];
   paywayPublicKey?: string | null;
   paywayToken?: PaywayTokenInfo | null;
 }) {
@@ -2649,7 +2640,7 @@ export function SocioDetail({
 
       {/* Servicios Contratados */}
       {activeTab === 'servicios-contratados' && (
-        <ServiciosContratadosTab serviciosContratados={serviciosContratados} />
+        <ServiciosContratadosTab movimientos={movimientos} />
       )}
 
       {/* Cuenta Corriente */}
@@ -3243,19 +3234,51 @@ function ImpositivosTab({
   );
 }
 
-function ServiciosContratadosTab({
-  serviciosContratados,
-}: {
-  serviciosContratados: ServiciosContratado[];
-}) {
-  if (serviciosContratados.length === 0) {
+function ServiciosContratadosTab({ movimientos }: { movimientos: Movimiento[] }) {
+  // Agrupa los movimientos que tienen servicio (cargados via "Cargar Consumo")
+  // por servicioId → servicio nombre, cantidad de cargos y total debitado.
+  type Resumen = {
+    servicioId: string;
+    servicioNombre: string;
+    cantidad: number;
+    total: number;
+    ultimaFecha: string | null;
+  };
+
+  const mapaServicios = new Map<string, Resumen>();
+  for (const m of movimientos) {
+    if (!m.servicioId || !m.servicioNombre) continue;
+    const prev = mapaServicios.get(m.servicioId);
+    const importe = parseFloat(m.debe ?? '0') || 0;
+    if (prev) {
+      prev.cantidad += 1;
+      prev.total += importe;
+      if (m.fecha && (!prev.ultimaFecha || m.fecha > prev.ultimaFecha)) {
+        prev.ultimaFecha = m.fecha;
+      }
+    } else {
+      mapaServicios.set(m.servicioId, {
+        servicioId: m.servicioId,
+        servicioNombre: m.servicioNombre,
+        cantidad: 1,
+        total: importe,
+        ultimaFecha: m.fecha,
+      });
+    }
+  }
+  const servicios = [...mapaServicios.values()].sort((a, b) =>
+    a.servicioNombre.localeCompare(b.servicioNombre),
+  );
+
+  if (servicios.length === 0) {
     return (
       <EmptyState
         icon={<Package className="h-7 w-7 opacity-40" />}
-        text="El socio no tiene embarcaciones asignadas a espacios todavía."
+        text="No se han cargado consumos para este socio todavía."
       />
     );
   }
+
   return (
     <div className="rounded-2xl bg-white p-6 shadow-sm">
       <p className="mb-4 text-[18px] font-bold" style={{ color: '#101828' }}>
@@ -3265,24 +3288,24 @@ function ServiciosContratadosTab({
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-100 text-left text-xs font-semibold text-gray-400 uppercase">
-              <th className="pr-4 pb-2">Embarcación</th>
-              <th className="pr-4 pb-2">Espacio</th>
-              <th className="pr-4 pb-2">Tarifa</th>
-              <th className="pb-2 text-right">Precio / mes</th>
+              <th className="pr-4 pb-2">Servicio</th>
+              <th className="pr-4 pb-2 text-center">Cargos</th>
+              <th className="pr-4 pb-2">Último cargo</th>
+              <th className="pb-2 text-right">Total facturado</th>
             </tr>
           </thead>
           <tbody>
-            {serviciosContratados.map((s, i) => (
-              <tr key={i} className="border-b border-gray-50 last:border-0">
+            {servicios.map((s) => (
+              <tr key={s.servicioId} className="border-b border-gray-50 last:border-0">
                 <td className="py-3 pr-4 font-medium" style={{ color: '#101828' }}>
-                  {s.embarcacionNombre}
+                  {s.servicioNombre}
                 </td>
-                <td className="py-3 pr-4 text-gray-600">{s.espacioLabel}</td>
-                <td className="py-3 pr-4 text-gray-600">{s.servicioNombre ?? '—'}</td>
+                <td className="py-3 pr-4 text-center text-gray-600">{s.cantidad}</td>
+                <td className="py-3 pr-4 text-gray-600">
+                  {s.ultimaFecha ? fmtDate(s.ultimaFecha) : '—'}
+                </td>
                 <td className="py-3 text-right font-medium" style={{ color: '#101828' }}>
-                  {s.precio
-                    ? `$${Number(s.precio).toLocaleString('es-AR', { minimumFractionDigits: 2 })}`
-                    : '—'}
+                  {fmt(s.total)}
                 </td>
               </tr>
             ))}

@@ -332,27 +332,11 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
     return partes.join(' · ') || 'Espacio';
   }
 
-  // Mapa espacioId → datos del espacio para enriquecer las embarcaciones.
+  // Mapa espacioId → label para enriquecer las embarcaciones.
   const espacioLabelMap = new Map<string, string>();
-  const espacioSocioMap = new Map<string, (typeof espaciosSocioRows)[number]>();
   for (const e of espaciosSocioRows) {
     espacioLabelMap.set(e.id, labelEspacio(e));
-    espacioSocioMap.set(e.id, e);
   }
-
-  // Servicios contratados: por cada embarcación en un espacio, derivar
-  // el servicio/tarifa del espacio.
-  const serviciosContratados = embarcacionesList
-    .filter((e) => e.espacioId != null)
-    .map((emb) => {
-      const esp = espacioSocioMap.get(emb.espacioId!);
-      return {
-        embarcacionNombre: emb.nombre,
-        espacioLabel: esp ? labelEspacio(esp) : (emb.espacioId ?? ''),
-        servicioNombre: esp?.servicioNombre ?? null,
-        precio: esp?.servicioPrecio ?? null,
-      };
-    });
 
   // El filtro por eslora se hace por barco en EspacioEmbarcacionRow.
   // Acá pasamos todos los espacios disponibles con sus datos de eslora y precio.
@@ -391,7 +375,6 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
         espacioLabel: e.espacioId ? (espacioLabelMap.get(e.espacioId) ?? null) : null,
       }))}
       espaciosDisponibles={espaciosDisponiblesView}
-      serviciosContratados={serviciosContratados}
       movimientos={movimientosList.map((m) => ({
         ...m,
         fecha: m.fecha?.toISOString() ?? null,
