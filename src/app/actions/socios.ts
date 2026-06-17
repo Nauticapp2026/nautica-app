@@ -2,12 +2,21 @@
 
 import { revalidatePath } from 'next/cache';
 import { db } from '@/lib/db';
-import { documentos, embarcaciones, memberships, profiles } from '@/lib/db/schema';
+import {
+  documentos,
+  embarcaciones,
+  memberships,
+  movimientosCuentaCorriente,
+  profiles,
+  servicios as serviciosTable,
+  socioServiciosCancelados,
+} from '@/lib/db/schema';
 import { getActiveMarina } from '@/lib/auth/session';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { translateInviteError } from '@/lib/auth/errors';
 import { and, eq, max } from 'drizzle-orm';
 import { z } from 'zod';
+import { randomUUID } from 'node:crypto';
 
 async function nextNumeroSocio(guarderiaId: string): Promise<number> {
   const [row] = await db
@@ -531,5 +540,80 @@ export async function updateSocioStatusAction(
     return {};
   } catch {
     return { error: 'Error al actualizar el estado.' };
+  }
+}
+
+// ─── Cancelar servicio contratado ────────────────────────────────────────────
+
+const cancelarServicioSchema = z.object({
+  socioId: z.string().uuid(),
+  servicioId: z.string().uuid(),
+  cobrarProporcional: z.boolean(),
+  monto: z.string().optional(),
+  fecha: z.string().optional(),
+  concepto: z.string().optional(),
+});
+
+export async function cancelarServicioAction(input: unknown) {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+
+  const parsed = cancelarServicioSchema.safeParse(input);
+  if (!parsed.success) return { error: 'Datos inválidos' };
+
+  const { socioId, servicioId, cobrarProporcional, monto, fecha, concepto } = parsed.data;
+  const guarderiaId = ctx.activeMembership.guarderiaId;
+
+  try {
+    // Verificar que el socio pertenece a la guardería.
+    const [membership] = await db
+      .select({ id: memberships.id })
+      .from(memberships)
+      .where(
+        and(
+          eq(memberships.userId, socioId),
+          eq(memberships.guarderiaId, guarderiaId),
+          eq(memberships.rol, 'socio'),
+        ),
+      )
+      .limit(1);
+    if (!membership) return { error: 'Socio no encontrado' };
+
+    // Verificar que el servicio pertenece a la guardería.
+    const [servicio] = await db
+      .select({ id: serviciosTable.id })
+      .from(serviciosTable)
+      .where(and(eq(serviciosTable.id, servicioId), eq(serviciosTable.guarderiaId, guarderiaId)))
+      .limit(1);
+    if (!servicio) return { error: 'Servicio no encontrado' };
+
+    // Registrar cancelación (ignora si ya existía).
+    await db
+      .insert(socioServiciosCancelados)
+      .values({
+        socioId,
+        servicioId,
+        guarderiaId,
+        fechaCancelacion: new Date().toISOString().split('T')[0],
+      })
+      .onConflictDoNothing();
+
+    // Si el admin eligió cobrar el proporcional, crear el movimiento.
+    if (cobrarProporcional && monto && fecha) {
+      await db.insert(movimientosCuentaCorriente).values({
+        socioId,
+        servicioId,
+        concepto: concepto ?? 'Proporcional por cancelación de servicio',
+        tipo: 'otro',
+        debe: monto,
+        fecha: new Date(fecha),
+        estado: 'no_pagado',
+      });
+    }
+
+    revalidatePath(`/usuarios/${socioId}`);
+    return {};
+  } catch {
+    return { error: 'Error al cancelar el servicio.' };
   }
 }

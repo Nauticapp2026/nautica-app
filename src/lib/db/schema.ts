@@ -11,6 +11,7 @@ import {
   date,
   jsonb,
   primaryKey,
+  unique,
   uniqueIndex,
   index,
   type AnyPgColumn,
@@ -1377,6 +1378,25 @@ export const guarderiaPlanHistorial = pgTable(
     createdBy: uuid('created_by').references(() => profiles.id, { onDelete: 'set null' }),
   },
   (t) => [index('guarderia_plan_historial_guarderia_idx').on(t.guarderiaId, t.efectivoDesde)],
+);
+
+export const socioServiciosCancelados = pgTable(
+  'socio_servicios_cancelados',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    socioId: uuid('socio_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    servicioId: uuid('servicio_id')
+      .notNull()
+      .references(() => servicios.id, { onDelete: 'cascade' }),
+    guarderiaId: uuid('guarderia_id')
+      .notNull()
+      .references(() => guarderias.id, { onDelete: 'cascade' }),
+    fechaCancelacion: date('fecha_cancelacion').notNull().defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [unique().on(t.socioId, t.servicioId, t.guarderiaId)],
 );
 
 // Tabla genérica key/value para settings globales de la plataforma. Hoy guarda

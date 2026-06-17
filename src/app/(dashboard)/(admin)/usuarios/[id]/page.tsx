@@ -21,6 +21,7 @@ import {
   porteriaInvitados,
   profiles,
   servicios as serviciosTable,
+  socioServiciosCancelados,
 } from '@/lib/db/schema';
 import { eq, and, desc, inArray, isNull, asc } from 'drizzle-orm';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -85,6 +86,7 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
     espaciosDisponibles,
     guarderiaRow,
     paywayTokenRow,
+    cancelacionesList,
   ] = await Promise.all([
     db
       .select({
@@ -253,6 +255,19 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
       .from(paywayTokens)
       .where(and(eq(paywayTokens.socioId, id), eq(paywayTokens.guarderiaId, gId)))
       .limit(1),
+
+    db
+      .select({
+        servicioId: socioServiciosCancelados.servicioId,
+        fechaCancelacion: socioServiciosCancelados.fechaCancelacion,
+      })
+      .from(socioServiciosCancelados)
+      .where(
+        and(
+          eq(socioServiciosCancelados.socioId, id),
+          eq(socioServiciosCancelados.guarderiaId, gId),
+        ),
+      ),
   ]);
 
   // Para cada movimiento facturado, traer el código de la factura. Lo
@@ -382,6 +397,10 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
         facturaArchivo: facturasPorMovimiento.get(m.id)?.archivo ?? null,
       }))}
       servicios={serviciosList}
+      cancelaciones={cancelacionesList.map((c) => ({
+        servicioId: c.servicioId,
+        fechaCancelacion: c.fechaCancelacion ?? new Date().toISOString().split('T')[0],
+      }))}
       navegantes={navegantesList.map((n) => ({
         ...n,
         desde: n.desde?.toISOString() ?? null,

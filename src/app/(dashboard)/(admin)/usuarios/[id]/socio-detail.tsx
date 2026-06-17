@@ -43,6 +43,7 @@ import {
 import { assignEspacioToSocioAction, moveOcupanteAction } from '@/app/actions/espacios';
 import { toast } from 'sonner';
 import {
+  cancelarServicioAction,
   deleteSocioAction,
   deleteSocioDocumentoAction,
   updateNumeroSocioAction,
@@ -2108,6 +2109,7 @@ export function SocioDetail({
   documentos = [],
   salidas = [],
   espaciosDisponibles,
+  cancelaciones = [],
   paywayPublicKey = null,
   paywayToken = null,
 }: {
@@ -2119,6 +2121,7 @@ export function SocioDetail({
   documentos?: DocumentoItem[];
   salidas?: SalidaItem[];
   espaciosDisponibles: EspacioOption[];
+  cancelaciones?: { servicioId: string; fechaCancelacion: string }[];
   paywayPublicKey?: string | null;
   paywayToken?: PaywayTokenInfo | null;
 }) {
@@ -2640,7 +2643,12 @@ export function SocioDetail({
 
       {/* Servicios Contratados */}
       {activeTab === 'servicios-contratados' && (
-        <ServiciosContratadosTab movimientos={movimientos} />
+        <ServiciosContratadosTab
+          movimientos={movimientos}
+          servicios={servicios}
+          cancelaciones={cancelaciones}
+          socioId={socio.id}
+        />
       )}
 
       {/* Cuenta Corriente */}
@@ -3234,9 +3242,22 @@ function ImpositivosTab({
   );
 }
 
-function ServiciosContratadosTab({ movimientos }: { movimientos: Movimiento[] }) {
-  // Agrupa los movimientos que tienen servicio (cargados via "Cargar Consumo")
-  // por servicioId → servicio nombre, cantidad de cargos y total debitado.
+function ServiciosContratadosTab({
+  movimientos,
+  servicios,
+  cancelaciones,
+  socioId,
+}: {
+  movimientos: Movimiento[];
+  servicios: Servicio[];
+  cancelaciones: { servicioId: string; fechaCancelacion: string }[];
+  socioId: string;
+}) {
+  const router = useRouter();
+  const [cancelandoId, setCancelandoId] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  // Agrupa movimientos por servicio.
   type Resumen = {
     servicioId: string;
     servicioNombre: string;
@@ -3244,7 +3265,6 @@ function ServiciosContratadosTab({ movimientos }: { movimientos: Movimiento[] })
     total: number;
     ultimaFecha: string | null;
   };
-
   const mapaServicios = new Map<string, Resumen>();
   for (const m of movimientos) {
     if (!m.servicioId || !m.servicioNombre) continue;
@@ -3266,11 +3286,61 @@ function ServiciosContratadosTab({ movimientos }: { movimientos: Movimiento[] })
       });
     }
   }
-  const servicios = [...mapaServicios.values()].sort((a, b) =>
+  const filas = [...mapaServicios.values()].sort((a, b) =>
     a.servicioNombre.localeCompare(b.servicioNombre),
   );
 
-  if (servicios.length === 0) {
+  const cancelacionMap = new Map(cancelaciones.map((c) => [c.servicioId, c.fechaCancelacion]));
+
+  // Calcula el proporcional para el mes actual basado en el día de hoy.
+  function calcularProporcional(precio: string): {
+    monto: number;
+    diasUsados: number;
+    diasMes: number;
+  } {
+    const hoy = new Date();
+    const diasMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0).getDate();
+    const diasUsados = hoy.getDate();
+    const monto = Math.round((diasUsados / diasMes) * parseFloat(precio) * 100) / 100;
+    return { monto, diasUsados, diasMes };
+  }
+
+  // Servicio seleccionado para cancelar (para el dialog).
+  const servicioSeleccionado = cancelandoId
+    ? (filas.find((f) => f.servicioId === cancelandoId) ?? null)
+    : null;
+  const precioServicio = cancelandoId
+    ? (servicios.find((s) => s.id === cancelandoId)?.precio ?? null)
+    : null;
+  const proporcional = precioServicio ? calcularProporcional(precioServicio) : null;
+
+  function handleCancelar(cobrarProporcional: boolean) {
+    if (!cancelandoId) return;
+    startTransition(async () => {
+      const hoy = new Date();
+      const res = await cancelarServicioAction({
+        socioId,
+        servicioId: cancelandoId,
+        cobrarProporcional,
+        ...(cobrarProporcional && proporcional
+          ? {
+              monto: String(proporcional.monto),
+              fecha: hoy.toISOString().split('T')[0],
+              concepto: `Proporcional ${servicioSeleccionado?.servicioNombre ?? 'servicio'} — ${proporcional.diasUsados} días`,
+            }
+          : {}),
+      });
+      if (res?.error) {
+        toast.error(res.error);
+      } else {
+        toast.success('Servicio cancelado');
+        setCancelandoId(null);
+        router.refresh();
+      }
+    });
+  }
+
+  if (filas.length === 0) {
     return (
       <EmptyState
         icon={<Package className="h-7 w-7 opacity-40" />}
@@ -3280,39 +3350,136 @@ function ServiciosContratadosTab({ movimientos }: { movimientos: Movimiento[] })
   }
 
   return (
-    <div className="rounded-2xl bg-white p-6 shadow-sm">
-      <p className="mb-4 text-[18px] font-bold" style={{ color: '#101828' }}>
-        Servicios contratados
-      </p>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-gray-100 text-left text-xs font-semibold text-gray-400 uppercase">
-              <th className="pr-4 pb-2">Servicio</th>
-              <th className="pr-4 pb-2 text-center">Cargos</th>
-              <th className="pr-4 pb-2">Último cargo</th>
-              <th className="pb-2 text-right">Total facturado</th>
-            </tr>
-          </thead>
-          <tbody>
-            {servicios.map((s) => (
-              <tr key={s.servicioId} className="border-b border-gray-50 last:border-0">
-                <td className="py-3 pr-4 font-medium" style={{ color: '#101828' }}>
-                  {s.servicioNombre}
-                </td>
-                <td className="py-3 pr-4 text-center text-gray-600">{s.cantidad}</td>
-                <td className="py-3 pr-4 text-gray-600">
-                  {s.ultimaFecha ? fmtDate(s.ultimaFecha) : '—'}
-                </td>
-                <td className="py-3 text-right font-medium" style={{ color: '#101828' }}>
-                  {fmt(s.total)}
-                </td>
+    <>
+      <div className="rounded-2xl bg-white p-6 shadow-sm">
+        <p className="mb-4 text-[18px] font-bold" style={{ color: '#101828' }}>
+          Servicios contratados
+        </p>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-100 text-left text-xs font-semibold text-gray-400 uppercase">
+                <th className="pr-4 pb-2">Servicio</th>
+                <th className="pr-4 pb-2 text-center">Cargos</th>
+                <th className="pr-4 pb-2">Último cargo</th>
+                <th className="pr-4 pb-2 text-right">Total</th>
+                <th className="pb-2" />
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {filas.map((s) => {
+                const cancelado = cancelacionMap.get(s.servicioId);
+                return (
+                  <tr key={s.servicioId} className="border-b border-gray-50 last:border-0">
+                    <td className="py-3 pr-4">
+                      <span className="font-medium" style={{ color: '#101828' }}>
+                        {s.servicioNombre}
+                      </span>
+                      {cancelado && (
+                        <span className="ml-2 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-600">
+                          Cancelado {fmtDate(cancelado)}
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-3 pr-4 text-center text-gray-600">{s.cantidad}</td>
+                    <td className="py-3 pr-4 text-gray-600">
+                      {s.ultimaFecha ? fmtDate(s.ultimaFecha) : '—'}
+                    </td>
+                    <td className="py-3 pr-4 text-right font-medium" style={{ color: '#101828' }}>
+                      {fmt(s.total)}
+                    </td>
+                    <td className="py-3 text-right">
+                      {!cancelado && (
+                        <button
+                          onClick={() => setCancelandoId(s.servicioId)}
+                          className="rounded-[8px] border border-red-200 px-3 py-1 text-xs font-medium text-red-600 transition hover:bg-red-50"
+                        >
+                          Cancelar
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
-    </div>
+
+      {/* Dialog de cancelación */}
+      {cancelandoId && servicioSeleccionado && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+            <p className="mb-1 text-base font-bold" style={{ color: '#101828' }}>
+              Cancelar servicio
+            </p>
+            <p className="mb-4 text-sm text-gray-500">{servicioSeleccionado.servicioNombre}</p>
+
+            {proporcional ? (
+              <>
+                <p className="mb-4 text-sm text-gray-700">
+                  El servicio estuvo activo <strong>{proporcional.diasUsados}</strong> de{' '}
+                  <strong>{proporcional.diasMes}</strong> días del mes. ¿Querés cargar el
+                  proporcional a la cuenta corriente?
+                </p>
+                <div className="mb-5 rounded-xl border border-gray-100 bg-gray-50 p-3 text-center">
+                  <p className="text-xs text-gray-500">Importe proporcional</p>
+                  <p className="text-xl font-bold" style={{ color: '#101828' }}>
+                    {fmt(proporcional.monto)}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setCancelandoId(null)}
+                    disabled={isPending}
+                    className="flex-1 rounded-[10px] border border-gray-200 py-2.5 text-sm font-medium text-gray-600 transition hover:bg-gray-50 disabled:opacity-40"
+                  >
+                    Volver
+                  </button>
+                  <button
+                    onClick={() => handleCancelar(false)}
+                    disabled={isPending}
+                    className="flex-1 rounded-[10px] border border-red-200 py-2.5 text-sm font-medium text-red-600 transition hover:bg-red-50 disabled:opacity-40"
+                  >
+                    Solo cancelar
+                  </button>
+                  <button
+                    onClick={() => handleCancelar(true)}
+                    disabled={isPending}
+                    className="flex-1 rounded-[10px] py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-40"
+                    style={{ background: '#175861' }}
+                  >
+                    {isPending ? '...' : 'Cobrar y cancelar'}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="mb-5 text-sm text-gray-700">
+                  El historial de cargos quedará visible. Esta acción no se puede deshacer.
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setCancelandoId(null)}
+                    disabled={isPending}
+                    className="flex-1 rounded-[10px] border border-gray-200 py-2.5 text-sm font-medium text-gray-600 transition hover:bg-gray-50 disabled:opacity-40"
+                  >
+                    Volver
+                  </button>
+                  <button
+                    onClick={() => handleCancelar(false)}
+                    disabled={isPending}
+                    className="flex-1 rounded-[10px] bg-red-600 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-40"
+                  >
+                    {isPending ? 'Cancelando...' : 'Confirmar cancelación'}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
