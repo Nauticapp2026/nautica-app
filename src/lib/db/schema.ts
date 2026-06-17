@@ -119,6 +119,14 @@ export const tipoDocumentoAdjuntoEnum = pgEnum('tipo_documento_adjunto', [
   'seguro',
 ]);
 
+export const condicionIibbEnum = pgEnum('condicion_iibb', [
+  'convenio_multilateral',
+  'local',
+  'exento',
+  'no_gravado',
+  'no_corresponde',
+]);
+
 export const condicionFrenteIvaEnum = pgEnum('condicion_frente_iva', [
   'consumidor_final',
   'responsable_inscripto',
@@ -349,6 +357,7 @@ export const guarderias = pgTable(
     condicionIva: condicionFrenteIvaEnum('condicion_iva'),
     rubro: text('rubro'),
     iibb: text('iibb'),
+    condicionIibb: condicionIibbEnum('condicion_iibb'),
     fechaInicio: timestamp('fecha_inicio', { withTimezone: true }),
     // Día del mes (1-28) en que se generan movimientos mensuales y auto-facturación.
     diaFacturacion: integer('dia_facturacion').default(1),

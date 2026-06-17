@@ -11,6 +11,7 @@ import {
   FilterX,
   Minus,
   Plus,
+  Receipt,
   Trash2,
   Users,
   X,
@@ -42,12 +43,13 @@ import {
 import { EmptyState } from '@/components/shared/empty-state';
 import { ImagesUploader } from '@/components/shared/images-uploader';
 
-export type TabKey = 'info' | 'equipo' | 'plan' | 'payway';
+export type TabKey = 'info' | 'impositivos' | 'equipo' | 'plan' | 'payway';
 
 export type PaywayData = SavePaywayCredsData;
 
 const TABS: { key: TabKey; label: string; icon: typeof Bell }[] = [
   { key: 'info', label: 'Información general', icon: Building2 },
+  { key: 'impositivos', label: 'Datos impositivos', icon: Receipt },
   { key: 'equipo', label: 'Equipo', icon: Users },
   { key: 'plan', label: 'Plan', icon: CreditCard },
   { key: 'payway', label: 'Payway', icon: CreditCard },
@@ -73,22 +75,42 @@ const DIAS_LABELS: Record<HorarioInput['dia'], string> = {
 
 export type InfoGeneralData = UpdateGuarderiaGeneralData;
 
+type CondicionIvaValue =
+  | 'monotributo'
+  | 'responsable_inscripto'
+  | 'consumidor_final'
+  | 'exento'
+  | 'cliente_exterior'
+  | 'iva_no_alcanzado'
+  | 'proveedor_exterior';
+
 export type PuntoVentaData = {
   puntoDeVenta: number | null;
   razonSocial: string;
-  condicionIva: SavePuntoVentaData['condicionIva'];
-  rubro: string;
+  cuit: string;
+  condicionIva: CondicionIvaValue;
+  condicionIibb: string;
+  direccion: string; // read-only, viene de Datos de la Guardería
   fechaInicio: string; // 'YYYY-MM-DD' o ''
   certificadoAfipOk: boolean;
 };
 
-const CONDICION_IVA_OPTS: { value: SavePuntoVentaData['condicionIva']; label: string }[] = [
+const CONDICION_IVA_OPTS: { value: CondicionIvaValue; label: string }[] = [
   { value: 'monotributo', label: 'Monotributo' },
   { value: 'responsable_inscripto', label: 'Responsable Inscripto' },
   { value: 'consumidor_final', label: 'Consumidor Final' },
   { value: 'exento', label: 'Exento' },
   { value: 'cliente_exterior', label: 'Cliente Exterior' },
   { value: 'iva_no_alcanzado', label: 'IVA No Alcanzado' },
+];
+
+const CONDICION_IIBB_OPTS: { value: string; label: string }[] = [
+  { value: '', label: '— Sin especificar —' },
+  { value: 'convenio_multilateral', label: 'Convenio Multilateral' },
+  { value: 'local', label: 'Local' },
+  { value: 'exento', label: 'Exento' },
+  { value: 'no_gravado', label: 'No Gravado' },
+  { value: 'no_corresponde', label: 'No corresponde' },
 ];
 
 export type Rol = CreateMiembroEquipoData['rol'];
@@ -180,7 +202,20 @@ export function ConfiguracionClient({
   initialAltaEquipoOpen?: boolean;
 }) {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<TabKey>(initialTab);
+
+  const infoGeneralCompleta = !!(
+    infoGeneral.nombre.trim() &&
+    infoGeneral.direccion.trim() &&
+    infoGeneral.email.trim()
+  );
+  const posConfigurado = puntoVenta.puntoDeVenta != null;
+  const showImpositivosTab = infoGeneralCompleta && posConfigurado;
+
+  const visibleTabs = TABS.filter((t) => t.key !== 'impositivos' || showImpositivosTab);
+
+  const [activeTab, setActiveTab] = useState<TabKey>(
+    initialTab === 'impositivos' && !showImpositivosTab ? 'info' : initialTab,
+  );
 
   // Limpiar la query string después de consumirla, así un reload no reabre el modal.
   useEffect(() => {
@@ -199,7 +234,7 @@ export function ConfiguracionClient({
 
       <div className="mb-6 overflow-x-auto border-b border-gray-200">
         <div className="flex min-w-max items-center gap-2 whitespace-nowrap">
-          {TABS.map(({ key, label, icon: Icon }) => {
+          {visibleTabs.map(({ key, label, icon: Icon }) => {
             const isActive = activeTab === key;
             return (
               <button
@@ -223,11 +258,14 @@ export function ConfiguracionClient({
       {activeTab === 'info' && (
         <>
           <InfoGeneralForm initial={infoGeneral} />
-          <div className="mt-6">
-            <PuntoVentaTab initial={puntoVenta} />
-          </div>
+          {!showImpositivosTab && (
+            <div className="mt-6">
+              <PuntoVentaTab initial={puntoVenta} />
+            </div>
+          )}
         </>
       )}
+      {activeTab === 'impositivos' && <PuntoVentaTab initial={puntoVenta} />}
       {activeTab === 'equipo' && (
         <EquipoTab
           miembros={miembros}
@@ -281,7 +319,7 @@ function InfoGeneralForm({ initial }: { initial: InfoGeneralData }) {
   return (
     <section className="rounded-2xl border border-gray-200 bg-white p-4 md:p-8">
       <h2 className="mb-6 text-base font-bold" style={{ color: '#101828' }}>
-        Datos de la Guardería
+        Información general
       </h2>
 
       <div className="space-y-4">
@@ -294,13 +332,6 @@ function InfoGeneralForm({ initial }: { initial: InfoGeneralData }) {
         </Field>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <Field label="CUIT" required>
-            <input
-              className={inputCls}
-              value={data.cuit}
-              onChange={(e) => onField('cuit', e.target.value)}
-            />
-          </Field>
           <Field label="Tipo de establecimiento" required>
             <select
               className={inputCls}
@@ -1443,16 +1474,25 @@ function PuntoVentaTab({ initial }: { initial: PuntoVentaData }) {
       setFeedback({ type: 'error', msg: 'Ingresá un número de referencia válido.' });
       return;
     }
+    if (!data.razonSocial.trim()) {
+      setFeedback({ type: 'error', msg: 'La razón social es obligatoria.' });
+      return;
+    }
+    if (!data.cuit.trim()) {
+      setFeedback({ type: 'error', msg: 'El CUIT es obligatorio.' });
+      return;
+    }
     if (!data.fechaInicio) {
-      setFeedback({ type: 'error', msg: 'Elegí la fecha de inicio.' });
+      setFeedback({ type: 'error', msg: 'Elegí la fecha de inicio de actividades.' });
       return;
     }
     startTransition(async () => {
       const res = await savePuntoVentaAction({
         puntoDeVenta: data.puntoDeVenta!,
         razonSocial: data.razonSocial,
-        condicionIva: data.condicionIva,
-        rubro: data.rubro,
+        cuit: data.cuit,
+        condicionIva: data.condicionIva as SavePuntoVentaData['condicionIva'],
+        condicionIibb: data.condicionIibb as SavePuntoVentaData['condicionIibb'],
         fechaInicio: data.fechaInicio,
       });
       if (res.error) setFeedback({ type: 'error', msg: res.error });
@@ -1462,6 +1502,8 @@ function PuntoVentaTab({ initial }: { initial: PuntoVentaData }) {
   };
 
   const readOnlyCls = readOnly ? 'bg-gray-50 text-gray-500' : '';
+  const condicionIvaLabel =
+    CONDICION_IVA_OPTS.find((o) => o.value === data.condicionIva)?.label ?? null;
 
   return (
     <section className="rounded-2xl border border-gray-200 bg-white p-4 md:p-8">
@@ -1486,7 +1528,7 @@ function PuntoVentaTab({ initial }: { initial: PuntoVentaData }) {
 
       <div className="space-y-4">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <Field label="Número de Referencia" required>
+          <Field label="Nº de referencia" required>
             <input
               className={`${inputCls} ${readOnlyCls}`}
               type="number"
@@ -1499,33 +1541,6 @@ function PuntoVentaTab({ initial }: { initial: PuntoVentaData }) {
               }
             />
           </Field>
-          <Field label="Condición frente IVA" required>
-            <select
-              className={`${inputCls} ${readOnlyCls}`}
-              value={data.condicionIva}
-              disabled={readOnly}
-              onChange={(e) =>
-                onField('condicionIva', e.target.value as PuntoVentaData['condicionIva'])
-              }
-            >
-              {CONDICION_IVA_OPTS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </Field>
-        </div>
-
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <Field label="Rubro" required>
-            <input
-              className={`${inputCls} ${readOnlyCls}`}
-              value={data.rubro}
-              disabled={readOnly}
-              onChange={(e) => onField('rubro', e.target.value)}
-            />
-          </Field>
           <Field label="Razón social" required>
             <input
               className={`${inputCls} ${readOnlyCls}`}
@@ -1536,7 +1551,73 @@ function PuntoVentaTab({ initial }: { initial: PuntoVentaData }) {
           </Field>
         </div>
 
-        <Field label="Fecha inicio" required>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <Field label="CUIT" required>
+            <input
+              className={`${inputCls} ${readOnlyCls}`}
+              value={data.cuit}
+              disabled={readOnly}
+              placeholder="20-12345678-9"
+              onChange={(e) => onField('cuit', e.target.value)}
+            />
+          </Field>
+          <Field label="Condición frente al IVA" required>
+            {readOnly ? (
+              <div className="flex h-11 items-center rounded-[10px] border border-gray-200 bg-gray-50 px-4 text-sm text-gray-500">
+                {condicionIvaLabel ?? '—'}
+              </div>
+            ) : (
+              <select
+                className={inputCls}
+                value={data.condicionIva}
+                onChange={(e) =>
+                  onField('condicionIva', e.target.value as PuntoVentaData['condicionIva'])
+                }
+              >
+                {CONDICION_IVA_OPTS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            )}
+          </Field>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <Field label="Condición Ingresos Brutos">
+            {readOnly ? (
+              <div className="flex h-11 items-center rounded-[10px] border border-gray-200 bg-gray-50 px-4 text-sm text-[#101828]">
+                {CONDICION_IIBB_OPTS.find((o) => o.value === data.condicionIibb)?.label || '—'}
+              </div>
+            ) : (
+              <select
+                className={inputCls}
+                value={data.condicionIibb}
+                onChange={(e) => onField('condicionIibb', e.target.value)}
+              >
+                {CONDICION_IIBB_OPTS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            )}
+          </Field>
+          <Field label="Domicilio fiscal">
+            <div className="flex h-11 items-center rounded-[10px] border border-gray-200 bg-gray-50 px-4 text-sm">
+              {data.direccion ? (
+                <span className="text-[#101828]">{data.direccion}</span>
+              ) : (
+                <span className="text-gray-400">
+                  Sin configurar — completá en Información general
+                </span>
+              )}
+            </div>
+          </Field>
+        </div>
+
+        <Field label="Fecha de inicio de actividades" required>
           <input
             className={`${inputCls} ${readOnlyCls}`}
             type="date"

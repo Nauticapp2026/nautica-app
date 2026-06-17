@@ -37,7 +37,6 @@ export type HorarioInput = {
 
 export type UpdateGuarderiaGeneralData = {
   nombre: string;
-  cuit: string;
   tipo: Tipo;
   direccion: string;
   ciudad: string;
@@ -69,7 +68,6 @@ export async function updateGuarderiaGeneralAction(
 
   const nombre = data.nombre.trim();
   if (!nombre) return { error: 'El nombre es obligatorio.' };
-  if (!data.cuit.trim()) return { error: 'El CUIT es obligatorio.' };
   if (!TIPOS.includes(data.tipo)) return { error: 'Tipo de establecimiento inválido.' };
   if (
     !Number.isInteger(data.diaFacturacion) ||
@@ -92,7 +90,6 @@ export async function updateGuarderiaGeneralAction(
     .update(guarderias)
     .set({
       nombre,
-      cuit: data.cuit.trim(),
       tipo: data.tipo,
       direccion: data.direccion.trim(),
       ciudad: data.ciudad.trim(),
@@ -193,6 +190,23 @@ const CONDICIONES_IVA = [
 ] as const;
 type CondicionIva = (typeof CONDICIONES_IVA)[number];
 
+const CONDICIONES_IIBB = [
+  'convenio_multilateral',
+  'local',
+  'exento',
+  'no_gravado',
+  'no_corresponde',
+] as const;
+type CondicionIibb = (typeof CONDICIONES_IIBB)[number];
+
+const CONDICION_IIBB_LABEL: Record<CondicionIibb, string> = {
+  convenio_multilateral: 'Convenio Multilateral',
+  local: 'Local',
+  exento: 'Exento',
+  no_gravado: 'No Gravado',
+  no_corresponde: 'No corresponde',
+};
+
 /**
  * Construye la URL del webhook de tusfacturas para este deployment.
  * - Devuelve undefined si falta TUSFACTURAS_WEBHOOK_SECRET o NEXT_PUBLIC_APP_URL.
@@ -209,8 +223,9 @@ function buildTusFacturasWebhookUrl(): string | undefined {
 export type SavePuntoVentaData = {
   puntoDeVenta: number;
   razonSocial: string;
+  cuit: string;
   condicionIva: CondicionIva;
-  rubro: string;
+  condicionIibb: CondicionIibb | '';
   fechaInicio: string; // 'YYYY-MM-DD' (del input date)
 };
 
@@ -223,8 +238,8 @@ export async function savePuntoVentaAction(data: SavePuntoVentaData): Promise<{ 
     return { error: 'El número de referencia debe ser un número entero positivo.' };
   }
   if (!data.razonSocial.trim()) return { error: 'La razón social es obligatoria.' };
+  if (!data.cuit.trim()) return { error: 'El CUIT es obligatorio.' };
   if (!CONDICIONES_IVA.includes(data.condicionIva)) return { error: 'Condición IVA inválida.' };
-  if (!data.rubro.trim()) return { error: 'El rubro es obligatorio.' };
   if (!data.fechaInicio) return { error: 'La fecha de inicio es obligatoria.' };
 
   const guarderiaId = ctx.activeMembership.guarderiaId;
@@ -232,9 +247,8 @@ export async function savePuntoVentaAction(data: SavePuntoVentaData): Promise<{ 
   const [guarderia] = await db
     .select({
       direccion: guarderias.direccion,
-      cuit: guarderias.cuit,
       email: guarderias.email,
-      iibb: guarderias.iibb,
+      rubro: guarderias.rubro,
       puntoDeVentaActual: guarderias.puntoDeVenta,
     })
     .from(guarderias)
@@ -242,9 +256,9 @@ export async function savePuntoVentaAction(data: SavePuntoVentaData): Promise<{ 
     .limit(1);
 
   if (!guarderia) return { error: 'Guardería no encontrada.' };
-  if (!guarderia.direccion || !guarderia.cuit || !guarderia.email) {
+  if (!guarderia.direccion || !guarderia.email) {
     return {
-      error: 'Completá dirección, CUIT y email en Información general antes de configurar el POS.',
+      error: 'Completá dirección y email en Datos de la Guardería antes de configurar el POS.',
     };
   }
 
@@ -266,10 +280,12 @@ export async function savePuntoVentaAction(data: SavePuntoVentaData): Promise<{ 
       punto_venta: String(data.puntoDeVenta),
       direccion: guarderia.direccion,
       razon_social: data.razonSocial.trim(),
-      cuit: guarderia.cuit,
+      cuit: data.cuit.trim(),
       iva_condicion: ivaCode,
       iva_emails: guarderia.email,
-      ...(guarderia.iibb ? { iibb: guarderia.iibb } : {}),
+      ...(data.condicionIibb
+        ? { iibb: CONDICION_IIBB_LABEL[data.condicionIibb as CondicionIibb] }
+        : {}),
       fecha_inicio: toTusFecha(data.fechaInicio),
       factura_afip: 'S',
       es_agente_retencion: 'N',
@@ -289,8 +305,10 @@ export async function savePuntoVentaAction(data: SavePuntoVentaData): Promise<{ 
     .set({
       puntoDeVenta: data.puntoDeVenta,
       razonSocial: data.razonSocial.trim(),
+      cuit: data.cuit.trim(),
       condicionIva: data.condicionIva,
-      rubro: data.rubro.trim(),
+      condicionIibb: (data.condicionIibb || null) as CondicionIibb | null,
+      rubro: guarderia.rubro?.trim() || 'Servicios náuticos',
       fechaInicio: new Date(data.fechaInicio),
       tusfacturasApikey: tusResponse.apikey != null ? String(tusResponse.apikey) : null,
       tusfacturasApitoken: tusResponse.apitoken ?? null,

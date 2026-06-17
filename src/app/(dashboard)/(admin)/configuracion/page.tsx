@@ -63,7 +63,7 @@ export default async function ConfiguracionPage({ searchParams }: Props) {
       puntoDeVenta: guarderias.puntoDeVenta,
       razonSocial: guarderias.razonSocial,
       condicionIva: guarderias.condicionIva,
-      rubro: guarderias.rubro,
+      condicionIibb: guarderias.condicionIibb,
       fechaInicio: guarderias.fechaInicio,
       imagenes: guarderias.imagenes,
       diaFacturacion: guarderias.diaFacturacion,
@@ -116,7 +116,6 @@ export default async function ConfiguracionPage({ searchParams }: Props) {
 
   const infoGeneral: InfoGeneralData = {
     nombre: guarderia?.nombre ?? '',
-    cuit: guarderia?.cuit ?? '',
     tipo: (guarderia?.tipo ?? 'club_nautico') as InfoGeneralData['tipo'],
     direccion: guarderia?.direccion ?? '',
     ciudad: guarderia?.ciudad ?? '',
@@ -187,8 +186,10 @@ export default async function ConfiguracionPage({ searchParams }: Props) {
   const puntoVenta: PuntoVentaData = {
     puntoDeVenta: guarderia?.puntoDeVenta ?? null,
     razonSocial: guarderia?.razonSocial ?? '',
+    cuit: guarderia?.cuit ?? '',
     condicionIva: (guarderia?.condicionIva ?? 'monotributo') as PuntoVentaData['condicionIva'],
-    rubro: guarderia?.rubro ?? '',
+    condicionIibb: guarderia?.condicionIibb ?? '',
+    direccion: guarderia?.direccion ?? '',
     fechaInicio: guarderia?.fechaInicio ? guarderia.fechaInicio.toISOString().slice(0, 10) : '',
     certificadoAfipOk: guarderia?.certificadoAfipOk ?? false,
   };
