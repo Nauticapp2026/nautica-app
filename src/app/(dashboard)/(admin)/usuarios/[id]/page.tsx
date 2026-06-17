@@ -58,6 +58,7 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
       memberSince: memberships.createdAt,
       membershipStatus: memberships.status,
       numeroSocio: memberships.numeroSocio,
+      facturaFiscal: memberships.facturaFiscal,
     })
     .from(profiles)
     .innerJoin(
@@ -381,6 +382,7 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
         tipoDocumento: socio.tipoDocumento ?? null,
         condicionIva: socio.condicionIva ?? null,
         estadoSocio: socio.estadoSocio ?? null,
+        facturaFiscal: socio.facturaFiscal ?? true,
       }}
       embarcaciones={embarcacionesList.map((e) => ({
         ...e,

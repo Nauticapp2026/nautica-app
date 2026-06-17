@@ -617,3 +617,28 @@ export async function cancelarServicioAction(input: unknown) {
     return { error: 'Error al cancelar el servicio.' };
   }
 }
+
+// ─── Toggle facturaFiscal ────────────────────────────────────────────────────
+
+export async function toggleFacturaFiscalAction(socioId: string, value: boolean) {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+  const guarderiaId = ctx.activeMembership.guarderiaId;
+  try {
+    await db
+      .update(memberships)
+      .set({ facturaFiscal: value })
+      .where(
+        and(
+          eq(memberships.userId, socioId),
+          eq(memberships.guarderiaId, guarderiaId),
+          eq(memberships.rol, 'socio'),
+        ),
+      );
+    revalidatePath(`/usuarios/${socioId}`);
+    revalidatePath('/facturacion');
+    return {};
+  } catch {
+    return { error: 'Error al actualizar.' };
+  }
+}

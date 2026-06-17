@@ -46,6 +46,7 @@ import {
   cancelarServicioAction,
   deleteSocioAction,
   deleteSocioDocumentoAction,
+  toggleFacturaFiscalAction,
   updateNumeroSocioAction,
   updateSocioAction,
   updateSocioStatusAction,
@@ -85,6 +86,7 @@ type SocioData = {
   memberSince: string;
   membershipStatus: 'active' | 'suspended' | 'removed' | 'inactivo' | null;
   numeroSocio: number | null;
+  facturaFiscal: boolean;
 };
 
 type Embarcacion = {
@@ -3130,11 +3132,48 @@ function ImpositivosTab({
   editError: string | null;
   isSaving: boolean;
 }) {
+  const router = useRouter();
+  const [facturaFiscal, setFacturaFiscal] = useState(socio.facturaFiscal);
+  const [isToggling, startToggle] = useTransition();
+
   const inputCls =
     'h-11 w-full rounded-[10px] border border-gray-200 bg-white px-4 text-sm text-[#101828] focus:border-[#175861] focus:outline-none focus:ring-1 focus:ring-[#175861]';
 
+  function handleToggleFactura(checked: boolean) {
+    setFacturaFiscal(checked);
+    startToggle(async () => {
+      const res = await toggleFacturaFiscalAction(socio.id, checked);
+      if (res?.error) {
+        toast.error(res.error);
+        setFacturaFiscal(!checked);
+      } else {
+        toast.success(checked ? 'Habilitado para facturación' : 'Deshabilitado de facturación');
+        router.refresh();
+      }
+    });
+  }
+
   return (
     <div className="space-y-4">
+      {/* Check facturación */}
+      <div className="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
+        <div>
+          <p className="text-sm font-semibold" style={{ color: '#101828' }}>
+            Usar datos personales para facturación
+          </p>
+          <p className="text-xs text-gray-500">
+            Si está activo, el socio aparece en el módulo de Facturación
+          </p>
+        </div>
+        <input
+          type="checkbox"
+          checked={facturaFiscal}
+          disabled={isToggling}
+          onChange={(e) => handleToggleFactura(e.target.checked)}
+          className="h-4 w-4 cursor-pointer accent-[#175861] disabled:cursor-not-allowed"
+        />
+      </div>
+
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-bold" style={{ color: '#101828' }}>
           Datos Impositivos
