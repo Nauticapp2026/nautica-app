@@ -139,6 +139,7 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
         hasta: porteria.hasta,
         arribadaEn: porteria.arribadaEn,
         createdAt: porteria.createdAt,
+        esNavegante: porteriaInvitados.esNavegante,
       })
       .from(porteriaInvitados)
       .innerJoin(porteria, eq(porteria.id, porteriaInvitados.porteriaId))
@@ -148,7 +149,6 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
           eq(porteria.socioId, id),
           eq(porteria.guarderiaId, gId),
           eq(porteria.tipo, 'acceso_externo'),
-          eq(porteriaInvitados.esNavegante, true),
         ),
       )
       .orderBy(desc(porteria.createdAt)),
@@ -407,6 +407,7 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
         hasta: n.hasta?.toISOString() ?? null,
         arribadaEn: n.arribadaEn?.toISOString() ?? null,
         createdAt: n.createdAt.toISOString(),
+        esNavegante: n.esNavegante ?? false,
       }))}
       documentos={documentosConUrl}
       salidas={salidasList.map((s) => ({

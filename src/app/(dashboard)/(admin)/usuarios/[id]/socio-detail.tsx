@@ -129,6 +129,7 @@ type Navegante = {
   hasta: string | null;
   arribadaEn: string | null;
   createdAt: string;
+  esNavegante: boolean;
 };
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -175,7 +176,7 @@ const TABS = [
   { id: 'embarcacion', label: 'Embarcación', icon: Anchor },
   { id: 'servicios-contratados', label: 'Servicios Contratados', icon: Package },
   { id: 'cuenta-corriente', label: 'Cuenta Corriente', icon: CreditCard },
-  { id: 'navegantes', label: 'Navegantes', icon: Users },
+  { id: 'navegantes', label: 'Accesos Externos', icon: Users },
   { id: 'salidas', label: 'Salidas', icon: Clock },
   { id: 'documentacion', label: 'Documentación', icon: FileText },
   { id: 'payway', label: 'Débito automático', icon: CreditCard },
@@ -2846,13 +2847,13 @@ export function SocioDetail({
         </div>
       )}
 
-      {/* Navegantes — accesos externos del socio */}
+      {/* Accesos Externos del socio */}
       {activeTab === 'navegantes' && (
         <div className="rounded-2xl border border-gray-200 bg-white p-4 md:p-6">
           {navegantes.length === 0 ? (
             <EmptyState
               icon={<Users className="h-7 w-7 opacity-40" />}
-              text="No hay navegantes registrados."
+              text="No hay accesos externos registrados."
             />
           ) : (
             <div className="space-y-3">
@@ -2883,9 +2884,16 @@ export function SocioDetail({
                       {inicial}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold" style={{ color: '#101828' }}>
-                        {nombreCompleto}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className="truncate text-sm font-semibold" style={{ color: '#101828' }}>
+                          {nombreCompleto}
+                        </p>
+                        {n.esNavegante && (
+                          <span className="shrink-0 rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
+                            Navega
+                          </span>
+                        )}
+                      </div>
                       <div className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-gray-500">
                         {n.desde && <span>Desde {fmtDate(n.desde)}</span>}
                         {n.hasta && <span>Hasta {fmtDate(n.hasta)}</span>}

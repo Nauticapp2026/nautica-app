@@ -13,7 +13,7 @@ import {
   porteriaInvitados,
   profiles,
 } from '@/lib/db/schema';
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 import { UsuariosClient, type FiltroSocios } from './usuarios-client';
 
 export default async function UsuariosPage({
@@ -143,11 +143,15 @@ export default async function UsuariosPage({
               validoHasta: invitados.validoHasta,
             })
             .from(invitados)
+            // Excluir personas que son acceso externo: si tienen registro en
+            // porteria_invitados van a la sección "Accesos externos", no a "Invitados".
+            .leftJoin(porteriaInvitados, eq(porteriaInvitados.invitadoId, invitados.id))
             .where(
               and(
                 inArray(invitados.socioId, profileIds as string[]),
                 eq(invitados.guarderiaId, gId),
                 eq(invitados.estado, 'activo'),
+                isNull(porteriaInvitados.id),
               ),
             )
         : Promise.resolve(
