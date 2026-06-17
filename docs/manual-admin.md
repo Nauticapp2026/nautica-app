@@ -110,8 +110,8 @@ La tabla muestra: número de socio (#), nombre, email, embarcación asignada, ub
   - **Rojo (Moroso)** — socio con deuda pendiente.
 - Si un socio tiene un **ícono de alerta amarillo** junto a su nombre, significa que tiene datos de perfil o documentación incompletos. Hacé clic en su nombre para ver qué falta completar.
 - Cada fila tiene un **botón chevron (›)** a la derecha. Al hacerle clic se despliega un panel con:
-  - **Invitados autorizados** — personas que el socio autorizó a ingresar al club.
-  - **Accesos externos recientes** — últimas entradas registradas por portería.
+  - **Invitados autorizados** — personas registradas por el socio como invitados permanentes (no incluye accesos externos).
+  - **Accesos externos recientes** — últimas entradas registradas por portería como acceso externo.
 
 ### Dar de alta un socio manualmente
 
@@ -145,20 +145,49 @@ La tabla muestra: número de socio (#), nombre, email, embarcación asignada, ub
 
 ### Ver y editar el perfil de un socio
 
-Hacé clic en el nombre del socio en la tabla para abrir su perfil. El perfil tiene ocho pestañas:
+Hacé clic en el nombre del socio en la tabla para abrir su perfil. El perfil tiene nueve pestañas:
 
 #### Pestaña Generales
 
-Mostrá y editá los datos personales: nombre, apellido, email, teléfono, documento, dirección, razón social, condición IVA.
+Mostrá y editá los datos personales: nombre, apellido, email, teléfono, documento y dirección.
 
 - **Número de socio** — campo editable para asignar o modificar el número interno del socio. El número aparece como chip (#NNN) en la cabecera del perfil y en la lista de socios.
 - **Estado de membresía** — selector en la cabecera del perfil para cambiar el estado: **Activo**, **Pausado**, **Inactivo**. También está disponible la opción **Eliminar** para desvincular al socio del club.
+
+#### Pestaña Datos Impositivos
+
+Mostrá y editá los datos fiscales del socio: razón social, CUIT, dirección fiscal, condición frente al IVA e Ingresos Brutos.
+
+**Usar datos personales para facturación** — checkbox en la parte superior de esta pestaña. Cuando está activo, el socio aparece en todos los flujos de emisión de comprobantes (factura individual, ventanilla y lote). Cuando está inactivo, el socio **no aparece en ningún selector de facturación** aunque tenga movimientos pendientes.
+
+> **Campos requeridos para poder emitir factura AFIP al socio:**
+>
+> - **Razón social** — nombre legal del receptor del comprobante.
+> - **CUIT** — obligatorio para socios con condición IVA Responsable Inscripto o Monotributo (11 dígitos sin guiones). Para Consumidor Final el documento puede ser DNI.
+> - **Condición frente al IVA** — determina el tipo de comprobante (A, B o C).
+> - **Dirección fiscal** — requerida para el encabezado del comprobante.
+>
+> Si alguno de estos datos falta, la emisión puede fallar o generar un rechazo de AFIP. Completá esta pestaña antes de intentar facturar al socio.
 
 #### Pestaña Embarcación
 
 Muestra las embarcaciones del socio. Podés editar o eliminar cada una.
 
 Cada embarcación tiene su **propio espacio asignado**. Dentro de la tarjeta de cada embarcación hay un selector de espacio que muestra la amarra o cama actual. Podés asignar o cambiar el espacio directamente desde ahí, sin necesidad de ir a la sección Espacios. Si el socio tiene varias embarcaciones, cada una puede estar en un espacio diferente.
+
+#### Pestaña Servicios Contratados
+
+Lista los servicios que el socio consume, cargados mediante **Cargar consumo** en la Cuenta Corriente. Los servicios se agrupan por tipo y muestran el historial de movimientos asociados.
+
+**Cancelar un servicio:**
+
+1. Hacé clic en **Cancelar** en el servicio que querés dar de baja.
+2. Si el servicio tiene precio fijo, el sistema pregunta si querés cobrar el proporcional del mes: días utilizados en el mes actual dividido la cantidad de días del mes, multiplicado por el precio.
+   - **Solo cancelar** — registra la cancelación sin generar cargo adicional.
+   - **Cobrar y cancelar** — genera un movimiento en la Cuenta Corriente por el proporcional y registra la cancelación.
+3. El servicio queda marcado como **Cancelado** con la fecha de baja. El historial de movimientos anteriores se conserva.
+
+> La cancelación no borra datos. Si necesitás reactivar el servicio, tenés que volver a cargarlo mediante Cargar consumo.
 
 #### Pestaña Cuenta Corriente
 
@@ -168,17 +197,16 @@ Muestra los movimientos del socio: facturas, cobros y saldo.
 - **Informar pago** — registrá un pago recibido sin emitir factura (el saldo queda como "saldo a favor" en la cuenta).
 - **Marcar como pagadas** — seleccioná una o más facturas con la casilla de verificación y hacé clic en este botón para registrarlas como cobradas. Te pedirá el medio de pago.
 
-#### Pestaña Comprobantes
+#### Pestaña Accesos Externos
 
-Historial de comprobantes AFIP emitidos al socio (facturas y notas de crédito).
+Historial de accesos externos registrados por el socio. Muestra todas las personas que ingresaron al club bajo la autorización del socio como acceso externo.
 
-#### Pestaña Navegantes
-
-Historial de accesos externos donde la persona fue autorizada como navegante por el socio. Cada registro muestra el nombre del navegante, el período autorizado (desde / hasta) y el estado:
+Cada registro muestra el nombre de la persona, el período autorizado (desde / hasta) y un badge de estado:
 
 - **Autorizado** — el acceso está activo.
-- **Ingresó** — el navegante ya registró entrada en portería.
+- **Ingresó** — la persona ya registró entrada en portería.
 - **Cancelado** — el acceso fue revocado desde la app.
+- **Navega** — la persona está autorizada a navegar con la embarcación del socio.
 
 #### Pestaña Salidas
 
@@ -469,6 +497,26 @@ Hacé clic en la comunicación en la lista para abrirla y editarla. Podés volve
 Desde esta sección emitís y gestionás las facturas de tu club.
 
 > Para poder emitir facturas AFIP necesitás tener configurado el **Punto de Venta** y haber confirmado el **Certificado AFIP**. Podés hacerlo desde **Configuración → Datos de facturación**. Si la emisión está bloqueada, el panel muestra un aviso explicando qué falta. Los **recibos internos** se pueden emitir aunque el certificado todavía no esté configurado.
+
+### Datos requeridos para emitir facturas AFIP
+
+Para que la emisión no falle, tanto el **club** como cada **socio** deben tener ciertos datos completos:
+
+**Del club** (Configuración → Información general):
+
+- CUIT del club
+- Condición frente al IVA
+- Punto de Venta configurado y Certificado AFIP confirmado
+
+**Del socio** (perfil → pestaña Datos Impositivos):
+
+- **Usar datos personales para facturación** — debe estar activo (de lo contrario el socio no aparece en ningún selector de facturación).
+- **Razón social** — nombre legal que figura en el comprobante.
+- **CUIT** — obligatorio para Responsable Inscripto y Monotributo (11 dígitos). Para Consumidor Final se acepta DNI.
+- **Condición frente al IVA** — define si se emite Factura A, B o C.
+- **Dirección fiscal** — requerida para el encabezado del comprobante.
+
+Si alguno de estos datos falta en el socio, el sistema puede rechazar la emisión o TusFacturas puede devolver un error de AFIP. Completá la pestaña **Datos Impositivos** del socio antes de intentar facturarle.
 
 ### Resumen de facturación
 
