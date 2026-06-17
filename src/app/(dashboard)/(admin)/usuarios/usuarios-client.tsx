@@ -103,6 +103,14 @@ const CONDICION_IVA_OPTS = [
   { value: 'iva_no_alcanzado', label: 'IVA No Alcanzado' },
 ];
 
+const CONDICION_IIBB_OPTS = [
+  { value: 'convenio_multilateral', label: 'Convenio Multilateral' },
+  { value: 'local', label: 'Local' },
+  { value: 'exento', label: 'Exento' },
+  { value: 'no_gravado', label: 'No Gravado' },
+  { value: 'no_corresponde', label: 'No Corresponde' },
+];
+
 const inputCls =
   'h-11 w-full rounded-[10px] border border-gray-200 bg-white px-4 text-sm text-[#101828] focus:border-[#175861] focus:outline-none focus:ring-1 focus:ring-[#175861]';
 
@@ -119,7 +127,10 @@ const EMPTY_FORM = {
   tipoDocumento: '',
   numeroDocumento: '',
   razonSocial: '',
+  cuit: '',
+  direccionFiscal: '',
   condicionIva: '',
+  condicionIibb: '',
   embarcacionNombre: '',
   matricula: '',
   astillero: '',
@@ -435,42 +446,104 @@ function CrearSocioModal({ open, onClose }: { open: boolean; onClose: () => void
                       type="checkbox"
                       checked={facturaFiscal}
                       onChange={(e) => {
-                        setFacturaFiscal(e.target.checked);
-                        if (!e.target.checked)
-                          setForm((f) => ({ ...f, razonSocial: '', condicionIva: '' }));
+                        const checked = e.target.checked;
+                        setFacturaFiscal(checked);
+                        if (checked) {
+                          const nombreCompleto = [form.nombre.trim(), form.apellido.trim()]
+                            .filter(Boolean)
+                            .join(' ');
+                          const domicilio = [
+                            form.direccion.trim(),
+                            form.ciudad.trim(),
+                            form.provincia.trim(),
+                            form.codigoPostal.trim(),
+                          ]
+                            .filter(Boolean)
+                            .join(', ');
+                          setForm((f) => ({
+                            ...f,
+                            razonSocial: nombreCompleto,
+                            direccionFiscal: domicilio,
+                          }));
+                        } else {
+                          setForm((f) => ({
+                            ...f,
+                            razonSocial: '',
+                            cuit: '',
+                            direccionFiscal: '',
+                            condicionIva: '',
+                            condicionIibb: '',
+                          }));
+                        }
                       }}
                       className="h-3.5 w-3.5 cursor-pointer accent-[#175861]"
                     />
-                    <span className="text-xs text-gray-500">Emite comprobante fiscal</span>
+                    <span className="text-xs text-gray-500">
+                      Usar datos personales para facturación
+                    </span>
                   </label>
                 }
               />
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Field label="Razón social">
-                  <input
-                    className={inputCls}
-                    placeholder="Razón social"
-                    value={form.razonSocial}
-                    onChange={set('razonSocial')}
-                    disabled={!facturaFiscal}
-                  />
-                </Field>
-                <Field label="Condición frente IVA">
-                  <select
-                    className={inputCls}
-                    value={form.condicionIva}
-                    onChange={set('condicionIva')}
-                    disabled={!facturaFiscal}
-                  >
-                    <option value="">Seleccione...</option>
-                    {CONDICION_IVA_OPTS.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-              </div>
+              {facturaFiscal && (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <Field label="Razón social">
+                      <input
+                        className={inputCls}
+                        placeholder="Razón social"
+                        value={form.razonSocial}
+                        onChange={set('razonSocial')}
+                      />
+                    </Field>
+                    <Field label="CUIT">
+                      <input
+                        className={inputCls}
+                        placeholder="20-12345678-9"
+                        value={form.cuit}
+                        onChange={set('cuit')}
+                      />
+                    </Field>
+                  </div>
+                  <Field label="Dirección fiscal">
+                    <input
+                      className={inputCls}
+                      placeholder="Av. Corrientes 1234, CABA"
+                      value={form.direccionFiscal}
+                      onChange={set('direccionFiscal')}
+                    />
+                  </Field>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <Field label="Condición frente IVA">
+                      <select
+                        className={inputCls}
+                        value={form.condicionIva}
+                        onChange={set('condicionIva')}
+                      >
+                        <option value="">Seleccione...</option>
+                        {CONDICION_IVA_OPTS.map((o) => (
+                          <option key={o.value} value={o.value}>
+                            {o.label}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                    <Field label="Ingresos Brutos">
+                      <select
+                        className={inputCls}
+                        value={form.condicionIibb}
+                        onChange={set('condicionIibb')}
+                      >
+                        <option value="">Seleccione...</option>
+                        {CONDICION_IIBB_OPTS.map((o) => (
+                          <option key={o.value} value={o.value}>
+                            {o.label}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Datos de Embarcación */}
@@ -581,7 +654,10 @@ function CrearSocioModal({ open, onClose }: { open: boolean; onClose: () => void
 
             {/* Adjuntos */}
             <div className="space-y-4">
-              <SectionHeader title="Adjuntos" />
+              <SectionHeader title="Documentación del socio" />
+              <p className="text-xs text-gray-400">
+                Certificado náutico, matrícula, seguro u otros documentos.
+              </p>
 
               <label className="flex min-h-16 cursor-pointer flex-col items-center justify-center gap-1 rounded-[10px] border-2 border-dashed border-gray-300 px-4 py-3 text-sm text-gray-500 hover:border-[#175861] hover:text-[#175861]">
                 <div className="flex items-center gap-2">

@@ -30,7 +30,10 @@ export type CreateSocioData = {
   tipoDocumento: string;
   numeroDocumento: string;
   razonSocial: string;
+  cuit: string;
+  direccionFiscal: string;
   condicionIva: string;
+  condicionIibb: string;
   embarcacionNombre: string;
   matricula: string;
   astillero: string;
@@ -112,7 +115,10 @@ export async function createSocioAction(data: CreateSocioData): Promise<SocioRes
           tipoDocumento: (data.tipoDocumento || null) as never,
           numeroDocumento: data.numeroDocumento.trim() || null,
           razonSocial: data.razonSocial.trim() || null,
+          cuit: data.cuit.trim() || null,
+          direccionFiscal: data.direccionFiscal.trim() || null,
           condicionIva: (data.condicionIva || null) as never,
+          condicionIibb: (data.condicionIibb || null) as never,
           estadoSocio: 'activo',
         })
         .onConflictDoUpdate({
@@ -130,7 +136,10 @@ export async function createSocioAction(data: CreateSocioData): Promise<SocioRes
             tipoDocumento: (data.tipoDocumento || null) as never,
             numeroDocumento: data.numeroDocumento.trim() || null,
             razonSocial: data.razonSocial.trim() || null,
+            cuit: data.cuit.trim() || null,
+            direccionFiscal: data.direccionFiscal.trim() || null,
             condicionIva: (data.condicionIva || null) as never,
+            condicionIibb: (data.condicionIibb || null) as never,
             estadoSocio: 'activo',
           },
         });
@@ -186,7 +195,10 @@ export type UpdateSocioData = {
   codigoPostal: string;
   contactoEmergencia: string;
   razonSocial: string;
+  cuit: string;
+  direccionFiscal: string;
   condicionIva: string;
+  condicionIibb: string;
 };
 
 export async function updateSocioAction(data: UpdateSocioData): Promise<{ error?: string }> {
@@ -248,7 +260,10 @@ export async function updateSocioAction(data: UpdateSocioData): Promise<{ error?
         codigoPostal: data.codigoPostal.trim() || null,
         contactoEmergencia: data.contactoEmergencia.trim() || null,
         razonSocial: data.razonSocial.trim() || null,
+        cuit: data.cuit.trim() || null,
+        direccionFiscal: data.direccionFiscal.trim() || null,
         condicionIva: (data.condicionIva || null) as never,
+        condicionIibb: (data.condicionIibb || null) as never,
       })
       .where(eq(profiles.id, data.socioId));
 

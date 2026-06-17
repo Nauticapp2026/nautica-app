@@ -74,7 +74,10 @@ type SocioData = {
   codigoPostal: string | null;
   contactoEmergencia: string | null;
   razonSocial: string | null;
+  cuit: string | null;
+  direccionFiscal: string | null;
   condicionIva: string | null;
+  condicionIibb: string | null;
   estadoSocio: string | null;
   deuda: string | null;
   memberSince: string;
@@ -138,6 +141,14 @@ const CONDICION_IVA_OPTS = [
   { value: 'iva_no_alcanzado', label: 'IVA No Alcanzado' },
 ];
 
+const CONDICION_IIBB_OPTS = [
+  { value: 'convenio_multilateral', label: 'Convenio Multilateral' },
+  { value: 'local', label: 'Local' },
+  { value: 'exento', label: 'Exento' },
+  { value: 'no_gravado', label: 'No Gravado' },
+  { value: 'no_corresponde', label: 'No Corresponde' },
+];
+
 const TIPO_DOC_OPTS = [
   { value: 'dni', label: 'DNI' },
   { value: 'cuit', label: 'CUIT' },
@@ -158,6 +169,7 @@ const FORMAS_PAGO = [
 
 const TABS = [
   { id: 'generales', label: 'Generales', icon: User },
+  { id: 'impositivos', label: 'Impositivos', icon: FileText },
   { id: 'embarcacion', label: 'Embarcación', icon: Anchor },
   { id: 'cuenta-corriente', label: 'Cuenta Corriente', icon: CreditCard },
   { id: 'navegantes', label: 'Navegantes', icon: Users },
@@ -1245,6 +1257,18 @@ function EspacioEmbarcacionRow({
 
   const tieneEspacio = emb.espacioId != null;
 
+  // Filtrar espacios cuya eslora >= eslora del barco (en metros).
+  const esloraBarcoM = emb.esloraM != null ? Number(emb.esloraM) : null;
+  const espaciosFiltrados =
+    esloraBarcoM != null
+      ? espaciosDisponibles.filter((e) => {
+          if (e.eslora == null) return true;
+          const esloraEspacioM =
+            e.unidadMetraje === 'pies' ? Number(e.eslora) * 0.3048 : Number(e.eslora);
+          return esloraEspacioM + 0.01 >= esloraBarcoM;
+        })
+      : espaciosDisponibles;
+
   function submit() {
     if (!destinoId) {
       toast.error('Seleccioná un espacio.');
@@ -1268,7 +1292,7 @@ function EspacioEmbarcacionRow({
     });
   }
 
-  if (espaciosDisponibles.length === 0 && !tieneEspacio) return null;
+  if (espaciosFiltrados.length === 0 && !tieneEspacio) return null;
 
   return (
     <div className="flex flex-col gap-2 border-t border-gray-100 pt-4 sm:flex-row sm:items-center">
@@ -1279,9 +1303,10 @@ function EspacioEmbarcacionRow({
         className="h-10 flex-1 rounded-[10px] border border-gray-200 bg-white px-3 text-sm text-[#101828] focus:border-[#175861] focus:ring-1 focus:ring-[#175861] focus:outline-none disabled:opacity-50"
       >
         <option value="">{tieneEspacio ? 'Cambiar espacio…' : 'Asignar espacio…'}</option>
-        {espaciosDisponibles.map((e) => (
+        {espaciosFiltrados.map((e) => (
           <option key={e.id} value={e.id}>
             {e.label}
+            {e.precio ? ` — $${Number(e.precio).toLocaleString('es-AR')}` : ''}
           </option>
         ))}
       </select>
@@ -2058,7 +2083,13 @@ function DocumentacionTab({
   );
 }
 
-export type EspacioOption = { id: string; label: string };
+export type EspacioOption = {
+  id: string;
+  label: string;
+  eslora: string | null;
+  unidadMetraje: 'metros' | 'pies' | null;
+  precio: string | null;
+};
 
 type PaywayTokenInfo = {
   lastFour: string;
@@ -2110,7 +2141,10 @@ export function SocioDetail({
     codigoPostal: socio.codigoPostal ?? '',
     contactoEmergencia: socio.contactoEmergencia ?? '',
     razonSocial: socio.razonSocial ?? '',
+    cuit: socio.cuit ?? '',
+    direccionFiscal: socio.direccionFiscal ?? '',
     condicionIva: socio.condicionIva ?? '',
+    condicionIibb: socio.condicionIibb ?? '',
     numeroSocio: socio.numeroSocio != null ? String(socio.numeroSocio) : '',
   });
   const [editError, setEditError] = useState<string | null>(null);
@@ -2147,7 +2181,10 @@ export function SocioDetail({
       codigoPostal: socio.codigoPostal ?? '',
       contactoEmergencia: socio.contactoEmergencia ?? '',
       razonSocial: socio.razonSocial ?? '',
+      cuit: socio.cuit ?? '',
+      direccionFiscal: socio.direccionFiscal ?? '',
       condicionIva: socio.condicionIva ?? '',
+      condicionIibb: socio.condicionIibb ?? '',
       numeroSocio: socio.numeroSocio != null ? String(socio.numeroSocio) : '',
     });
     setEditError(null);
@@ -2505,38 +2542,6 @@ export function SocioDetail({
                 placeholder="—"
               />
             </div>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <label className="mb-1.5 block text-xs font-semibold text-gray-500">
-                  Razón social
-                </label>
-                <input
-                  className={inputCls}
-                  value={editForm.razonSocial}
-                  onChange={setField('razonSocial')}
-                  readOnly={!editando}
-                />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-xs font-semibold text-gray-500">
-                  Condición frente IVA
-                </label>
-                <select
-                  className={inputCls}
-                  value={editForm.condicionIva}
-                  onChange={setField('condicionIva')}
-                  disabled={!editando}
-                >
-                  <option value="">—</option>
-                  {CONDICION_IVA_OPTS.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
             {editError && (
               <div className="rounded-[10px] border border-red-200 bg-red-50 p-3">
                 <p className="text-sm font-medium text-red-700">{editError}</p>
@@ -2600,6 +2605,23 @@ export function SocioDetail({
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Impositivos */}
+      {activeTab === 'impositivos' && (
+        <div className="rounded-2xl bg-white p-6 shadow-sm">
+          <ImpositivosTab
+            socio={socio}
+            editForm={editForm}
+            editando={editando}
+            setEditando={setEditando}
+            setField={setField}
+            handleGuardar={handleGuardar}
+            handleCancelar={handleCancelar}
+            editError={editError}
+            isSaving={isSaving}
+          />
         </div>
       )}
 
@@ -3054,6 +3076,156 @@ const PAYWAY_USE_SANDBOX =
   process.env.NODE_ENV !== 'production' || process.env.NEXT_PUBLIC_PAYWAY_SANDBOX === '1';
 
 const CARD_BRAND: Record<number, string> = { 1: 'Visa', 2: 'Mastercard', 65: 'Amex' };
+
+function ImpositivosTab({
+  socio,
+  editForm,
+  editando,
+  setEditando,
+  setField,
+  handleGuardar,
+  handleCancelar,
+  editError,
+  isSaving,
+}: {
+  socio: SocioData;
+  editForm: {
+    razonSocial: string;
+    cuit: string;
+    direccionFiscal: string;
+    condicionIva: string;
+    condicionIibb: string;
+    [key: string]: string;
+  };
+  editando: boolean;
+  setEditando: (v: boolean) => void;
+  setField: (
+    k: 'razonSocial' | 'cuit' | 'direccionFiscal' | 'condicionIva' | 'condicionIibb',
+  ) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => void;
+  handleGuardar: () => void;
+  handleCancelar: () => void;
+  editError: string | null;
+  isSaving: boolean;
+}) {
+  const inputCls =
+    'h-11 w-full rounded-[10px] border border-gray-200 bg-white px-4 text-sm text-[#101828] focus:border-[#175861] focus:outline-none focus:ring-1 focus:ring-[#175861]';
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-bold" style={{ color: '#101828' }}>
+          Datos Impositivos
+        </h2>
+        {!editando ? (
+          <button
+            onClick={() => setEditando(true)}
+            className="rounded-[8px] border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 transition hover:bg-gray-50"
+          >
+            Editar
+          </button>
+        ) : (
+          <div className="flex gap-2">
+            <button
+              onClick={handleCancelar}
+              className="rounded-[8px] border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 transition hover:bg-gray-50"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleGuardar}
+              disabled={isSaving}
+              className="rounded-[8px] px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-40"
+              style={{ background: '#175861' }}
+            >
+              {isSaving ? 'Guardando...' : 'Guardar'}
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold text-gray-500">Razón social</label>
+            <input
+              className={inputCls}
+              value={editForm.razonSocial}
+              onChange={setField('razonSocial')}
+              readOnly={!editando}
+              placeholder="—"
+            />
+          </div>
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold text-gray-500">CUIT</label>
+            <input
+              className={inputCls}
+              value={editForm.cuit}
+              onChange={setField('cuit')}
+              readOnly={!editando}
+              placeholder="—"
+            />
+          </div>
+        </div>
+        <div>
+          <label className="mb-1.5 block text-xs font-semibold text-gray-500">
+            Dirección fiscal
+          </label>
+          <input
+            className={inputCls}
+            value={editForm.direccionFiscal}
+            onChange={setField('direccionFiscal')}
+            readOnly={!editando}
+            placeholder="—"
+          />
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold text-gray-500">
+              Condición frente IVA
+            </label>
+            <select
+              className={inputCls}
+              value={editForm.condicionIva}
+              onChange={setField('condicionIva')}
+              disabled={!editando}
+            >
+              <option value="">—</option>
+              {CONDICION_IVA_OPTS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold text-gray-500">
+              Ingresos Brutos
+            </label>
+            <select
+              className={inputCls}
+              value={editForm.condicionIibb}
+              onChange={setField('condicionIibb')}
+              disabled={!editando}
+            >
+              <option value="">—</option>
+              {CONDICION_IIBB_OPTS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {editError && (
+          <div className="rounded-[10px] border border-red-200 bg-red-50 p-3">
+            <p className="text-sm font-medium text-red-700">{editError}</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function PaywayTab({
   socioId,

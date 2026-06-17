@@ -48,7 +48,10 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
       codigoPostal: profiles.codigoPostal,
       contactoEmergencia: profiles.contactoEmergencia,
       razonSocial: profiles.razonSocial,
+      cuit: profiles.cuit,
+      direccionFiscal: profiles.direccionFiscal,
       condicionIva: profiles.condicionIva,
+      condicionIibb: profiles.condicionIibb,
       estadoSocio: profiles.estadoSocio,
       deuda: profiles.deuda,
       memberSince: memberships.createdAt,
@@ -215,6 +218,7 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
         orden: espacios.orden,
         eslora: espacios.eslora,
         unidadMetraje: serviciosTable.unidadMetraje,
+        precio: serviciosTable.precio,
       })
       .from(espacios)
       .leftJoin(areas, eq(areas.id, espacios.areaId))
@@ -332,28 +336,14 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
   }
 
   // Eslora máxima de las embarcaciones del socio (siempre en metros).
-  // Se usa para filtrar espacios destino compatibles con el barco más grande.
-  const esloraMaxBarcoM = embarcacionesList.reduce((max, e) => {
-    const v = e.esloraM != null ? Number(e.esloraM) : 0;
-    return v > max ? v : max;
-  }, 0);
-
-  function espacioAceptaBarco(e: {
-    eslora: string | null;
-    unidadMetraje: 'metros' | 'pies' | null;
-  }): boolean {
-    if (e.eslora == null) return true;
-    const esloraNum = Number(e.eslora);
-    const esloraM = e.unidadMetraje === 'pies' ? esloraNum * 0.3048 : esloraNum;
-    return esloraM + 0.01 >= esloraMaxBarcoM;
-  }
-
-  const espaciosFiltrados =
-    esloraMaxBarcoM > 0 ? espaciosDisponibles.filter(espacioAceptaBarco) : espaciosDisponibles;
-
-  const espaciosDisponiblesView = espaciosFiltrados.map((e) => ({
+  // El filtro por eslora se hace por barco en EspacioEmbarcacionRow.
+  // Acá pasamos todos los espacios disponibles con sus datos de eslora y precio.
+  const espaciosDisponiblesView = espaciosDisponibles.map((e) => ({
     id: e.id,
     label: labelEspacio(e),
+    eslora: e.eslora ?? null,
+    unidadMetraje: e.unidadMetraje ?? null,
+    precio: e.precio ?? null,
   }));
 
   return (

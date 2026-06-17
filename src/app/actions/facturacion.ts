@@ -119,22 +119,28 @@ function buildCliente(p: {
   razonSocial: string | null;
   tipoDocumento: string | null;
   numeroDocumento: string | null;
+  cuit: string | null;
   direccion: string | null;
+  direccionFiscal: string | null;
   condicionIva: string | null;
   condicionVenta: CondicionVenta;
 }): TusFacturasCliente {
   const razon =
     p.razonSocial?.trim() || [p.nombre, p.apellido].filter(Boolean).join(' ').trim() || p.email;
 
+  // Si el socio tiene CUIT fiscal cargado, usarlo como documento de facturación.
+  const docTipo = p.cuit?.trim() ? 'CUIT' : (TIPO_DOC_API[p.tipoDocumento ?? ''] ?? 'OTRO');
+  const docNro = p.cuit?.trim() || p.numeroDocumento || '';
+
   const condicionPago = CONDICION_PAGO_API[p.condicionVenta] ?? '201';
 
   return {
     codigo: p.id,
-    documento_tipo: TIPO_DOC_API[p.tipoDocumento ?? ''] ?? 'OTRO',
-    documento_nro: p.numeroDocumento ?? '',
+    documento_tipo: docTipo,
+    documento_nro: docNro,
     razon_social: razon,
     email: p.email,
-    domicilio: p.direccion ?? '',
+    domicilio: p.direccionFiscal?.trim() || p.direccion || '',
     provincia: '1',
     envia_por_mail: 'S',
     reclama_deuda: 'N',
@@ -252,7 +258,9 @@ export async function crearFacturaCore(
       razonSocial: profiles.razonSocial,
       tipoDocumento: profiles.tipoDocumento,
       numeroDocumento: profiles.numeroDocumento,
+      cuit: profiles.cuit,
       direccion: profiles.direccion,
+      direccionFiscal: profiles.direccionFiscal,
       condicionIva: profiles.condicionIva,
     })
     .from(profiles)
@@ -812,7 +820,9 @@ export async function emitirNotaCreditoAction(data: EmitirNcData): Promise<Emiti
       razonSocial: profiles.razonSocial,
       tipoDocumento: profiles.tipoDocumento,
       numeroDocumento: profiles.numeroDocumento,
+      cuit: profiles.cuit,
       direccion: profiles.direccion,
+      direccionFiscal: profiles.direccionFiscal,
       condicionIva: profiles.condicionIva,
     })
     .from(profiles)
