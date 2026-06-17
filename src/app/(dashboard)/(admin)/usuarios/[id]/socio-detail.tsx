@@ -14,6 +14,7 @@ import {
   Users,
   Clock,
   FileText,
+  Package,
   Printer,
   Ship,
   Star,
@@ -118,6 +119,13 @@ type Servicio = {
   precio: string | null;
 };
 
+type ServiciosContratado = {
+  embarcacionNombre: string;
+  espacioLabel: string;
+  servicioNombre: string | null;
+  precio: string | null;
+};
+
 type Navegante = {
   id: string;
   nombre: string;
@@ -169,8 +177,9 @@ const FORMAS_PAGO = [
 
 const TABS = [
   { id: 'generales', label: 'Generales', icon: User },
-  { id: 'impositivos', label: 'Impositivos', icon: FileText },
+  { id: 'impositivos', label: 'Datos Impositivos', icon: FileText },
   { id: 'embarcacion', label: 'Embarcación', icon: Anchor },
+  { id: 'servicios-contratados', label: 'Servicios Contratados', icon: Package },
   { id: 'cuenta-corriente', label: 'Cuenta Corriente', icon: CreditCard },
   { id: 'navegantes', label: 'Navegantes', icon: Users },
   { id: 'salidas', label: 'Salidas', icon: Clock },
@@ -2106,6 +2115,7 @@ export function SocioDetail({
   documentos = [],
   salidas = [],
   espaciosDisponibles,
+  serviciosContratados = [],
   paywayPublicKey = null,
   paywayToken = null,
 }: {
@@ -2117,6 +2127,7 @@ export function SocioDetail({
   documentos?: DocumentoItem[];
   salidas?: SalidaItem[];
   espaciosDisponibles: EspacioOption[];
+  serviciosContratados?: ServiciosContratado[];
   paywayPublicKey?: string | null;
   paywayToken?: PaywayTokenInfo | null;
 }) {
@@ -2634,6 +2645,11 @@ export function SocioDetail({
             espaciosDisponibles={espaciosDisponibles}
           />
         </div>
+      )}
+
+      {/* Servicios Contratados */}
+      {activeTab === 'servicios-contratados' && (
+        <ServiciosContratadosTab serviciosContratados={serviciosContratados} />
       )}
 
       {/* Cuenta Corriente */}
@@ -3222,6 +3238,56 @@ function ImpositivosTab({
             <p className="text-sm font-medium text-red-700">{editError}</p>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+function ServiciosContratadosTab({
+  serviciosContratados,
+}: {
+  serviciosContratados: ServiciosContratado[];
+}) {
+  if (serviciosContratados.length === 0) {
+    return (
+      <EmptyState
+        icon={<Package className="h-7 w-7 opacity-40" />}
+        text="El socio no tiene embarcaciones asignadas a espacios todavía."
+      />
+    );
+  }
+  return (
+    <div className="rounded-2xl bg-white p-6 shadow-sm">
+      <p className="mb-4 text-[18px] font-bold" style={{ color: '#101828' }}>
+        Servicios contratados
+      </p>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-gray-100 text-left text-xs font-semibold text-gray-400 uppercase">
+              <th className="pr-4 pb-2">Embarcación</th>
+              <th className="pr-4 pb-2">Espacio</th>
+              <th className="pr-4 pb-2">Tarifa</th>
+              <th className="pb-2 text-right">Precio / mes</th>
+            </tr>
+          </thead>
+          <tbody>
+            {serviciosContratados.map((s, i) => (
+              <tr key={i} className="border-b border-gray-50 last:border-0">
+                <td className="py-3 pr-4 font-medium" style={{ color: '#101828' }}>
+                  {s.embarcacionNombre}
+                </td>
+                <td className="py-3 pr-4 text-gray-600">{s.espacioLabel}</td>
+                <td className="py-3 pr-4 text-gray-600">{s.servicioNombre ?? '—'}</td>
+                <td className="py-3 text-right font-medium" style={{ color: '#101828' }}>
+                  {s.precio
+                    ? `$${Number(s.precio).toLocaleString('es-AR', { minimumFractionDigits: 2 })}`
+                    : '—'}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );
