@@ -1,9 +1,8 @@
 'use client';
 
-import { Suspense, useActionState, useEffect, useState } from 'react';
+import { Suspense, useEffect, useState, useTransition } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { updatePassword, type ActionResult } from '@/app/actions/auth';
 import { Logo } from '@/components/shared/logo';
 import { createClient } from '@/lib/supabase/client';
 
@@ -15,10 +14,11 @@ function ResetPasswordForm() {
   const [sessionReady, setSessionReady] = useState(false);
   const [setupError, setSetupError] = useState<string | null>(null);
 
-  const [state, formAction, pending] = useActionState<ActionResult | null, FormData>(
-    updatePassword,
-    null,
-  );
+  const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [formError, setFormError] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
+  const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
     async function setupSession() {
@@ -58,6 +58,31 @@ function ResetPasswordForm() {
     setupSession();
   }, [searchParams]);
 
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setFormError(null);
+
+    if (password.length < 8) {
+      setFormError('La contraseña debe tener al menos 8 caracteres.');
+      return;
+    }
+    if (password !== confirm) {
+      setFormError('Las contraseñas no coinciden.');
+      return;
+    }
+
+    startTransition(async () => {
+      const supabase = createClient();
+      const { error } = await supabase.auth.updateUser({ password });
+      if (error) {
+        setFormError('No se pudo actualizar la contraseña. ' + error.message);
+        return;
+      }
+      await supabase.auth.signOut();
+      setDone(true);
+    });
+  }
+
   if (setupError) {
     return (
       <div className="space-y-4 text-center">
@@ -77,8 +102,26 @@ function ResetPasswordForm() {
     return <p className="text-center text-sm text-gray-500">Verificando link…</p>;
   }
 
+  if (done) {
+    return (
+      <div className="space-y-4 text-center">
+        <h1 className="text-lg font-semibold" style={{ color: '#101828' }}>
+          ¡Contraseña actualizada!
+        </h1>
+        <p className="text-sm text-gray-500">Ya podés iniciar sesión con tu nueva contraseña.</p>
+        <Link
+          href="/login"
+          className="inline-block text-sm font-medium underline"
+          style={{ color: '#669E9D' }}
+        >
+          Ir al inicio de sesión
+        </Link>
+      </div>
+    );
+  }
+
   return (
-    <form action={formAction} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-1.5 text-center">
         <h1 className="text-lg font-semibold" style={{ color: '#101828' }}>
           Elegí una nueva contraseña
@@ -91,16 +134,15 @@ function ResetPasswordForm() {
           Nueva contraseña
         </label>
         <input
-          name="password"
           type="password"
           placeholder="••••••••"
           required
           minLength={8}
           className={inputCls}
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          autoComplete="new-password"
         />
-        {state?.fieldErrors?.password && (
-          <p className="text-sm text-red-500">{state.fieldErrors.password[0]}</p>
-        )}
       </div>
 
       <div className="space-y-1.5">
@@ -108,27 +150,26 @@ function ResetPasswordForm() {
           Confirmar contraseña
         </label>
         <input
-          name="confirmPassword"
           type="password"
           placeholder="••••••••"
           required
           minLength={8}
           className={inputCls}
+          value={confirm}
+          onChange={(e) => setConfirm(e.target.value)}
+          autoComplete="new-password"
         />
-        {state?.fieldErrors?.confirmPassword && (
-          <p className="text-sm text-red-500">{state.fieldErrors.confirmPassword[0]}</p>
-        )}
       </div>
 
-      {state?.error && <p className="text-sm text-red-500">{state.error}</p>}
+      {formError && <p className="text-sm text-red-500">{formError}</p>}
 
       <button
         type="submit"
-        disabled={pending}
+        disabled={isPending}
         className="mt-2 w-full rounded-[10px] py-3 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
         style={{ background: '#175861' }}
       >
-        {pending ? 'Guardando...' : 'Guardar contraseña'}
+        {isPending ? 'Guardando...' : 'Guardar contraseña'}
       </button>
 
       <p className="text-center text-sm">
