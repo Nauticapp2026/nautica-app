@@ -22,7 +22,7 @@ function ResetPasswordForm() {
 
   useEffect(() => {
     async function setupSession() {
-      // Supabase redirige con ?error=... cuando el link expiró o ya fue usado
+      // Supabase o el callback redirigen con ?error=... cuando el link expiró
       const supabaseError = searchParams.get('error_code') ?? searchParams.get('error');
       if (supabaseError) {
         if (supabaseError === 'otp_expired') {
@@ -35,28 +35,17 @@ function ResetPasswordForm() {
 
       const supabase = createClient();
 
-      // PKCE flow: Supabase redirige con ?code=...
-      const code = searchParams.get('code');
-      if (code) {
-        const { error } = await supabase.auth.exchangeCodeForSession(code);
-        if (error) {
-          // Intentar como OTP token_hash (algunos proyectos Supabase no usan PKCE)
-          const { error: otpError } = await supabase.auth.verifyOtp({
-            token_hash: code,
-            type: 'recovery',
-          });
-          if (otpError) {
-            setSetupError(`Error: ${otpError.message} (code exchange: ${error.message})`);
-          } else {
-            setSessionReady(true);
-          }
-        } else {
-          setSessionReady(true);
-        }
+      // Camino principal: el Route Handler /api/auth/callback ya hizo el exchange
+      // y estableció la sesión en cookies antes de redirigir aquí.
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (session) {
+        setSessionReady(true);
         return;
       }
 
-      // Implicit flow: tokens en el #fragment (access_token + type=recovery)
+      // Fallback implicit flow: tokens en el #fragment (access_token + type=recovery)
       const hash = window.location.hash.replace(/^#/, '');
       if (hash) {
         const params = Object.fromEntries(new URLSearchParams(hash));
