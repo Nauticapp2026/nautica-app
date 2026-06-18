@@ -1,20 +1,37 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useState, useTransition } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { requestPasswordReset, type ActionResult } from '@/app/actions/auth';
+import { createClient } from '@/lib/supabase/client';
 
 const inputCls =
   'w-full rounded-[10px] border border-gray-200 px-4 py-3 text-sm outline-none transition focus:border-[#175861] focus:ring-1 focus:ring-[#175861]';
 
 export default function ForgotPasswordPage() {
-  const [state, formAction, pending] = useActionState<ActionResult | null, FormData>(
-    requestPasswordReset,
-    null,
-  );
+  const [email, setEmail] = useState('');
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
 
-  const sent = state !== null && !state.error && !state.fieldErrors;
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+
+    startTransition(async () => {
+      const supabase = createClient();
+      const { error: supabaseError } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+
+      if (supabaseError) {
+        setError('No se pudo enviar el email. Intentá de nuevo.');
+        return;
+      }
+
+      setSent(true);
+    });
+  }
 
   return (
     <div className="w-full max-w-sm rounded-2xl bg-white p-8 shadow-2xl">
@@ -40,7 +57,7 @@ export default function ForgotPasswordPage() {
           </Link>
         </div>
       ) : (
-        <form action={formAction} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5 text-center">
             <h1 className="text-lg font-semibold" style={{ color: '#101828' }}>
               Restablecé tu contraseña
@@ -55,26 +72,24 @@ export default function ForgotPasswordPage() {
               Email
             </label>
             <input
-              name="email"
               type="email"
               placeholder="tu@email.com"
               required
               className={inputCls}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
             />
-            {state?.fieldErrors?.email && (
-              <p className="text-sm text-red-500">{state.fieldErrors.email[0]}</p>
-            )}
           </div>
 
-          {state?.error && <p className="text-sm text-red-500">{state.error}</p>}
+          {error && <p className="text-sm text-red-500">{error}</p>}
 
           <button
             type="submit"
-            disabled={pending}
+            disabled={isPending}
             className="mt-2 w-full rounded-[10px] py-3 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
             style={{ background: '#175861' }}
           >
-            {pending ? 'Enviando...' : 'Enviar link'}
+            {isPending ? 'Enviando...' : 'Enviar link'}
           </button>
 
           <p className="text-center text-sm">
