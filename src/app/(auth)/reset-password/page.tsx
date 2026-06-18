@@ -40,7 +40,16 @@ function ResetPasswordForm() {
       if (code) {
         const { error } = await supabase.auth.exchangeCodeForSession(code);
         if (error) {
-          setSetupError('El link expiró o ya fue usado. Pedí uno nuevo.');
+          // Intentar como OTP token_hash (algunos proyectos Supabase no usan PKCE)
+          const { error: otpError } = await supabase.auth.verifyOtp({
+            token_hash: code,
+            type: 'recovery',
+          });
+          if (otpError) {
+            setSetupError(`Error: ${otpError.message} (code exchange: ${error.message})`);
+          } else {
+            setSessionReady(true);
+          }
         } else {
           setSessionReady(true);
         }
