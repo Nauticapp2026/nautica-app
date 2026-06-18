@@ -22,6 +22,17 @@ function ResetPasswordForm() {
 
   useEffect(() => {
     async function setupSession() {
+      // Supabase redirige con ?error=... cuando el link expiró o ya fue usado
+      const supabaseError = searchParams.get('error_code') ?? searchParams.get('error');
+      if (supabaseError) {
+        if (supabaseError === 'otp_expired') {
+          setSetupError('El link expiró. Los links de recuperación son válidos por 1 hora.');
+        } else {
+          setSetupError('El link es inválido o ya fue usado. Pedí uno nuevo.');
+        }
+        return;
+      }
+
       const supabase = createClient();
 
       // PKCE flow: Supabase redirige con ?code=...
