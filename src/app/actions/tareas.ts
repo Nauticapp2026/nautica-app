@@ -7,6 +7,7 @@ import { db } from '@/lib/db';
 import { tareas, memberships, embarcaciones, guarderias, solicitudesLavado } from '@/lib/db/schema';
 import { getActiveMarina } from '@/lib/auth/session';
 import { sendPushToUser } from '@/lib/push-notifications';
+import { createAdminClient } from '@/lib/supabase/admin';
 import {
   ESTADOS_SOLICITUD_LAVADO,
   ESTADOS_TAREA,
@@ -319,11 +320,29 @@ export async function updateSolicitudLavadoEstadoAction(
   }
 
   if (pushTitle && pushBody && pushTipo) {
+    // El trigger trg_notificar_solicitud_lavado ya insertó el row en `notificaciones`.
+    // Lo buscamos para pasarle el id al push y poder trackear clicks.
+    let notificacionId: string | undefined;
+    try {
+      const adminClient = createAdminClient();
+      const { data: notifRow } = await adminClient
+        .from('notificaciones')
+        .select('id')
+        .eq('user_id', solicitud.socioId)
+        .eq('tipo', pushTipo)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      notificacionId = (notifRow?.id as string | undefined) ?? undefined;
+    } catch {
+      // No bloqueamos el flujo por el tracking.
+    }
+
     await sendPushToUser({
       userId: solicitud.socioId,
       title: pushTitle,
       body: pushBody,
-      data: { tipo: pushTipo, solicitudId: solicitud.id },
+      data: { tipo: pushTipo, solicitudId: solicitud.id, notificacion_id: notificacionId },
     });
   }
 
