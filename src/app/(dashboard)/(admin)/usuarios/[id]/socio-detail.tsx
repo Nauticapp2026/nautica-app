@@ -3614,18 +3614,12 @@ function EditMovimientoModal({
   onSaved: () => void;
 }) {
   const [concepto, setConcepto] = useState(mov.concepto ?? '');
-  const [monto, setMonto] = useState(mov.debe ?? '');
   const [fecha, setFecha] = useState(mov.fecha ? mov.fecha.slice(0, 10) : todayISODate());
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   function handleSave() {
     setError(null);
-    const montoNum = parseFloat(montoToNumberStr(monto));
-    if (!monto || isNaN(montoNum) || montoNum <= 0) {
-      setError('El monto debe ser mayor a cero.');
-      return;
-    }
     if (!fecha) {
       setError('La fecha es requerida.');
       return;
@@ -3634,7 +3628,6 @@ function EditMovimientoModal({
       const res = await updateMovimientoAction({
         movimientoId: mov.id,
         concepto,
-        monto: montoToNumberStr(monto),
         fecha,
       });
       if (res.error) setError(res.error);
@@ -3666,30 +3659,16 @@ function EditMovimientoModal({
               onChange={(e) => setConcepto(e.target.value)}
             />
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1 block text-xs font-semibold" style={{ color: '#101828' }}>
-                Monto
-              </label>
-              <input
-                className={inputCls}
-                inputMode="decimal"
-                placeholder="0,00"
-                value={monto}
-                onChange={(e) => setMonto(sanitizeMontoInput(e.target.value))}
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-semibold" style={{ color: '#101828' }}>
-                Fecha
-              </label>
-              <input
-                type="date"
-                className={inputCls}
-                value={fecha}
-                onChange={(e) => setFecha(e.target.value)}
-              />
-            </div>
+          <div>
+            <label className="mb-1 block text-xs font-semibold" style={{ color: '#101828' }}>
+              Fecha
+            </label>
+            <input
+              type="date"
+              className={inputCls}
+              value={fecha}
+              onChange={(e) => setFecha(e.target.value)}
+            />
           </div>
         </div>
 
@@ -3705,7 +3684,7 @@ function EditMovimientoModal({
           </button>
           <button
             onClick={handleSave}
-            disabled={isPending || !monto || !fecha}
+            disabled={isPending || !fecha}
             className="flex-1 rounded-[10px] py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-40"
             style={{ background: '#175861' }}
           >

@@ -285,7 +285,6 @@ export async function eliminarPagoAction(movimientoId: string): Promise<{ error?
 export async function updateMovimientoAction(data: {
   movimientoId: string;
   concepto: string;
-  monto: string;
   fecha: string;
 }): Promise<{ error?: string }> {
   const ctx = await getActiveMarina();
@@ -316,7 +315,6 @@ export async function updateMovimientoAction(data: {
       .update(movimientosCuentaCorriente)
       .set({
         concepto: data.concepto.trim() || null,
-        debe: data.monto,
         fecha: new Date(data.fecha),
       })
       .where(eq(movimientosCuentaCorriente.id, data.movimientoId));
