@@ -51,7 +51,7 @@ En la parte inferior del menú encontrás el botón **¿Necesitás ayuda?** para
 
 ## 2. Dashboard
 
-El Dashboard es la pantalla de inicio. Muestra el estado operativo del club en tiempo real.
+El Dashboard es la pantalla de inicio. Muestra el estado operativo del club en tiempo real. Los datos **se actualizan automáticamente** sin necesidad de recargar la página: cualquier cambio registrado por un operario, desde la app mobile o desde otra pestaña del panel se refleja en segundos. Cuando volvés a la pestaña tras haberla tenido en segundo plano, también se refresca automáticamente.
 
 ### Qué muestra
 
@@ -110,8 +110,8 @@ La tabla muestra: número de socio (#), nombre, email, embarcación asignada, ub
   - **Rojo (Moroso)** — socio con deuda pendiente.
 - Si un socio tiene un **ícono de alerta amarillo** junto a su nombre, significa que tiene datos de perfil o documentación incompletos. Hacé clic en su nombre para ver qué falta completar.
 - Cada fila tiene un **botón chevron (›)** a la derecha. Al hacerle clic se despliega un panel con:
-  - **Invitados autorizados** — personas registradas por el socio como invitados permanentes (no incluye accesos externos).
-  - **Accesos externos recientes** — últimas entradas registradas por portería como acceso externo.
+  - **Invitados autorizados** — personas registradas por el socio como invitados permanentes. Cada nombre muestra la fecha hasta la que está autorizado (ej: `· válido hasta 30/06/2026`). No incluye accesos externos.
+  - **Accesos externos recientes** — últimas entradas registradas por portería como acceso externo. Cada nombre muestra la fecha de la última entrada (ej: `· desde 19/06/2026`). Si la misma persona ingresó varias veces, aparece una sola vez con la entrada más reciente.
 
 ### Dar de alta un socio manualmente
 
@@ -561,7 +561,9 @@ Para facturar servicios puntuales que no están cargados como movimientos del so
 Emití facturas para múltiples socios al mismo tiempo.
 
 1. Hacé clic en **Factura en lote**.
-2. El sistema lista los socios con conceptos pendientes (solo socios con **Emite comprobante fiscal** activado). Seleccioná los que querés facturar.
+2. El sistema lista los socios con conceptos pendientes (solo socios con **Emite comprobante fiscal** activado). Cada socio puede tener uno o más conceptos expandibles.
+   - La **casilla del socio** selecciona o deselecciona todos sus conceptos de una vez.
+   - Podés marcar o desmarcar conceptos individuales dentro del socio. Si solo algunos están marcados, la casilla del socio muestra el estado **intermedio** (guión) indicando selección parcial.
 3. Revisá el resumen y confirmá.
 
 El tipo de comprobante se determina automáticamente para cada socio según la condición IVA del club y de cada socio individualmente (igual que en la factura individual). La condición de venta es siempre **Contado**.
@@ -684,7 +686,9 @@ Datos básicos del club y configuración de facturación, todo en una sola pesta
 - **Dirección, Ciudad, Provincia, Código Postal** _(requeridos)_
 - **Teléfono operativo** _(requerido)_
 - **Email operativo** _(requerido)_
-- **Día de facturación** — día del mes (1 al 28) en que corre la facturación automática mensual.
+- **Día de facturación** — configura cuándo corre la facturación automática mensual. Tenés dos opciones:
+  - **Día fijo (1 al 28)** — ingresá el número del día del mes en que querés que se genere la facturación.
+  - **Primer día hábil del mes** — marcá la casilla "Primer día hábil del mes" para que la facturación corra el primer día hábil de cada mes. Si el 1º es sábado, corre el lunes 3; si es domingo, corre el lunes 2; si es día de semana, corre el 1º. Al marcar esta opción, el campo de día numérico se oculta.
 
 **Horarios de atención:**
 Para cada día de la semana podés configurar:

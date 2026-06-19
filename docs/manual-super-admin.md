@@ -258,6 +258,28 @@ Enviá notificaciones push a los usuarios de la app mobile de toda la plataforma
 
 Al enviar, la notificación sale en el momento a todos los dispositivos de la audiencia elegida que tengan la app instalada y hayan dado permiso de notificaciones. Si alguna queda en estado **pendiente** o **fallida**, el sistema la reintenta automáticamente una vez por día.
 
+### Métricas de estado (notificaciones de plataforma)
+
+Las cuatro tarjetas superiores muestran un resumen de las notificaciones de plataforma enviadas desde este panel:
+
+| Tarjeta    | Qué mide                                    |
+| ---------- | ------------------------------------------- |
+| Total      | Cantidad total de notificaciones creadas    |
+| Pendientes | Notificaciones que aún no fueron entregadas |
+| Enviadas   | Notificaciones entregadas correctamente     |
+| Fallidas   | Notificaciones con error de entrega         |
+
+### Métricas de engagement (notificaciones transaccionales)
+
+La segunda fila de tarjetas muestra el comportamiento de los usuarios con las notificaciones transaccionales (las que la app envía automáticamente — alertas, tareas, aprobaciones, etc.):
+
+| Tarjeta        | Qué mide                                                        |
+| -------------- | --------------------------------------------------------------- |
+| Total enviadas | Total de notificaciones transaccionales generadas en la app     |
+| Leídas         | Cuántas fueron marcadas como leídas por el usuario              |
+| Tocadas        | Cuántas generaron una acción de toque (click) en el dispositivo |
+| Tasa de toque  | Porcentaje de notificaciones tocadas sobre el total enviadas    |
+
 ### Ver notificaciones enviadas
 
 Las notificaciones aparecen en tarjetas con: título, cuerpo, estado (Pendiente / Enviada / Fallida), audiencia, fecha y autor. Si una notificación falló, se muestra el mensaje de error.
