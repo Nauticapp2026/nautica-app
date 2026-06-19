@@ -179,6 +179,21 @@ Cada embarcación tiene su **propio espacio asignado**. Dentro de la tarjeta de 
 
 Lista los servicios que el socio consume, cargados mediante **Cargar consumo** en la Cuenta Corriente. Los servicios se agrupan por tipo y muestran el historial de movimientos asociados.
 
+### Ver cargos individuales
+
+Cada fila de servicio tiene un **chevron (›)** a la izquierda del nombre. Al hacerle clic se despliegan los cargos individuales de ese servicio, ordenados del más reciente al más viejo, con fecha, concepto y monto de cada uno.
+
+### Editar un cargo
+
+1. Expandí la fila del servicio con el chevron.
+2. Hacé clic en el ícono de **lápiz** junto al cargo que querés corregir.
+3. En el modal podés modificar:
+   - **Concepto** — descripción del cargo.
+   - **Fecha** — fecha en que se registró.
+4. Hacé clic en **Guardar**.
+
+> El monto del cargo no se puede modificar desde este formulario. Los cargos que ya tienen una factura AFIP emitida no muestran el botón de edición.
+
 **Cancelar un servicio:**
 
 1. Hacé clic en **Cancelar** en el servicio que querés dar de baja.
@@ -193,7 +208,7 @@ Lista los servicios que el socio consume, cargados mediante **Cargar consumo** e
 
 Muestra los movimientos del socio: facturas, cobros y saldo.
 
-- **Agregar servicio** — registrá un servicio o cargo adicional.
+- **Agregar servicio** — registrá un servicio o cargo adicional. El campo Fecha se pre-carga con el día de hoy; podés cambiarlo si el cargo corresponde a otra fecha.
 - **Informar pago** — registrá un pago recibido sin emitir factura (el saldo queda como "saldo a favor" en la cuenta).
 - **Marcar como pagadas** — seleccioná una o más facturas con la casilla de verificación y hacé clic en este botón para registrarlas como cobradas. Te pedirá el medio de pago.
 
