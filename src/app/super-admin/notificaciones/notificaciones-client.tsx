@@ -8,10 +8,13 @@ import {
   Calendar,
   CheckCircle2,
   Clock,
+  Eye,
   FilterX,
   Globe,
+  MousePointerClick,
   Plus,
   Trash2,
+  TrendingUp,
   X,
 } from 'lucide-react';
 
@@ -42,6 +45,12 @@ export type PlatformNotificacion = {
   enviadoEn: string | null;
   createdAt: string;
   autor: string | null;
+};
+
+export type PushStats = {
+  total: number;
+  leidas: number;
+  clickeadas: number;
 };
 
 const AUDIENCIA_LABELS: Record<NotificacionAudiencia, string> = {
@@ -75,8 +84,10 @@ type ModalState = { mode: 'create' } | null;
 
 export function PlatformNotificacionesClient({
   notificaciones,
+  pushStats,
 }: {
   notificaciones: PlatformNotificacion[];
+  pushStats: PushStats;
 }) {
   const router = useRouter();
   const [query, setQuery] = useState('');
@@ -137,7 +148,7 @@ export function PlatformNotificacionesClient({
         </div>
       </div>
 
-      <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="mb-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard icon={<Bell className="h-5 w-5" />} label="Total" value={stats.total} />
         <StatCard
           icon={<Clock className="h-5 w-5" />}
@@ -153,6 +164,32 @@ export function PlatformNotificacionesClient({
           icon={<AlertTriangle className="h-5 w-5" />}
           label="Fallidas"
           value={stats.fallidas}
+        />
+      </div>
+
+      <p className="mb-2 text-xs font-semibold tracking-wide text-gray-400 uppercase">
+        Engagement — notificaciones transaccionales (app mobile)
+      </p>
+      <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <StatCard
+          icon={<Bell className="h-5 w-5" />}
+          label="Total enviadas"
+          value={pushStats.total}
+        />
+        <StatCard icon={<Eye className="h-5 w-5" />} label="Leídas" value={pushStats.leidas} />
+        <StatCard
+          icon={<MousePointerClick className="h-5 w-5" />}
+          label="Tocadas"
+          value={pushStats.clickeadas}
+        />
+        <StatCard
+          icon={<TrendingUp className="h-5 w-5" />}
+          label="Tasa de toque"
+          value={
+            pushStats.total > 0
+              ? `${((pushStats.clickeadas / pushStats.total) * 100).toFixed(1)}%`
+              : '—'
+          }
         />
       </div>
 
@@ -211,7 +248,15 @@ export function PlatformNotificacionesClient({
   );
 }
 
-function StatCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: number }) {
+function StatCard({
+  icon,
+  label,
+  value,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: number | string;
+}) {
   return (
     <div className="flex items-center gap-4 rounded-2xl border border-gray-200 bg-white p-4">
       <div className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-gray-100 text-[#669E9D]">
