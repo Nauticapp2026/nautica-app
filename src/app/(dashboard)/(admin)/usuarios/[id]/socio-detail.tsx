@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition, useRef, useEffect } from 'react';
+import { Fragment, useState, useTransition, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Script from 'next/script';
@@ -9,12 +9,14 @@ import {
   User,
   Anchor,
   CheckCircle2,
+  ChevronDown,
   CreditCard,
   DollarSign,
   Users,
   Clock,
   FileText,
   Package,
+  Pencil,
   Printer,
   Ship,
   Star,
@@ -32,6 +34,7 @@ import {
   eliminarPagoAction,
   informarPagoAction,
   marcarPagadasAction,
+  updateMovimientoAction,
 } from '@/app/actions/movimientos';
 import { crearReciboInternoAction } from '@/app/actions/facturacion';
 import {
@@ -196,6 +199,11 @@ function fmt(amount: number) {
 }
 
 const fmtDate = formatArgentinaDate;
+
+function todayISODate() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 
 const ESTADO_BADGE: Record<string, string> = {
   pagado: 'bg-gray-900 text-white',
@@ -681,7 +689,7 @@ function AgregarServicioModal({
   const [servicioId, setServicioId] = useState('');
   const [concepto, setConcepto] = useState('');
   const [monto, setMonto] = useState('');
-  const [fecha, setFecha] = useState('');
+  const [fecha, setFecha] = useState(todayISODate);
   const [estadoPago, setEstadoPago] = useState<'no_pagado' | 'pagado'>('no_pagado');
   const [formaDePago, setFormaDePago] = useState('');
   const [datosPago, setDatosPago] = useState<Record<string, string>>({});
@@ -703,7 +711,7 @@ function AgregarServicioModal({
     setServicioId('');
     setConcepto('');
     setMonto('');
-    setFecha('');
+    setFecha(todayISODate());
     setEstadoPago('no_pagado');
     setFormaDePago('');
     setDatosPago({});
@@ -3295,7 +3303,18 @@ function ServiciosContratadosTab({
 }) {
   const router = useRouter();
   const [cancelandoId, setCancelandoId] = useState<string | null>(null);
+  const [editingMov, setEditingMov] = useState<Movimiento | null>(null);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [isPending, startTransition] = useTransition();
+
+  function toggleExpand(id: string) {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   // Agrupa movimientos por servicio.
   type Resumen = {
@@ -3409,42 +3428,104 @@ function ServiciosContratadosTab({
             <tbody>
               {filas.map((s) => {
                 const cancelado = cancelacionMap.get(s.servicioId);
+                const isExpanded = expandedIds.has(s.servicioId);
+                const movsForServicio = movimientos
+                  .filter((m) => m.servicioId === s.servicioId)
+                  .sort((a, b) => {
+                    if (!a.fecha) return 1;
+                    if (!b.fecha) return -1;
+                    return b.fecha.localeCompare(a.fecha);
+                  });
                 return (
-                  <tr key={s.servicioId} className="border-b border-gray-50 last:border-0">
-                    <td className="py-3 pr-4">
-                      <span className="font-medium" style={{ color: '#101828' }}>
-                        {s.servicioNombre}
-                      </span>
-                      {cancelado && (
-                        <span className="ml-2 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-600">
-                          Cancelado {fmtDate(cancelado)}
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-3 pr-4 text-center text-gray-600">{s.cantidad}</td>
-                    <td className="py-3 pr-4 text-gray-600">
-                      {s.ultimaFecha ? fmtDate(s.ultimaFecha) : '—'}
-                    </td>
-                    <td className="py-3 pr-4 text-right font-medium" style={{ color: '#101828' }}>
-                      {fmt(s.total)}
-                    </td>
-                    <td className="py-3 text-right">
-                      {!cancelado && (
-                        <button
-                          onClick={() => setCancelandoId(s.servicioId)}
-                          className="rounded-[8px] border border-red-200 px-3 py-1 text-xs font-medium text-red-600 transition hover:bg-red-50"
-                        >
-                          Cancelar
-                        </button>
-                      )}
-                    </td>
-                  </tr>
+                  <Fragment key={s.servicioId}>
+                    <tr className="border-b border-gray-50 last:border-0">
+                      <td className="py-3 pr-4">
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => toggleExpand(s.servicioId)}
+                            className="rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                            title={isExpanded ? 'Ocultar cargos' : 'Ver cargos'}
+                          >
+                            <ChevronDown
+                              className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                            />
+                          </button>
+                          <span className="font-medium" style={{ color: '#101828' }}>
+                            {s.servicioNombre}
+                          </span>
+                          {cancelado && (
+                            <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-600">
+                              Cancelado {fmtDate(cancelado)}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-3 pr-4 text-center text-gray-600">{s.cantidad}</td>
+                      <td className="py-3 pr-4 text-gray-600">
+                        {s.ultimaFecha ? fmtDate(s.ultimaFecha) : '—'}
+                      </td>
+                      <td className="py-3 pr-4 text-right font-medium" style={{ color: '#101828' }}>
+                        {fmt(s.total)}
+                      </td>
+                      <td className="py-3 text-right">
+                        {!cancelado && (
+                          <button
+                            onClick={() => setCancelandoId(s.servicioId)}
+                            className="rounded-[8px] border border-red-200 px-3 py-1 text-xs font-medium text-red-600 transition hover:bg-red-50"
+                          >
+                            Cancelar
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                    {isExpanded &&
+                      movsForServicio.map((m) => (
+                        <tr key={m.id} className="bg-gray-50">
+                          <td className="py-2 pr-4 pl-9 text-sm text-gray-500">
+                            {m.fecha ? fmtDate(m.fecha) : '—'}
+                          </td>
+                          <td colSpan={2} className="py-2 pr-4 text-sm text-gray-500">
+                            {m.concepto ?? (
+                              <span className="text-gray-300 italic">Sin detalle</span>
+                            )}
+                          </td>
+                          <td
+                            className="py-2 pr-4 text-right text-sm font-medium"
+                            style={{ color: '#101828' }}
+                          >
+                            {fmt(parseFloat(m.debe ?? '0'))}
+                          </td>
+                          <td className="py-2 text-right">
+                            {!m.facturaCodigo && (
+                              <button
+                                onClick={() => setEditingMov(m)}
+                                className="rounded-[8px] border border-gray-200 p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+                                title="Editar cargo"
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                  </Fragment>
                 );
               })}
             </tbody>
           </table>
         </div>
       </div>
+
+      {editingMov && (
+        <EditMovimientoModal
+          mov={editingMov}
+          onClose={() => setEditingMov(null)}
+          onSaved={() => {
+            setEditingMov(null);
+            router.refresh();
+          }}
+        />
+      )}
 
       {/* Dialog de cancelación */}
       {cancelandoId && servicioSeleccionado && (
@@ -3520,6 +3601,119 @@ function ServiciosContratadosTab({
         </div>
       )}
     </>
+  );
+}
+
+function EditMovimientoModal({
+  mov,
+  onClose,
+  onSaved,
+}: {
+  mov: Movimiento;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [concepto, setConcepto] = useState(mov.concepto ?? '');
+  const [monto, setMonto] = useState(mov.debe ?? '');
+  const [fecha, setFecha] = useState(mov.fecha ? mov.fecha.slice(0, 10) : todayISODate());
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  function handleSave() {
+    setError(null);
+    const montoNum = parseFloat(montoToNumberStr(monto));
+    if (!monto || isNaN(montoNum) || montoNum <= 0) {
+      setError('El monto debe ser mayor a cero.');
+      return;
+    }
+    if (!fecha) {
+      setError('La fecha es requerida.');
+      return;
+    }
+    startTransition(async () => {
+      const res = await updateMovimientoAction({
+        movimientoId: mov.id,
+        concepto,
+        monto: montoToNumberStr(monto),
+        fecha,
+      });
+      if (res.error) setError(res.error);
+      else onSaved();
+    });
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+        <div className="mb-4 flex items-start justify-between">
+          <p className="text-base font-bold" style={{ color: '#101828' }}>
+            Editar cargo
+          </p>
+          <button onClick={onClose} className="rounded-[8px] p-1 text-gray-400 hover:bg-gray-100">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="space-y-3">
+          <div>
+            <label className="mb-1 block text-xs font-semibold" style={{ color: '#101828' }}>
+              Concepto
+            </label>
+            <input
+              className={inputCls}
+              placeholder="Descripción del cargo"
+              value={concepto}
+              onChange={(e) => setConcepto(e.target.value)}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-xs font-semibold" style={{ color: '#101828' }}>
+                Monto
+              </label>
+              <input
+                className={inputCls}
+                inputMode="decimal"
+                placeholder="0,00"
+                value={monto}
+                onChange={(e) => setMonto(sanitizeMontoInput(e.target.value))}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold" style={{ color: '#101828' }}>
+                Fecha
+              </label>
+              <input
+                type="date"
+                className={inputCls}
+                value={fecha}
+                onChange={(e) => setFecha(e.target.value)}
+              />
+            </div>
+          </div>
+        </div>
+
+        {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+
+        <div className="mt-5 flex gap-2">
+          <button
+            onClick={onClose}
+            disabled={isPending}
+            className="flex-1 rounded-[10px] border border-gray-200 py-2.5 text-sm font-medium text-gray-600 transition hover:bg-gray-50 disabled:opacity-40"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={isPending || !monto || !fecha}
+            className="flex-1 rounded-[10px] py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-40"
+            style={{ background: '#175861' }}
+          >
+            {isPending ? 'Guardando...' : 'Guardar'}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
