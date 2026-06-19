@@ -723,12 +723,17 @@ Esta sección aparece debajo de las fotos. Configurá aquí el Punto de Venta pa
 _Paso 1 — Configurar el Punto de Venta:_
 
 1. Completá los datos:
-   - **Número de Punto de Venta** _(requerido)_
-   - **Condición frente al IVA** _(requerida)_ — la de tu club.
-   - **Rubro** _(requerido)_
+   - **Número de Punto de Venta** _(requerido)_ — debe existir previamente en AFIP (Servicios → Administrador de Relaciones → POS de Facturación Electrónica).
    - **Razón social** _(requerida)_
+   - **CUIT** _(requerido)_
+   - **Condición frente al IVA** _(requerida)_ — la de tu club.
+   - **Condición Ingresos Brutos** _(opcional)_
    - **Fecha de inicio de actividades** _(requerida)_
-2. Hacé clic en **Guardar**.
+2. Hacé clic en **Guardar cambios**.
+
+Una vez creado, el **número de Punto de Venta no se puede cambiar**. El resto de los datos (razón social, CUIT, condición IVA, fecha de inicio) son editables: modificalos y hacé clic en **Guardar cambios** cuando necesites actualizarlos.
+
+> Si el POS ya tiene facturas emitidas, TusFacturas puede bloquear la edición del CUIT y la condición frente al IVA. En ese caso el sistema mostrará el mensaje de error devuelto por TusFacturas.
 
 _Paso 2 — Certificado de enlace con AFIP:_
 
