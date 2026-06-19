@@ -251,6 +251,9 @@ export async function savePuntoVentaAction(data: SavePuntoVentaData): Promise<{ 
       email: guarderias.email,
       rubro: guarderias.rubro,
       puntoDeVentaActual: guarderias.puntoDeVenta,
+      tusfacturasApikey: guarderias.tusfacturasApikey,
+      tusfacturasApitoken: guarderias.tusfacturasApitoken,
+      tusfacturasUsertoken: guarderias.tusfacturasUsertoken,
     })
     .from(guarderias)
     .where(eq(guarderias.id, guarderiaId))
@@ -263,10 +266,16 @@ export async function savePuntoVentaAction(data: SavePuntoVentaData): Promise<{ 
     };
   }
 
-  if (guarderia.puntoDeVentaActual != null) {
-    return {
-      error: 'Ya tenés un número de referencia configurado. No se puede volver a agregar.',
-    };
+  const esModificacion = guarderia.puntoDeVentaActual != null;
+
+  if (esModificacion) {
+    if (
+      !guarderia.tusfacturasApikey ||
+      !guarderia.tusfacturasApitoken ||
+      !guarderia.tusfacturasUsertoken
+    ) {
+      return { error: 'No se encontraron las credenciales del POS. Contactá a soporte.' };
+    }
   }
 
   const ivaCode = CONDICION_IVA_API[data.condicionIva];
@@ -274,27 +283,38 @@ export async function savePuntoVentaAction(data: SavePuntoVentaData): Promise<{ 
 
   const webhookUrl = buildTusFacturasWebhookUrl();
 
+  const posCreds = esModificacion
+    ? {
+        apikey: guarderia.tusfacturasApikey!,
+        apitoken: guarderia.tusfacturasApitoken!,
+        usertoken: guarderia.tusfacturasUsertoken!,
+      }
+    : undefined;
+
   let tusResponse;
   try {
-    tusResponse = await administrarPuntoVenta({
-      operacion: 'A',
-      punto_venta: String(data.puntoDeVenta),
-      direccion: guarderia.direccion,
-      razon_social: data.razonSocial.trim(),
-      cuit: data.cuit.trim(),
-      iva_condicion: ivaCode,
-      iva_emails: guarderia.email,
-      ...(data.condicionIibb
-        ? { iibb: CONDICION_IIBB_LABEL[data.condicionIibb as CondicionIibb] }
-        : {}),
-      fecha_inicio: toTusFecha(data.fechaInicio),
-      factura_afip: 'S',
-      es_agente_retencion: 'N',
-      esta_activo: 'S',
-      es_predeterminado: 'S',
-      conceptos_tipo: 'PS',
-      ...(webhookUrl ? { webhook: webhookUrl } : {}),
-    });
+    tusResponse = await administrarPuntoVenta(
+      {
+        operacion: esModificacion ? 'M' : 'A',
+        punto_venta: String(esModificacion ? guarderia.puntoDeVentaActual : data.puntoDeVenta),
+        direccion: guarderia.direccion,
+        razon_social: data.razonSocial.trim(),
+        cuit: data.cuit.trim(),
+        iva_condicion: ivaCode,
+        iva_emails: guarderia.email,
+        ...(data.condicionIibb
+          ? { iibb: CONDICION_IIBB_LABEL[data.condicionIibb as CondicionIibb] }
+          : {}),
+        fecha_inicio: toTusFecha(data.fechaInicio),
+        factura_afip: 'S',
+        es_agente_retencion: 'N',
+        esta_activo: 'S',
+        es_predeterminado: 'S',
+        conceptos_tipo: 'PS',
+        ...(webhookUrl ? { webhook: webhookUrl } : {}),
+      },
+      posCreds,
+    );
   } catch (err) {
     return {
       error: err instanceof Error ? err.message : 'Error al sincronizar con TusFacturas.',
@@ -304,16 +324,16 @@ export async function savePuntoVentaAction(data: SavePuntoVentaData): Promise<{ 
   await db
     .update(guarderias)
     .set({
-      puntoDeVenta: data.puntoDeVenta,
+      ...(!esModificacion && { puntoDeVenta: data.puntoDeVenta }),
       razonSocial: data.razonSocial.trim(),
       cuit: data.cuit.trim(),
       condicionIva: data.condicionIva,
       condicionIibb: (data.condicionIibb || null) as CondicionIibb | null,
       rubro: guarderia.rubro?.trim() || 'Servicios náuticos',
       fechaInicio: new Date(data.fechaInicio),
-      tusfacturasApikey: tusResponse.apikey != null ? String(tusResponse.apikey) : null,
-      tusfacturasApitoken: tusResponse.apitoken ?? null,
-      tusfacturasUsertoken: tusResponse.usertoken ?? null,
+      ...(tusResponse.apikey != null && { tusfacturasApikey: String(tusResponse.apikey) }),
+      ...(tusResponse.apitoken != null && { tusfacturasApitoken: tusResponse.apitoken }),
+      ...(tusResponse.usertoken != null && { tusfacturasUsertoken: tusResponse.usertoken }),
       updatedAt: new Date(),
     })
     .where(eq(guarderias.id, guarderiaId));

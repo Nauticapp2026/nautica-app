@@ -1471,10 +1471,8 @@ function PuntoVentaTab({ initial }: { initial: PuntoVentaData }) {
   const [pending, startTransition] = useTransition();
 
   const yaConfigurado = initial.puntoDeVenta != null;
-  const readOnly = yaConfigurado;
 
   const onField = <K extends keyof PuntoVentaData>(key: K, value: PuntoVentaData[K]) => {
-    if (readOnly) return;
     setData((prev) => ({ ...prev, [key]: value }));
     setFeedback(null);
   };
@@ -1508,11 +1506,15 @@ function PuntoVentaTab({ initial }: { initial: PuntoVentaData }) {
       });
       if (res.error) setFeedback({ type: 'error', msg: res.error });
       else
-        setFeedback({ type: 'success', msg: 'Número de referencia sincronizado con TusFacturas.' });
+        setFeedback({
+          type: 'success',
+          msg: yaConfigurado
+            ? 'Datos actualizados en TusFacturas.'
+            : 'Número de referencia sincronizado con TusFacturas.',
+        });
     });
   };
 
-  const readOnlyCls = readOnly ? 'bg-gray-50 text-gray-500' : '';
   const condicionIvaLabel =
     CONDICION_IVA_OPTS.find((o) => o.value === data.condicionIva)?.label ?? null;
 
@@ -1524,8 +1526,8 @@ function PuntoVentaTab({ initial }: { initial: PuntoVentaData }) {
 
       {yaConfigurado && (
         <div className="mb-6 rounded-[10px] border border-[#CAE6E4] bg-[#ECFDF3] px-4 py-3 text-sm text-[#175861]">
-          Este número de referencia ya fue creado en TusFacturas. Los datos no se pueden modificar
-          desde acá.
+          El número de referencia no se puede cambiar una vez creado. Podés actualizar el resto de
+          los datos impositivos.
         </div>
       )}
 
@@ -1541,12 +1543,12 @@ function PuntoVentaTab({ initial }: { initial: PuntoVentaData }) {
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <Field label="Nº de referencia" required>
             <input
-              className={`${inputCls} ${readOnlyCls}`}
+              className={`${inputCls} ${yaConfigurado ? 'bg-gray-50 text-gray-500' : ''}`}
               type="number"
               min={1}
               placeholder="1"
               value={data.puntoDeVenta ?? ''}
-              disabled={readOnly}
+              disabled={yaConfigurado}
               onChange={(e) =>
                 onField('puntoDeVenta', e.target.value ? Number(e.target.value) : null)
               }
@@ -1554,9 +1556,8 @@ function PuntoVentaTab({ initial }: { initial: PuntoVentaData }) {
           </Field>
           <Field label="Razón social" required>
             <input
-              className={`${inputCls} ${readOnlyCls}`}
+              className={inputCls}
               value={data.razonSocial}
-              disabled={readOnly}
               onChange={(e) => onField('razonSocial', e.target.value)}
             />
           </Field>
@@ -1565,55 +1566,42 @@ function PuntoVentaTab({ initial }: { initial: PuntoVentaData }) {
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <Field label="CUIT" required>
             <input
-              className={`${inputCls} ${readOnlyCls}`}
+              className={inputCls}
               value={data.cuit}
-              disabled={readOnly}
               placeholder="20-12345678-9"
               onChange={(e) => onField('cuit', e.target.value)}
             />
           </Field>
           <Field label="Condición frente al IVA" required>
-            {readOnly ? (
-              <div className="flex h-11 items-center rounded-[10px] border border-gray-200 bg-gray-50 px-4 text-sm text-gray-500">
-                {condicionIvaLabel ?? '—'}
-              </div>
-            ) : (
-              <select
-                className={inputCls}
-                value={data.condicionIva}
-                onChange={(e) =>
-                  onField('condicionIva', e.target.value as PuntoVentaData['condicionIva'])
-                }
-              >
-                {CONDICION_IVA_OPTS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            )}
+            <select
+              className={inputCls}
+              value={data.condicionIva}
+              onChange={(e) =>
+                onField('condicionIva', e.target.value as PuntoVentaData['condicionIva'])
+              }
+            >
+              {CONDICION_IVA_OPTS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
           </Field>
         </div>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <Field label="Condición Ingresos Brutos">
-            {readOnly ? (
-              <div className="flex h-11 items-center rounded-[10px] border border-gray-200 bg-gray-50 px-4 text-sm text-[#101828]">
-                {CONDICION_IIBB_OPTS.find((o) => o.value === data.condicionIibb)?.label || '—'}
-              </div>
-            ) : (
-              <select
-                className={inputCls}
-                value={data.condicionIibb}
-                onChange={(e) => onField('condicionIibb', e.target.value)}
-              >
-                {CONDICION_IIBB_OPTS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            )}
+            <select
+              className={inputCls}
+              value={data.condicionIibb}
+              onChange={(e) => onField('condicionIibb', e.target.value)}
+            >
+              {CONDICION_IIBB_OPTS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
           </Field>
           <Field label="Domicilio fiscal">
             <div className="flex h-11 items-center rounded-[10px] border border-gray-200 bg-gray-50 px-4 text-sm">
@@ -1630,10 +1618,9 @@ function PuntoVentaTab({ initial }: { initial: PuntoVentaData }) {
 
         <Field label="Fecha de inicio de actividades" required>
           <input
-            className={`${inputCls} ${readOnlyCls}`}
+            className={inputCls}
             type="date"
             value={data.fechaInicio}
-            disabled={readOnly}
             onChange={(e) => onField('fechaInicio', e.target.value)}
           />
         </Field>
@@ -1644,18 +1631,16 @@ function PuntoVentaTab({ initial }: { initial: PuntoVentaData }) {
           </p>
         )}
 
-        {!readOnly && (
-          <div className="pt-2">
-            <button
-              type="button"
-              onClick={onSubmit}
-              disabled={pending}
-              className="rounded-[10px] bg-[#175861] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#0f4249] disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {pending ? 'Sincronizando…' : 'Guardar cambios'}
-            </button>
-          </div>
-        )}
+        <div className="pt-2">
+          <button
+            type="button"
+            onClick={onSubmit}
+            disabled={pending}
+            className="rounded-[10px] bg-[#175861] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#0f4249] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {pending ? 'Sincronizando…' : 'Guardar cambios'}
+          </button>
+        </div>
 
         {yaConfigurado && (
           <div className="mt-2 border-t border-gray-200 pt-6">
