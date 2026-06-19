@@ -2259,16 +2259,9 @@ export function SocioDetail({
   const memberDate = formatArgentinaDate(socio.memberSince);
 
   const totalIngresos = movimientos.reduce((sum, m) => sum + parseFloat(m.debe ?? '0'), 0);
-  const totalCargosPendientes = movimientos
-    .filter((m) => m.estado === 'no_pagado')
-    .reduce((sum, m) => sum + parseFloat(m.debe ?? '0'), 0);
-  // Pagos a cuenta: movimientos con haber > 0 que no estan imputados a una
-  // factura. Hoy todavia no linkeamos pagos a facturas, asi que tomamos
-  // todos los haber como "sin imputar". Cuando se implemente la imputacion,
-  // filtrar por una columna `factura_id IS NULL`.
   const totalPagosACuenta = movimientos.reduce((sum, m) => sum + parseFloat(m.haber ?? '0'), 0);
-  // Saldo real del socio. Positivo = nos debe, negativo = saldo a favor.
-  const saldoBruto = totalCargosPendientes - totalPagosACuenta;
+  // Saldo real: total facturado menos total cobrado. Positivo = nos debe, negativo = saldo a favor.
+  const saldoBruto = totalIngresos - totalPagosACuenta;
   const totalPendiente = Math.max(0, saldoBruto);
   const totalAFavor = saldoBruto < 0 ? Math.abs(saldoBruto) : 0;
 

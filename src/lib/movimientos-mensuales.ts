@@ -73,12 +73,30 @@ export function calcularProporcionalMes(
 }
 
 /**
+ * Devuelve el día del mes (1-3) correspondiente al primer día hábil
+ * (lunes a viernes). Si el 1º es sábado → día 3; si es domingo → día 2.
+ */
+export function primerDiaHabilDelMes(d: Date): number {
+  const dow = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1)).getUTCDay();
+  if (dow === 6) return 3; // sábado → lunes 3
+  if (dow === 0) return 2; // domingo → lunes 2
+  return 1;
+}
+
+/**
  * Determina si `hoy` es el día de cobro de la guardería. Como
  * `diaFacturacion` está restringido a 1-28 (check en DB), siempre existe
  * en cualquier mes — no hace falta el clamp con daysInMonth.
+ * Si `primerHabil` es true, usa el primer día hábil del mes en lugar del
+ * día fijo.
  */
-export function esDiaDeCobro(diaFacturacion: number, hoy: Date = new Date()): boolean {
-  return hoy.getUTCDate() === diaFacturacion;
+export function esDiaDeCobro(
+  diaFacturacion: number,
+  hoy: Date = new Date(),
+  primerHabil = false,
+): boolean {
+  const diaObjetivo = primerHabil ? primerDiaHabilDelMes(hoy) : diaFacturacion;
+  return hoy.getUTCDate() === diaObjetivo;
 }
 
 /**
@@ -154,6 +172,8 @@ export async function runMonthlyGeneration(now: Date = new Date()): Promise<{
   const diaHoy = now.getUTCDate();
   const todayStr = now.toISOString().slice(0, 10);
 
+  const primerHabilDelMes = primerDiaHabilDelMes(now);
+
   const rows = await db
     .select({
       espacioId: espacios.id,
@@ -163,6 +183,7 @@ export async function runMonthlyGeneration(now: Date = new Date()): Promise<{
       servicioNombre: servicios.nombre,
       servicioPrecio: servicios.precio,
       diaFacturacion: guarderias.diaFacturacion,
+      facturacionPrimerHabil: guarderias.facturacionPrimerHabil,
     })
     .from(espacios)
     .innerJoin(servicios, eq(servicios.id, espacios.servicioId))
@@ -184,8 +205,9 @@ export async function runMonthlyGeneration(now: Date = new Date()): Promise<{
   for (const r of rows) {
     if (!r.ocupanteId || !r.servicioId) continue;
 
-    const dia = r.diaFacturacion ?? 1;
-    if (dia !== diaHoy) {
+    const usaPrimerHabil = r.facturacionPrimerHabil ?? false;
+    const diaObjetivo = usaPrimerHabil ? primerHabilDelMes : (r.diaFacturacion ?? 1);
+    if (diaObjetivo !== diaHoy) {
       skipped++;
       continue;
     }

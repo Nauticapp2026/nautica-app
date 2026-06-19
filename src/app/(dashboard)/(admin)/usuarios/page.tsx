@@ -246,17 +246,25 @@ export default async function UsuariosPage({
     });
   }
 
-  const accesosBySocio = new Map<string, { id: string; nombre: string | null }[]>();
-  const accesosIdsSeen = new Set<string>();
+  const accesosBySocio = new Map<
+    string,
+    { id: string; nombre: string | null; desde: string | null }[]
+  >();
+  // Clave de deduplicación por socio: evitar mostrar la misma persona dos veces.
+  // El query viene ordenado DESC por createdAt, así la primera ocurrencia es la más reciente.
+  const accesoNombresSeen = new Map<string, Set<string>>();
   for (const acc of accesosList) {
-    if (!acc.socioId || accesosIdsSeen.has(acc.id)) continue;
-    accesosIdsSeen.add(acc.id);
+    if (!acc.socioId) continue;
     if (!accesosBySocio.has(acc.socioId)) accesosBySocio.set(acc.socioId, []);
+    if (!accesoNombresSeen.has(acc.socioId)) accesoNombresSeen.set(acc.socioId, new Set());
     const arr = accesosBySocio.get(acc.socioId)!;
+    const nombre =
+      [acc.invitadoNombre, acc.invitadoApellido].filter(Boolean).join(' ') || acc.motivo || null;
+    const key = nombre?.toLowerCase().trim() ?? acc.id;
+    if (accesoNombresSeen.get(acc.socioId)!.has(key)) continue;
+    accesoNombresSeen.get(acc.socioId)!.add(key);
     if (arr.length < 5) {
-      const nombre =
-        [acc.invitadoNombre, acc.invitadoApellido].filter(Boolean).join(' ') || acc.motivo || null;
-      arr.push({ id: acc.id, nombre });
+      arr.push({ id: acc.id, nombre, desde: acc.desde?.toISOString() ?? null });
     }
   }
 

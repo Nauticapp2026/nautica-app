@@ -47,6 +47,7 @@ export type UpdateGuarderiaGeneralData = {
   horarios: HorarioInput[];
   imagenes: string[];
   diaFacturacion: number;
+  facturacionPrimerHabil: boolean;
 };
 
 function isAdmin(ctx: NonNullable<Awaited<ReturnType<typeof getActiveMarina>>>): boolean {
@@ -70,9 +71,8 @@ export async function updateGuarderiaGeneralAction(
   if (!nombre) return { error: 'El nombre es obligatorio.' };
   if (!TIPOS.includes(data.tipo)) return { error: 'Tipo de establecimiento inválido.' };
   if (
-    !Number.isInteger(data.diaFacturacion) ||
-    data.diaFacturacion < 1 ||
-    data.diaFacturacion > 28
+    !data.facturacionPrimerHabil &&
+    (!Number.isInteger(data.diaFacturacion) || data.diaFacturacion < 1 || data.diaFacturacion > 28)
   ) {
     return { error: 'El día de facturación debe ser un entero entre 1 y 28.' };
   }
@@ -99,6 +99,7 @@ export async function updateGuarderiaGeneralAction(
       email: data.email.trim(),
       imagenes: data.imagenes,
       diaFacturacion: data.diaFacturacion,
+      facturacionPrimerHabil: data.facturacionPrimerHabil,
       ...(coords
         ? {
             latitud: coords.lat.toFixed(6),

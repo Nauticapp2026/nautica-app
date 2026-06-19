@@ -67,6 +67,7 @@ export default async function ConfiguracionPage({ searchParams }: Props) {
       fechaInicio: guarderias.fechaInicio,
       imagenes: guarderias.imagenes,
       diaFacturacion: guarderias.diaFacturacion,
+      facturacionPrimerHabil: guarderias.facturacionPrimerHabil,
       certificadoAfipOk: guarderias.certificadoAfipOk,
       plan: guarderias.plan,
       planPendiente: guarderias.planPendiente,
@@ -126,6 +127,7 @@ export default async function ConfiguracionPage({ searchParams }: Props) {
     horarios,
     imagenes: guarderia?.imagenes ?? [],
     diaFacturacion: guarderia?.diaFacturacion ?? 1,
+    facturacionPrimerHabil: guarderia?.facturacionPrimerHabil ?? false,
   };
 
   const miembrosRows = await db

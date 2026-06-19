@@ -913,12 +913,16 @@ function LoteModal({
                         .reduce((sum, m) => sum + parseFloat(m.debe ?? '0'), 0);
                       const allMovSel = s.movsFiltrados.every((m) => isMovSel(s.id, m.id));
                       const selCount = s.movsFiltrados.filter((m) => isMovSel(s.id, m.id)).length;
+                      const someMovSel = selCount > 0 && !allMovSel;
 
                       return (
                         <div key={s.id} className="border-b border-gray-50 last:border-0">
                           {/* Fila del socio */}
                           <div className="flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-gray-50">
                             <input
+                              ref={(el) => {
+                                if (el) el.indeterminate = someMovSel;
+                              }}
                               type="checkbox"
                               className="h-4 w-4 cursor-pointer rounded accent-[#175861]"
                               checked={allMovSel}

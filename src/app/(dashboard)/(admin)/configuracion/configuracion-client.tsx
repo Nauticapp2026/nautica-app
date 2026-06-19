@@ -398,18 +398,29 @@ function InfoGeneralForm({ initial }: { initial: InfoGeneralData }) {
         </div>
 
         <Field label="Día de facturación" required>
-          <input
-            className={inputCls}
-            type="number"
-            min={1}
-            max={28}
-            value={data.diaFacturacion}
-            onChange={(e) => onField('diaFacturacion', parseInt(e.target.value, 10) || 1)}
-          />
+          <label className="mb-2 flex cursor-pointer items-center gap-2">
+            <input
+              type="checkbox"
+              className="h-4 w-4 cursor-pointer rounded accent-[#175861]"
+              checked={data.facturacionPrimerHabil}
+              onChange={(e) => onField('facturacionPrimerHabil', e.target.checked)}
+            />
+            <span className="text-sm text-gray-700">Primer día hábil del mes</span>
+          </label>
+          {!data.facturacionPrimerHabil && (
+            <input
+              className={inputCls}
+              type="number"
+              min={1}
+              max={28}
+              value={data.diaFacturacion}
+              onChange={(e) => onField('diaFacturacion', parseInt(e.target.value, 10) || 1)}
+            />
+          )}
           <p className="mt-1 text-xs text-gray-500">
-            Día del mes (1 a 28) en que se generan los movimientos mensuales y se emiten las
-            facturas automáticas para los socios. La primera factura de cada socio se emite
-            manualmente; las siguientes se generan ese día automáticamente.
+            {data.facturacionPrimerHabil
+              ? 'Se facturará el primer lunes del mes (o el martes si hay feriado). Cubre los meses en que el 1º cae sábado o domingo.'
+              : 'Día del mes (1 a 28) en que se generan los movimientos mensuales y se emiten las facturas automáticas. La primera factura de cada socio se emite manualmente; las siguientes se generan ese día automáticamente.'}
           </p>
         </Field>
 

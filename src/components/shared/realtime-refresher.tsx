@@ -4,6 +4,18 @@ import { useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 
+const REALTIME_TABLES = [
+  'alertas',
+  'tareas',
+  'porteria',
+  'solicitudes_membership',
+  'memberships',
+  'embarcaciones',
+  'espacios',
+  'facturacion',
+  'solicitudes_lavado',
+] as const;
+
 export function RealtimeRefresher({ guarderiaId }: { guarderiaId: string }) {
   const router = useRouter();
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -15,40 +27,34 @@ export function RealtimeRefresher({ guarderiaId }: { guarderiaId: string }) {
 
   useEffect(() => {
     const supabase = createClient();
-    const channel = supabase
-      .channel(`dashboard-${guarderiaId}`)
-      .on(
+    let channel = supabase.channel(`dashboard-${guarderiaId}`);
+
+    for (const table of REALTIME_TABLES) {
+      channel = channel.on(
         'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'alertas',
-          filter: `guarderia_id=eq.${guarderiaId}`,
-        },
+        { event: '*', schema: 'public', table, filter: `guarderia_id=eq.${guarderiaId}` },
         scheduleRefresh,
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'tareas', filter: `guarderia_id=eq.${guarderiaId}` },
-        scheduleRefresh,
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'porteria',
-          filter: `guarderia_id=eq.${guarderiaId}`,
-        },
-        scheduleRefresh,
-      )
-      .subscribe();
+      );
+    }
+
+    channel.subscribe();
 
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
       supabase.removeChannel(channel);
     };
   }, [guarderiaId, scheduleRefresh]);
+
+  // Refresh cuando el usuario vuelve a la pestaña (cubre tablas sin guarderia_id directo)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        scheduleRefresh();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [scheduleRefresh]);
 
   return null;
 }

@@ -42,6 +42,7 @@ type InvitadoItem = {
 type AccesoItem = {
   id: string;
   nombre: string | null;
+  desde: string | null;
 };
 
 type Socio = {
@@ -1158,6 +1159,12 @@ export function UsuariosClient({
                                           <span className="text-xs text-gray-700">
                                             {[inv.nombre, inv.apellido].filter(Boolean).join(' ')}
                                           </span>
+                                          {inv.validoHasta && (
+                                            <span className="text-xs text-gray-400">
+                                              · válido hasta{' '}
+                                              {formatArgentinaDate(new Date(inv.validoHasta))}
+                                            </span>
+                                          )}
                                         </div>
                                       ))}
                                     </div>
@@ -1177,6 +1184,11 @@ export function UsuariosClient({
                                           <span className="text-xs text-gray-700">
                                             {acc.nombre ?? '—'}
                                           </span>
+                                          {acc.desde && (
+                                            <span className="text-xs text-gray-400">
+                                              · desde {formatArgentinaDate(new Date(acc.desde))}
+                                            </span>
+                                          )}
                                         </div>
                                       ))}
                                     </div>
