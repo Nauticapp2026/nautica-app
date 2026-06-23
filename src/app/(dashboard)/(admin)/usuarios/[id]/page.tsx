@@ -81,6 +81,7 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
     movimientosList,
     serviciosList,
     navegantesList,
+    invitadosSocioList,
     documentosList,
     salidasList,
     espaciosSocioRows,
@@ -153,6 +154,35 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
         ),
       )
       .orderBy(desc(porteria.createdAt)),
+
+    db
+      .select({
+        id: invitados.id,
+        nombre: invitados.nombre,
+        apellido: invitados.apellido,
+        email: invitados.email,
+        telefono: invitados.telefono,
+        dni: invitados.dni,
+        motivo: invitados.motivo,
+        tipo: invitados.tipo,
+        estado: invitados.estado,
+        validoHasta: invitados.validoHasta,
+        createdAt: invitados.createdAt,
+      })
+      .from(invitados)
+      // Excluir los que son acceso externo (tienen porteria_invitados): esos van
+      // a la solapa "Accesos Externos". Misma regla que el desplegable de la
+      // lista de socios.
+      .leftJoin(porteriaInvitados, eq(porteriaInvitados.invitadoId, invitados.id))
+      .where(
+        and(
+          eq(invitados.socioId, id),
+          eq(invitados.guarderiaId, gId),
+          eq(invitados.estado, 'activo'),
+          isNull(porteriaInvitados.id),
+        ),
+      )
+      .orderBy(desc(invitados.createdAt)),
 
     db
       .select({
@@ -416,6 +446,11 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
         arribadaEn: n.arribadaEn?.toISOString() ?? null,
         createdAt: n.createdAt.toISOString(),
         esNavegante: n.esNavegante ?? false,
+      }))}
+      invitados={invitadosSocioList.map((iv) => ({
+        ...iv,
+        validoHasta: iv.validoHasta?.toISOString() ?? null,
+        createdAt: iv.createdAt.toISOString(),
       }))}
       documentos={documentosConUrl}
       salidas={salidasList.map((s) => ({

@@ -27,6 +27,7 @@ import {
   Plus,
   Trash2,
   Upload,
+  UserCheck,
   X,
 } from 'lucide-react';
 import {
@@ -138,6 +139,20 @@ type Navegante = {
   esNavegante: boolean;
 };
 
+type InvitadoSocio = {
+  id: string;
+  nombre: string;
+  apellido: string | null;
+  email: string | null;
+  telefono: string | null;
+  dni: string | null;
+  motivo: string | null;
+  tipo: string | null;
+  estado: string | null;
+  validoHasta: string | null;
+  createdAt: string;
+};
+
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const CONDICION_IVA_OPTS = [
@@ -183,6 +198,7 @@ const TABS = [
   { id: 'servicios-contratados', label: 'Servicios Contratados', icon: Package },
   { id: 'cuenta-corriente', label: 'Cuenta Corriente', icon: CreditCard },
   { id: 'navegantes', label: 'Accesos Externos', icon: Users },
+  { id: 'invitados', label: 'Invitados', icon: UserCheck },
   { id: 'salidas', label: 'Salidas', icon: Clock },
   { id: 'documentacion', label: 'Documentación', icon: FileText },
   { id: 'payway', label: 'Débito automático', icon: CreditCard },
@@ -2129,6 +2145,7 @@ export function SocioDetail({
   movimientos,
   servicios,
   navegantes,
+  invitados = [],
   documentos = [],
   salidas = [],
   espaciosDisponibles,
@@ -2141,6 +2158,7 @@ export function SocioDetail({
   movimientos: Movimiento[];
   servicios: Servicio[];
   navegantes: Navegante[];
+  invitados?: InvitadoSocio[];
   documentos?: DocumentoItem[];
   salidas?: SalidaItem[];
   espaciosDisponibles: EspacioOption[];
@@ -3031,6 +3049,53 @@ export function SocioDetail({
                       className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${estadoCls}`}
                     >
                       {estadoLabel}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Invitados del socio */}
+      {activeTab === 'invitados' && (
+        <div className="rounded-2xl border border-gray-200 bg-white p-4 md:p-6">
+          {invitados.length === 0 ? (
+            <EmptyState
+              icon={<UserCheck className="h-7 w-7 opacity-40" />}
+              text="No hay invitados registrados."
+            />
+          ) : (
+            <div className="space-y-3">
+              {invitados.map((iv) => {
+                const nombreCompleto = [iv.nombre, iv.apellido].filter(Boolean).join(' ') || '—';
+                const inicial = (iv.nombre?.[0] ?? '?').toUpperCase();
+                const tipoLabel = iv.tipo === 'titular' ? 'Titular' : 'Autorizado';
+                return (
+                  <div
+                    key={iv.id}
+                    className="flex items-center gap-4 rounded-[10px] border border-gray-100 bg-gray-50 p-4"
+                  >
+                    <div
+                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
+                      style={{ background: '#669E9D' }}
+                    >
+                      {inicial}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold" style={{ color: '#101828' }}>
+                        {nombreCompleto}
+                      </p>
+                      <div className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-gray-500">
+                        {iv.validoHasta && <span>Válido hasta {fmtDate(iv.validoHasta)}</span>}
+                        {iv.telefono && <span>Tel. {iv.telefono}</span>}
+                        {iv.dni && <span>DNI {iv.dni}</span>}
+                      </div>
+                      {iv.motivo && <p className="mt-0.5 text-xs text-gray-400">{iv.motivo}</p>}
+                    </div>
+                    <span className="inline-block rounded-full bg-teal-50 px-3 py-1 text-xs font-medium text-[#175861]">
+                      {tipoLabel}
                     </span>
                   </div>
                 );
