@@ -24,6 +24,7 @@ import {
 import { createSocioAction, uploadSocioDocumentoAction } from '@/app/actions/socios';
 import { formatArgentinaDate } from '@/lib/dates';
 import { EmptyState } from '@/components/shared/empty-state';
+import { Pagination } from '@/components/shared/pagination';
 import { ImportSociosModal } from './import-socios-modal';
 import { ImportEmbarcacionesModal } from './import-embarcaciones-modal';
 import { ASTILLEROS } from './astilleros';
@@ -889,6 +890,21 @@ export function UsuariosClient({
     return base;
   }, [socios, search, sortKey, sortDir, filtro]);
 
+  // Paginación (10 por página). Volver a la página 1 cuando cambia el conjunto
+  // filtrado: ajuste de estado en render (la key previa), en vez de setState
+  // dentro de useEffect.
+  const PAGE_SIZE = 10;
+  const [page, setPage] = useState(1);
+  const filterKey = `${search}|${filtro ?? ''}|${sortKey ?? ''}|${sortDir}`;
+  const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
+  if (filterKey !== prevFilterKey) {
+    setPrevFilterKey(filterKey);
+    setPage(1);
+  }
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, pageCount);
+  const paginados = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
   return (
     <>
       <CrearSocioModal open={modalOpen} onClose={() => setModalOpen(false)} />
@@ -969,241 +985,254 @@ export function UsuariosClient({
               }
             />
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[640px] text-sm">
-                <thead>
-                  <tr className="bg-gray-50 text-left text-xs font-semibold text-gray-500">
-                    <th className="w-10 px-4 py-3" />
-                    <SortableTh
-                      label="Nº Socio"
-                      sortKey="numero"
-                      activeKey={sortKey}
-                      dir={sortDir}
-                      onClick={() => toggleSort('numero')}
-                      align="center"
-                    />
-                    <SortableTh
-                      label="Nombre"
-                      sortKey="socio"
-                      activeKey={sortKey}
-                      dir={sortDir}
-                      onClick={() => toggleSort('socio')}
-                    />
-                    <SortableTh
-                      label="Embarcación"
-                      sortKey="embarcacion"
-                      activeKey={sortKey}
-                      dir={sortDir}
-                      onClick={() => toggleSort('embarcacion')}
-                    />
-                    <SortableTh
-                      label="Ubicación"
-                      sortKey="ubicacion"
-                      activeKey={sortKey}
-                      dir={sortDir}
-                      onClick={() => toggleSort('ubicacion')}
-                    />
-                    <th className="px-4 py-3 text-center">Estado</th>
-                    <th className="px-4 py-3 text-center">Ingreso</th>
-                    <SortableTh
-                      label="Saldo"
-                      sortKey="deuda"
-                      activeKey={sortKey}
-                      dir={sortDir}
-                      onClick={() => toggleSort('deuda')}
-                      align="center"
-                    />
-                    <th className="px-4 py-3 text-right">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map((s) => {
-                    const nombre = [s.nombre, s.apellido].filter(Boolean).join(' ') || '—';
-                    const deuda = parseFloat(s.deuda ?? '0');
-                    const isExpanded = expandedIds.has(s.profileId);
-                    return (
-                      <Fragment key={s.membresiaId}>
-                        <tr
-                          className={`cursor-pointer border-t border-gray-100 transition hover:bg-gray-50/80 ${
-                            isExpanded ? 'bg-gray-50/40' : ''
-                          }`}
-                          onClick={() => router.push(`/usuarios/${s.profileId}`)}
-                        >
-                          <td className="w-10 px-4 py-3">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleExpand(s.profileId);
-                              }}
-                              title={isExpanded ? 'Ocultar detalle' : 'Ver invitados y accesos'}
-                              className="text-gray-400 transition hover:text-[#175861]"
-                            >
-                              {isExpanded ? (
-                                <ChevronDown className="h-4 w-4" />
-                              ) : (
-                                <ChevronRight className="h-4 w-4" />
-                              )}
-                            </button>
-                          </td>
-                          <td className="w-14 px-4 py-3 text-center text-xs font-medium text-gray-400">
-                            {s.numeroSocio != null ? `#${s.numeroSocio}` : '—'}
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-1.5">
-                              <p className="font-medium" style={{ color: '#175861' }}>
-                                {nombre}
-                              </p>
-                              {s.datosIncompletos && (
-                                <span title="Datos incompletos" className="shrink-0">
-                                  <AlertTriangle className="h-3.5 w-3.5 text-amber-400" />
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-xs" style={{ color: '#669E9D' }}>
-                              {s.email}
-                            </p>
-                          </td>
-                          <td className="px-4 py-3 text-gray-500">{s.embarcacion ?? '—'}</td>
-                          <td className="px-4 py-3 text-gray-500">{s.ubicacion ?? '—'}</td>
-                          <td className="px-4 py-3 text-center">
-                            {s.membershipStatus === 'suspended' ? (
-                              <span className="inline-block rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-700">
-                                Pausado
-                              </span>
-                            ) : s.membershipStatus === 'inactivo' ? (
-                              <span className="inline-block rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-500">
-                                Inactivo
-                              </span>
-                            ) : s.estadoSocio === 'moroso' ? (
-                              <span className="inline-block rounded-full bg-red-100 px-3 py-1 text-xs font-medium text-red-700">
-                                Moroso
-                              </span>
-                            ) : (
-                              <span className="inline-block rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-700">
-                                Activo
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 text-center text-xs text-gray-400">
-                            {s.fechaIngreso ? formatArgentinaDate(s.fechaIngreso) : '—'}
-                          </td>
-                          <td
-                            className="px-4 py-3 text-center font-medium"
-                            style={{ color: '#669E9D' }}
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[640px] text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 text-left text-xs font-semibold text-gray-500">
+                      <th className="w-10 px-4 py-3" />
+                      <SortableTh
+                        label="Nº Socio"
+                        sortKey="numero"
+                        activeKey={sortKey}
+                        dir={sortDir}
+                        onClick={() => toggleSort('numero')}
+                        align="center"
+                      />
+                      <SortableTh
+                        label="Nombre"
+                        sortKey="socio"
+                        activeKey={sortKey}
+                        dir={sortDir}
+                        onClick={() => toggleSort('socio')}
+                      />
+                      <SortableTh
+                        label="Embarcación"
+                        sortKey="embarcacion"
+                        activeKey={sortKey}
+                        dir={sortDir}
+                        onClick={() => toggleSort('embarcacion')}
+                      />
+                      <SortableTh
+                        label="Ubicación"
+                        sortKey="ubicacion"
+                        activeKey={sortKey}
+                        dir={sortDir}
+                        onClick={() => toggleSort('ubicacion')}
+                      />
+                      <th className="px-4 py-3 text-center">Estado</th>
+                      <th className="px-4 py-3 text-center">Ingreso</th>
+                      <SortableTh
+                        label="Saldo"
+                        sortKey="deuda"
+                        activeKey={sortKey}
+                        dir={sortDir}
+                        onClick={() => toggleSort('deuda')}
+                        align="center"
+                      />
+                      <th className="px-4 py-3 text-right">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paginados.map((s) => {
+                      const nombre = [s.nombre, s.apellido].filter(Boolean).join(' ') || '—';
+                      const deuda = parseFloat(s.deuda ?? '0');
+                      const isExpanded = expandedIds.has(s.profileId);
+                      return (
+                        <Fragment key={s.membresiaId}>
+                          <tr
+                            className={`cursor-pointer border-t border-gray-100 transition hover:bg-gray-50/80 ${
+                              isExpanded ? 'bg-gray-50/40' : ''
+                            }`}
+                            onClick={() => router.push(`/usuarios/${s.profileId}`)}
                           >
-                            ${deuda.toLocaleString('es-AR')}
-                          </td>
-                          <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                            <div className="inline-flex items-center gap-3">
-                              <a
-                                href={`mailto:${s.email}`}
-                                title={`Enviar email a ${s.email}`}
-                                aria-label={`Enviar email a ${nombre}`}
+                            <td className="w-10 px-4 py-3">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleExpand(s.profileId);
+                                }}
+                                title={isExpanded ? 'Ocultar detalle' : 'Ver invitados y accesos'}
                                 className="text-gray-400 transition hover:text-[#175861]"
                               >
-                                <Mail className="h-4 w-4" />
-                              </a>
-                              {(() => {
-                                const wa = buildWhatsappUrl(s.telefono);
-                                return wa ? (
-                                  <a
-                                    href={wa}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    title={`WhatsApp ${s.telefono}`}
-                                    aria-label={`Enviar WhatsApp a ${nombre}`}
-                                    className="text-gray-400 transition hover:text-[#25D366]"
-                                  >
-                                    <MessageCircle className="h-4 w-4" />
-                                  </a>
+                                {isExpanded ? (
+                                  <ChevronDown className="h-4 w-4" />
                                 ) : (
-                                  <span
-                                    title="Sin teléfono cargado"
-                                    className="text-gray-200"
-                                    aria-hidden
-                                  >
-                                    <MessageCircle className="h-4 w-4" />
+                                  <ChevronRight className="h-4 w-4" />
+                                )}
+                              </button>
+                            </td>
+                            <td className="w-14 px-4 py-3 text-center text-xs font-medium text-gray-400">
+                              {s.numeroSocio != null ? `#${s.numeroSocio}` : '—'}
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-1.5">
+                                <p className="font-medium" style={{ color: '#175861' }}>
+                                  {nombre}
+                                </p>
+                                {s.datosIncompletos && (
+                                  <span title="Datos incompletos" className="shrink-0">
+                                    <AlertTriangle className="h-3.5 w-3.5 text-amber-400" />
                                   </span>
-                                );
-                              })()}
-                              <Link
-                                href={`/usuarios/${s.profileId}`}
-                                className="inline-flex items-center gap-1.5 text-xs font-medium transition hover:opacity-70"
-                                style={{ color: '#669E9D' }}
-                              >
-                                <Eye className="h-3.5 w-3.5" />
-                                Ver
-                              </Link>
-                            </div>
-                          </td>
-                        </tr>
-
-                        {isExpanded && (
-                          <tr className="border-t border-gray-100 bg-gray-50/60">
-                            <td colSpan={8} className="px-6 pt-3 pb-4">
-                              <div className="flex flex-col gap-0">
-                                {/* Invitados autorizados */}
-                                <div className="pb-4">
-                                  <p className="mb-2 text-xs font-semibold tracking-wide text-gray-400 uppercase">
-                                    Invitados autorizados
-                                  </p>
-                                  {s.invitados.length === 0 ? (
-                                    <p className="text-xs text-gray-400">
-                                      Sin invitados registrados
-                                    </p>
+                                )}
+                              </div>
+                              <p className="text-xs" style={{ color: '#669E9D' }}>
+                                {s.email}
+                              </p>
+                            </td>
+                            <td className="px-4 py-3 text-gray-500">{s.embarcacion ?? '—'}</td>
+                            <td className="px-4 py-3 text-gray-500">{s.ubicacion ?? '—'}</td>
+                            <td className="px-4 py-3 text-center">
+                              {s.membershipStatus === 'suspended' ? (
+                                <span className="inline-block rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-700">
+                                  Pausado
+                                </span>
+                              ) : s.membershipStatus === 'inactivo' ? (
+                                <span className="inline-block rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-500">
+                                  Inactivo
+                                </span>
+                              ) : s.estadoSocio === 'moroso' ? (
+                                <span className="inline-block rounded-full bg-red-100 px-3 py-1 text-xs font-medium text-red-700">
+                                  Moroso
+                                </span>
+                              ) : (
+                                <span className="inline-block rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-700">
+                                  Activo
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-center text-xs text-gray-400">
+                              {s.fechaIngreso ? formatArgentinaDate(s.fechaIngreso) : '—'}
+                            </td>
+                            <td
+                              className="px-4 py-3 text-center font-medium"
+                              style={{ color: '#669E9D' }}
+                            >
+                              ${deuda.toLocaleString('es-AR')}
+                            </td>
+                            <td
+                              className="px-4 py-3 text-right"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <div className="inline-flex items-center gap-3">
+                                <a
+                                  href={`mailto:${s.email}`}
+                                  title={`Enviar email a ${s.email}`}
+                                  aria-label={`Enviar email a ${nombre}`}
+                                  className="text-gray-400 transition hover:text-[#175861]"
+                                >
+                                  <Mail className="h-4 w-4" />
+                                </a>
+                                {(() => {
+                                  const wa = buildWhatsappUrl(s.telefono);
+                                  return wa ? (
+                                    <a
+                                      href={wa}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      title={`WhatsApp ${s.telefono}`}
+                                      aria-label={`Enviar WhatsApp a ${nombre}`}
+                                      className="text-gray-400 transition hover:text-[#25D366]"
+                                    >
+                                      <MessageCircle className="h-4 w-4" />
+                                    </a>
                                   ) : (
-                                    <div className="space-y-1.5">
-                                      {s.invitados.map((inv) => (
-                                        <div key={inv.id} className="flex items-center gap-2">
-                                          <span className="text-xs text-gray-700">
-                                            {[inv.nombre, inv.apellido].filter(Boolean).join(' ')}
-                                          </span>
-                                          {inv.validoHasta && (
-                                            <span className="text-xs text-gray-400">
-                                              · válido hasta{' '}
-                                              {formatArgentinaDate(new Date(inv.validoHasta))}
-                                            </span>
-                                          )}
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
-
-                                <div className="border-t border-gray-200 pt-4">
-                                  <p className="mb-2 text-xs font-semibold tracking-wide text-gray-400 uppercase">
-                                    Accesos externos recientes
-                                  </p>
-                                  {s.accesosExternos.length === 0 ? (
-                                    <p className="text-xs text-gray-400">Sin accesos registrados</p>
-                                  ) : (
-                                    <div className="space-y-1.5">
-                                      {s.accesosExternos.map((acc) => (
-                                        <div key={acc.id} className="flex items-center gap-2">
-                                          <span className="text-xs text-gray-700">
-                                            {acc.nombre ?? '—'}
-                                          </span>
-                                          {acc.desde && (
-                                            <span className="text-xs text-gray-400">
-                                              · desde {formatArgentinaDate(new Date(acc.desde))}
-                                            </span>
-                                          )}
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
+                                    <span
+                                      title="Sin teléfono cargado"
+                                      className="text-gray-200"
+                                      aria-hidden
+                                    >
+                                      <MessageCircle className="h-4 w-4" />
+                                    </span>
+                                  );
+                                })()}
+                                <Link
+                                  href={`/usuarios/${s.profileId}`}
+                                  className="inline-flex items-center gap-1.5 text-xs font-medium transition hover:opacity-70"
+                                  style={{ color: '#669E9D' }}
+                                >
+                                  <Eye className="h-3.5 w-3.5" />
+                                  Ver
+                                </Link>
                               </div>
                             </td>
                           </tr>
-                        )}
-                      </Fragment>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+
+                          {isExpanded && (
+                            <tr className="border-t border-gray-100 bg-gray-50/60">
+                              <td colSpan={8} className="px-6 pt-3 pb-4">
+                                <div className="flex flex-col gap-0">
+                                  {/* Invitados autorizados */}
+                                  <div className="pb-4">
+                                    <p className="mb-2 text-xs font-semibold tracking-wide text-gray-400 uppercase">
+                                      Invitados autorizados
+                                    </p>
+                                    {s.invitados.length === 0 ? (
+                                      <p className="text-xs text-gray-400">
+                                        Sin invitados registrados
+                                      </p>
+                                    ) : (
+                                      <div className="space-y-1.5">
+                                        {s.invitados.map((inv) => (
+                                          <div key={inv.id} className="flex items-center gap-2">
+                                            <span className="text-xs text-gray-700">
+                                              {[inv.nombre, inv.apellido].filter(Boolean).join(' ')}
+                                            </span>
+                                            {inv.validoHasta && (
+                                              <span className="text-xs text-gray-400">
+                                                · válido hasta{' '}
+                                                {formatArgentinaDate(new Date(inv.validoHasta))}
+                                              </span>
+                                            )}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  <div className="border-t border-gray-200 pt-4">
+                                    <p className="mb-2 text-xs font-semibold tracking-wide text-gray-400 uppercase">
+                                      Accesos externos recientes
+                                    </p>
+                                    {s.accesosExternos.length === 0 ? (
+                                      <p className="text-xs text-gray-400">
+                                        Sin accesos registrados
+                                      </p>
+                                    ) : (
+                                      <div className="space-y-1.5">
+                                        {s.accesosExternos.map((acc) => (
+                                          <div key={acc.id} className="flex items-center gap-2">
+                                            <span className="text-xs text-gray-700">
+                                              {acc.nombre ?? '—'}
+                                            </span>
+                                            {acc.desde && (
+                                              <span className="text-xs text-gray-400">
+                                                · desde {formatArgentinaDate(new Date(acc.desde))}
+                                              </span>
+                                            )}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </Fragment>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <Pagination
+                page={safePage}
+                totalItems={filtered.length}
+                pageSize={PAGE_SIZE}
+                onPageChange={setPage}
+              />
+            </>
           )}
         </div>
       </div>
