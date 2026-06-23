@@ -2868,7 +2868,7 @@ export function SocioDetail({
                     ? 'Ingresó'
                     : n.estado === 'revocado'
                       ? 'Cancelado'
-                      : 'Autorizado';
+                      : 'Autorizado a Navegar';
                 const estadoCls =
                   n.estado === 'usado'
                     ? 'bg-blue-50 text-blue-700'
