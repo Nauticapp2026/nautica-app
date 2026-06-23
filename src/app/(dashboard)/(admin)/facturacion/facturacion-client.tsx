@@ -37,6 +37,7 @@ import { reintentarCobroPaywayAction } from '@/app/actions/payway';
 import { toast } from 'sonner';
 import { formatArgentinaDate } from '@/lib/dates';
 import { EmptyState } from '@/components/shared/empty-state';
+import { Pagination } from '@/components/shared/pagination';
 
 // ─── Tipos ──────────────────────────────────────────────────────────────────
 
@@ -1772,6 +1773,28 @@ export function FacturacionClient({
       });
   }, [facturas, search, filterDesde, filterHasta]);
 
+  // Paginación (10 por página). Reset a la página 1 al cambiar de tab o de
+  // filtros: ajuste de estado en render (key previa), no setState en useEffect.
+  const PAGE_SIZE = 10;
+  const [page, setPage] = useState(1);
+  const filterKey = `${activeTab}|${search}|${filterEstado}|${filterTipo}|${filterDesde}|${filterHasta}`;
+  const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
+  if (filterKey !== prevFilterKey) {
+    setPrevFilterKey(filterKey);
+    setPage(1);
+  }
+
+  const afipPageCount = Math.max(1, Math.ceil(filtradosAfip.length / PAGE_SIZE));
+  const afipPage = Math.min(page, afipPageCount);
+  const afipPaginados = filtradosAfip.slice((afipPage - 1) * PAGE_SIZE, afipPage * PAGE_SIZE);
+
+  const recibosPageCount = Math.max(1, Math.ceil(filtradosRecibos.length / PAGE_SIZE));
+  const recibosPage = Math.min(page, recibosPageCount);
+  const recibosPaginados = filtradosRecibos.slice(
+    (recibosPage - 1) * PAGE_SIZE,
+    recibosPage * PAGE_SIZE,
+  );
+
   function limpiarFiltros() {
     setSearch('');
     setFilterEstado('');
@@ -2063,131 +2086,139 @@ export function FacturacionClient({
                 }
               />
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[900px] text-sm">
-                  <thead>
-                    <tr className="bg-gray-50 text-left text-xs font-semibold text-gray-500">
-                      <th className="px-4 py-3">Número</th>
-                      <th className="px-4 py-3">Tipo</th>
-                      <th className="px-4 py-3">Cliente</th>
-                      <th className="px-4 py-3">Fecha</th>
-                      <th className="px-4 py-3">Vencimiento</th>
-                      <th className="px-4 py-3">Período</th>
-                      <th className="px-4 py-3 text-right">Total</th>
-                      <th className="px-4 py-3 text-center">Estado</th>
-                      <th className="px-4 py-3 text-right">Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filtradosAfip.map((f) => (
-                      <tr
-                        key={f.id}
-                        className="border-t border-gray-100 transition hover:bg-gray-50/50"
-                      >
-                        <td className="px-4 py-3 font-medium" style={{ color: '#101828' }}>
-                          {f.codigo ?? '—'}
-                        </td>
-                        <td className="px-4 py-3 text-gray-500">
-                          {TIPO_FACTURA_LABEL[f.tipoFactura ?? ''] ?? '—'}
-                        </td>
-                        <td className="px-4 py-3 font-medium" style={{ color: '#175861' }}>
-                          {f.socioNombre}
-                        </td>
-                        <td className="px-4 py-3 text-gray-500">{fmtDate(f.emision)}</td>
-                        <td className="px-4 py-3 text-gray-500">{fmtDate(f.vencimiento)}</td>
-                        <td className="px-4 py-3 text-xs text-gray-500">
-                          {f.desde ? (
-                            <div>
-                              <div>Desde {fmtDate(f.desde)}</div>
-                              <div>Hasta {fmtDate(f.hasta)}</div>
-                            </div>
-                          ) : (
-                            '—'
-                          )}
-                        </td>
-                        <td
-                          className="px-4 py-3 text-right font-medium"
-                          style={{ color: '#101828' }}
-                        >
-                          {fmtMoney(f.importe)}
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          <span
-                            className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${
-                              ESTADO_BADGE[f.estado ?? 'pendiente'] ?? 'bg-gray-100 text-gray-600'
-                            }`}
-                          >
-                            {ESTADO_LABEL[f.estado ?? 'pendiente'] ?? f.estado}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center justify-end gap-2">
-                            <button
-                              onClick={() => setPagarFactura(f)}
-                              disabled={f.estado === 'pagada'}
-                              title="Marcar como pagada"
-                              className="rounded-[6px] p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-[#175861] disabled:opacity-30 disabled:hover:bg-transparent"
-                            >
-                              <Edit3 className="h-4 w-4" />
-                            </button>
-                            {f.archivo ? (
-                              <a
-                                href={f.archivo}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                title="Ver PDF"
-                                className="rounded-[6px] p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-[#175861]"
-                              >
-                                <Send className="h-4 w-4" />
-                              </a>
-                            ) : (
-                              <button
-                                disabled
-                                title="PDF no disponible"
-                                className="rounded-[6px] p-1.5 text-gray-400 opacity-30"
-                              >
-                                <Send className="h-4 w-4" />
-                              </button>
-                            )}
-                            {f.archivo ? (
-                              <a
-                                href={f.archivo}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                download
-                                title="Descargar"
-                                className="rounded-[6px] p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-[#175861]"
-                              >
-                                <Download className="h-4 w-4" />
-                              </a>
-                            ) : (
-                              <button
-                                disabled
-                                title="PDF no disponible"
-                                className="rounded-[6px] p-1.5 text-gray-400 opacity-30"
-                              >
-                                <Download className="h-4 w-4" />
-                              </button>
-                            )}
-                            {(f.tipoFactura === 'factura_a' ||
-                              f.tipoFactura === 'factura_b' ||
-                              f.tipoFactura === 'factura_c') &&
-                            f.cae ? (
-                              <button
-                                onClick={() => setNcFactura(f)}
-                                title="Emitir Nota de Crédito"
-                                className="rounded-[6px] p-1.5 text-gray-400 transition hover:bg-amber-50 hover:text-amber-600"
-                              >
-                                <CornerDownLeft className="h-4 w-4" />
-                              </button>
-                            ) : null}
-                          </div>
-                        </td>
+              <>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[900px] text-sm">
+                    <thead>
+                      <tr className="bg-gray-50 text-left text-xs font-semibold text-gray-500">
+                        <th className="px-4 py-3">Número</th>
+                        <th className="px-4 py-3">Tipo</th>
+                        <th className="px-4 py-3">Cliente</th>
+                        <th className="px-4 py-3">Fecha</th>
+                        <th className="px-4 py-3">Vencimiento</th>
+                        <th className="px-4 py-3">Período</th>
+                        <th className="px-4 py-3 text-right">Total</th>
+                        <th className="px-4 py-3 text-center">Estado</th>
+                        <th className="px-4 py-3 text-right">Acciones</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {afipPaginados.map((f) => (
+                        <tr
+                          key={f.id}
+                          className="border-t border-gray-100 transition hover:bg-gray-50/50"
+                        >
+                          <td className="px-4 py-3 font-medium" style={{ color: '#101828' }}>
+                            {f.codigo ?? '—'}
+                          </td>
+                          <td className="px-4 py-3 text-gray-500">
+                            {TIPO_FACTURA_LABEL[f.tipoFactura ?? ''] ?? '—'}
+                          </td>
+                          <td className="px-4 py-3 font-medium" style={{ color: '#175861' }}>
+                            {f.socioNombre}
+                          </td>
+                          <td className="px-4 py-3 text-gray-500">{fmtDate(f.emision)}</td>
+                          <td className="px-4 py-3 text-gray-500">{fmtDate(f.vencimiento)}</td>
+                          <td className="px-4 py-3 text-xs text-gray-500">
+                            {f.desde ? (
+                              <div>
+                                <div>Desde {fmtDate(f.desde)}</div>
+                                <div>Hasta {fmtDate(f.hasta)}</div>
+                              </div>
+                            ) : (
+                              '—'
+                            )}
+                          </td>
+                          <td
+                            className="px-4 py-3 text-right font-medium"
+                            style={{ color: '#101828' }}
+                          >
+                            {fmtMoney(f.importe)}
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <span
+                              className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${
+                                ESTADO_BADGE[f.estado ?? 'pendiente'] ?? 'bg-gray-100 text-gray-600'
+                              }`}
+                            >
+                              {ESTADO_LABEL[f.estado ?? 'pendiente'] ?? f.estado}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                onClick={() => setPagarFactura(f)}
+                                disabled={f.estado === 'pagada'}
+                                title="Marcar como pagada"
+                                className="rounded-[6px] p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-[#175861] disabled:opacity-30 disabled:hover:bg-transparent"
+                              >
+                                <Edit3 className="h-4 w-4" />
+                              </button>
+                              {f.archivo ? (
+                                <a
+                                  href={f.archivo}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  title="Ver PDF"
+                                  className="rounded-[6px] p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-[#175861]"
+                                >
+                                  <Send className="h-4 w-4" />
+                                </a>
+                              ) : (
+                                <button
+                                  disabled
+                                  title="PDF no disponible"
+                                  className="rounded-[6px] p-1.5 text-gray-400 opacity-30"
+                                >
+                                  <Send className="h-4 w-4" />
+                                </button>
+                              )}
+                              {f.archivo ? (
+                                <a
+                                  href={f.archivo}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  download
+                                  title="Descargar"
+                                  className="rounded-[6px] p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-[#175861]"
+                                >
+                                  <Download className="h-4 w-4" />
+                                </a>
+                              ) : (
+                                <button
+                                  disabled
+                                  title="PDF no disponible"
+                                  className="rounded-[6px] p-1.5 text-gray-400 opacity-30"
+                                >
+                                  <Download className="h-4 w-4" />
+                                </button>
+                              )}
+                              {(f.tipoFactura === 'factura_a' ||
+                                f.tipoFactura === 'factura_b' ||
+                                f.tipoFactura === 'factura_c') &&
+                              f.cae ? (
+                                <button
+                                  onClick={() => setNcFactura(f)}
+                                  title="Emitir Nota de Crédito"
+                                  className="rounded-[6px] p-1.5 text-gray-400 transition hover:bg-amber-50 hover:text-amber-600"
+                                >
+                                  <CornerDownLeft className="h-4 w-4" />
+                                </button>
+                              ) : null}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <Pagination
+                  page={afipPage}
+                  totalItems={filtradosAfip.length}
+                  pageSize={PAGE_SIZE}
+                  onPageChange={setPage}
+                />
+              </>
             )
           ) : // Tab: Recibos internos
           filtradosRecibos.length === 0 ? (
@@ -2200,51 +2231,62 @@ export function FacturacionClient({
               }
             />
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[600px] text-sm">
-                <thead>
-                  <tr className="bg-gray-50 text-left text-xs font-semibold text-gray-500">
-                    <th className="px-4 py-3">Número</th>
-                    <th className="px-4 py-3">Cliente</th>
-                    <th className="px-4 py-3">Fecha</th>
-                    <th className="px-4 py-3 text-right">Total</th>
-                    <th className="px-4 py-3 text-right">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtradosRecibos.map((f) => (
-                    <tr
-                      key={f.id}
-                      className="border-t border-gray-100 transition hover:bg-gray-50/50"
-                    >
-                      <td className="px-4 py-3 font-medium" style={{ color: '#101828' }}>
-                        {f.codigo ?? '—'}
-                      </td>
-                      <td className="px-4 py-3 font-medium" style={{ color: '#175861' }}>
-                        {f.socioNombre}
-                      </td>
-                      <td className="px-4 py-3 text-gray-500">{fmtDate(f.emision)}</td>
-                      <td className="px-4 py-3 text-right font-medium" style={{ color: '#101828' }}>
-                        {fmtMoney(f.importe)}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center justify-end">
-                          <a
-                            href={`/facturacion/recibo/${f.id}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title="Ver / Imprimir recibo"
-                            className="rounded-[6px] p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-[#175861]"
-                          >
-                            <Printer className="h-4 w-4" />
-                          </a>
-                        </div>
-                      </td>
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[600px] text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 text-left text-xs font-semibold text-gray-500">
+                      <th className="px-4 py-3">Número</th>
+                      <th className="px-4 py-3">Cliente</th>
+                      <th className="px-4 py-3">Fecha</th>
+                      <th className="px-4 py-3 text-right">Total</th>
+                      <th className="px-4 py-3 text-right">Acciones</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {recibosPaginados.map((f) => (
+                      <tr
+                        key={f.id}
+                        className="border-t border-gray-100 transition hover:bg-gray-50/50"
+                      >
+                        <td className="px-4 py-3 font-medium" style={{ color: '#101828' }}>
+                          {f.codigo ?? '—'}
+                        </td>
+                        <td className="px-4 py-3 font-medium" style={{ color: '#175861' }}>
+                          {f.socioNombre}
+                        </td>
+                        <td className="px-4 py-3 text-gray-500">{fmtDate(f.emision)}</td>
+                        <td
+                          className="px-4 py-3 text-right font-medium"
+                          style={{ color: '#101828' }}
+                        >
+                          {fmtMoney(f.importe)}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-end">
+                            <a
+                              href={`/facturacion/recibo/${f.id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title="Ver / Imprimir recibo"
+                              className="rounded-[6px] p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-[#175861]"
+                            >
+                              <Printer className="h-4 w-4" />
+                            </a>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <Pagination
+                page={recibosPage}
+                totalItems={filtradosRecibos.length}
+                pageSize={PAGE_SIZE}
+                onPageChange={setPage}
+              />
+            </>
           )}
         </div>
       )}
