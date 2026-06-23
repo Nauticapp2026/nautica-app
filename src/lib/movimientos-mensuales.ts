@@ -233,3 +233,25 @@ export async function runMonthlyGeneration(now: Date = new Date()): Promise<{
     guarderiaIds: Array.from(guarderiasProcesadas),
   };
 }
+
+/**
+ * Devuelve los ids de TODAS las guarderías cuyo día de facturación es hoy,
+ * independientemente de si tienen espacios ocupados. El día de cobro es una
+ * propiedad de la guardería (no de los espacios), así que la auto-emisión y
+ * los cobros deben correr sobre este set — no solo sobre las que generaron
+ * un movimiento de espacio. Así un socio con consumos pendientes pero sin
+ * espacio asignado igual se factura/cobra.
+ */
+export async function guarderiasQueFacturanHoy(now: Date = new Date()): Promise<string[]> {
+  const rows = await db
+    .select({
+      id: guarderias.id,
+      diaFacturacion: guarderias.diaFacturacion,
+      facturacionPrimerHabil: guarderias.facturacionPrimerHabil,
+    })
+    .from(guarderias);
+
+  return rows
+    .filter((g) => esDiaDeCobro(g.diaFacturacion ?? 1, now, g.facturacionPrimerHabil ?? false))
+    .map((g) => g.id);
+}
