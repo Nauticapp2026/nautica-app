@@ -277,7 +277,7 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
   const movimientoIds = movimientosList.map((m) => m.id);
   const facturasPorMovimiento = new Map<
     string,
-    { codigo: string | null; archivo: string | null }
+    { codigo: string | null; archivo: string | null; tipo: string | null }
   >();
   if (movimientoIds.length > 0) {
     const rows = await db
@@ -285,6 +285,7 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
         movimientoId: facturacionItemMovimientos.movimientoId,
         codigo: facturacion.codigo,
         archivo: facturacion.archivo,
+        tipoFactura: facturacion.tipoFactura,
       })
       .from(facturacionItemMovimientos)
       .innerJoin(
@@ -294,7 +295,11 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
       .innerJoin(facturacion, eq(facturacion.id, facturacionItems.facturacionId))
       .where(inArray(facturacionItemMovimientos.movimientoId, movimientoIds));
     for (const r of rows) {
-      facturasPorMovimiento.set(r.movimientoId, { codigo: r.codigo, archivo: r.archivo });
+      facturasPorMovimiento.set(r.movimientoId, {
+        codigo: r.codigo,
+        archivo: r.archivo,
+        tipo: r.tipoFactura,
+      });
     }
   }
 
@@ -397,6 +402,7 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
         fecha: m.fecha?.toISOString() ?? null,
         facturaCodigo: facturasPorMovimiento.get(m.id)?.codigo ?? null,
         facturaArchivo: facturasPorMovimiento.get(m.id)?.archivo ?? null,
+        facturaTipo: facturasPorMovimiento.get(m.id)?.tipo ?? null,
       }))}
       servicios={serviciosList}
       cancelaciones={cancelacionesList.map((c) => ({

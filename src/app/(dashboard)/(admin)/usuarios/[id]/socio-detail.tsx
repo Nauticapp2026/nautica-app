@@ -117,6 +117,7 @@ type Movimiento = {
   servicioId: string | null;
   facturaCodigo: string | null;
   facturaArchivo: string | null;
+  facturaTipo: string | null;
 };
 
 type Servicio = {
@@ -229,6 +230,17 @@ const ESTADO_LABEL: Record<string, string> = {
   facturado: 'En Plazo',
   no_pagado: 'En Plazo',
   vencido: 'Vencido',
+};
+
+// Etiquetas de tipo de comprobante para la columna/filtro de cuenta corriente.
+const TIPO_COMPROBANTE_LABEL: Record<string, string> = {
+  factura_a: 'Factura A',
+  factura_b: 'Factura B',
+  factura_c: 'Factura C',
+  recibo: 'Recibo',
+  nota_credito_a: 'Nota de crédito A',
+  nota_credito_b: 'Nota de crédito B',
+  nota_credito_c: 'Nota de crédito C',
 };
 
 // ─── Field helper ─────────────────────────────────────────────────────────────
@@ -2142,6 +2154,12 @@ export function SocioDetail({
   const [modalInformarPagoOpen, setModalInformarPagoOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
+  // Filtros de la tabla de cuenta corriente.
+  const [ccFechaDesde, setCcFechaDesde] = useState('');
+  const [ccFechaHasta, setCcFechaHasta] = useState('');
+  const [ccEstado, setCcEstado] = useState('');
+  const [ccTipoComp, setCcTipoComp] = useState('');
+
   // Generales edit mode
   const [editando, setEditando] = useState(false);
   const [editForm, setEditForm] = useState({
@@ -2266,12 +2284,35 @@ export function SocioDetail({
 
   const memberDate = formatArgentinaDate(socio.memberSince);
 
-  const totalIngresos = movimientos.reduce((sum, m) => sum + parseFloat(m.debe ?? '0'), 0);
-  const totalPagosACuenta = movimientos.reduce((sum, m) => sum + parseFloat(m.haber ?? '0'), 0);
-  // Saldo real: total facturado menos total cobrado. Positivo = nos debe, negativo = saldo a favor.
-  const saldoBruto = totalIngresos - totalPagosACuenta;
+  // Saldo real del socio: SIEMPRE sobre todos los movimientos (no se filtra por
+  // fecha/estado/comprobante). Positivo = nos debe, negativo = saldo a favor.
+  const saldoBruto =
+    movimientos.reduce((sum, m) => sum + parseFloat(m.debe ?? '0'), 0) -
+    movimientos.reduce((sum, m) => sum + parseFloat(m.haber ?? '0'), 0);
   const totalPendiente = Math.max(0, saldoBruto);
   const totalAFavor = saldoBruto < 0 ? Math.abs(saldoBruto) : 0;
+
+  // Predicado de filtros de la tabla de cuenta corriente.
+  function pasaFiltrosCC(m: Movimiento): boolean {
+    const fecha = m.fecha ? m.fecha.slice(0, 10) : '';
+    if (ccFechaDesde && (!fecha || fecha < ccFechaDesde)) return false;
+    if (ccFechaHasta && (!fecha || fecha > ccFechaHasta)) return false;
+    if (ccEstado === 'pagado' && m.estado !== 'pagado') return false;
+    if (ccEstado === 'en_plazo' && m.estado !== 'facturado' && m.estado !== 'no_pagado')
+      return false;
+    if (ccTipoComp === 'sin' && m.facturaTipo) return false;
+    if (ccTipoComp && ccTipoComp !== 'sin' && m.facturaTipo !== ccTipoComp) return false;
+    return true;
+  }
+  const movimientosFiltrados = movimientos.filter(pasaFiltrosCC);
+  const hayFiltrosCC = Boolean(ccFechaDesde || ccFechaHasta || ccEstado || ccTipoComp);
+
+  // Cards Ventas/Cobranzas: reflejan los movimientos filtrados.
+  const totalIngresos = movimientosFiltrados.reduce((sum, m) => sum + parseFloat(m.debe ?? '0'), 0);
+  const totalPagosACuenta = movimientosFiltrados.reduce(
+    (sum, m) => sum + parseFloat(m.haber ?? '0'),
+    0,
+  );
 
   function toggleId(id: string) {
     setSelectedIds((prev) => {
@@ -2680,6 +2721,69 @@ export function SocioDetail({
             </div>
           </div>
 
+          {/* Filtros */}
+          <div className="mb-5 flex flex-wrap items-end gap-3">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-gray-500">Desde</label>
+              <input
+                type="date"
+                value={ccFechaDesde}
+                onChange={(e) => setCcFechaDesde(e.target.value)}
+                className="border-input focus-visible:border-ring focus-visible:ring-ring/50 h-9 rounded-[8px] border bg-white px-3 text-sm focus-visible:ring-[3px] focus-visible:outline-none"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-gray-500">Hasta</label>
+              <input
+                type="date"
+                value={ccFechaHasta}
+                onChange={(e) => setCcFechaHasta(e.target.value)}
+                className="border-input focus-visible:border-ring focus-visible:ring-ring/50 h-9 rounded-[8px] border bg-white px-3 text-sm focus-visible:ring-[3px] focus-visible:outline-none"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-gray-500">Estado</label>
+              <select
+                value={ccEstado}
+                onChange={(e) => setCcEstado(e.target.value)}
+                className="border-input focus-visible:border-ring focus-visible:ring-ring/50 h-9 rounded-[8px] border bg-white px-3 text-sm focus-visible:ring-[3px] focus-visible:outline-none"
+              >
+                <option value="">Todos</option>
+                <option value="pagado">Pagado</option>
+                <option value="en_plazo">En Plazo</option>
+              </select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-gray-500">Tipo de comprobante</label>
+              <select
+                value={ccTipoComp}
+                onChange={(e) => setCcTipoComp(e.target.value)}
+                className="border-input focus-visible:border-ring focus-visible:ring-ring/50 h-9 rounded-[8px] border bg-white px-3 text-sm focus-visible:ring-[3px] focus-visible:outline-none"
+              >
+                <option value="">Todos</option>
+                {Object.entries(TIPO_COMPROBANTE_LABEL).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+                <option value="sin">Sin comprobante</option>
+              </select>
+            </div>
+            {hayFiltrosCC && (
+              <button
+                onClick={() => {
+                  setCcFechaDesde('');
+                  setCcFechaHasta('');
+                  setCcEstado('');
+                  setCcTipoComp('');
+                }}
+                className="h-9 rounded-[8px] border border-gray-200 px-3 text-sm font-medium text-gray-600 transition hover:bg-gray-50"
+              >
+                Limpiar
+              </button>
+            )}
+          </div>
+
           {/* Metric cards */}
           <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div className="flex items-center gap-4 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
@@ -2750,6 +2854,7 @@ export function SocioDetail({
                     <tr className="bg-gray-50 text-left text-xs font-semibold text-gray-500">
                       <th className="px-4 py-3">Fecha</th>
                       <th className="px-4 py-3">Detalle</th>
+                      <th className="px-4 py-3">Tipo de comprobante</th>
                       <th className="px-4 py-3">Nº Comprobante</th>
                       <th className="px-4 py-3 text-right">Ventas</th>
                       <th className="px-4 py-3 text-right">Cobranzas</th>
@@ -2770,7 +2875,17 @@ export function SocioDetail({
                         acum = acum + venta - cobranza;
                         return { ...m, saldo: acum };
                       });
-                      return conSaldo.reverse().map((m) => {
+                      const visibles = conSaldo.reverse().filter(pasaFiltrosCC);
+                      if (visibles.length === 0) {
+                        return (
+                          <tr>
+                            <td colSpan={8} className="px-4 py-8 text-center text-sm text-gray-400">
+                              No hay movimientos que coincidan con los filtros.
+                            </td>
+                          </tr>
+                        );
+                      }
+                      return visibles.map((m) => {
                         const venta = parseFloat(m.debe ?? '0');
                         const cobranza = parseFloat(m.haber ?? '0');
                         const esPago = cobranza > 0 && venta === 0;
@@ -2786,6 +2901,11 @@ export function SocioDetail({
                             <td className="px-4 py-3 text-gray-500">{fmtDate(m.fecha)}</td>
                             <td className="px-4 py-3 font-medium" style={{ color: '#175861' }}>
                               {detalle}
+                            </td>
+                            <td className="px-4 py-3 text-gray-500">
+                              {m.facturaTipo
+                                ? (TIPO_COMPROBANTE_LABEL[m.facturaTipo] ?? m.facturaTipo)
+                                : '—'}
                             </td>
                             <td className="px-4 py-3 text-gray-500">
                               <div className="flex items-center gap-1.5">
