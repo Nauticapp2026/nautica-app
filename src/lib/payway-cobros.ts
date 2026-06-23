@@ -10,7 +10,7 @@
  *  5. Si el cobro es aprobado, marca los movimientos como pagados.
  */
 
-import { and, eq, gt, inArray } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 
 import { db } from '@/lib/db';
@@ -113,33 +113,27 @@ export async function runPaywayCharges(guarderiaIds: string[]): Promise<PaywayCh
     const sdk = makePaywaySdk(ambient, g.publicKey, g.privateKey);
 
     for (const token of tokens) {
-      // Movimientos pendientes de cobro del socio. Incluye 'facturado': el
-      // cron emite la factura ANTES de cobrar, lo que deja los movimientos en
-      // 'facturado'; si filtráramos solo 'no_pagado', a los socios que se
-      // auto-facturan nunca se les cobraría. Solo se excluye 'pagado'.
+      // El monto a cobrar es el SALDO NETO del socio: SUM(debe) - SUM(haber)
+      // sobre TODOS sus movimientos (misma fórmula que las cards de saldo en
+      // socio-detail). NO la suma de cargos pendientes: eso ignoraría los pagos
+      // ya registrados (movimientos de haber) y cobraría de más.
       const movimientos = await db
         .select({
-          id: movimientosCuentaCorriente.id,
           debe: movimientosCuentaCorriente.debe,
+          haber: movimientosCuentaCorriente.haber,
         })
         .from(movimientosCuentaCorriente)
-        .where(
-          and(
-            eq(movimientosCuentaCorriente.socioId, token.socioId),
-            inArray(movimientosCuentaCorriente.estado, ['no_pagado', 'facturado']),
-            gt(movimientosCuentaCorriente.debe, '0'),
-          ),
-        );
+        .where(eq(movimientosCuentaCorriente.socioId, token.socioId));
 
-      if (!movimientos.length) continue;
-
-      const totalPesos = movimientos.reduce((acc, m) => acc + parseFloat(m.debe ?? '0'), 0);
+      const sumDebe = movimientos.reduce((acc, m) => acc + parseFloat(m.debe ?? '0'), 0);
+      const sumHaber = movimientos.reduce((acc, m) => acc + parseFloat(m.haber ?? '0'), 0);
+      const totalPesos = Math.round((sumDebe - sumHaber) * 100) / 100;
+      // Si no debe nada (o tiene saldo a favor), no se cobra.
       if (totalPesos < 0.01) continue;
 
       result.socios++;
 
       const siteTransactionId = randomUUID();
-      const movimientosIds = movimientos.map((m) => m.id);
 
       // Insertar cobro en estado pendiente antes de llamar a Payway.
       const [cobro] = await db
@@ -150,7 +144,8 @@ export async function runPaywayCharges(guarderiaIds: string[]): Promise<PaywayCh
           monto: Math.round(totalPesos * 100), // centavos para auditoría
           siteTransactionId,
           estado: 'pendiente',
-          movimientosIds,
+          // Pago neto del saldo: no mapea 1:1 a movimientos puntuales.
+          movimientosIds: [],
         })
         .returning({ id: paywayCobros.id });
 
@@ -187,11 +182,22 @@ export async function runPaywayCharges(guarderiaIds: string[]): Promise<PaywayCh
       const paywayPaymentId = paywayResult.id != null ? String(paywayResult.id) : null;
 
       if (approved) {
-        // Marcar movimientos como pagados.
-        await db
-          .update(movimientosCuentaCorriente)
-          .set({ estado: 'pagado', formaDePago: 'debito_automatico' })
-          .where(inArray(movimientosCuentaCorriente.id, movimientosIds));
+        // Registrar el cobro como un movimiento de pago (haber), igual que
+        // informarPagoAction. Lleva el saldo del socio a 0 sin marcar cargos
+        // puntuales (el monto es el neto, no mapea 1:1 a movimientos). Mantiene
+        // consistencia con el flujo manual de "Registrar pago".
+        await db.insert(movimientosCuentaCorriente).values({
+          socioId: token.socioId,
+          concepto: 'Pago — Débito automático',
+          tipo: 'otro',
+          estado: 'pagado',
+          debe: '0',
+          haber: totalPesos.toFixed(2),
+          importeSigned: `-${totalPesos.toFixed(2)}`,
+          fecha: new Date(),
+          formaDePago: 'debito_automatico',
+          datosPago: null,
+        });
 
         await db
           .update(paywayCobros)
