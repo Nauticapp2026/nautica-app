@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/cron/mensuales",
-      "schedule": "0 5 * * *"
+      "schedule": "0 11 * * *"
     },
     {
       "path": "/api/cron/notificaciones-push",
