@@ -255,7 +255,7 @@
 
 <h2>2. Dashboard</h2>
 
-<p>El Dashboard es la pantalla de inicio. Muestra el estado operativo del club en tiempo real.</p>
+<p>El Dashboard es la pantalla de inicio. Muestra el estado operativo del club en tiempo real. Los datos <strong>se actualizan automáticamente</strong> sin necesidad de recargar la página: cualquier cambio registrado por un operario, desde la app mobile o desde otra pestaña del panel se refleja en segundos. Cuando volvés a la pestaña tras haberla tenido en segundo plano, también se refresca automáticamente.</p>
 
 <h3>Qué muestra</h3>
 
@@ -292,7 +292,7 @@
 <p>La tabla muestra: número de socio (#), nombre, email, embarcación asignada, ubicación, fecha de ingreso, estado y deuda.</p>
 
 <ul><li>Usá la barra de búsqueda para filtrar por nombre o email.</li><li>Hacé clic en el encabezado <strong>#</strong> para ordenar la lista por número de socio (ascendente o descendente).</li><li>La columna <strong>Ingreso</strong> muestra la fecha en que se incorporó el socio al club.</li><li>El <strong>número de socio</strong> (#NNN) aparece como un chip junto al nombre. Podés editarlo en el perfil del socio → pestaña <strong>Generales</strong>.</li><li>El <strong>estado</strong> de la membresía se indica con un badge de color:</li></ul><ul class="nested"><li>- <strong>Verde (Activo)</strong> — socio con membresía vigente.</li><li><strong>Ámbar (Pausado)</strong> — membresía temporalmente suspendida.</li><li><strong>Gris (Inactivo)</strong> — socio inactivo.</li><li><strong>Rojo (Moroso)</strong> — socio con deuda pendiente.</li></ul>- Si un socio tiene un <strong>ícono de alerta amarillo</strong> junto a su nombre, significa que tiene datos de perfil o documentación incompletos. Hacé clic en su nombre para ver qué falta completar.
-<ul><li>Cada fila tiene un <strong>botón chevron (›)</strong> a la derecha. Al hacerle clic se despliega un panel con:</li></ul><ul class="nested"><li>- <strong>Invitados autorizados</strong> — personas que el socio autorizó a ingresar al club.</li><li><strong>Accesos externos recientes</strong> — últimas entradas registradas por portería.</li></ul>
+<ul><li>Cada fila tiene un <strong>botón chevron (›)</strong> a la derecha. Al hacerle clic se despliega un panel con:</li></ul><ul class="nested"><li>- <strong>Invitados autorizados</strong> — personas registradas por el socio como invitados permanentes. Cada nombre muestra la fecha hasta la que está autorizado (ej: <code>· válido hasta 30/06/2026</code>). No incluye accesos externos.</li><li><strong>Accesos externos recientes</strong> — últimas entradas registradas por portería como acceso externo. Cada nombre muestra la fecha de la última entrada (ej: <code>· desde 19/06/2026</code>). Si la misma persona ingresó varias veces, aparece una sola vez con la entrada más reciente.</li></ul>
 <h3>Dar de alta un socio manualmente</h3>
 
 <ol><li>Hacé clic en <strong>Agregar socio</strong>.</li><li>Completá los datos en el formulario (las secciones se van desplegando):</li></ol>
@@ -322,33 +322,80 @@
 <ol><li>Hacé clic en <strong>Guardar</strong>.</li></ol>
 <h3>Ver y editar el perfil de un socio</h3>
 
-<p>Hacé clic en el nombre del socio en la tabla para abrir su perfil. El perfil tiene ocho pestañas:</p>
+<p>Hacé clic en el nombre del socio en la tabla para abrir su perfil. El perfil tiene nueve pestañas:</p>
 
 <h4>Pestaña Generales</h4>
 
-<p>Mostrá y editá los datos personales: nombre, apellido, email, teléfono, documento, dirección, razón social, condición IVA.</p>
+<p>Mostrá y editá los datos personales: nombre, apellido, email, teléfono, documento y dirección.</p>
 
 <ul><li><strong>Número de socio</strong> — campo editable para asignar o modificar el número interno del socio. El número aparece como chip (#NNN) en la cabecera del perfil y en la lista de socios.</li><li><strong>Estado de membresía</strong> — selector en la cabecera del perfil para cambiar el estado: <strong>Activo</strong>, <strong>Pausado</strong>, <strong>Inactivo</strong>. También está disponible la opción <strong>Eliminar</strong> para desvincular al socio del club.</li></ul>
+<h4>Pestaña Datos Impositivos</h4>
+
+<p>Mostrá y editá los datos fiscales del socio: razón social, CUIT, dirección fiscal, condición frente al IVA e Ingresos Brutos.</p>
+
+<p><strong>Usar datos personales para facturación</strong> — checkbox en la parte superior de esta pestaña. Cuando está activo, el socio aparece en todos los flujos de emisión de comprobantes (factura individual, ventanilla y lote). Cuando está inactivo, el socio <strong>no aparece en ningún selector de facturación</strong> aunque tenga movimientos pendientes.</p>
+
+<blockquote><strong>Campos requeridos para poder emitir factura AFIP al socio:</strong></blockquote>
+<p>></p>
+<blockquote>- <strong>Razón social</strong> — nombre legal del receptor del comprobante.<br>- <strong>CUIT</strong> — obligatorio para socios con condición IVA Responsable Inscripto o Monotributo (11 dígitos sin guiones). Para Consumidor Final el documento puede ser DNI.<br>- <strong>Condición frente al IVA</strong> — determina el tipo de comprobante (A, B o C).<br>- <strong>Dirección fiscal</strong> — requerida para el encabezado del comprobante.</blockquote>
+<p>></p>
+<blockquote>Si alguno de estos datos falta, la emisión puede fallar o generar un rechazo de AFIP. Completá esta pestaña antes de intentar facturar al socio.</blockquote>
+
 <h4>Pestaña Embarcación</h4>
 
 <p>Muestra las embarcaciones del socio. Podés editar o eliminar cada una.</p>
 
 <p>Cada embarcación tiene su <strong>propio espacio asignado</strong>. Dentro de la tarjeta de cada embarcación hay un selector de espacio que muestra la amarra o cama actual. Podés asignar o cambiar el espacio directamente desde ahí, sin necesidad de ir a la sección Espacios. Si el socio tiene varias embarcaciones, cada una puede estar en un espacio diferente.</p>
 
+<h4>Pestaña Servicios Contratados</h4>
+
+<p>Lista los servicios que el socio consume, cargados mediante <strong>Cargar consumo</strong> en la Cuenta Corriente. Los servicios se agrupan por tipo y muestran el historial de movimientos asociados.</p>
+
+<h3>Ver cargos individuales</h3>
+
+<p>Cada fila de servicio tiene un <strong>chevron (›)</strong> a la izquierda del nombre. Al hacerle clic se despliegan los cargos individuales de ese servicio, ordenados del más reciente al más viejo, con fecha, concepto y monto de cada uno.</p>
+
+<h3>Editar un cargo</h3>
+
+<ol><li>Expandí la fila del servicio con el chevron.</li><li>Hacé clic en el ícono de <strong>lápiz</strong> junto al cargo que querés corregir.</li><li>En el modal podés modificar:</li></ol>   - <strong>Concepto</strong> — descripción del cargo.
+<p>- <strong>Fecha</strong> — fecha en que se registró.</p>
+<ol><li>Hacé clic en <strong>Guardar</strong>.</li></ol>
+<blockquote>El monto del cargo no se puede modificar desde este formulario. Los cargos que ya tienen una factura AFIP emitida no muestran el botón de edición.</blockquote>
+
+<p><strong>Cancelar un servicio:</strong></p>
+
+<ol><li>Hacé clic en <strong>Cancelar</strong> en el servicio que querés dar de baja.</li><li>Si el servicio tiene precio fijo, el sistema pregunta si querés cobrar el proporcional del mes: días utilizados en el mes actual dividido la cantidad de días del mes, multiplicado por el precio.</li></ol>   - <strong>Solo cancelar</strong> — registra la cancelación sin generar cargo adicional.
+<p>- <strong>Cobrar y cancelar</strong> — genera un movimiento en la Cuenta Corriente por el proporcional y registra la cancelación.</p>
+<ol><li>El servicio queda marcado como <strong>Cancelado</strong> con la fecha de baja. El historial de movimientos anteriores se conserva.</li></ol>
+<blockquote>La cancelación no borra datos. Si necesitás reactivar el servicio, tenés que volver a cargarlo mediante Cargar consumo.</blockquote>
+
 <h4>Pestaña Cuenta Corriente</h4>
 
 <p>Muestra los movimientos del socio: facturas, cobros y saldo.</p>
 
-<ul><li><strong>Agregar servicio</strong> — registrá un servicio o cargo adicional.</li><li><strong>Informar pago</strong> — registrá un pago recibido sin emitir factura (el saldo queda como "saldo a favor" en la cuenta).</li><li><strong>Marcar como pagadas</strong> — seleccioná una o más facturas con la casilla de verificación y hacé clic en este botón para registrarlas como cobradas. Te pedirá el medio de pago.</li></ul>
-<h4>Pestaña Comprobantes</h4>
+<p>Arriba de la tabla hay tres tarjetas: <strong>Ingresos por venta</strong>, <strong>Cobranzas</strong> y <strong>Saldo</strong> del socio.</p>
 
-<p>Historial de comprobantes AFIP emitidos al socio (facturas y notas de crédito).</p>
+<ul><li><strong>Agregar servicio</strong> (Cargar consumo) — registrá un servicio o cargo adicional. El campo Fecha se pre-carga con el día de hoy; podés cambiarlo si el cargo corresponde a otra fecha.</li><li><strong>Informar pago</strong> (Registrar pago) — registrá un pago recibido sin emitir factura (el saldo queda como "saldo a favor" en la cuenta).</li><li><strong>Marcar como pagadas</strong> — seleccioná una o más facturas con la casilla de verificación y hacé clic en este botón para registrarlas como cobradas. Te pedirá el medio de pago.</li></ul>
+<p><strong>Filtros.</strong> Sobre la tabla podés filtrar los movimientos por:</p>
 
-<h4>Pestaña Navegantes</h4>
+<ul><li><strong>Desde / Hasta</strong> — rango de fechas.</li><li><strong>Estado</strong> — Pagado o En Plazo.</li><li><strong>Tipo de comprobante</strong> — Factura A/B/C, Recibo, Nota de crédito o Sin comprobante.</li></ul>
+<p>Al aplicar filtros, las tarjetas de <strong>Ingresos por venta</strong> y <strong>Cobranzas</strong> muestran los totales de lo filtrado. La tarjeta de <strong>Saldo</strong> siempre muestra el saldo real del socio (no se ve afectada por los filtros).</p>
 
-<p>Historial de accesos externos donde la persona fue autorizada como navegante por el socio. Cada registro muestra el nombre del navegante, el período autorizado (desde / hasta) y el estado:</p>
+<p>La tabla incluye una columna <strong>Tipo de comprobante</strong> (antes del Nº de comprobante) que indica el tipo de factura asociada a cada movimiento.</p>
 
-<ul><li><strong>Autorizado</strong> — el acceso está activo.</li><li><strong>Ingresó</strong> — el navegante ya registró entrada en portería.</li><li><strong>Cancelado</strong> — el acceso fue revocado desde la app.</li></ul>
+<h4>Pestaña Accesos Externos</h4>
+
+<p>Historial de accesos externos registrados por el socio. Muestra todas las personas que ingresaron al club bajo la autorización del socio como acceso externo.</p>
+
+<p>Cada registro muestra el nombre de la persona, el período autorizado (desde / hasta) y un badge de estado:</p>
+
+<ul><li><strong>Autorizado a Navegar</strong> — el acceso está activo.</li><li><strong>Ingresó</strong> — la persona ya registró entrada en portería.</li><li><strong>Cancelado</strong> — el acceso fue revocado desde la app.</li><li><strong>Navega</strong> — la persona está autorizada a navegar con la embarcación del socio.</li></ul>
+<h4>Pestaña Invitados</h4>
+
+<p>Lista los invitados autorizados por el socio (los mismos que aparecen al desplegar la fila del socio en la lista de Usuarios). Cada invitado muestra su nombre, la fecha hasta la que está autorizado, teléfono, DNI y un badge <strong>Titular</strong> o <strong>Autorizado</strong>.</p>
+
+<blockquote>No incluye los accesos externos (esos están en la pestaña Accesos Externos).</blockquote>
+
 <h4>Pestaña Salidas</h4>
 
 <p>Historial de salidas y entradas de la embarcación. Las salidas que el socio canceló desde la app mobile aparecen con el badge <strong>Cancelada</strong> en rojo.</p>
@@ -562,6 +609,18 @@
 
 <blockquote>Para poder emitir facturas AFIP necesitás tener configurado el <strong>Punto de Venta</strong> y haber confirmado el <strong>Certificado AFIP</strong>. Podés hacerlo desde <strong>Configuración → Datos de facturación</strong>. Si la emisión está bloqueada, el panel muestra un aviso explicando qué falta. Los <strong>recibos internos</strong> se pueden emitir aunque el certificado todavía no esté configurado.</blockquote>
 
+<h3>Datos requeridos para emitir facturas AFIP</h3>
+
+<p>Para que la emisión no falle, tanto el <strong>club</strong> como cada <strong>socio</strong> deben tener ciertos datos completos:</p>
+
+<p><strong>Del club</strong> (Configuración → Información general):</p>
+
+<ul><li>CUIT del club</li><li>Condición frente al IVA</li><li>Punto de Venta configurado y Certificado AFIP confirmado</li></ul>
+<p><strong>Del socio</strong> (perfil → pestaña Datos Impositivos):</p>
+
+<ul><li><strong>Usar datos personales para facturación</strong> — debe estar activo (de lo contrario el socio no aparece en ningún selector de facturación).</li><li><strong>Razón social</strong> — nombre legal que figura en el comprobante.</li><li><strong>CUIT</strong> — obligatorio para Responsable Inscripto y Monotributo (11 dígitos). Para Consumidor Final se acepta DNI.</li><li><strong>Condición frente al IVA</strong> — define si se emite Factura A, B o C.</li><li><strong>Dirección fiscal</strong> — requerida para el encabezado del comprobante.</li></ul>
+<p>Si alguno de estos datos falta en el socio, el sistema puede rechazar la emisión o TusFacturas puede devolver un error de AFIP. Completá la pestaña <strong>Datos Impositivos</strong> del socio antes de intentar facturarle.</p>
+
 <h3>Resumen de facturación</h3>
 
 <p>Las tarjetas superiores muestran:</p>
@@ -590,7 +649,9 @@
 
 <p>Emití facturas para múltiples socios al mismo tiempo.</p>
 
-<ol><li>Hacé clic en <strong>Factura en lote</strong>.</li><li>El sistema lista los socios con conceptos pendientes (solo socios con <strong>Emite comprobante fiscal</strong> activado). Seleccioná los que querés facturar.</li><li>Revisá el resumen y confirmá.</li></ol>
+<ol><li>Hacé clic en <strong>Factura en lote</strong>.</li><li>El sistema lista los socios con conceptos pendientes (solo socios con <strong>Emite comprobante fiscal</strong> activado). Cada socio puede tener uno o más conceptos expandibles.</li></ol>   - La <strong>casilla del socio</strong> selecciona o deselecciona todos sus conceptos de una vez.
+<p>- Podés marcar o desmarcar conceptos individuales dentro del socio. Si solo algunos están marcados, la casilla del socio muestra el estado <strong>intermedio</strong> (guión) indicando selección parcial.</p>
+<ol><li>Revisá el resumen y confirmá.</li></ol>
 <p>El tipo de comprobante se determina automáticamente para cada socio según la condición IVA del club y de cada socio individualmente (igual que en la factura individual). La condición de venta es siempre <strong>Contado</strong>.</p>
 
 <blockquote>La facturación mensual automática corre el día del mes que configuraste en <strong>Configuración → Información general</strong> (campo "Día de facturación"). Solo aplica a socios que ya tuvieron al menos una factura emitida.</blockquote>
@@ -679,7 +740,7 @@
 
 <p><strong>Datos del club:</strong></p>
 
-<ul><li><strong>Nombre del club / guardería</strong> <em>(requerido)</em></li><li><strong>CUIT</strong> <em>(requerido)</em></li><li><strong>Tipo</strong>: Club Náutico / Marina Privada / Guardería Náutica / Puerto Deportivo / Otro</li><li><strong>Dirección, Ciudad, Provincia, Código Postal</strong> <em>(requeridos)</em></li><li><strong>Teléfono operativo</strong> <em>(requerido)</em></li><li><strong>Email operativo</strong> <em>(requerido)</em></li><li><strong>Día de facturación</strong> — día del mes (1 al 28) en que corre la facturación automática mensual.</li></ul>
+<ul><li><strong>Nombre del club / guardería</strong> <em>(requerido)</em></li><li><strong>CUIT</strong> <em>(requerido)</em></li><li><strong>Tipo</strong>: Club Náutico / Marina Privada / Guardería Náutica / Puerto Deportivo / Otro</li><li><strong>Dirección, Ciudad, Provincia, Código Postal</strong> <em>(requeridos)</em></li><li><strong>Teléfono operativo</strong> <em>(requerido)</em></li><li><strong>Email operativo</strong> <em>(requerido)</em></li><li><strong>Día de facturación</strong> — configura cuándo corre la facturación automática mensual. Tenés dos opciones:</li></ul><ul class="nested"><li>- <strong>Día fijo (1 al 28)</strong> — ingresá el número del día del mes en que querés que se genere la facturación.</li><li><strong>Primer día hábil del mes</strong> — marcá la casilla "Primer día hábil del mes" para que la facturación corra el primer día hábil de cada mes. Si el 1º es sábado, corre el lunes 3; si es domingo, corre el lunes 2; si es día de semana, corre el 1º. Al marcar esta opción, el campo de día numérico se oculta.</li></ul>
 <p><strong>Horarios de atención:</strong></p>
 <p>Para cada día de la semana podés configurar:</p>
 
@@ -695,12 +756,17 @@
 
 <p><em>Paso 1 — Configurar el Punto de Venta:</em></p>
 
-<ol><li>Completá los datos:</li></ol>   - <strong>Número de Punto de Venta</strong> <em>(requerido)</em>
-<p>- <strong>Condición frente al IVA</strong> <em>(requerida)</em> — la de tu club.</p>
-<p>- <strong>Rubro</strong> <em>(requerido)</em></p>
+<ol><li>Completá los datos:</li></ol>   - <strong>Número de Punto de Venta</strong> <em>(requerido)</em> — debe existir previamente en AFIP (Servicios → Administrador de Relaciones → POS de Facturación Electrónica).
 <p>- <strong>Razón social</strong> <em>(requerida)</em></p>
+<p>- <strong>CUIT</strong> <em>(requerido)</em></p>
+<p>- <strong>Condición frente al IVA</strong> <em>(requerida)</em> — la de tu club.</p>
+<p>- <strong>Condición Ingresos Brutos</strong> <em>(opcional)</em></p>
 <p>- <strong>Fecha de inicio de actividades</strong> <em>(requerida)</em></p>
-<ol><li>Hacé clic en <strong>Guardar</strong>.</li></ol>
+<ol><li>Hacé clic en <strong>Guardar cambios</strong>.</li></ol>
+<p>Una vez creado, el <strong>número de Punto de Venta no se puede cambiar</strong>. El resto de los datos (razón social, CUIT, condición IVA, fecha de inicio) son editables: modificalos y hacé clic en <strong>Guardar cambios</strong> cuando necesites actualizarlos.</p>
+
+<blockquote>Si el POS ya tiene facturas emitidas, TusFacturas puede bloquear la edición del CUIT y la condición frente al IVA. En ese caso el sistema mostrará el mensaje de error devuelto por TusFacturas.</blockquote>
+
 <p><em>Paso 2 — Certificado de enlace con AFIP:</em></p>
 
 <p>El certificado permite que el sistema emita facturas directamente a AFIP en nombre de tu club.</p>
@@ -777,7 +843,7 @@
 <p>No hace falta hacer nada. El día de facturación configurado en tu club, el sistema:</p>
 
 <ol><li>Genera los movimientos mensuales de cada espacio asignado.</li><li>Emite la factura automáticamente (para socios que ya tuvieron al menos una factura).</li><li>Cobra via débito automático a todos los socios con tarjeta registrada.</li></ol>
-<p>Los movimientos cobrados quedan marcados como <strong>Pagados</strong> con forma de pago <strong>Débito automático</strong>.</p>
+<p>Cuando el cobro se aprueba, se registra un pago <strong>Pago — Débito automático</strong> en la cuenta corriente del socio y su saldo queda saldado. El monto cobrado es el <strong>saldo real</strong> del socio (todos los cargos pendientes menos los pagos ya registrados), no la suma de cargos sin descontar lo ya pagado.</p>
 
 <h3>Ver el historial de cobros</h3>
 
@@ -805,13 +871,13 @@
 <p>Payway envía la notificación directamente al banco del socio. La app no envía notificación adicional por el momento.</p>
 
 <p><strong>¿Qué pasa si el socio tiene deuda de meses anteriores?</strong></p>
-<p>El cron cobra el total de movimientos no pagados del socio en ese momento, no solo el mes corriente. Si tenía deuda acumulada, se cobra todo junto.</p>
+<p>El cron cobra el <strong>saldo real</strong> del socio en ese momento (todos los cargos pendientes menos los pagos ya registrados), no solo el mes corriente. Si tenía deuda acumulada, se cobra todo junto.</p>
 
 <p><strong>¿Se puede configurar un tope de monto?</strong></p>
-<p>No. Se cobra el total de los movimientos pendientes sin tope.</p>
+<p>No. Se cobra el saldo pendiente completo sin tope.</p>
 
-<p><strong>¿Qué pasa si el socio no tiene espacio asignado o no tiene movimientos ese mes?</strong></p>
-<p>No se genera ningún cobro. El débito automático solo se dispara si hay movimientos pendientes de pago.</p>
+<p><strong>¿Qué pasa si el socio no tiene movimientos pendientes ese mes?</strong></p>
+<p>No se genera ningún cobro. El débito automático solo se dispara si el socio tiene saldo pendiente — no importa si tiene o no espacio asignado.</p>
 
 <hr>
 

@@ -208,9 +208,21 @@ Cada fila de servicio tiene un **chevron (›)** a la izquierda del nombre. Al h
 
 Muestra los movimientos del socio: facturas, cobros y saldo.
 
-- **Agregar servicio** — registrá un servicio o cargo adicional. El campo Fecha se pre-carga con el día de hoy; podés cambiarlo si el cargo corresponde a otra fecha.
-- **Informar pago** — registrá un pago recibido sin emitir factura (el saldo queda como "saldo a favor" en la cuenta).
+Arriba de la tabla hay tres tarjetas: **Ingresos por venta**, **Cobranzas** y **Saldo** del socio.
+
+- **Agregar servicio** (Cargar consumo) — registrá un servicio o cargo adicional. El campo Fecha se pre-carga con el día de hoy; podés cambiarlo si el cargo corresponde a otra fecha.
+- **Informar pago** (Registrar pago) — registrá un pago recibido sin emitir factura (el saldo queda como "saldo a favor" en la cuenta).
 - **Marcar como pagadas** — seleccioná una o más facturas con la casilla de verificación y hacé clic en este botón para registrarlas como cobradas. Te pedirá el medio de pago.
+
+**Filtros.** Sobre la tabla podés filtrar los movimientos por:
+
+- **Desde / Hasta** — rango de fechas.
+- **Estado** — Pagado o En Plazo.
+- **Tipo de comprobante** — Factura A/B/C, Recibo, Nota de crédito o Sin comprobante.
+
+Al aplicar filtros, las tarjetas de **Ingresos por venta** y **Cobranzas** muestran los totales de lo filtrado. La tarjeta de **Saldo** siempre muestra el saldo real del socio (no se ve afectada por los filtros).
+
+La tabla incluye una columna **Tipo de comprobante** (antes del Nº de comprobante) que indica el tipo de factura asociada a cada movimiento.
 
 #### Pestaña Accesos Externos
 
@@ -218,10 +230,16 @@ Historial de accesos externos registrados por el socio. Muestra todas las person
 
 Cada registro muestra el nombre de la persona, el período autorizado (desde / hasta) y un badge de estado:
 
-- **Autorizado** — el acceso está activo.
+- **Autorizado a Navegar** — el acceso está activo.
 - **Ingresó** — la persona ya registró entrada en portería.
 - **Cancelado** — el acceso fue revocado desde la app.
 - **Navega** — la persona está autorizada a navegar con la embarcación del socio.
+
+#### Pestaña Invitados
+
+Lista los invitados autorizados por el socio (los mismos que aparecen al desplegar la fila del socio en la lista de Usuarios). Cada invitado muestra su nombre, la fecha hasta la que está autorizado, teléfono, DNI y un badge **Titular** o **Autorizado**.
+
+> No incluye los accesos externos (esos están en la pestaña Accesos Externos).
 
 #### Pestaña Salidas
 
@@ -835,7 +853,7 @@ No hace falta hacer nada. El día de facturación configurado en tu club, el sis
 2. Emite la factura automáticamente (para socios que ya tuvieron al menos una factura).
 3. Cobra via débito automático a todos los socios con tarjeta registrada.
 
-Los movimientos cobrados quedan marcados como **Pagados** con forma de pago **Débito automático**.
+Cuando el cobro se aprueba, se registra un pago **Pago — Débito automático** en la cuenta corriente del socio y su saldo queda saldado. El monto cobrado es el **saldo real** del socio (todos los cargos pendientes menos los pagos ya registrados), no la suma de cargos sin descontar lo ya pagado.
 
 ### Ver el historial de cobros
 
@@ -874,13 +892,13 @@ Si un cobro aparece como **Rechazado** o **Error**:
 Payway envía la notificación directamente al banco del socio. La app no envía notificación adicional por el momento.
 
 **¿Qué pasa si el socio tiene deuda de meses anteriores?**
-El cron cobra el total de movimientos no pagados del socio en ese momento, no solo el mes corriente. Si tenía deuda acumulada, se cobra todo junto.
+El cron cobra el **saldo real** del socio en ese momento (todos los cargos pendientes menos los pagos ya registrados), no solo el mes corriente. Si tenía deuda acumulada, se cobra todo junto.
 
 **¿Se puede configurar un tope de monto?**
-No. Se cobra el total de los movimientos pendientes sin tope.
+No. Se cobra el saldo pendiente completo sin tope.
 
-**¿Qué pasa si el socio no tiene espacio asignado o no tiene movimientos ese mes?**
-No se genera ningún cobro. El débito automático solo se dispara si hay movimientos pendientes de pago.
+**¿Qué pasa si el socio no tiene movimientos pendientes ese mes?**
+No se genera ningún cobro. El débito automático solo se dispara si el socio tiene saldo pendiente — no importa si tiene o no espacio asignado.
 
 ---
 
