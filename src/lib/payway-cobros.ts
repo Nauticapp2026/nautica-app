@@ -113,7 +113,10 @@ export async function runPaywayCharges(guarderiaIds: string[]): Promise<PaywayCh
     const sdk = makePaywaySdk(ambient, g.publicKey, g.privateKey);
 
     for (const token of tokens) {
-      // Movimientos no pagados del socio.
+      // Movimientos pendientes de cobro del socio. Incluye 'facturado': el
+      // cron emite la factura ANTES de cobrar, lo que deja los movimientos en
+      // 'facturado'; si filtráramos solo 'no_pagado', a los socios que se
+      // auto-facturan nunca se les cobraría. Solo se excluye 'pagado'.
       const movimientos = await db
         .select({
           id: movimientosCuentaCorriente.id,
@@ -123,7 +126,7 @@ export async function runPaywayCharges(guarderiaIds: string[]): Promise<PaywayCh
         .where(
           and(
             eq(movimientosCuentaCorriente.socioId, token.socioId),
-            eq(movimientosCuentaCorriente.estado, 'no_pagado'),
+            inArray(movimientosCuentaCorriente.estado, ['no_pagado', 'facturado']),
             gt(movimientosCuentaCorriente.debe, '0'),
           ),
         );
