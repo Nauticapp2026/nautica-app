@@ -419,6 +419,9 @@ function TareaModal({
 }) {
   const router = useRouter();
   const editing = mode?.mode === 'edit' ? mode.tarea : null;
+  // En tareas de Lavado la embarcación y el horario vienen de la solicitud del
+  // socio: no se editan desde el web (solo lectura).
+  const esLavado = editing?.estado === 'lavado';
 
   const [form, setForm] = useState({
     descripcion: editing?.descripcion ?? '',
@@ -515,9 +518,10 @@ function TareaModal({
                 Embarcación
               </label>
               <select
-                className={inputCls}
+                className={`${inputCls} disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500`}
                 value={form.embarcacionId}
                 onChange={set('embarcacionId')}
+                disabled={esLavado}
               >
                 <option value="">Sin embarcación</option>
                 {embarcaciones.map((e) => (
@@ -526,6 +530,11 @@ function TareaModal({
                   </option>
                 ))}
               </select>
+              {esLavado && (
+                <p className="mt-1.5 text-xs text-gray-400">
+                  Definida por la solicitud de lavado del socio.
+                </p>
+              )}
             </div>
           </div>
 
@@ -556,10 +565,16 @@ function TareaModal({
               </label>
               <input
                 type="datetime-local"
-                className={inputCls}
+                className={`${inputCls} disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500`}
                 value={form.fechaHora}
                 onChange={set('fechaHora')}
+                disabled={esLavado}
               />
+              {esLavado && (
+                <p className="mt-1.5 text-xs text-gray-400">
+                  Definido por la solicitud de lavado del socio.
+                </p>
+              )}
             </div>
           </div>
 

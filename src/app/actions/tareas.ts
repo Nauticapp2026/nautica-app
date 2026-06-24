@@ -126,16 +126,27 @@ export async function updateTareaAction(data: UpdateTareaData): Promise<{ error?
   const gId = ctx.activeMembership.guarderiaId;
 
   const [current] = await db
-    .select({ id: tareas.id, estado: tareas.estado })
+    .select({
+      id: tareas.id,
+      estado: tareas.estado,
+      embarcacionId: tareas.embarcacionId,
+      fechaHora: tareas.fechaHora,
+    })
     .from(tareas)
     .where(and(eq(tareas.id, data.id), eq(tareas.guarderiaId, gId)))
     .limit(1);
   if (!current) return { error: 'Tarea no encontrada.' };
 
+  // En tareas de Lavado la embarcación y el horario vienen de la solicitud del
+  // socio: no se editan desde el web. Se preservan los valores actuales aunque
+  // el cliente mande otra cosa (el modal además los deja de solo lectura).
+  const esLavado = current.estado === 'lavado';
+
   if (data.operarioId && !(await validateOperarioBelongsToGuarderia(data.operarioId, gId))) {
     return { error: 'El operario no pertenece a esta guardería.' };
   }
   if (
+    !esLavado &&
     data.embarcacionId &&
     !(await validateEmbarcacionBelongsToGuarderia(data.embarcacionId, gId))
   ) {
@@ -156,9 +167,13 @@ export async function updateTareaAction(data: UpdateTareaData): Promise<{ error?
       descripcion,
       nota: data.nota?.trim() || null,
       operarioId: data.operarioId || null,
-      embarcacionId: data.embarcacionId || null,
+      embarcacionId: esLavado ? current.embarcacionId : data.embarcacionId || null,
       estado: estadoFinal,
-      fechaHora: data.fechaHora ? new Date(data.fechaHora + '-03:00') : null,
+      fechaHora: esLavado
+        ? current.fechaHora
+        : data.fechaHora
+          ? new Date(data.fechaHora + '-03:00')
+          : null,
     })
     .where(and(eq(tareas.id, data.id), eq(tareas.guarderiaId, gId)));
 
