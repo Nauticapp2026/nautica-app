@@ -1049,6 +1049,7 @@ export function EspaciosClient({
 
       {modalOpen && (
         <NuevaAreaModal
+          operarios={operarios}
           onClose={() => setModalOpen(false)}
           onSaved={() => {
             setModalOpen(false);
@@ -1732,9 +1733,18 @@ type LadoInput = {
   confirmado: boolean;
 };
 
-function NuevaAreaModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+function NuevaAreaModal({
+  operarios,
+  onClose,
+  onSaved,
+}: {
+  operarios: SocioOpt[];
+  onClose: () => void;
+  onSaved: () => void;
+}) {
   const [tipo, setTipo] = useState<'marina' | 'nave'>('marina');
   const [nombre, setNombre] = useState('');
+  const [operarioIds, setOperarioIds] = useState<string[]>([]);
 
   // Marina fields
   const [cantidadPeines, setCantidadPeines] = useState<string>('');
@@ -1788,6 +1798,7 @@ function NuevaAreaModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
         nombre: nombre.trim(),
         cantidadPeines: peines,
         cantidadAmarras: amarras,
+        operarioIds,
       };
     } else {
       if (lados.length === 0) {
@@ -1813,7 +1824,7 @@ function NuevaAreaModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
         }
         ladosInput.push({ nombre: l.nombre.trim(), cantidadPisos: pisos, cantidadCamas: camas });
       }
-      payload = { tipo: 'nave', nombre: nombre.trim(), lados: ladosInput };
+      payload = { tipo: 'nave', nombre: nombre.trim(), lados: ladosInput, operarioIds };
     }
 
     startTransition(async () => {
@@ -1861,6 +1872,40 @@ function NuevaAreaModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
               value={nombre}
               onChange={(e) => setNombre(e.target.value)}
             />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-semibold text-gray-700">
+              Operarios <span className="font-normal text-gray-400">(opcional)</span>
+            </label>
+            {operarios.length === 0 ? (
+              <p className="text-xs text-gray-400">No hay operarios en esta guardería.</p>
+            ) : (
+              <div className="max-h-32 space-y-1 overflow-y-auto rounded-[10px] border border-gray-200 p-2">
+                {operarios.map((o) => (
+                  <label
+                    key={o.id}
+                    className="flex cursor-pointer items-center gap-2 rounded-[8px] px-2 py-1 text-sm hover:bg-gray-50"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={operarioIds.includes(o.id)}
+                      onChange={() =>
+                        setOperarioIds((prev) =>
+                          prev.includes(o.id) ? prev.filter((x) => x !== o.id) : [...prev, o.id],
+                        )
+                      }
+                      className="h-4 w-4 cursor-pointer accent-[#175861]"
+                    />
+                    <span className="truncate text-[#101828]">{o.nombre}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+            <p className="mt-1 text-xs text-gray-400">
+              Los operarios verán y podrán tomar las tareas de esta área. Después podés cambiarlos
+              desde la tarjeta del área.
+            </p>
           </div>
 
           {tipo === 'marina' ? (

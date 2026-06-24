@@ -20,7 +20,7 @@ import { getActiveMarina } from '@/lib/auth/session';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { calcularProporcionalMes, ensureMonthlyMovimiento } from '@/lib/movimientos-mensuales';
 
-export type CreateAreaInput =
+export type CreateAreaInput = { operarioIds?: string[] } & (
   | {
       tipo: 'marina';
       nombre: string;
@@ -31,7 +31,34 @@ export type CreateAreaInput =
       tipo: 'nave';
       nombre: string;
       lados: { nombre: string; cantidadPisos: number; cantidadCamas: number }[];
-    };
+    }
+);
+
+// Asigna operarios a un área recién creada (valida que sean operarios activos
+// de la guardería). Silencioso ante ids inválidos: solo inserta los válidos.
+async function asignarOperariosNuevaArea(
+  guarderiaId: string,
+  areaId: string,
+  operarioIds: string[] | undefined,
+): Promise<void> {
+  const ids = [...new Set(operarioIds ?? [])];
+  if (ids.length === 0) return;
+  const validos = await db
+    .select({ userId: memberships.userId })
+    .from(memberships)
+    .where(
+      and(
+        eq(memberships.guarderiaId, guarderiaId),
+        eq(memberships.rol, 'operario'),
+        eq(memberships.status, 'active'),
+        inArray(memberships.userId, ids),
+      ),
+    );
+  if (validos.length === 0) return;
+  await db
+    .insert(areaOperarios)
+    .values(validos.map((v) => ({ guarderiaId, areaId, operarioId: v.userId })));
+}
 
 function isAdmin(ctx: NonNullable<Awaited<ReturnType<typeof getActiveMarina>>>): boolean {
   return (
@@ -104,6 +131,8 @@ export async function createAreaAction(
       await db.insert(espacios).values(rows);
     }
 
+    await asignarOperariosNuevaArea(guarderiaId, area.id, input.operarioIds);
+
     revalidatePath('/espacios');
     return { id: area.id };
   }
@@ -174,6 +203,8 @@ export async function createAreaAction(
       await db.insert(espacios).values(rows);
     }
   }
+
+  await asignarOperariosNuevaArea(guarderiaId, area.id, input.operarioIds);
 
   revalidatePath('/espacios');
   return { id: area.id };

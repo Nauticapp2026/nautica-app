@@ -420,7 +420,7 @@ Los espacios se muestran con colores:
 
 ### Asignar operarios a un área
 
-En la sección **Áreas** (arriba de Espacios), cada tarjeta de área tiene un botón **Asignar** junto a "Operarios". Ahí elegís uno o más operarios para esa área. Esos operarios son los que van a ver y poder tomar las tareas de las embarcaciones ubicadas en esa área (lavados, salidas, etc.).
+En la sección **Áreas** (arriba de Espacios), cada tarjeta de área tiene un botón **Asignar** junto a "Operarios". Ahí elegís uno o más operarios para esa área. Esos operarios son los que van a ver y poder tomar las tareas de las embarcaciones ubicadas en esa área (lavados, salidas, etc.). También podés asignar operarios **al crear el área** (ver abajo); después los cambiás desde la tarjeta.
 
 ### Crear una nueva área
 
@@ -428,7 +428,8 @@ En la sección **Áreas** (arriba de Espacios), cada tarjeta de área tiene un b
 2. Seleccioná el tipo: **Marina** o **Nave**.
 3. Para **Marina**: ingresá el nombre, la cantidad de peines y la cantidad de amarras por peine.
 4. Para **Nave**: ingresá el nombre, los lados, los pisos por lado y la cantidad de camas por piso.
-5. Confirmá. Los espacios se crean automáticamente.
+5. (Opcional) Tildá los **operarios** que van a atender esa área.
+6. Confirmá. Los espacios se crean automáticamente.
 
 ### Asignar un espacio a un socio
 
