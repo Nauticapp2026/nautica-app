@@ -249,6 +249,36 @@ const ESTADO_LABEL: Record<string, string> = {
   vencido: 'Vencido',
 };
 
+// Agrega a cada movimiento (orden desc: más nuevo primero) el saldo acumulado y
+// el estado MOSTRADO. Un cargo figura "Pagado" cuando los pagos (haber) alcanzan
+// a cubrirlo, asignando del más viejo al más nuevo (FIFO). Es cálculo de display:
+// no cambia el estado guardado (la facturación sigue mirando el real). Los cargos
+// ya 'pagado'/'vencido' no se reescriben ni consumen pool.
+function calcularSaldoYEstado<
+  T extends { debe: string | null; haber: string | null; estado: string | null },
+>(movimientos: T[]): (T & { saldo: number; estadoDisplay: string | null })[] {
+  const asc = [...movimientos].reverse();
+  let acum = 0;
+  let poolHaber = movimientos.reduce((acc, m) => acc + parseFloat(m.haber ?? '0'), 0);
+  const conSaldo = asc.map((m) => {
+    const venta = parseFloat(m.debe ?? '0');
+    const cobranza = parseFloat(m.haber ?? '0');
+    acum = acum + venta - cobranza;
+    let estadoDisplay = m.estado;
+    if (
+      venta > 0 &&
+      m.estado !== 'pagado' &&
+      m.estado !== 'vencido' &&
+      poolHaber >= venta - 0.001
+    ) {
+      estadoDisplay = 'pagado';
+      poolHaber -= venta;
+    }
+    return { ...m, saldo: acum, estadoDisplay };
+  });
+  return conSaldo.reverse();
+}
+
 // Etiquetas de tipo de comprobante para la columna/filtro de cuenta corriente.
 const TIPO_COMPROBANTE_LABEL: Record<string, string> = {
   factura_a: 'Factura A',
@@ -2314,18 +2344,21 @@ export function SocioDetail({
   const totalAFavor = saldoBruto < 0 ? Math.abs(saldoBruto) : 0;
 
   // Predicado de filtros de la tabla de cuenta corriente.
-  function pasaFiltrosCC(m: Movimiento): boolean {
+  function pasaFiltrosCC(m: Movimiento, estadoEf?: string | null): boolean {
+    const est = estadoEf ?? m.estado;
     const fecha = m.fecha ? m.fecha.slice(0, 10) : '';
     if (ccFechaDesde && (!fecha || fecha < ccFechaDesde)) return false;
     if (ccFechaHasta && (!fecha || fecha > ccFechaHasta)) return false;
-    if (ccEstado === 'pagado' && m.estado !== 'pagado') return false;
-    if (ccEstado === 'en_plazo' && m.estado !== 'facturado' && m.estado !== 'no_pagado')
-      return false;
+    if (ccEstado === 'pagado' && est !== 'pagado') return false;
+    if (ccEstado === 'en_plazo' && est !== 'facturado' && est !== 'no_pagado') return false;
     if (ccTipoComp === 'sin' && m.facturaTipo) return false;
     if (ccTipoComp && ccTipoComp !== 'sin' && m.facturaTipo !== ccTipoComp) return false;
     return true;
   }
-  const movimientosFiltrados = movimientos.filter(pasaFiltrosCC);
+  // Movimientos con saldo acumulado y estado mostrado (ver calcularSaldoYEstado).
+  const movimientosCalc = calcularSaldoYEstado(movimientos);
+
+  const movimientosFiltrados = movimientosCalc.filter((m) => pasaFiltrosCC(m, m.estadoDisplay));
   const hayFiltrosCC = Boolean(ccFechaDesde || ccFechaHasta || ccEstado || ccTipoComp);
 
   // Cards Ventas/Cobranzas: reflejan los movimientos filtrados.
@@ -2908,18 +2941,11 @@ export function SocioDetail({
                   </thead>
                   <tbody>
                     {(() => {
-                      // Calcular saldo acumulado de más viejo a más nuevo.
-                      // movimientos viene ordenado más nuevo primero (desc fecha),
-                      // así que invertimos para acumular y luego volvemos a invertir.
-                      const asc = [...movimientos].reverse();
-                      let acum = 0;
-                      const conSaldo = asc.map((m) => {
-                        const venta = parseFloat(m.debe ?? '0');
-                        const cobranza = parseFloat(m.haber ?? '0');
-                        acum = acum + venta - cobranza;
-                        return { ...m, saldo: acum };
-                      });
-                      const visibles = conSaldo.reverse().filter(pasaFiltrosCC);
+                      // Saldo acumulado + estado mostrado ya calculados en
+                      // movimientosCalc (FIFO de pagos). Acá solo filtramos.
+                      const visibles = movimientosCalc.filter((m) =>
+                        pasaFiltrosCC(m, m.estadoDisplay),
+                      );
                       if (visibles.length === 0) {
                         return (
                           <tr>
@@ -2994,10 +3020,11 @@ export function SocioDetail({
                                 ) : (
                                   <span
                                     className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${
-                                      ESTADO_BADGE[m.estado ?? ''] ?? 'bg-gray-100 text-gray-500'
+                                      ESTADO_BADGE[m.estadoDisplay ?? ''] ??
+                                      'bg-gray-100 text-gray-500'
                                     }`}
                                   >
-                                    {ESTADO_LABEL[m.estado ?? ''] ?? m.estado ?? '—'}
+                                    {ESTADO_LABEL[m.estadoDisplay ?? ''] ?? m.estadoDisplay ?? '—'}
                                   </span>
                                 )}
                               </div>
