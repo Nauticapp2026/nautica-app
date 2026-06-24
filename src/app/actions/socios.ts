@@ -44,6 +44,7 @@ export type CreateSocioData = {
   condicionIva: string;
   condicionIvaPersonal: string;
   condicionIibb: string;
+  emailFacturacion: string;
   embarcacionNombre: string;
   matricula: string;
   astillero: string;
@@ -130,6 +131,7 @@ export async function createSocioAction(data: CreateSocioData): Promise<SocioRes
           condicionIva: (data.condicionIva || null) as never,
           condicionIvaPersonal: (data.condicionIvaPersonal || null) as never,
           condicionIibb: (data.condicionIibb || null) as never,
+          emailFacturacion: data.emailFacturacion.trim() || null,
           estadoSocio: 'activo',
         })
         .onConflictDoUpdate({
@@ -152,6 +154,7 @@ export async function createSocioAction(data: CreateSocioData): Promise<SocioRes
             condicionIva: (data.condicionIva || null) as never,
             condicionIvaPersonal: (data.condicionIvaPersonal || null) as never,
             condicionIibb: (data.condicionIibb || null) as never,
+            emailFacturacion: data.emailFacturacion.trim() || null,
             estadoSocio: 'activo',
           },
         });
@@ -212,6 +215,7 @@ export type UpdateSocioData = {
   condicionIva: string;
   condicionIvaPersonal: string;
   condicionIibb: string;
+  emailFacturacion: string;
 };
 
 export async function updateSocioAction(data: UpdateSocioData): Promise<{ error?: string }> {
@@ -278,6 +282,7 @@ export async function updateSocioAction(data: UpdateSocioData): Promise<{ error?
         condicionIva: (data.condicionIva || null) as never,
         condicionIvaPersonal: (data.condicionIvaPersonal || null) as never,
         condicionIibb: (data.condicionIibb || null) as never,
+        emailFacturacion: data.emailFacturacion.trim() || null,
       })
       .where(eq(profiles.id, data.socioId));
 

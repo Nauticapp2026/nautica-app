@@ -120,6 +120,7 @@ function precioSinIva(total: number, alicuota: string): number {
 type SocioFacturacion = {
   id: string;
   email: string;
+  emailFacturacion: string | null;
   nombre: string | null;
   apellido: string | null;
   razonSocial: string | null;
@@ -183,7 +184,7 @@ function buildCliente(
     documento_tipo: docTipo,
     documento_nro: docNro,
     razon_social: ident.razon,
-    email: p.email,
+    email: p.emailFacturacion?.trim() || p.email,
     domicilio: ident.domicilio,
     provincia: '1',
     envia_por_mail: 'S',
@@ -307,6 +308,7 @@ export async function crearFacturaCore(
       direccionFiscal: profiles.direccionFiscal,
       condicionIva: profiles.condicionIva,
       condicionIvaPersonal: profiles.condicionIvaPersonal,
+      emailFacturacion: profiles.emailFacturacion,
       facturaFiscal: memberships.facturaFiscal,
     })
     .from(profiles)
@@ -867,6 +869,7 @@ export async function emitirNotaCreditoAction(data: EmitirNcData): Promise<Emiti
       direccionFiscal: profiles.direccionFiscal,
       condicionIva: profiles.condicionIva,
       condicionIvaPersonal: profiles.condicionIvaPersonal,
+      emailFacturacion: profiles.emailFacturacion,
       facturaFiscal: memberships.facturaFiscal,
     })
     .from(profiles)

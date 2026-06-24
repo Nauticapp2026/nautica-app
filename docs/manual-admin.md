@@ -156,7 +156,9 @@ Mostrá y editá los datos personales: nombre, apellido, email, teléfono, docum
 
 #### Pestaña Datos Impositivos
 
-Mostrá y editá los datos fiscales del socio: razón social, CUIT, dirección fiscal, condición frente al IVA e Ingresos Brutos.
+Mostrá y editá los datos fiscales del socio: razón social, CUIT, dirección fiscal, **email de facturación**, condición frente al IVA e Ingresos Brutos.
+
+El **email de facturación** es la dirección a la que se envía el comprobante. Si se deja vacío, se usa el email de la cuenta del socio (pestaña Generales).
 
 **Usar datos personales para facturación** — checkbox en la parte superior de esta pestaña. Define **con qué datos se emiten los comprobantes** del socio:
 

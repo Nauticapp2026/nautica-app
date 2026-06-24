@@ -134,6 +134,7 @@ const EMPTY_FORM = {
   condicionIva: '',
   condicionIvaPersonal: '',
   condicionIibb: '',
+  emailFacturacion: '',
   embarcacionNombre: '',
   matricula: '',
   astillero: '',
@@ -536,6 +537,15 @@ function CrearSocioModal({ open, onClose }: { open: boolean; onClose: () => void
                       </select>
                     </Field>
                   </div>
+                  <Field label="Email de facturación">
+                    <input
+                      type="email"
+                      className={inputCls}
+                      placeholder="A dónde se envía el comprobante (opcional)"
+                      value={form.emailFacturacion}
+                      onChange={set('emailFacturacion')}
+                    />
+                  </Field>
                 </div>
               )}
             </div>

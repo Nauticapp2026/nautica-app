@@ -54,6 +54,7 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
       condicionIva: profiles.condicionIva,
       condicionIvaPersonal: profiles.condicionIvaPersonal,
       condicionIibb: profiles.condicionIibb,
+      emailFacturacion: profiles.emailFacturacion,
       estadoSocio: profiles.estadoSocio,
       deuda: profiles.deuda,
       memberSince: memberships.createdAt,

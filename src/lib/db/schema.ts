@@ -409,6 +409,9 @@ export const profiles = pgTable('profiles', {
   // condicionIva (arriba) es la de los Datos Impositivos / razón social.
   condicionIvaPersonal: condicionFrenteIvaEnum('condicion_iva_personal'),
   razonSocial: text('razon_social'),
+  // Email al que se envía el comprobante (Datos Impositivos). Si está vacío se
+  // usa `email` (el de la cuenta). Separado del email de login.
+  emailFacturacion: text('email_facturacion'),
   sede: text('sede'),
   usertoken: text('usertoken'),
   qr: text('qr'),

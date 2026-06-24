@@ -86,6 +86,7 @@ type SocioData = {
   condicionIva: string | null;
   condicionIvaPersonal: string | null;
   condicionIibb: string | null;
+  emailFacturacion: string | null;
   estadoSocio: string | null;
   deuda: string | null;
   memberSince: string;
@@ -2229,6 +2230,7 @@ export function SocioDetail({
     condicionIva: socio.condicionIva ?? '',
     condicionIvaPersonal: socio.condicionIvaPersonal ?? '',
     condicionIibb: socio.condicionIibb ?? '',
+    emailFacturacion: socio.emailFacturacion ?? '',
     numeroSocio: socio.numeroSocio != null ? String(socio.numeroSocio) : '',
   });
   const [editError, setEditError] = useState<string | null>(null);
@@ -2270,6 +2272,7 @@ export function SocioDetail({
       condicionIva: socio.condicionIva ?? '',
       condicionIvaPersonal: socio.condicionIvaPersonal ?? '',
       condicionIibb: socio.condicionIibb ?? '',
+      emailFacturacion: socio.emailFacturacion ?? '',
       numeroSocio: socio.numeroSocio != null ? String(socio.numeroSocio) : '',
     });
     setEditError(null);
@@ -3364,7 +3367,13 @@ function ImpositivosTab({
   editando: boolean;
   setEditando: (v: boolean) => void;
   setField: (
-    k: 'razonSocial' | 'cuit' | 'direccionFiscal' | 'condicionIva' | 'condicionIibb',
+    k:
+      | 'razonSocial'
+      | 'cuit'
+      | 'direccionFiscal'
+      | 'condicionIva'
+      | 'condicionIibb'
+      | 'emailFacturacion',
   ) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => void;
   handleGuardar: () => void;
   handleCancelar: () => void;
@@ -3481,6 +3490,23 @@ function ImpositivosTab({
             readOnly={!editando}
             placeholder="—"
           />
+        </div>
+        <div>
+          <label className="mb-1.5 block text-xs font-semibold text-gray-500">
+            Email de facturación
+          </label>
+          <input
+            type="email"
+            className={inputCls}
+            value={editForm.emailFacturacion}
+            onChange={setField('emailFacturacion')}
+            readOnly={!editando}
+            placeholder="—"
+          />
+          <p className="mt-1.5 text-xs text-gray-400">
+            A esta dirección se envía el comprobante. Si se deja vacío, se usa el email de la
+            cuenta.
+          </p>
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
