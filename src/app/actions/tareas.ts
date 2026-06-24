@@ -4,7 +4,14 @@ import { revalidatePath } from 'next/cache';
 import { and, eq } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
-import { tareas, memberships, embarcaciones, guarderias, solicitudesLavado } from '@/lib/db/schema';
+import {
+  tareas,
+  memberships,
+  embarcaciones,
+  espacios,
+  guarderias,
+  solicitudesLavado,
+} from '@/lib/db/schema';
 import { getActiveMarina } from '@/lib/auth/session';
 import { sendPushToUser } from '@/lib/push-notifications';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -72,6 +79,20 @@ async function validateEmbarcacionBelongsToGuarderia(
   return Boolean(row);
 }
 
+// Área de una tarea = área del espacio de la embarcación. NULL si la embarcación
+// no tiene espacio asignado (o no hay embarcación). La tarea sin área la ven
+// todos los operarios de la guardería.
+async function getAreaIdForEmbarcacion(embarcacionId: string | null): Promise<string | null> {
+  if (!embarcacionId) return null;
+  const [row] = await db
+    .select({ areaId: espacios.areaId })
+    .from(embarcaciones)
+    .innerJoin(espacios, eq(espacios.id, embarcaciones.espacioId))
+    .where(eq(embarcaciones.id, embarcacionId))
+    .limit(1);
+  return row?.areaId ?? null;
+}
+
 // ─── Crear ──────────────────────────────────────────────────────────────────
 
 export async function createTareaAction(
@@ -104,6 +125,7 @@ export async function createTareaAction(
       nota: data.nota?.trim() || null,
       operarioId: data.operarioId || null,
       embarcacionId: data.embarcacionId || null,
+      areaId: await getAreaIdForEmbarcacion(data.embarcacionId || null),
       estado: (data.estado ?? 'preparar') as EstadoTarea,
       fechaHora: data.fechaHora ? new Date(data.fechaHora + '-03:00') : null,
     })
@@ -161,13 +183,18 @@ export async function updateTareaAction(data: UpdateTareaData): Promise<{ error?
     ? estadoActual
     : ((data.estado ?? 'preparar') as EstadoTarea);
 
+  // Embarcación efectiva (en Lavado se preserva) y área derivada de ella.
+  const embarcacionFinal = esLavado ? current.embarcacionId : data.embarcacionId || null;
+  const areaId = await getAreaIdForEmbarcacion(embarcacionFinal);
+
   await db
     .update(tareas)
     .set({
       descripcion,
       nota: data.nota?.trim() || null,
       operarioId: data.operarioId || null,
-      embarcacionId: esLavado ? current.embarcacionId : data.embarcacionId || null,
+      embarcacionId: embarcacionFinal,
+      areaId,
       estado: estadoFinal,
       fechaHora: esLavado
         ? current.fechaHora

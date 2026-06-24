@@ -8,6 +8,7 @@ import { and, asc, eq } from 'drizzle-orm';
 import { getActiveMarina } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import {
+  areaOperarios,
   areas,
   embarcaciones,
   espacios,
@@ -51,6 +52,8 @@ export default async function EspaciosPage() {
     sociosRows,
     serviciosRows,
     embarcacionesRows,
+    operariosRows,
+    areaOperariosRows,
   ] = await Promise.all([
     db
       .select({ id: areas.id, nombre: areas.nombre })
@@ -164,7 +167,40 @@ export default async function EspaciosPage() {
       })
       .from(embarcaciones)
       .where(eq(embarcaciones.guarderiaId, guarderiaId)),
+
+    // Operarios de la guardería (para asignarlos a áreas).
+    db
+      .select({
+        id: profiles.id,
+        nombre: profiles.nombre,
+        apellido: profiles.apellido,
+        email: profiles.email,
+      })
+      .from(memberships)
+      .innerJoin(profiles, eq(profiles.id, memberships.userId))
+      .where(
+        and(
+          eq(memberships.guarderiaId, guarderiaId),
+          eq(memberships.rol, 'operario'),
+          eq(memberships.status, 'active'),
+        ),
+      )
+      .orderBy(asc(profiles.apellido), asc(profiles.nombre)),
+
+    // Asignaciones operario ↔ área de la guardería.
+    db
+      .select({ areaId: areaOperarios.areaId, operarioId: areaOperarios.operarioId })
+      .from(areaOperarios)
+      .where(eq(areaOperarios.guarderiaId, guarderiaId)),
   ]);
+
+  // Mapa área → operarioIds asignados.
+  const operariosPorArea = new Map<string, string[]>();
+  for (const r of areaOperariosRows) {
+    const arr = operariosPorArea.get(r.areaId) ?? [];
+    arr.push(r.operarioId);
+    operariosPorArea.set(r.areaId, arr);
+  }
 
   const toNum = (v: string | null) => (v != null ? Number(v) : null);
 
@@ -221,6 +257,7 @@ export default async function EspaciosPage() {
   const areasView: AreaView[] = areasRows.map((a) => {
     const marinasDelArea = marinasRows.filter((m) => m.areaId === a.id);
     const navesDelArea = navesRows.filter((n) => n.areaId === a.id);
+    const operarioIds = operariosPorArea.get(a.id) ?? [];
 
     if (marinasDelArea.length > 0) {
       const peines = marinasDelArea.map((m) => ({
@@ -234,6 +271,7 @@ export default async function EspaciosPage() {
         tipo: 'marina' as const,
         peines,
         lados: [],
+        operarioIds,
       };
     }
 
@@ -262,12 +300,25 @@ export default async function EspaciosPage() {
         tipo: 'nave' as const,
         peines: [],
         lados: ladosArea,
+        operarioIds,
       };
     }
 
     // Área vacía (sin marinas ni naves cargadas todavía)
-    return { id: a.id, nombre: a.nombre, tipo: 'marina' as const, peines: [], lados: [] };
+    return {
+      id: a.id,
+      nombre: a.nombre,
+      tipo: 'marina' as const,
+      peines: [],
+      lados: [],
+      operarioIds,
+    };
   });
+
+  const operarios: SocioOpt[] = operariosRows.map((o) => ({
+    id: o.id,
+    nombre: [o.nombre, o.apellido].filter(Boolean).join(' ').trim() || o.email,
+  }));
 
   const socios: SocioOpt[] = sociosRows.map((s) => ({
     id: s.id,
@@ -303,6 +354,7 @@ export default async function EspaciosPage() {
     <EspaciosClient
       areas={areasView}
       socios={socios}
+      operarios={operarios}
       serviciosEspacios={serviciosEspacios}
       esloraMaxPorSocio={esloraMaxPorSocio}
       embarcaciones={embarcacionesList}

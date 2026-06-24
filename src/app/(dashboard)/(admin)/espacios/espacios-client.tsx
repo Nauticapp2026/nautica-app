@@ -12,6 +12,7 @@ import {
   Search,
   Trash2,
   Upload,
+  Users,
   X,
 } from 'lucide-react';
 import {
@@ -46,6 +47,7 @@ import {
   moveEspacioToPisoAction,
   moveOcupanteAction,
   reorderEspaciosAction,
+  setAreaOperariosAction,
   updateEspacioAction,
   type CreateAreaInput,
 } from '@/app/actions/espacios';
@@ -77,6 +79,7 @@ export type AreaView = {
     nombre: string;
     pisos: { pisoId: string; nombre: string; espacios: EspacioCell[] }[];
   }[];
+  operarioIds: string[];
 };
 
 export type SocioOpt = { id: string; nombre: string };
@@ -215,12 +218,14 @@ const inputCls =
 export function EspaciosClient({
   areas,
   socios,
+  operarios,
   serviciosEspacios,
   esloraMaxPorSocio,
   embarcaciones,
 }: {
   areas: AreaView[];
   socios: SocioOpt[];
+  operarios: SocioOpt[];
   serviciosEspacios: ServicioEspacio[];
   esloraMaxPorSocio: Record<string, number>;
   embarcaciones: EmbarcacionOpt[];
@@ -895,6 +900,7 @@ export function EspaciosClient({
                 key={a.id}
                 area={a}
                 counts={countEspacios(a)}
+                operarios={operarios}
                 onDelete={() => {
                   setDeleteError(null);
                   setConfirmDelete(a);
@@ -1177,12 +1183,48 @@ function StatCard({ label, value, accent }: { label: string; value: number; acce
 function AreaCard({
   area,
   counts,
+  operarios,
   onDelete,
 }: {
   area: AreaView;
   counts: { total: number; ocupado: number; reservado: number; disponible: number };
+  operarios: SocioOpt[];
   onDelete: () => void;
 }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [sel, setSel] = useState<string[]>(area.operarioIds);
+  const [saving, startSaving] = useTransition();
+
+  // Re-sync si cambian los datos del server (post-refresh).
+  const [prevIds, setPrevIds] = useState(area.operarioIds);
+  if (area.operarioIds !== prevIds) {
+    setPrevIds(area.operarioIds);
+    setSel(area.operarioIds);
+  }
+
+  const nombrePorId = useMemo(() => new Map(operarios.map((o) => [o.id, o.nombre])), [operarios]);
+  const asignados = area.operarioIds
+    .map((id) => nombrePorId.get(id))
+    .filter((n): n is string => Boolean(n));
+
+  function toggle(id: string) {
+    setSel((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
+
+  function guardar() {
+    startSaving(async () => {
+      const res = await setAreaOperariosAction(area.id, sel);
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+      toast.success('Operarios actualizados');
+      setOpen(false);
+      router.refresh();
+    });
+  }
+
   return (
     <div className="rounded-[14px] border border-gray-200 bg-white p-4">
       <div className="flex items-start justify-between">
@@ -1205,6 +1247,83 @@ function AreaCard({
         <CountChip color="bg-red-500" label={`Ocupado (${counts.ocupado})`} />
         <CountChip color="bg-amber-400" label={`Reservado (${counts.reservado})`} />
         <CountChip color="bg-[#669E9D]" label={`Disponible (${counts.disponible})`} />
+      </div>
+
+      {/* Operarios del área */}
+      <div className="relative mt-3 border-t border-gray-100 pt-3">
+        <div className="flex items-center justify-between">
+          <span className="flex items-center gap-1.5 text-xs font-semibold text-gray-500">
+            <Users className="h-3.5 w-3.5" />
+            Operarios
+          </span>
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            className="rounded-[8px] border border-gray-200 px-2 py-1 text-xs font-medium text-gray-600 transition hover:bg-gray-50"
+          >
+            Asignar
+          </button>
+        </div>
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {asignados.length === 0 ? (
+            <span className="text-xs text-gray-400">Sin operarios asignados</span>
+          ) : (
+            asignados.map((n) => (
+              <span
+                key={n}
+                className="rounded-full bg-[#D9EBE9] px-2 py-0.5 text-xs text-[#175861]"
+              >
+                {n}
+              </span>
+            ))
+          )}
+        </div>
+
+        {open && (
+          <div className="absolute top-full right-0 left-0 z-20 mt-1 rounded-[10px] border border-gray-200 bg-white p-2 shadow-lg">
+            {operarios.length === 0 ? (
+              <p className="px-2 py-3 text-xs text-gray-400">No hay operarios en esta guardería.</p>
+            ) : (
+              <div className="max-h-48 overflow-y-auto">
+                {operarios.map((o) => (
+                  <label
+                    key={o.id}
+                    className="flex cursor-pointer items-center gap-2 rounded-[8px] px-2 py-1.5 text-sm hover:bg-gray-50"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={sel.includes(o.id)}
+                      onChange={() => toggle(o.id)}
+                      className="h-4 w-4 cursor-pointer accent-[#175861]"
+                    />
+                    <span className="truncate text-[#101828]">{o.nombre}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+            <div className="mt-2 flex justify-end gap-2 border-t border-gray-100 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setSel(area.operarioIds);
+                  setOpen(false);
+                }}
+                className="rounded-[8px] px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={guardar}
+                disabled={saving}
+                className="rounded-[8px] px-2.5 py-1 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-40"
+                style={{ background: '#175861' }}
+              >
+                {saving ? 'Guardando...' : 'Guardar'}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

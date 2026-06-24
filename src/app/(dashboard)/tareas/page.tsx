@@ -1,9 +1,10 @@
-import { and, asc, desc, eq, isNull, notInArray, or } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, notInArray, or } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 
 import { getActiveMarina } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import {
+  areaOperarios,
   embarcaciones,
   espacios,
   memberships,
@@ -49,6 +50,23 @@ export default async function TareasPage() {
   // Fallback: embarcación principal del socio cuando la tarea no tiene embarcacionId
   // (p.ej. solicitudes de lavado creadas desde mobile sin vincular embarcación).
   const lavadoEmb = alias(embarcaciones, 'lavado_emb');
+
+  // El operario solo ve tareas de SUS áreas + las que no tienen área (visibles a
+  // todos). El admin/super admin ven todas.
+  const soloMisAreas = isOperario && !isAdmin;
+  let operarioAreaIds: string[] = [];
+  if (soloMisAreas) {
+    const rows = await db
+      .select({ areaId: areaOperarios.areaId })
+      .from(areaOperarios)
+      .where(and(eq(areaOperarios.operarioId, ctx.user.id), eq(areaOperarios.guarderiaId, gId)));
+    operarioAreaIds = rows.map((r) => r.areaId);
+  }
+  const areaCond = soloMisAreas
+    ? operarioAreaIds.length > 0
+      ? or(isNull(tareas.areaId), inArray(tareas.areaId, operarioAreaIds))
+      : isNull(tareas.areaId)
+    : undefined;
 
   const [listado, operariosList, embarcacionesList] = await Promise.all([
     db
@@ -98,6 +116,8 @@ export default async function TareasPage() {
           // 'cancelada' se excluye siempre. 'lista' se incluye y el cliente
           // la oculta al día siguiente (mismo patrón que 'guardada').
           or(isNull(solicitudesLavado.estado), notInArray(solicitudesLavado.estado, ['cancelada'])),
+          // Operario: solo sus áreas + tareas sin área. Admin: sin filtro.
+          areaCond,
         ),
       )
       .orderBy(desc(tareas.createdAt))

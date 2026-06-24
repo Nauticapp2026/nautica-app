@@ -377,6 +377,14 @@ Desde la tarjeta de la tarea, usá el selector **Mover a...** para cambiar la co
 
 En la tarjeta de la tarea, usá el selector **Operario** para asignar o cambiar la persona responsable.
 
+### Operarios por área (a quién le aparecen las tareas)
+
+Cada tarea (lavado, salida, etc.) se asocia automáticamente al **área** del espacio de la embarcación. Las tareas de un área le aparecen a **los operarios asignados a esa área**, y el que está disponible la **toma**.
+
+- Los operarios se asignan a cada área desde **Espacios** (ver "Asignar operarios a un área").
+- Una tarea **sin** área (ej. una tarea genérica sin embarcación) la ven **todos** los operarios de la guardería.
+- El administrador sigue viendo **todas** las tareas.
+
 ### Tareas de lavado
 
 Las solicitudes de lavado que llegan desde la app mobile aparecen en la columna **Lavado**. Cada tarjeta muestra el nombre de la embarcación, su ubicación en el club y la fecha para la que el socio pidió que el lavado esté listo.
@@ -408,6 +416,10 @@ Los espacios se muestran con colores:
 - **Teal** — disponible
 - **Rojo** — ocupado
 - **Amarillo** — reservado
+
+### Asignar operarios a un área
+
+En la sección **Áreas** (arriba de Espacios), cada tarjeta de área tiene un botón **Asignar** junto a "Operarios". Ahí elegís uno o más operarios para esa área. Esos operarios son los que van a ver y poder tomar las tareas de las embarcaciones ubicadas en esa área (lavados, salidas, etc.).
 
 ### Crear una nueva área
 

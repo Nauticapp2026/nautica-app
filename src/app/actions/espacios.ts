@@ -5,6 +5,7 @@ import { and, asc, desc, eq, inArray } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import {
+  areaOperarios,
   areas,
   embarcaciones,
   espacios,
@@ -626,6 +627,59 @@ export async function deleteAreaAction(id: string): Promise<{ error?: string }> 
   await db.delete(areas).where(eq(areas.id, id));
 
   revalidatePath('/espacios');
+  return {};
+}
+
+/**
+ * Reemplaza la lista de operarios asignados a un área. Los operarios de un área
+ * son los que ven (y pueden tomar) las tareas de esa área.
+ */
+export async function setAreaOperariosAction(
+  areaId: string,
+  operarioIds: string[],
+): Promise<{ error?: string }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+  if (!isAdmin(ctx)) return { error: 'Solo administradores pueden asignar operarios.' };
+
+  const guarderiaId = ctx.activeMembership.guarderiaId;
+
+  const [area] = await db
+    .select({ id: areas.id })
+    .from(areas)
+    .where(and(eq(areas.id, areaId), eq(areas.guarderiaId, guarderiaId)))
+    .limit(1);
+  if (!area) return { error: 'Área no encontrada.' };
+
+  // Validar que todos sean operarios activos de esta guardería.
+  const ids = [...new Set(operarioIds)];
+  if (ids.length > 0) {
+    const validos = await db
+      .select({ userId: memberships.userId })
+      .from(memberships)
+      .where(
+        and(
+          eq(memberships.guarderiaId, guarderiaId),
+          eq(memberships.rol, 'operario'),
+          eq(memberships.status, 'active'),
+          inArray(memberships.userId, ids),
+        ),
+      );
+    if (validos.length !== ids.length) {
+      return { error: 'Alguno de los operarios no pertenece a esta guardería.' };
+    }
+  }
+
+  // Reemplazo completo: borrar las asignaciones actuales e insertar las nuevas.
+  await db.delete(areaOperarios).where(eq(areaOperarios.areaId, areaId));
+  if (ids.length > 0) {
+    await db
+      .insert(areaOperarios)
+      .values(ids.map((operarioId) => ({ guarderiaId, areaId, operarioId })));
+  }
+
+  revalidatePath('/espacios');
+  revalidatePath('/tareas');
   return {};
 }
 

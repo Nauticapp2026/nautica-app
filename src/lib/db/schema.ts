@@ -916,6 +916,10 @@ export const tareas = pgTable(
       .notNull()
       .references(() => guarderias.id, { onDelete: 'cascade' }),
     operarioId: uuid('operario_id').references(() => profiles.id, { onDelete: 'set null' }),
+    // Área a la que pertenece la tarea (derivada de la embarcación → espacio).
+    // La tarea la ven los operarios asignados a esta área (ver areaOperarios).
+    // NULL = sin área: la ven todos los operarios de la guardería.
+    areaId: uuid('area_id').references(() => areas.id, { onDelete: 'set null' }),
     embarcacionId: uuid('embarcacion_id').references(() => embarcaciones.id, {
       onDelete: 'set null',
     }),
@@ -931,6 +935,31 @@ export const tareas = pgTable(
   (t) => [
     index('tareas_guarderia_idx').on(t.guarderiaId),
     index('tareas_operario_idx').on(t.operarioId),
+    index('tareas_area_idx').on(t.areaId),
+  ],
+);
+
+// Operarios asignados a cada área (M:N). Una tarea de un área la ven todos los
+// operarios asignados a esa área; el que está disponible la "toma".
+export const areaOperarios = pgTable(
+  'area_operarios',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    guarderiaId: uuid('guarderia_id')
+      .notNull()
+      .references(() => guarderias.id, { onDelete: 'cascade' }),
+    areaId: uuid('area_id')
+      .notNull()
+      .references(() => areas.id, { onDelete: 'cascade' }),
+    operarioId: uuid('operario_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex('area_operarios_area_operario_idx').on(t.areaId, t.operarioId),
+    index('area_operarios_operario_idx').on(t.operarioId),
+    index('area_operarios_guarderia_idx').on(t.guarderiaId),
   ],
 );
 
