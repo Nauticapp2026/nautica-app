@@ -52,6 +52,7 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
       cuit: profiles.cuit,
       direccionFiscal: profiles.direccionFiscal,
       condicionIva: profiles.condicionIva,
+      condicionIvaPersonal: profiles.condicionIvaPersonal,
       condicionIibb: profiles.condicionIibb,
       estadoSocio: profiles.estadoSocio,
       deuda: profiles.deuda,
@@ -416,8 +417,9 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
         memberSince: socio.memberSince.toISOString(),
         tipoDocumento: socio.tipoDocumento ?? null,
         condicionIva: socio.condicionIva ?? null,
+        condicionIvaPersonal: socio.condicionIvaPersonal ?? null,
         estadoSocio: socio.estadoSocio ?? null,
-        facturaFiscal: socio.facturaFiscal ?? true,
+        facturaFiscal: socio.facturaFiscal ?? false,
       }}
       embarcaciones={embarcacionesList.map((e) => ({
         ...e,

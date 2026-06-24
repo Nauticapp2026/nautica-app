@@ -73,10 +73,21 @@ type Socio = {
   email: string;
   numeroDocumento: string;
   condicionIva: string | null;
+  condicionIvaPersonal: string | null;
+  // true = factura con datos personales (Generales); false = Datos Impositivos.
+  facturaFiscal: boolean;
   pendientes: number;
   pendienteTotal: string;
   movimientos: LoteMovimiento[];
 };
+
+// Condición frente al IVA efectiva del socio según el modo de facturación:
+// si factura con datos personales, la de Generales; si no, la fiscal.
+function condicionIvaEfectiva(
+  socio: Pick<Socio, 'facturaFiscal' | 'condicionIva' | 'condicionIvaPersonal'>,
+): string | null {
+  return socio.facturaFiscal ? socio.condicionIvaPersonal : socio.condicionIva;
+}
 
 type CobroPayway = {
   id: string;
@@ -243,7 +254,10 @@ function NuevaFacturaModal({
   function handleSocioChange(e: React.ChangeEvent<HTMLSelectElement>) {
     const socioId = e.target.value;
     const socio = socios.find((s) => s.id === socioId);
-    const tipoFactura = derivarTipoFactura(guarderiaCondicionIva, socio?.condicionIva ?? null);
+    const tipoFactura = derivarTipoFactura(
+      guarderiaCondicionIva,
+      socio ? condicionIvaEfectiva(socio) : null,
+    );
     setForm((f) => ({ ...f, socioId, tipoFactura }));
     setMovimientos([]);
     setSelectedMovs(new Set());
@@ -1501,7 +1515,10 @@ function VentanillaModal({
                       setSocioId(id);
                       const socio = socios.find((s) => s.id === id);
                       setTipoFactura(
-                        derivarTipoFactura(guarderiaCondicionIva, socio?.condicionIva ?? null),
+                        derivarTipoFactura(
+                          guarderiaCondicionIva,
+                          socio ? condicionIvaEfectiva(socio) : null,
+                        ),
                       );
                     }}
                   >

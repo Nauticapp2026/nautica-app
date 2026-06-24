@@ -111,7 +111,12 @@ function precioSinIva(total: number, alicuota: string): number {
   return +(total / (1 + a / 100)).toFixed(2);
 }
 
-function buildCliente(p: {
+/**
+ * Datos del socio relevantes para construir la identidad de facturación.
+ * facturaFiscal = true  → facturar con datos PERSONALES (pestaña Generales).
+ * facturaFiscal = false → facturar con DATOS IMPOSITIVOS (razón social, CUIT).
+ */
+type SocioFacturacion = {
   id: string;
   email: string;
   nombre: string | null;
@@ -123,14 +128,52 @@ function buildCliente(p: {
   direccion: string | null;
   direccionFiscal: string | null;
   condicionIva: string | null;
-  condicionVenta: CondicionVenta;
-}): TusFacturasCliente {
-  const razon =
-    p.razonSocial?.trim() || [p.nombre, p.apellido].filter(Boolean).join(' ').trim() || p.email;
+  condicionIvaPersonal: string | null;
+  facturaFiscal: boolean;
+};
 
-  // Si el socio tiene CUIT fiscal cargado, usarlo como documento de facturación.
-  const docTipo = p.cuit?.trim() ? 'CUIT' : (TIPO_DOC_API[p.tipoDocumento ?? ''] ?? 'OTRO');
-  const docNro = p.cuit?.trim() || p.numeroDocumento || '';
+/**
+ * Identidad fiscal efectiva del socio según el modo de facturación. Usada tanto
+ * para validar el documento como para armar el cliente de TusFacturas, así ambos
+ * siempre miran los mismos campos. Devuelve los valores en enums internos (DB).
+ */
+function identidadFacturacion(p: SocioFacturacion): {
+  razon: string;
+  tipoDocumento: string | null;
+  numeroDocumento: string | null;
+  condicionIva: string | null;
+  domicilio: string;
+} {
+  const nombreCompleto = [p.nombre, p.apellido].filter(Boolean).join(' ').trim();
+
+  if (p.facturaFiscal) {
+    // Datos personales (Generales).
+    return {
+      razon: nombreCompleto || p.email,
+      tipoDocumento: p.tipoDocumento,
+      numeroDocumento: p.numeroDocumento,
+      condicionIva: p.condicionIvaPersonal,
+      domicilio: p.direccion?.trim() || '',
+    };
+  }
+
+  // Datos impositivos. Si tiene CUIT cargado, es el documento de facturación.
+  return {
+    razon: p.razonSocial?.trim() || nombreCompleto || p.email,
+    tipoDocumento: p.cuit?.trim() ? 'cuit' : p.tipoDocumento,
+    numeroDocumento: p.cuit?.trim() || p.numeroDocumento,
+    condicionIva: p.condicionIva,
+    domicilio: p.direccionFiscal?.trim() || p.direccion?.trim() || '',
+  };
+}
+
+function buildCliente(
+  p: SocioFacturacion & { condicionVenta: CondicionVenta },
+): TusFacturasCliente {
+  const ident = identidadFacturacion(p);
+
+  const docTipo = TIPO_DOC_API[ident.tipoDocumento ?? ''] ?? 'OTRO';
+  const docNro = ident.numeroDocumento || '';
 
   const condicionPago = CONDICION_PAGO_API[p.condicionVenta] ?? '201';
 
@@ -138,16 +181,16 @@ function buildCliente(p: {
     codigo: p.id,
     documento_tipo: docTipo,
     documento_nro: docNro,
-    razon_social: razon,
+    razon_social: ident.razon,
     email: p.email,
-    domicilio: p.direccionFiscal?.trim() || p.direccion || '',
+    domicilio: ident.domicilio,
     provincia: '1',
     envia_por_mail: 'S',
     reclama_deuda: 'N',
     rg5329: 'N',
     condicion_pago: condicionPago,
     ...(condicionPago === '214' ? { condicion_pago_otra: 'Otros' } : {}),
-    condicion_iva: CONDICION_IVA_API[p.condicionIva ?? ''] ?? 'CF',
+    condicion_iva: CONDICION_IVA_API[ident.condicionIva ?? ''] ?? 'CF',
     condicion_iva_operacion: '1',
   };
 }
@@ -187,8 +230,9 @@ function buildPagos(total: number, medio: MedioPago): TusFacturasFormaPago[] {
 }
 
 /**
- * Valida que el socio tenga documento compatible con su condición ante el IVA.
- * Devuelve mensaje de error si hay inconsistencia, o null si está OK.
+ * Valida que el socio tenga documento compatible con su condición ante el IVA,
+ * mirando la identidad efectiva según el modo de facturación (datos personales
+ * vs. datos impositivos). Devuelve mensaje de error o null si está OK.
  *
  * Reglas de tusfacturas.app / AFIP:
  *  - Si condición IVA = Responsable Inscripto o Monotributo → requiere CUIT válido (11 dígitos).
@@ -196,18 +240,17 @@ function buildPagos(total: number, medio: MedioPago): TusFacturasFormaPago[] {
  *  - Si tipo documento = DNI → número debe ser numérico (7-8 dígitos).
  *  - Consumidor Final sin documento es válido (se factura al consumidor anónimo).
  */
-function validarDocumentoSocio(p: {
-  tipoDocumento: string | null;
-  numeroDocumento: string | null;
-  condicionIva: string | null;
-}): string | null {
-  const tipo = p.tipoDocumento ?? '';
-  const nro = (p.numeroDocumento ?? '').replace(/[\s-]/g, '');
-  const iva = p.condicionIva ?? '';
+function validarDocumentoSocio(socio: SocioFacturacion): string | null {
+  const ident = identidadFacturacion(socio);
+  const tipo = ident.tipoDocumento ?? '';
+  const nro = (ident.numeroDocumento ?? '').replace(/[\s-]/g, '');
+  const iva = ident.condicionIva ?? '';
 
   const requiereCuit = iva === 'responsable_inscripto' || iva === 'monotributo';
   if (requiereCuit && tipo !== 'cuit' && tipo !== 'cuil') {
-    return 'La condición IVA del socio requiere tipo de documento CUIT/CUIL. Actualizá los datos del socio.';
+    return socio.facturaFiscal
+      ? 'La condición frente al IVA en Datos Personales requiere CUIT/CUIL, pero el documento cargado es otro. Revisá los datos del socio.'
+      : 'La condición IVA del socio requiere tipo de documento CUIT/CUIL. Actualizá los Datos Impositivos del socio.';
   }
 
   if ((tipo === 'cuit' || tipo === 'cuil') && !/^\d{11}$/.test(nro)) {
@@ -262,6 +305,8 @@ export async function crearFacturaCore(
       direccion: profiles.direccion,
       direccionFiscal: profiles.direccionFiscal,
       condicionIva: profiles.condicionIva,
+      condicionIvaPersonal: profiles.condicionIvaPersonal,
+      facturaFiscal: memberships.facturaFiscal,
     })
     .from(profiles)
     .innerJoin(memberships, eq(memberships.userId, profiles.id))
@@ -277,11 +322,7 @@ export async function crearFacturaCore(
 
   // 1.a Validar documento del socio antes de llamar a tusfacturas (evita
   // errores crípticos tipo "Error al crear al cliente").
-  const validacionSocio = validarDocumentoSocio({
-    tipoDocumento: socio.tipoDocumento,
-    numeroDocumento: socio.numeroDocumento,
-    condicionIva: socio.condicionIva,
-  });
+  const validacionSocio = validarDocumentoSocio(socio);
   if (validacionSocio) return { error: validacionSocio };
 
   // 1.b Traer POS + creds propias de la guardería.
@@ -824,8 +865,14 @@ export async function emitirNotaCreditoAction(data: EmitirNcData): Promise<Emiti
       direccion: profiles.direccion,
       direccionFiscal: profiles.direccionFiscal,
       condicionIva: profiles.condicionIva,
+      condicionIvaPersonal: profiles.condicionIvaPersonal,
+      facturaFiscal: memberships.facturaFiscal,
     })
     .from(profiles)
+    .innerJoin(
+      memberships,
+      and(eq(memberships.userId, profiles.id), eq(memberships.guarderiaId, gId)),
+    )
     .where(eq(profiles.id, original.socioId!))
     .limit(1);
 

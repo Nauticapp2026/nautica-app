@@ -132,6 +132,7 @@ const EMPTY_FORM = {
   cuit: '',
   direccionFiscal: '',
   condicionIva: '',
+  condicionIvaPersonal: '',
   condicionIibb: '',
   embarcacionNombre: '',
   matricula: '',
@@ -188,7 +189,9 @@ type AdjuntoInput = { file: File; tipo: TipoDocAdjunto };
 function CrearSocioModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const router = useRouter();
   const [form, setForm] = useState(EMPTY_FORM);
-  const [facturaFiscal, setFacturaFiscal] = useState(true);
+  // true = facturar con datos personales (Generales); false = con Datos Impositivos.
+  // Default false: por defecto se factura con los Datos Impositivos.
+  const [facturaFiscal, setFacturaFiscal] = useState(false);
   const [esloraUnidad, setEsloraUnidad] = useState<'m' | 'ft'>('m');
   const [astilleroSel, setAstilleroSel] = useState('');
   const [adjuntos, setAdjuntos] = useState<AdjuntoInput[]>([]);
@@ -212,7 +215,7 @@ function CrearSocioModal({ open, onClose }: { open: boolean; onClose: () => void
 
   function handleClose() {
     setForm(EMPTY_FORM);
-    setFacturaFiscal(true);
+    setFacturaFiscal(false);
     setEsloraUnidad('m');
     setAstilleroSel('');
     setAdjuntos([]);
@@ -375,6 +378,20 @@ function CrearSocioModal({ open, onClose }: { open: boolean; onClose: () => void
                   />
                 </Field>
               </div>
+              <Field label="Condición frente al IVA">
+                <select
+                  className={inputCls}
+                  value={form.condicionIvaPersonal}
+                  onChange={set('condicionIvaPersonal')}
+                >
+                  <option value="">Seleccione...</option>
+                  {CONDICION_IVA_OPTS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
               <Field label="Dirección" required>
                 <input
                   className={inputCls}
@@ -447,37 +464,7 @@ function CrearSocioModal({ open, onClose }: { open: boolean; onClose: () => void
                     <input
                       type="checkbox"
                       checked={facturaFiscal}
-                      onChange={(e) => {
-                        const checked = e.target.checked;
-                        setFacturaFiscal(checked);
-                        if (checked) {
-                          const nombreCompleto = [form.nombre.trim(), form.apellido.trim()]
-                            .filter(Boolean)
-                            .join(' ');
-                          const domicilio = [
-                            form.direccion.trim(),
-                            form.ciudad.trim(),
-                            form.provincia.trim(),
-                            form.codigoPostal.trim(),
-                          ]
-                            .filter(Boolean)
-                            .join(', ');
-                          setForm((f) => ({
-                            ...f,
-                            razonSocial: nombreCompleto,
-                            direccionFiscal: domicilio,
-                          }));
-                        } else {
-                          setForm((f) => ({
-                            ...f,
-                            razonSocial: '',
-                            cuit: '',
-                            direccionFiscal: '',
-                            condicionIva: '',
-                            condicionIibb: '',
-                          }));
-                        }
-                      }}
+                      onChange={(e) => setFacturaFiscal(e.target.checked)}
                       className="h-3.5 w-3.5 cursor-pointer accent-[#175861]"
                     />
                     <span className="text-xs text-gray-500">
@@ -486,7 +473,12 @@ function CrearSocioModal({ open, onClose }: { open: boolean; onClose: () => void
                   </label>
                 }
               />
-              {facturaFiscal && (
+              {facturaFiscal ? (
+                <p className="text-xs text-gray-500">
+                  Se facturará con los datos personales (Generales). Completá la condición frente al
+                  IVA en la sección Datos Personales.
+                </p>
+              ) : (
                 <div className="space-y-3">
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <Field label="Razón social">

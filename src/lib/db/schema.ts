@@ -404,6 +404,10 @@ export const profiles = pgTable('profiles', {
   numeroDocumento: text('numero_documento'),
   tipoDocumento: tipoDocumentoEnum('tipo_documento'),
   condicionIva: condicionFrenteIvaEnum('condicion_iva'),
+  // Condición frente al IVA de la identidad PERSONAL (pestaña Generales). Se usa
+  // cuando se factura con datos personales (memberships.facturaFiscal = true).
+  // condicionIva (arriba) es la de los Datos Impositivos / razón social.
+  condicionIvaPersonal: condicionFrenteIvaEnum('condicion_iva_personal'),
   razonSocial: text('razon_social'),
   sede: text('sede'),
   usertoken: text('usertoken'),
@@ -430,7 +434,12 @@ export const memberships = pgTable(
     rol: rolEnum('rol').notNull().default('socio'),
     status: membershipStatusEnum('status').default('active').notNull(),
     numeroSocio: integer('numero_socio'),
-    facturaFiscal: boolean('factura_fiscal').notNull().default(true),
+    // Semántica: true = facturar con los datos PERSONALES del socio (pestaña
+    // Generales: nombre/apellido, DNI, dirección, condicionIvaPersonal).
+    // false = facturar con los Datos Impositivos (razón social, CUIT, dirección
+    // fiscal, condicionIva). El nombre de la columna quedó histórico; NO indica
+    // "factura fiscal sí/no". Default false = se factura con Datos Impositivos.
+    facturaFiscal: boolean('factura_fiscal').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },

@@ -42,6 +42,7 @@ export type CreateSocioData = {
   cuit: string;
   direccionFiscal: string;
   condicionIva: string;
+  condicionIvaPersonal: string;
   condicionIibb: string;
   embarcacionNombre: string;
   matricula: string;
@@ -127,6 +128,7 @@ export async function createSocioAction(data: CreateSocioData): Promise<SocioRes
           cuit: data.cuit.trim() || null,
           direccionFiscal: data.direccionFiscal.trim() || null,
           condicionIva: (data.condicionIva || null) as never,
+          condicionIvaPersonal: (data.condicionIvaPersonal || null) as never,
           condicionIibb: (data.condicionIibb || null) as never,
           estadoSocio: 'activo',
         })
@@ -148,6 +150,7 @@ export async function createSocioAction(data: CreateSocioData): Promise<SocioRes
             cuit: data.cuit.trim() || null,
             direccionFiscal: data.direccionFiscal.trim() || null,
             condicionIva: (data.condicionIva || null) as never,
+            condicionIvaPersonal: (data.condicionIvaPersonal || null) as never,
             condicionIibb: (data.condicionIibb || null) as never,
             estadoSocio: 'activo',
           },
@@ -207,6 +210,7 @@ export type UpdateSocioData = {
   cuit: string;
   direccionFiscal: string;
   condicionIva: string;
+  condicionIvaPersonal: string;
   condicionIibb: string;
 };
 
@@ -272,6 +276,7 @@ export async function updateSocioAction(data: UpdateSocioData): Promise<{ error?
         cuit: data.cuit.trim() || null,
         direccionFiscal: data.direccionFiscal.trim() || null,
         condicionIva: (data.condicionIva || null) as never,
+        condicionIvaPersonal: (data.condicionIvaPersonal || null) as never,
         condicionIibb: (data.condicionIibb || null) as never,
       })
       .where(eq(profiles.id, data.socioId));

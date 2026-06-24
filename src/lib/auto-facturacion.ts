@@ -106,7 +106,13 @@ export async function runAutoEmision(
     const guardCondicionIva = guardRow?.condicionIva ?? null;
 
     const sociosRows = await db
-      .select({ socioId: memberships.userId, socioCondicionIva: profiles.condicionIva })
+      .select({
+        socioId: memberships.userId,
+        condicionIva: profiles.condicionIva,
+        condicionIvaPersonal: profiles.condicionIvaPersonal,
+        // true = factura con datos personales (Generales); false = Datos Impositivos.
+        facturaFiscal: memberships.facturaFiscal,
+      })
       .from(memberships)
       .innerJoin(profiles, eq(profiles.id, memberships.userId))
       .where(
@@ -117,7 +123,9 @@ export async function runAutoEmision(
         ),
       );
 
-    for (const { socioId, socioCondicionIva } of sociosRows) {
+    for (const { socioId, condicionIva, condicionIvaPersonal, facturaFiscal } of sociosRows) {
+      // Condición frente al IVA efectiva según el modo de facturación.
+      const socioCondicionIva = facturaFiscal ? condicionIvaPersonal : condicionIva;
       // 1. Idempotencia: si ya hay factura creada hoy, skip.
       const [yaHoy] = await db
         .select({ n: count() })

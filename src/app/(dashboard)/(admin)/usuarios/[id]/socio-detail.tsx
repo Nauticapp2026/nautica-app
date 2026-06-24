@@ -84,6 +84,7 @@ type SocioData = {
   cuit: string | null;
   direccionFiscal: string | null;
   condicionIva: string | null;
+  condicionIvaPersonal: string | null;
   condicionIibb: string | null;
   estadoSocio: string | null;
   deuda: string | null;
@@ -2196,6 +2197,7 @@ export function SocioDetail({
     cuit: socio.cuit ?? '',
     direccionFiscal: socio.direccionFiscal ?? '',
     condicionIva: socio.condicionIva ?? '',
+    condicionIvaPersonal: socio.condicionIvaPersonal ?? '',
     condicionIibb: socio.condicionIibb ?? '',
     numeroSocio: socio.numeroSocio != null ? String(socio.numeroSocio) : '',
   });
@@ -2236,6 +2238,7 @@ export function SocioDetail({
       cuit: socio.cuit ?? '',
       direccionFiscal: socio.direccionFiscal ?? '',
       condicionIva: socio.condicionIva ?? '',
+      condicionIvaPersonal: socio.condicionIvaPersonal ?? '',
       condicionIibb: socio.condicionIibb ?? '',
       numeroSocio: socio.numeroSocio != null ? String(socio.numeroSocio) : '',
     });
@@ -2553,6 +2556,29 @@ export function SocioDetail({
                   onChange={setField('numeroDocumento')}
                   readOnly={!editando}
                 />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold text-gray-500">
+                  Condición frente al IVA
+                </label>
+                <select
+                  className={inputCls}
+                  value={editForm.condicionIvaPersonal}
+                  onChange={setField('condicionIvaPersonal')}
+                  disabled={!editando}
+                >
+                  <option value="">—</option>
+                  {CONDICION_IVA_OPTS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1.5 text-xs text-gray-400">
+                  Se usa cuando el socio factura con datos personales.
+                </p>
               </div>
             </div>
             <div>
@@ -3333,7 +3359,9 @@ function ImpositivosTab({
         toast.error(res.error);
         setFacturaFiscal(!checked);
       } else {
-        toast.success(checked ? 'Habilitado para facturación' : 'Deshabilitado de facturación');
+        toast.success(
+          checked ? 'Facturará con datos personales' : 'Facturará con datos impositivos',
+        );
         router.refresh();
       }
     });
@@ -3348,7 +3376,8 @@ function ImpositivosTab({
             Usar datos personales para facturación
           </p>
           <p className="text-xs text-gray-500">
-            Si está activo, el socio aparece en el módulo de Facturación
+            Activado: factura con los datos de Generales (nombre, DNI, dirección). Desactivado:
+            factura con los Datos Impositivos (razón social, CUIT).
           </p>
         </div>
         <input

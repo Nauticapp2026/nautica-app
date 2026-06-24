@@ -333,13 +333,18 @@
 
 <p>Mostrá y editá los datos fiscales del socio: razón social, CUIT, dirección fiscal, condición frente al IVA e Ingresos Brutos.</p>
 
-<p><strong>Usar datos personales para facturación</strong> — checkbox en la parte superior de esta pestaña. Cuando está activo, el socio aparece en todos los flujos de emisión de comprobantes (factura individual, ventanilla y lote). Cuando está inactivo, el socio <strong>no aparece en ningún selector de facturación</strong> aunque tenga movimientos pendientes.</p>
+<p><strong>Usar datos personales para facturación</strong> — checkbox en la parte superior de esta pestaña. Define <strong>con qué datos se emiten los comprobantes</strong> del socio:</p>
+
+<ul><li><strong>Desactivado</strong> (valor por defecto): se factura con los <strong>Datos Impositivos</strong> (razón social, CUIT, dirección fiscal y condición frente al IVA de esta pestaña).</li><li><strong>Activado</strong>: se factura con los <strong>datos personales</strong> del socio (nombre y apellido, tipo y número de documento, dirección y condición frente al IVA cargados en la pestaña <strong>Generales</strong>).</li></ul>
+<blockquote><strong>Importante:</strong> todos los socios activos aparecen en los flujos de facturación (individual, ventanilla y lote). Este checkbox ya <strong>no</strong> controla si el socio aparece o no en el módulo: solo elige el conjunto de datos con el que se emite.</blockquote>
 
 <blockquote><strong>Campos requeridos para poder emitir factura AFIP al socio:</strong></blockquote>
 <p>></p>
-<blockquote>- <strong>Razón social</strong> — nombre legal del receptor del comprobante.<br>- <strong>CUIT</strong> — obligatorio para socios con condición IVA Responsable Inscripto o Monotributo (11 dígitos sin guiones). Para Consumidor Final el documento puede ser DNI.<br>- <strong>Condición frente al IVA</strong> — determina el tipo de comprobante (A, B o C).<br>- <strong>Dirección fiscal</strong> — requerida para el encabezado del comprobante.</blockquote>
+<blockquote>Según el modo elegido, el receptor del comprobante necesita: <strong>razón social / nombre</strong>, <strong>documento</strong> (CUIT para Responsable Inscripto o Monotributo —11 dígitos sin guiones—; DNI válido para Consumidor Final), <strong>condición frente al IVA</strong> (determina si es comprobante A, B o C) y <strong>dirección</strong>.</blockquote>
 <p>></p>
-<blockquote>Si alguno de estos datos falta, la emisión puede fallar o generar un rechazo de AFIP. Completá esta pestaña antes de intentar facturar al socio.</blockquote>
+<blockquote>- Con el checkbox <strong>desactivado</strong> estos datos salen de la pestaña Datos Impositivos.<br>- Con el checkbox <strong>activado</strong> salen de la pestaña Generales (incluida la nueva <strong>Condición frente al IVA</strong> de datos personales).</blockquote>
+<p>></p>
+<blockquote>Si alguno de estos datos falta en el modo elegido, la emisión puede fallar o generar un rechazo de AFIP. Completalos antes de intentar facturar al socio.</blockquote>
 
 <h4>Pestaña Embarcación</h4>
 
@@ -616,10 +621,10 @@
 <p><strong>Del club</strong> (Configuración → Información general):</p>
 
 <ul><li>CUIT del club</li><li>Condición frente al IVA</li><li>Punto de Venta configurado y Certificado AFIP confirmado</li></ul>
-<p><strong>Del socio</strong> (perfil → pestaña Datos Impositivos):</p>
+<p><strong>Del socio</strong> (perfil):</p>
 
-<ul><li><strong>Usar datos personales para facturación</strong> — debe estar activo (de lo contrario el socio no aparece en ningún selector de facturación).</li><li><strong>Razón social</strong> — nombre legal que figura en el comprobante.</li><li><strong>CUIT</strong> — obligatorio para Responsable Inscripto y Monotributo (11 dígitos). Para Consumidor Final se acepta DNI.</li><li><strong>Condición frente al IVA</strong> — define si se emite Factura A, B o C.</li><li><strong>Dirección fiscal</strong> — requerida para el encabezado del comprobante.</li></ul>
-<p>Si alguno de estos datos falta en el socio, el sistema puede rechazar la emisión o TusFacturas puede devolver un error de AFIP. Completá la pestaña <strong>Datos Impositivos</strong> del socio antes de intentar facturarle.</p>
+<ul><li><strong>Usar datos personales para facturación</strong> — elige con qué datos se emite: desactivado usa los <strong>Datos Impositivos</strong>; activado usa los datos de <strong>Generales</strong>.</li><li><strong>Razón social / nombre</strong> — nombre que figura en el comprobante (razón social si es por Datos Impositivos; nombre y apellido si es por datos personales).</li><li><strong>CUIT / documento</strong> — CUIT obligatorio para Responsable Inscripto y Monotributo (11 dígitos). Para Consumidor Final se acepta DNI.</li><li><strong>Condición frente al IVA</strong> — define si se emite Factura A, B o C. Está en Datos Impositivos y, para datos personales, en Generales.</li><li><strong>Dirección</strong> — requerida para el encabezado del comprobante (fiscal o personal según el modo).</li></ul>
+<p>Si alguno de estos datos falta en el modo elegido, el sistema puede rechazar la emisión o TusFacturas puede devolver un error de AFIP. Completalos antes de intentar facturarle.</p>
 
 <h3>Resumen de facturación</h3>
 

@@ -97,6 +97,9 @@ export default async function FacturacionPage() {
         razonSocial: profiles.razonSocial,
         numeroDocumento: profiles.numeroDocumento,
         condicionIva: profiles.condicionIva,
+        condicionIvaPersonal: profiles.condicionIvaPersonal,
+        // true = factura con datos personales (Generales); false = Datos Impositivos.
+        facturaFiscal: memberships.facturaFiscal,
         pendientes: sql<number>`count(${movimientosCuentaCorriente.id})::int`,
         pendienteTotal: sql<string>`coalesce(sum(${movimientosCuentaCorriente.debe}), '0')::text`,
       })
@@ -114,10 +117,9 @@ export default async function FacturacionPage() {
           eq(memberships.guarderiaId, gId),
           eq(memberships.rol, 'socio'),
           eq(memberships.status, 'active'),
-          eq(memberships.facturaFiscal, true),
         ),
       )
-      .groupBy(profiles.id)
+      .groupBy(profiles.id, memberships.facturaFiscal)
       .orderBy(profiles.apellido, profiles.nombre),
 
     db
@@ -166,7 +168,6 @@ export default async function FacturacionPage() {
           eq(memberships.guarderiaId, gId),
           eq(memberships.rol, 'socio'),
           eq(memberships.status, 'active'),
-          eq(memberships.facturaFiscal, true),
         ),
       )
       .leftJoin(servicios, eq(servicios.id, movimientosCuentaCorriente.servicioId))
@@ -219,6 +220,8 @@ export default async function FacturacionPage() {
     email: s.email,
     numeroDocumento: s.numeroDocumento ?? '',
     condicionIva: s.condicionIva ?? null,
+    condicionIvaPersonal: s.condicionIvaPersonal ?? null,
+    facturaFiscal: s.facturaFiscal,
     pendientes: s.pendientes,
     pendienteTotal: s.pendienteTotal,
     movimientos: movsBySocio.get(s.profileId) ?? [],
