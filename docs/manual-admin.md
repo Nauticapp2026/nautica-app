@@ -224,7 +224,7 @@ Arriba de la tabla hay tres tarjetas: **Ingresos por venta**, **Cobranzas** y **
 **Filtros.** Sobre la tabla podés filtrar los movimientos por:
 
 - **Desde / Hasta** — rango de fechas.
-- **Estado** — Pagado o En Plazo.
+- **Estado** — Pagado o En Plazo. Un cargo figura **Pagado** cuando los pagos registrados alcanzan a cubrirlo (se asignan del más viejo al más nuevo); si todavía no está cubierto, figura **En Plazo**.
 - **Tipo de comprobante** — Factura A/B/C, Recibo, Nota de crédito o Sin comprobante.
 
 Al aplicar filtros, las tarjetas de **Ingresos por venta** y **Cobranzas** muestran los totales de lo filtrado. La tarjeta de **Saldo** siempre muestra el saldo real del socio (no se ve afectada por los filtros).
@@ -354,7 +354,7 @@ Cada tarjeta muestra:
 ### Visibilidad según estado
 
 - **Salida programada** — solo se muestran las salidas del día en curso. Las del futuro se ocultarán hasta que llegue su fecha.
-- **Guardada** — las embarcaciones guardadas durante el día aparecen en esa columna. Al día siguiente desaparecen del tablero automáticamente.
+- **Guardada** — las embarcaciones guardadas aparecen en esa columna. Pasadas **24 horas** desde que se guardaron, la tarea desaparece del tablero y se **borra automáticamente** (no queda en el historial).
 - **Lavado lista** — cuando marcás un lavado como **Lista**, la tarjeta se mantiene visible el resto del día y desaparece sola al día siguiente.
 
 ### Crear una tarea
@@ -391,6 +391,7 @@ Las solicitudes de lavado que llegan desde la app mobile aparecen en la columna 
 
 - La solicitud puede estar en estado: **Pendiente**, **Aceptada**, **Lista** o **Cancelada**.
 - Para cancelar una solicitud de lavado, hacé clic en la opción correspondiente e ingresá el motivo (ej. "No tenemos turno disponible para ese día").
+- En una tarea de lavado, la **embarcación** y la **fecha/hora** vienen de la solicitud del socio y **no se pueden editar** desde la web (quedan de solo lectura). Sí podés editar el resto (nota, operario, estado).
 
 ---
 

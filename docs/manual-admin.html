@@ -385,7 +385,7 @@
 <ul><li><strong>Agregar servicio</strong> (Cargar consumo) — registrá un servicio o cargo adicional. El campo Fecha se pre-carga con el día de hoy; podés cambiarlo si el cargo corresponde a otra fecha.</li><li><strong>Informar pago</strong> (Registrar pago) — registrá un pago recibido sin emitir factura (el saldo queda como "saldo a favor" en la cuenta).</li><li><strong>Marcar como pagadas</strong> — seleccioná una o más facturas con la casilla de verificación y hacé clic en este botón para registrarlas como cobradas. Te pedirá el medio de pago.</li></ul>
 <p><strong>Filtros.</strong> Sobre la tabla podés filtrar los movimientos por:</p>
 
-<ul><li><strong>Desde / Hasta</strong> — rango de fechas.</li><li><strong>Estado</strong> — Pagado o En Plazo.</li><li><strong>Tipo de comprobante</strong> — Factura A/B/C, Recibo, Nota de crédito o Sin comprobante.</li></ul>
+<ul><li><strong>Desde / Hasta</strong> — rango de fechas.</li><li><strong>Estado</strong> — Pagado o En Plazo. Un cargo figura <strong>Pagado</strong> cuando los pagos registrados alcanzan a cubrirlo (se asignan del más viejo al más nuevo); si todavía no está cubierto, figura <strong>En Plazo</strong>.</li><li><strong>Tipo de comprobante</strong> — Factura A/B/C, Recibo, Nota de crédito o Sin comprobante.</li></ul>
 <p>Al aplicar filtros, las tarjetas de <strong>Ingresos por venta</strong> y <strong>Cobranzas</strong> muestran los totales de lo filtrado. La tarjeta de <strong>Saldo</strong> siempre muestra el saldo real del socio (no se ve afectada por los filtros).</p>
 
 <p>La tabla incluye una columna <strong>Tipo de comprobante</strong> (antes del Nº de comprobante) que indica el tipo de factura asociada a cada movimiento.</p>
@@ -479,7 +479,7 @@
 <ul><li><strong>Nombre del socio</strong> (arriba, en gris).</li><li><strong>Nombre de la embarcación</strong> (en negrita).</li><li><strong>Ubicación</strong> — nave y/o número de espacio donde está guardada la embarcación (ej. "Nave A — A-12"). Aparece si el espacio está asignado en el sistema.</li><li><strong>Para el DD/MM</strong> — solo en tarjetas de lavado: la fecha en que el socio pidió que el lavado esté listo.</li><li><strong>Descripción / nota</strong> — si la tarea tiene texto.</li></ul>
 <h3>Visibilidad según estado</h3>
 
-<ul><li><strong>Salida programada</strong> — solo se muestran las salidas del día en curso. Las del futuro se ocultarán hasta que llegue su fecha.</li><li><strong>Guardada</strong> — las embarcaciones guardadas durante el día aparecen en esa columna. Al día siguiente desaparecen del tablero automáticamente.</li><li><strong>Lavado lista</strong> — cuando marcás un lavado como <strong>Lista</strong>, la tarjeta se mantiene visible el resto del día y desaparece sola al día siguiente.</li></ul>
+<ul><li><strong>Salida programada</strong> — solo se muestran las salidas del día en curso. Las del futuro se ocultarán hasta que llegue su fecha.</li><li><strong>Guardada</strong> — las embarcaciones guardadas aparecen en esa columna. Pasadas <strong>24 horas</strong> desde que se guardaron, la tarea desaparece del tablero y se <strong>borra automáticamente</strong> (no queda en el historial).</li><li><strong>Lavado lista</strong> — cuando marcás un lavado como <strong>Lista</strong>, la tarjeta se mantiene visible el resto del día y desaparece sola al día siguiente.</li></ul>
 <h3>Crear una tarea</h3>
 
 <ol><li>Hacé clic en el botón <strong>+</strong> de la columna correspondiente, o en <strong>Nueva tarea</strong> (si lo tiene el header).</li><li>Completá el formulario:</li></ol>   - <strong>Descripción</strong> <em>(requerida)</em> — qué hay que hacer.
@@ -506,7 +506,7 @@
 
 <p>Las solicitudes de lavado que llegan desde la app mobile aparecen en la columna <strong>Lavado</strong>. Cada tarjeta muestra el nombre de la embarcación, su ubicación en el club y la fecha para la que el socio pidió que el lavado esté listo.</p>
 
-<ul><li>La solicitud puede estar en estado: <strong>Pendiente</strong>, <strong>Aceptada</strong>, <strong>Lista</strong> o <strong>Cancelada</strong>.</li><li>Para cancelar una solicitud de lavado, hacé clic en la opción correspondiente e ingresá el motivo (ej. "No tenemos turno disponible para ese día").</li></ul>
+<ul><li>La solicitud puede estar en estado: <strong>Pendiente</strong>, <strong>Aceptada</strong>, <strong>Lista</strong> o <strong>Cancelada</strong>.</li><li>Para cancelar una solicitud de lavado, hacé clic en la opción correspondiente e ingresá el motivo (ej. "No tenemos turno disponible para ese día").</li><li>En una tarea de lavado, la <strong>embarcación</strong> y la <strong>fecha/hora</strong> vienen de la solicitud del socio y <strong>no se pueden editar</strong> desde la web (quedan de solo lectura). Sí podés editar el resto (nota, operario, estado).</li></ul>
 <hr>
 
 <h2>7. Espacios</h2>
