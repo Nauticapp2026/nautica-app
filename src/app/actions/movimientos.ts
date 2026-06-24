@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { db } from '@/lib/db';
 import { memberships, movimientosCuentaCorriente } from '@/lib/db/schema';
 import { getActiveMarina } from '@/lib/auth/session';
+import { fechaCalendariaArg } from '@/lib/dates';
 import { and, eq, inArray } from 'drizzle-orm';
 
 function isAdmin(ctx: NonNullable<Awaited<ReturnType<typeof getActiveMarina>>>): boolean {
@@ -71,7 +72,8 @@ export async function addMovimientoAction(data: AddMovimientoData): Promise<{ er
       tipo: 'otro',
       estado,
       debe: data.monto || '0',
-      fecha: data.fecha ? new Date(data.fecha) : new Date(),
+      fecha: data.fecha ? fechaCalendariaArg(data.fecha) : new Date(),
+      createdBy: ctx.user.id,
       ...(estado === 'pagado' && data.formaDePago
         ? {
             formaDePago: data.formaDePago as never,
@@ -155,6 +157,7 @@ export async function marcarPagadasAction(data: MarcarPagadasData): Promise<{ er
             haber: importe,
             importeSigned: `-${importe}`,
             fecha: new Date(),
+            createdBy: ctx.user.id,
           });
         } else {
           const importe = Math.abs(diff).toFixed(2);
@@ -167,6 +170,7 @@ export async function marcarPagadasAction(data: MarcarPagadasData): Promise<{ er
             haber: '0',
             importeSigned: importe,
             fecha: new Date(),
+            createdBy: ctx.user.id,
           });
         }
       }
@@ -224,9 +228,10 @@ export async function informarPagoAction(
         debe: '0',
         haber: importe,
         importeSigned: `-${importe}`,
-        fecha: data.fecha ? new Date(data.fecha) : new Date(),
+        fecha: data.fecha ? fechaCalendariaArg(data.fecha) : new Date(),
         formaDePago: data.formaDePago as never,
         datosPago: data.datosPago ?? null,
+        createdBy: ctx.user.id,
       })
       .returning({ id: movimientosCuentaCorriente.id });
     revalidatePath(`/usuarios/${data.socioId}`);
@@ -315,7 +320,7 @@ export async function updateMovimientoAction(data: {
       .update(movimientosCuentaCorriente)
       .set({
         concepto: data.concepto.trim() || null,
-        fecha: new Date(data.fecha),
+        fecha: fechaCalendariaArg(data.fecha),
       })
       .where(eq(movimientosCuentaCorriente.id, data.movimientoId));
 

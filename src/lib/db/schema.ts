@@ -973,6 +973,9 @@ export const movimientosCuentaCorriente = pgTable(
     importeSigned: numeric('importe_signed', { precision: 12, scale: 2 }).default('0'),
     fecha: timestamp('fecha', { withTimezone: true }).defaultNow(),
     proximoPago: timestamp('proximo_pago', { withTimezone: true }),
+    // Quién creó el movimiento (cargo o pago). NULL = sistema (cron mensual /
+    // cobro Payway). Se completa desde los server actions.
+    createdBy: uuid('created_by').references(() => profiles.id, { onDelete: 'set null' }),
     formaDePago: medioPagoEnum('forma_de_pago'),
     // Transferencia bancaria
     bancoTransferencia: text('banco_transferencia'),
@@ -1002,6 +1005,7 @@ export const movimientosCuentaCorriente = pgTable(
   (t) => [
     index('movimientos_socio_idx').on(t.socioId),
     index('movimientos_servicio_idx').on(t.servicioId),
+    index('movimientos_created_by_idx').on(t.createdBy),
   ],
 );
 

@@ -14,6 +14,15 @@ const LOCALE = 'es-AR';
 
 const PLACEHOLDER = '—';
 
+// Convierte una fecha-calendario 'YYYY-MM-DD' (el día tal cual lo eligió el
+// usuario) a un Date que, al renderizarse en hora Argentina (UTC-3), cae SIEMPRE
+// en ese mismo día. Se ancla al mediodía UTC para que el offset nunca cruce el
+// límite del día. Usar esto en vez de `new Date('YYYY-MM-DD')` (que es medianoche
+// UTC y en ART retrocede un día) al guardar fechas elegidas por el usuario.
+export function fechaCalendariaArg(ymd: string): Date {
+  return new Date(`${ymd}T12:00:00.000Z`);
+}
+
 function toDate(value: string | Date | null | undefined): Date | null {
   if (!value) return null;
   const d = typeof value === 'string' ? new Date(value) : value;

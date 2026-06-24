@@ -613,6 +613,7 @@ export async function cancelarServicioAction(input: unknown) {
         debe: monto,
         fecha: new Date(fecha),
         estado: 'no_pagado',
+        createdBy: ctx.user.id,
       });
     }
 

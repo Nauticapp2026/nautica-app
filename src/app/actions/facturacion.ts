@@ -15,6 +15,7 @@ import {
   profiles,
 } from '@/lib/db/schema';
 import { getActiveMarina } from '@/lib/auth/session';
+import { fechaCalendariaArg } from '@/lib/dates';
 import {
   crearFactura,
   toTusFecha,
@@ -462,10 +463,10 @@ export async function crearFacturaCore(
       condicionVenta: data.condicionVenta,
       medioPago: data.medioPago,
       importe: total.toFixed(2),
-      emision: new Date(data.fecha),
-      desde: new Date(data.desde),
-      hasta: new Date(data.hasta),
-      vencimiento: new Date(data.vencimiento),
+      emision: fechaCalendariaArg(data.fecha),
+      desde: fechaCalendariaArg(data.desde),
+      hasta: fechaCalendariaArg(data.hasta),
+      vencimiento: fechaCalendariaArg(data.vencimiento),
       externalReference: facturaId,
     });
 
@@ -745,7 +746,7 @@ export async function crearReciboInternoAction(
   try {
     const id = randomUUID();
     const codigo = `RCP-${id.slice(-6).toUpperCase()}`;
-    const emision = data.fecha ? new Date(data.fecha) : new Date();
+    const emision = data.fecha ? fechaCalendariaArg(data.fecha) : new Date();
 
     await db.insert(facturacion).values({
       id,
@@ -997,6 +998,7 @@ export async function emitirNotaCreditoAction(data: EmitirNcData): Promise<Emiti
         haber: ncImporte.toFixed(2),
         importeSigned: `-${ncImporte.toFixed(2)}`,
         fecha: new Date(),
+        createdBy: ctx.user.id,
       });
     }
 
@@ -1074,7 +1076,8 @@ export async function ventanillaEmitirFacturaAction(data: VentanillaData): Promi
         debe: importe,
         haber: '0',
         importeSigned: importe,
-        fecha: new Date(data.fecha),
+        fecha: fechaCalendariaArg(data.fecha),
+        createdBy: ctx.user.id,
       })
       .returning({ id: movimientosCuentaCorriente.id });
     movimientoIds.push(inserted.id);
