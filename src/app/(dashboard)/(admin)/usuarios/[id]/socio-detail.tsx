@@ -3127,7 +3127,7 @@ export function SocioDetail({
               {invitados.map((iv) => {
                 const nombreCompleto = [iv.nombre, iv.apellido].filter(Boolean).join(' ') || '—';
                 const inicial = (iv.nombre?.[0] ?? '?').toUpperCase();
-                const tipoLabel = iv.tipo === 'titular' ? 'Titular' : 'Autorizado';
+                const tipoLabel = iv.tipo === 'titular' ? 'Invitado' : 'Autorizado';
                 return (
                   <div
                     key={iv.id}
