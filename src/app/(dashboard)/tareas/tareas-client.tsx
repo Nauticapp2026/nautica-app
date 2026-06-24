@@ -673,6 +673,7 @@ export function TareasClient({
   };
 
   const filtradas = useMemo(() => {
+    const ahoraMs = new Date().getTime();
     return tareas.filter((t) => {
       if (filterOperario && t.operarioId !== filterOperario) return false;
       if (filterEmbarcacion && t.embarcacionId !== filterEmbarcacion) return false;
@@ -683,9 +684,12 @@ export function TareasClient({
         const dia = fechaArYmd(t.fechaHora);
         return dia === hoyAr;
       }
-      // Guardadas: desaparecen al día siguiente (terminal del día).
+      // Guardadas: desaparecen a las 24 hs de guardadas (y un cron las borra
+      // físicamente). Se ocultan acá apenas pasan las 24 hs aunque el cron
+      // todavía no haya corrido.
       if (t.estado === 'guardada') {
-        return fechaArYmd(t.updatedAt) === hoyAr;
+        if (!t.updatedAt) return true;
+        return ahoraMs - new Date(t.updatedAt).getTime() < 24 * 60 * 60 * 1000;
       }
       // Lavado lista: se muestra el resto del día y desaparece al siguiente.
       if (t.estado === 'lavado' && t.solicitudLavadoEstado === 'lista') {
