@@ -624,6 +624,8 @@ El tipo de comprobante se determina automáticamente para cada socio según la c
 
 > La facturación mensual automática corre el día del mes que configuraste en **Configuración → Información general** (campo "Día de facturación"). Solo aplica a socios que ya tuvieron al menos una factura emitida.
 
+**¿Qué conceptos entran en la factura automática?** La factura incluye **todos los cargos pendientes** del socio: la mensualidad del espacio que el sistema genera ese día **más cualquier consumo cargado durante el mes que siga pendiente**. No entran los pagos ni saldos a favor, ni los cargos que ya estaban facturados (no se duplican). Importante: como todo consumo cargado desde **Cargar consumo** queda pendiente, cada consumo no cobrado antes del día de facturación se va a incluir en la factura mensual del socio.
+
 ### Recibos internos
 
 Los recibos internos son comprobantes de pago propios del club, sin intervención de AFIP. Son útiles para registrar cobros cuando todavía no tenés el certificado AFIP configurado, o para socios que no requieren factura fiscal.
@@ -875,6 +877,8 @@ No hace falta hacer nada. El día de facturación configurado en tu club, el sis
 3. Cobra via débito automático a todos los socios con tarjeta registrada.
 
 Cuando el cobro se aprueba, se registra un pago **Pago — Débito automático** en la cuenta corriente del socio y su saldo queda saldado. El monto cobrado es el **saldo real** del socio (todos los cargos pendientes menos los pagos ya registrados), no la suma de cargos sin descontar lo ya pagado.
+
+> **La factura y el cobro de Payway no toman lo mismo.** La **factura** documenta los **cargos pendientes** del socio (mensualidad + consumos del mes) y los marca como facturados. El **cobro de Payway** toma el **saldo neto** de toda la cuenta corriente: todo lo que el socio debe (`debe`) menos todo lo que ya pagó (`haber`). En el caso normal (factura recién emitida y nada pagado todavía) los dos montos coinciden, pero si el socio tenía saldo a favor o pagos parciales, **Payway cobra menos que el total facturado** ese día. Si el saldo neto es cero o está a favor del socio, no se genera cobro.
 
 ### Ver el historial de cobros
 

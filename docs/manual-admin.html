@@ -672,6 +672,8 @@
 
 <blockquote>La facturación mensual automática corre el día del mes que configuraste en <strong>Configuración → Información general</strong> (campo "Día de facturación"). Solo aplica a socios que ya tuvieron al menos una factura emitida.</blockquote>
 
+<p><strong>¿Qué conceptos entran en la factura automática?</strong> La factura incluye <strong>todos los cargos pendientes</strong> del socio: la mensualidad del espacio que el sistema genera ese día <strong>más cualquier consumo cargado durante el mes que siga pendiente</strong>. No entran los pagos ni saldos a favor, ni los cargos que ya estaban facturados (no se duplican). Importante: como todo consumo cargado desde <strong>Cargar consumo</strong> queda pendiente, cada consumo no cobrado antes del día de facturación se va a incluir en la factura mensual del socio.</p>
+
 <h3>Recibos internos</h3>
 
 <p>Los recibos internos son comprobantes de pago propios del club, sin intervención de AFIP. Son útiles para registrar cobros cuando todavía no tenés el certificado AFIP configurado, o para socios que no requieren factura fiscal.</p>
@@ -860,6 +862,8 @@
 
 <ol><li>Genera los movimientos mensuales de cada espacio asignado.</li><li>Emite la factura automáticamente (para socios que ya tuvieron al menos una factura).</li><li>Cobra via débito automático a todos los socios con tarjeta registrada.</li></ol>
 <p>Cuando el cobro se aprueba, se registra un pago <strong>Pago — Débito automático</strong> en la cuenta corriente del socio y su saldo queda saldado. El monto cobrado es el <strong>saldo real</strong> del socio (todos los cargos pendientes menos los pagos ya registrados), no la suma de cargos sin descontar lo ya pagado.</p>
+
+<blockquote><strong>La factura y el cobro de Payway no toman lo mismo.</strong> La <strong>factura</strong> documenta los <strong>cargos pendientes</strong> del socio (mensualidad + consumos del mes) y los marca como facturados. El <strong>cobro de Payway</strong> toma el <strong>saldo neto</strong> de toda la cuenta corriente: todo lo que el socio debe (<code>debe</code>) menos todo lo que ya pagó (<code>haber</code>). En el caso normal (factura recién emitida y nada pagado todavía) los dos montos coinciden, pero si el socio tenía saldo a favor o pagos parciales, <strong>Payway cobra menos que el total facturado</strong> ese día. Si el saldo neto es cero o está a favor del socio, no se genera cobro.</blockquote>
 
 <h3>Ver el historial de cobros</h3>
 
