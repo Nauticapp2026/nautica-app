@@ -9,22 +9,24 @@
 -- los patrones reales de query del detalle de socio, el dashboard (morosos) y
 -- el listado de comprobantes.
 --
--- IMPORTANTE: se usa CREATE INDEX CONCURRENTLY para NO bloquear la tabla en
--- producción. CONCURRENTLY no puede correr dentro de una transacción — ejecutar
--- cada statement por separado en el SQL Editor de Supabase (o con un script que
--- no envuelva todo en una transacción). IF NOT EXISTS lo hace idempotente.
+-- NOTA: CREATE INDEX (sin CONCURRENTLY) toma un lock breve en la tabla, pero
+-- con el volumen actual es instantáneo, así que corre sin problema en el SQL
+-- Editor de Supabase. IF NOT EXISTS lo hace idempotente. Si en el futuro estas
+-- tablas crecen mucho y hay que recrear un índice sin bloquear, usar
+-- CONCURRENTLY desde una conexión directa (puerto 5432, fuera de transacción),
+-- NO desde el SQL Editor (que envuelve todo en una transacción).
 -- =============================================================================
 
 -- movimientos_cuenta_corriente
-CREATE INDEX CONCURRENTLY IF NOT EXISTS movimientos_socio_estado_idx
+CREATE INDEX IF NOT EXISTS movimientos_socio_estado_idx
   ON movimientos_cuenta_corriente (socio_id, estado);
 
-CREATE INDEX CONCURRENTLY IF NOT EXISTS movimientos_socio_fecha_idx
+CREATE INDEX IF NOT EXISTS movimientos_socio_fecha_idx
   ON movimientos_cuenta_corriente (socio_id, fecha);
 
 -- facturacion
-CREATE INDEX CONCURRENTLY IF NOT EXISTS facturacion_guarderia_estado_idx
+CREATE INDEX IF NOT EXISTS facturacion_guarderia_estado_idx
   ON facturacion (guarderia_id, estado);
 
-CREATE INDEX CONCURRENTLY IF NOT EXISTS facturacion_guarderia_emision_idx
+CREATE INDEX IF NOT EXISTS facturacion_guarderia_emision_idx
   ON facturacion (guarderia_id, emision);
