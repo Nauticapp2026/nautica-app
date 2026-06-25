@@ -98,7 +98,27 @@ export type MarcarPagadasData = {
 export async function marcarPagadasAction(data: MarcarPagadasData): Promise<{ error?: string }> {
   const ctx = await getActiveMarina();
   if (!ctx) return { error: 'No autenticado' };
+  if (!isAdmin(ctx)) return { error: 'Solo administradores pueden registrar pagos.' };
   if (!data.ids.length) return { error: 'No hay movimientos seleccionados.' };
+
+  // Scope multi-tenant: validar que TODOS los movimientos pertenezcan a un socio
+  // de la guardería activa antes de mutar. movimientos_cuenta_corriente no tiene
+  // guarderia_id, así que se ata vía la membership del socio. Sin esto, un admin
+  // podría marcar pagados movimientos de otra guardería (IDOR). RLS no cubre esto:
+  // Drizzle usa el pooler y no propaga la sesión de auth.
+  const validos = await db
+    .select({ id: movimientosCuentaCorriente.id })
+    .from(movimientosCuentaCorriente)
+    .innerJoin(memberships, eq(memberships.userId, movimientosCuentaCorriente.socioId))
+    .where(
+      and(
+        inArray(movimientosCuentaCorriente.id, data.ids),
+        eq(memberships.guarderiaId, ctx.activeMembership.guarderiaId),
+      ),
+    );
+  if (validos.length !== data.ids.length) {
+    return { error: 'Movimientos inválidos.' };
+  }
 
   const setData: Record<string, unknown> = {
     estado: 'pagado',
