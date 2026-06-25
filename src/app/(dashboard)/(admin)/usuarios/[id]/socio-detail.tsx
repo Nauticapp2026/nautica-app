@@ -750,15 +750,10 @@ function AgregarServicioModal({
   const [concepto, setConcepto] = useState('');
   const [monto, setMonto] = useState('');
   const [fecha, setFecha] = useState(todayISODate);
-  const [estadoPago, setEstadoPago] = useState<'no_pagado' | 'pagado'>('no_pagado');
-  const [formaDePago, setFormaDePago] = useState('');
-  const [datosPago, setDatosPago] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const isValid = Boolean(
-    servicioId && monto && (estadoPago === 'no_pagado' || Boolean(formaDePago)),
-  );
+  const isValid = Boolean(servicioId && monto);
 
   function handleServicioChange(e: React.ChangeEvent<HTMLSelectElement>) {
     const id = e.target.value;
@@ -772,9 +767,6 @@ function AgregarServicioModal({
     setConcepto('');
     setMonto('');
     setFecha(todayISODate());
-    setEstadoPago('no_pagado');
-    setFormaDePago('');
-    setDatosPago({});
     setError(null);
     onClose();
   }
@@ -788,10 +780,7 @@ function AgregarServicioModal({
         concepto,
         monto: montoToNumberStr(monto),
         fecha,
-        estado: estadoPago,
-        ...(estadoPago === 'pagado' && formaDePago
-          ? { formaDePago, datosPago: datosPago as Record<string, unknown> }
-          : {}),
+        estado: 'no_pagado',
       });
       if (res.error) {
         setError(res.error);
@@ -826,28 +815,6 @@ function AgregarServicioModal({
         <div className="border-t border-gray-200" />
 
         <div className="flex-1 space-y-4 overflow-y-auto p-6">
-          {/* Toggle Pendiente / Pagado */}
-          <div className="flex rounded-[10px] border border-gray-200 bg-gray-50 p-1">
-            <button
-              type="button"
-              onClick={() => {
-                setEstadoPago('no_pagado');
-                setFormaDePago('');
-                setDatosPago({});
-              }}
-              className={`flex-1 rounded-[8px] py-1.5 text-sm font-medium transition ${estadoPago === 'no_pagado' ? 'bg-white text-[#101828] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-            >
-              Pendiente
-            </button>
-            <button
-              type="button"
-              onClick={() => setEstadoPago('pagado')}
-              className={`flex-1 rounded-[8px] py-1.5 text-sm font-medium transition ${estadoPago === 'pagado' ? 'bg-white text-[#101828] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-            >
-              Pagado
-            </button>
-          </div>
-
           <div>
             <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
               Servicio
@@ -900,33 +867,6 @@ function AgregarServicioModal({
               />
             </div>
           </div>
-
-          {estadoPago === 'pagado' && (
-            <>
-              <Field label="Forma de pago">
-                <select
-                  className={inputCls}
-                  value={formaDePago}
-                  onChange={(e) => {
-                    setFormaDePago(e.target.value);
-                    setDatosPago({});
-                  }}
-                >
-                  <option value="">Seleccione una opción...</option>
-                  {FORMAS_PAGO.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-              <FormaPagoFields
-                formaDePago={formaDePago}
-                datosPago={datosPago}
-                setDatosPago={setDatosPago}
-              />
-            </>
-          )}
 
           {error && <p className="text-sm text-red-600">{error}</p>}
         </div>
