@@ -64,6 +64,7 @@ import {
 import { formatArgentinaDate, formatArgentinaDateTime, formatNaiveDateTime } from '@/lib/dates';
 import { ASTILLEROS } from '../astilleros';
 import { EmptyState } from '@/components/shared/empty-state';
+import { Pagination } from '@/components/shared/pagination';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -2150,6 +2151,21 @@ export function SocioDetail({
   const [ccEstado, setCcEstado] = useState('');
   const [ccTipoComp, setCcTipoComp] = useState('');
 
+  // Paginación client-side de la tabla de CC. El cálculo de saldo/estado (FIFO)
+  // y los filtros se siguen haciendo sobre TODO el dataset; solo se pagina el
+  // render para no pintar cientos de filas en el DOM. Al cambiar un filtro se
+  // vuelve a la primera página.
+  const CC_PAGE_SIZE = 20;
+  const [ccPage, setCcPage] = useState(1);
+  // Reset a la primera página cuando cambian los filtros. Patrón "ajustar estado
+  // en render" (recomendado por React) en vez de un efecto con setState.
+  const ccFiltroSig = `${ccFechaDesde}|${ccFechaHasta}|${ccEstado}|${ccTipoComp}`;
+  const [ccPrevFiltroSig, setCcPrevFiltroSig] = useState(ccFiltroSig);
+  if (ccFiltroSig !== ccPrevFiltroSig) {
+    setCcPrevFiltroSig(ccFiltroSig);
+    setCcPage(1);
+  }
+
   // Generales edit mode
   const [editando, setEditando] = useState(false);
   const [editForm, setEditForm] = useState({
@@ -2898,7 +2914,15 @@ export function SocioDetail({
                           </tr>
                         );
                       }
-                      return visibles.map((m) => {
+                      // Paginar el render (no el cálculo). Clamp por si la página
+                      // quedó fuera de rango al achicarse el set filtrado.
+                      const pageCount = Math.max(1, Math.ceil(visibles.length / CC_PAGE_SIZE));
+                      const pageSafe = Math.min(ccPage, pageCount);
+                      const pageItems = visibles.slice(
+                        (pageSafe - 1) * CC_PAGE_SIZE,
+                        pageSafe * CC_PAGE_SIZE,
+                      );
+                      return pageItems.map((m) => {
                         const venta = parseFloat(m.debe ?? '0');
                         const cobranza = parseFloat(m.haber ?? '0');
                         const esPago = cobranza > 0 && venta === 0;
@@ -2978,6 +3002,12 @@ export function SocioDetail({
                     })()}
                   </tbody>
                 </table>
+                <Pagination
+                  page={ccPage}
+                  totalItems={movimientosFiltrados.length}
+                  pageSize={CC_PAGE_SIZE}
+                  onPageChange={setCcPage}
+                />
               </div>
             </>
           )}
