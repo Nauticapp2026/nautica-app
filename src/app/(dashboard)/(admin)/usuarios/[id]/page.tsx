@@ -342,32 +342,44 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
   //    extrae el path y genera signed URL igual.
   //  - URL externa genuina (no Supabase): se usa tal cual.
   const admin = createAdminClient();
-  const documentosConUrl = await Promise.all(
-    documentosList.map(async (d) => {
-      let signedUrl: string | null = null;
-      if (d.documentoUrl) {
-        let path = d.documentoUrl;
-        const supabasePublicMatch = path.match(
-          /\/object\/(?:public|sign)\/documentos\/(.+?)(?:\?|$)/,
-        );
-        if (supabasePublicMatch) path = decodeURIComponent(supabasePublicMatch[1]);
 
-        if (/^https?:\/\//i.test(path)) {
-          signedUrl = path;
-        } else {
-          const { data } = await admin.storage.from('documentos').createSignedUrl(path, 60 * 60); // 1 hora
-          signedUrl = data?.signedUrl ?? null;
-        }
-      }
-      return {
-        id: d.id,
-        nombre: d.nombre,
-        tipo: d.tipo ?? null,
-        createdAt: d.createdAt.toISOString(),
-        signedUrl,
-      };
-    }),
-  );
+  // Resolver el path de cada documento (o marcarlo como URL externa que se usa
+  // tal cual). Después firmamos TODOS los paths del bucket en una sola request
+  // con createSignedUrls(), en vez de una llamada de red por documento.
+  const resueltos = documentosList.map((d) => {
+    if (!d.documentoUrl) return { d, kind: 'none' as const };
+    let path = d.documentoUrl;
+    const supabaseMatch = path.match(/\/object\/(?:public|sign)\/documentos\/(.+?)(?:\?|$)/);
+    if (supabaseMatch) path = decodeURIComponent(supabaseMatch[1]);
+    if (/^https?:\/\//i.test(path)) return { d, kind: 'url' as const, url: path };
+    return { d, kind: 'path' as const, path };
+  });
+
+  const pathsAFirmar: string[] = [];
+  for (const r of resueltos) {
+    if (r.kind === 'path') pathsAFirmar.push(r.path);
+  }
+
+  const firmadas = new Map<string, string>();
+  if (pathsAFirmar.length > 0) {
+    const { data } = await admin.storage.from('documentos').createSignedUrls(pathsAFirmar, 60 * 60); // 1 hora
+    for (const item of data ?? []) {
+      if (item.path && item.signedUrl) firmadas.set(item.path, item.signedUrl);
+    }
+  }
+
+  const documentosConUrl = resueltos.map((r) => {
+    let signedUrl: string | null = null;
+    if (r.kind === 'url') signedUrl = r.url;
+    else if (r.kind === 'path') signedUrl = firmadas.get(r.path) ?? null;
+    return {
+      id: r.d.id,
+      nombre: r.d.nombre,
+      tipo: r.d.tipo ?? null,
+      createdAt: r.d.createdAt.toISOString(),
+      signedUrl,
+    };
+  });
 
   function labelEspacio(e: {
     nomenclatura: string | null;
