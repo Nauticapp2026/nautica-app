@@ -292,28 +292,34 @@ export default async function DashboardPage() {
       ),
   ]);
 
-  // Socios con deuda 2+ meses + monto total a cobrar.
-  const morososIds = morososRows.map((r) => r.socioId);
-  let deudaTotal = '0';
-  if (morososIds.length > 0) {
-    const [{ totalDebe, totalHaber }] = await db
+  // Socios morosos + monto total a cobrar. `morososRows` son CANDIDATOS: tienen
+  // un cargo no_pagado de 2+ meses. Pero solo son morosos de verdad si su saldo
+  // NETO (todo el debe - todo el haber) sigue positivo. Sin el neto, un socio
+  // que pagó con "Registrar pago" (haber con estado 'pagado', cargos viejos
+  // quedan no_pagado) figuraba moroso para siempre. Mismo criterio que la card
+  // "Saldo" y el filtro de /usuarios.
+  const candidatosMorososIds = morososRows.map((r) => r.socioId);
+  const morososIds: string[] = [];
+  let deudaAcum = 0;
+  if (candidatosMorososIds.length > 0) {
+    const saldos = await db
       .select({
+        socioId: movimientosCuentaCorriente.socioId,
         totalDebe: sum(movimientosCuentaCorriente.debe),
         totalHaber: sum(movimientosCuentaCorriente.haber),
       })
       .from(movimientosCuentaCorriente)
-      .where(
-        and(
-          inArray(movimientosCuentaCorriente.socioId, morososIds),
-          eq(movimientosCuentaCorriente.estado, 'no_pagado'),
-        ),
-      );
-    // Saldo a cobrar = unpaid debes - haberes (pagos a cuenta no imputados).
-    // Si sale negativo (saldo a favor), devolvemos 0.
-    const debe = parseFloat(totalDebe ?? '0');
-    const haber = parseFloat(totalHaber ?? '0');
-    deudaTotal = String(Math.max(0, debe - haber));
+      .where(inArray(movimientosCuentaCorriente.socioId, candidatosMorososIds))
+      .groupBy(movimientosCuentaCorriente.socioId);
+    for (const s of saldos) {
+      const neto = parseFloat(s.totalDebe ?? '0') - parseFloat(s.totalHaber ?? '0');
+      if (neto > 0.001) {
+        morososIds.push(s.socioId);
+        deudaAcum += neto;
+      }
+    }
   }
+  const deudaTotal = String(deudaAcum);
 
   // Socios con documentación incompleta: un socio se considera completo si
   // tiene al menos un documento de cada uno de los 3 tipos.

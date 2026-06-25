@@ -299,7 +299,12 @@ export default async function UsuariosPage({
     return {
       ...s,
       deuda: deuda.toFixed(2),
-      estadoSocio: (morososSet.has(s.profileId) ? 'moroso' : 'activo') as 'moroso' | 'activo',
+      // Moroso solo si además tiene saldo neto positivo: si pagó (aunque sea con
+      // "Registrar pago", que deja los cargos viejos en no_pagado), deuda = 0 y
+      // deja de figurar como moroso.
+      estadoSocio: (morososSet.has(s.profileId) && deuda > 0.001 ? 'moroso' : 'activo') as
+        | 'moroso'
+        | 'activo',
       membershipStatus: s.membershipStatus as 'active' | 'suspended' | 'inactivo',
       numeroSocio: s.numeroSocio,
       embarcacion: s.profileId ? (embByProfile[s.profileId] ?? null) : null,
