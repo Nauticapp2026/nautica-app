@@ -1038,6 +1038,10 @@ export const movimientosCuentaCorriente = pgTable(
     index('movimientos_socio_idx').on(t.socioId),
     index('movimientos_servicio_idx').on(t.servicioId),
     index('movimientos_created_by_idx').on(t.createdBy),
+    // Compuestos para los filtros frecuentes: "pendientes del socio" y
+    // "movimientos del socio ordenados por fecha" (detalle de socio, morosos).
+    index('movimientos_socio_estado_idx').on(t.socioId, t.estado),
+    index('movimientos_socio_fecha_idx').on(t.socioId, t.fecha),
   ],
 );
 
@@ -1076,6 +1080,11 @@ export const facturacion = pgTable(
     index('facturacion_guarderia_idx').on(t.guarderiaId),
     index('facturacion_socio_idx').on(t.socioId),
     index('facturacion_emision_idx').on(t.emision),
+    // Compuestos para los filtros del listado de comprobantes: por estado
+    // (pendiente/pagada/vencida) y por rango de emisión, siempre scopeados
+    // a la guardería.
+    index('facturacion_guarderia_estado_idx').on(t.guarderiaId, t.estado),
+    index('facturacion_guarderia_emision_idx').on(t.guarderiaId, t.emision),
   ],
 );
 
