@@ -217,7 +217,7 @@ Muestra los movimientos del socio: facturas, cobros y saldo.
 
 Arriba de la tabla hay tres tarjetas: **Ingresos por venta**, **Cobranzas** y **Saldo** del socio.
 
-- **Agregar servicio** (Cargar consumo) — registrá un servicio o cargo adicional. El campo Fecha se pre-carga con el día de hoy; podés cambiarlo si el cargo corresponde a otra fecha.
+- **Agregar servicio** (Cargar consumo) — registrá un servicio o cargo adicional. El campo Fecha se pre-carga con el día de hoy; podés cambiarlo si el cargo corresponde a otra fecha. Todo consumo cargado queda como **pendiente**: para registrar su cobro usá **Informar pago** o **Marcar como pagadas**.
 - **Informar pago** (Registrar pago) — registrá un pago recibido sin emitir factura (el saldo queda como "saldo a favor" en la cuenta).
 - **Marcar como pagadas** — seleccioná una o más facturas con la casilla de verificación y hacé clic en este botón para registrarlas como cobradas. Te pedirá el medio de pago.
 
