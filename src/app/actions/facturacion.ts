@@ -386,6 +386,7 @@ export async function crearFacturaCore(
         id: movimientosCuentaCorriente.id,
         concepto: movimientosCuentaCorriente.concepto,
         debe: movimientosCuentaCorriente.debe,
+        comprobanteInterno: movimientosCuentaCorriente.comprobanteInterno,
       })
       .from(movimientosCuentaCorriente)
       .where(
@@ -394,6 +395,13 @@ export async function crearFacturaCore(
           eq(movimientosCuentaCorriente.socioId, data.socioId),
         ),
       );
+
+    // Guard duro: un cargo con comprobante interno NO se factura (no va por
+    // TusFacturas). Las listas ya lo ocultan, pero el id podría llegar igual;
+    // acá se rechaza del lado del server.
+    if (movs.some((m) => m.comprobanteInterno)) {
+      return { error: 'No se puede facturar un cargo con comprobante interno.' };
+    }
 
     items = movs.map((m) => ({
       descripcion: m.concepto ?? 'Servicio',
