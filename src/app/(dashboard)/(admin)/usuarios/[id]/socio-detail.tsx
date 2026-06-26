@@ -33,12 +33,11 @@ import {
   X,
 } from 'lucide-react';
 import {
-  addMovimientoAction,
   informarPagoAction,
   marcarPagadasAction,
   updateMovimientoAction,
 } from '@/app/actions/movimientos';
-import { crearReciboInternoAction } from '@/app/actions/facturacion';
+import { cargarServicioAction, crearReciboInternoAction } from '@/app/actions/facturacion';
 import {
   createEmbarcacionAction,
   deleteEmbarcacionAction,
@@ -753,7 +752,14 @@ function AgregarServicioModal({
   const [concepto, setConcepto] = useState('');
   const [monto, setMonto] = useState('');
   const [fecha, setFecha] = useState(todayISODate);
+  const [comprobante, setComprobante] = useState<'interno' | 'fiscal'>('interno');
   const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<{
+    comprobante: 'interno' | 'fiscal';
+    nro?: string;
+    reciboId?: string;
+    pdfUrl?: string;
+  } | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const isValid = Boolean(servicioId && monto);
@@ -770,25 +776,32 @@ function AgregarServicioModal({
     setConcepto('');
     setMonto('');
     setFecha(todayISODate());
+    setComprobante('interno');
     setError(null);
+    setResult(null);
     onClose();
   }
 
   function handleSubmit() {
     setError(null);
     startTransition(async () => {
-      const res = await addMovimientoAction({
+      const res = await cargarServicioAction({
         socioId,
         servicioId,
         concepto,
         monto: montoToNumberStr(monto),
         fecha,
-        estado: 'no_pagado',
+        comprobante,
       });
       if (res.error) {
         setError(res.error);
       } else {
-        handleClose();
+        setResult({
+          comprobante: res.comprobante!,
+          nro: res.comprobanteNro,
+          reciboId: res.reciboId,
+          pdfUrl: res.pdfUrl,
+        });
         router.refresh();
       }
     });
@@ -802,10 +815,10 @@ function AgregarServicioModal({
         <div className="flex items-start justify-between p-6 pb-4">
           <div>
             <h2 className="text-[18px] font-bold" style={{ color: '#101828' }}>
-              Cargar consumo
+              Cargar Servicio
             </h2>
             <p className="mt-0.5 text-sm" style={{ color: '#669E9D' }}>
-              Registre el servicio consumido por {socioNombre}
+              Registrá un servicio del tarifario para {socioNombre}
             </p>
           </div>
           <button
@@ -817,81 +830,165 @@ function AgregarServicioModal({
         </div>
         <div className="border-t border-gray-200" />
 
-        <div className="flex-1 space-y-4 overflow-y-auto p-6">
-          <div>
-            <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
-              Servicio
-            </label>
-            <select className={inputCls} value={servicioId} onChange={handleServicioChange}>
-              <option value="">Seleccione un servicio</option>
-              {servicios.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.nombre}
-                  {s.precio ? ` — ${fmt(parseFloat(s.precio))}` : ''}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
-              Detalle del servicio
-            </label>
-            <input
-              className={inputCls}
-              placeholder="Descripción opcional"
-              value={concepto}
-              onChange={(e) => setConcepto(e.target.value)}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div>
-              <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
-                Monto
-              </label>
-              <input
-                className={inputCls}
-                inputMode="decimal"
-                placeholder="0,00"
-                value={monto}
-                onChange={(e) => setMonto(sanitizeMontoInput(e.target.value))}
-              />
+        {result ? (
+          <div className="space-y-4 p-6">
+            <div className="flex items-start gap-3 rounded-[10px] bg-teal-50 p-4">
+              <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-teal-600" />
+              <div>
+                <p className="font-semibold text-teal-900">
+                  Servicio cargado ·{' '}
+                  {result.comprobante === 'fiscal' ? 'Comprobante fiscal' : 'Comprobante interno'}
+                </p>
+                {result.nro && <p className="text-sm text-teal-700">Nro: {result.nro}</p>}
+              </div>
             </div>
-            <div>
-              <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
-                Fecha
-              </label>
-              <input
-                type="date"
-                className={inputCls}
-                value={fecha}
-                onChange={(e) => setFecha(e.target.value)}
-              />
-            </div>
-          </div>
-
-          {error && <p className="text-sm text-red-600">{error}</p>}
-        </div>
-
-        <div className="border-t border-gray-200 p-6">
-          <div className="flex gap-3">
+            {result.comprobante === 'interno' && result.reciboId && (
+              <Link
+                href={`/facturacion/recibo/${result.reciboId}`}
+                target="_blank"
+                className="flex w-full items-center justify-center gap-2 rounded-[10px] border border-gray-200 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Ver / imprimir comprobante
+              </Link>
+            )}
+            {result.comprobante === 'fiscal' && result.pdfUrl && (
+              <a
+                href={result.pdfUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex w-full items-center justify-center gap-2 rounded-[10px] border border-gray-200 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Descargar factura (PDF)
+              </a>
+            )}
             <button
               onClick={handleClose}
-              className="flex-1 rounded-[10px] border border-[#d1d5dc] bg-white py-2.5 text-sm font-medium text-[#364153] transition hover:bg-gray-50"
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={handleSubmit}
-              disabled={isPending || !isValid}
-              className="flex-1 rounded-[10px] py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+              className="w-full rounded-[10px] py-2.5 text-sm font-semibold text-white transition hover:opacity-90"
               style={{ background: '#175861' }}
             >
-              {isPending ? 'Guardando...' : 'Cargar consumo'}
+              Cerrar
             </button>
           </div>
-        </div>
+        ) : (
+          <>
+            <div className="flex-1 space-y-4 overflow-y-auto p-6">
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
+                  Servicio
+                </label>
+                <select className={inputCls} value={servicioId} onChange={handleServicioChange}>
+                  <option value="">Seleccione un servicio</option>
+                  {servicios.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.nombre}
+                      {s.precio ? ` — ${fmt(parseFloat(s.precio))}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
+                  Detalle del servicio
+                </label>
+                <input
+                  className={inputCls}
+                  placeholder="Descripción opcional"
+                  value={concepto}
+                  onChange={(e) => setConcepto(e.target.value)}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label
+                    className="mb-1.5 block text-xs font-semibold"
+                    style={{ color: '#101828' }}
+                  >
+                    Monto
+                  </label>
+                  <input
+                    className={inputCls}
+                    inputMode="decimal"
+                    placeholder="0,00"
+                    value={monto}
+                    onChange={(e) => setMonto(sanitizeMontoInput(e.target.value))}
+                  />
+                </div>
+                <div>
+                  <label
+                    className="mb-1.5 block text-xs font-semibold"
+                    style={{ color: '#101828' }}
+                  >
+                    Fecha
+                  </label>
+                  <input
+                    type="date"
+                    className={inputCls}
+                    value={fecha}
+                    onChange={(e) => setFecha(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
+                  Comprobante
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setComprobante('interno')}
+                    className={`rounded-[10px] border px-3 py-2.5 text-sm font-medium transition ${
+                      comprobante === 'interno'
+                        ? 'border-[#175861] bg-[#EFF8F7] text-[#175861]'
+                        : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >
+                    Interno
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setComprobante('fiscal')}
+                    className={`rounded-[10px] border px-3 py-2.5 text-sm font-medium transition ${
+                      comprobante === 'fiscal'
+                        ? 'border-[#175861] bg-[#EFF8F7] text-[#175861]'
+                        : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >
+                    Fiscal (AFIP)
+                  </button>
+                </div>
+                <p className="mt-1.5 text-xs text-gray-400">
+                  {comprobante === 'interno'
+                    ? 'Genera un comprobante interno (no fiscal). El cargo NO se factura por AFIP.'
+                    : 'Emite la factura AFIP del servicio en este momento.'}
+                </p>
+              </div>
+
+              {error && <p className="text-sm text-red-600">{error}</p>}
+            </div>
+
+            <div className="border-t border-gray-200 p-6">
+              <div className="flex gap-3">
+                <button
+                  onClick={handleClose}
+                  className="flex-1 rounded-[10px] border border-[#d1d5dc] bg-white py-2.5 text-sm font-medium text-[#364153] transition hover:bg-gray-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleSubmit}
+                  disabled={isPending || !isValid}
+                  className="flex-1 rounded-[10px] py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+                  style={{ background: '#175861' }}
+                >
+                  {isPending ? 'Guardando...' : 'Cargar Servicio'}
+                </button>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -2698,6 +2795,7 @@ export function SocioDetail({
           servicios={servicios}
           cancelaciones={cancelaciones}
           socioId={socio.id}
+          onCargarServicio={() => setModalServicioOpen(true)}
         />
       )}
 
@@ -2715,13 +2813,6 @@ export function SocioDetail({
                 className="shrink-0 justify-center rounded-[10px] border border-[#d1d5dc] px-4 py-2 text-sm font-medium text-[#364153] transition hover:bg-gray-50"
               >
                 Registrar pago
-              </button>
-              <button
-                onClick={() => setModalServicioOpen(true)}
-                className="shrink-0 justify-center rounded-[10px] px-4 py-2 text-sm font-medium text-white transition hover:opacity-90"
-                style={{ background: '#175861' }}
-              >
-                Cargar consumo
               </button>
             </div>
           </div>
@@ -3526,11 +3617,13 @@ function ServiciosContratadosTab({
   servicios,
   cancelaciones,
   socioId,
+  onCargarServicio,
 }: {
   movimientos: Movimiento[];
   servicios: Servicio[];
   cancelaciones: { servicioId: string; fechaCancelacion: string }[];
   socioId: string;
+  onCargarServicio: () => void;
 }) {
   const router = useRouter();
   const [cancelandoId, setCancelandoId] = useState<string | null>(null);
@@ -3635,19 +3728,42 @@ function ServiciosContratadosTab({
 
   if (filas.length === 0) {
     return (
-      <EmptyState
-        icon={<Package className="h-7 w-7 opacity-40" />}
-        text="No se han cargado consumos para este socio todavía."
-      />
+      <div className="rounded-2xl bg-white p-6 shadow-sm">
+        <div className="mb-4 flex items-center justify-between">
+          <p className="text-[18px] font-bold" style={{ color: '#101828' }}>
+            Servicios contratados
+          </p>
+          <button
+            onClick={onCargarServicio}
+            className="shrink-0 rounded-[10px] px-4 py-2 text-sm font-medium text-white transition hover:opacity-90"
+            style={{ background: '#175861' }}
+          >
+            Cargar Servicio
+          </button>
+        </div>
+        <EmptyState
+          icon={<Package className="h-7 w-7 opacity-40" />}
+          text="No se han cargado servicios para este socio todavía."
+        />
+      </div>
     );
   }
 
   return (
     <>
       <div className="rounded-2xl bg-white p-6 shadow-sm">
-        <p className="mb-4 text-[18px] font-bold" style={{ color: '#101828' }}>
-          Servicios contratados
-        </p>
+        <div className="mb-4 flex items-center justify-between">
+          <p className="text-[18px] font-bold" style={{ color: '#101828' }}>
+            Servicios contratados
+          </p>
+          <button
+            onClick={onCargarServicio}
+            className="shrink-0 rounded-[10px] px-4 py-2 text-sm font-medium text-white transition hover:opacity-90"
+            style={{ background: '#175861' }}
+          >
+            Cargar Servicio
+          </button>
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>

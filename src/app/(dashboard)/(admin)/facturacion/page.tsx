@@ -110,6 +110,8 @@ export default async function FacturacionPage() {
         and(
           eq(movimientosCuentaCorriente.socioId, profiles.id),
           eq(movimientosCuentaCorriente.estado, 'no_pagado'),
+          // Excluir cargos con comprobante interno (no se facturan por TusFacturas).
+          eq(movimientosCuentaCorriente.comprobanteInterno, false),
         ),
       )
       .where(
@@ -171,7 +173,12 @@ export default async function FacturacionPage() {
         ),
       )
       .leftJoin(servicios, eq(servicios.id, movimientosCuentaCorriente.servicioId))
-      .where(eq(movimientosCuentaCorriente.estado, 'no_pagado'))
+      .where(
+        and(
+          eq(movimientosCuentaCorriente.estado, 'no_pagado'),
+          eq(movimientosCuentaCorriente.comprobanteInterno, false),
+        ),
+      )
       .orderBy(movimientosCuentaCorriente.fecha),
   ]);
 

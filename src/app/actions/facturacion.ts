@@ -13,6 +13,7 @@ import {
   memberships,
   movimientosCuentaCorriente,
   profiles,
+  servicios,
 } from '@/lib/db/schema';
 import { getActiveMarina } from '@/lib/auth/session';
 import { fechaCalendariaArg } from '@/lib/dates';
@@ -783,6 +784,152 @@ export async function crearReciboInternoAction(
   } catch {
     return { error: 'Error al crear el comprobante interno.' };
   }
+}
+
+// ─── Action: cargar servicio (con comprobante interno o fiscal) ───────────────
+
+export type CargarServicioData = {
+  socioId: string;
+  servicioId: string;
+  concepto: string;
+  monto: string;
+  fecha: string;
+  comprobante: 'interno' | 'fiscal';
+};
+
+export async function cargarServicioAction(data: CargarServicioData): Promise<{
+  error?: string;
+  comprobante?: 'interno' | 'fiscal';
+  reciboId?: string;
+  facturaId?: string;
+  comprobanteNro?: string;
+  pdfUrl?: string;
+}> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+  const gId = ctx.activeMembership.guarderiaId;
+
+  if (!data.servicioId || !data.monto) return { error: 'Faltan datos del servicio.' };
+  const esInterno = data.comprobante === 'interno';
+
+  // 1. Crear el cargo en la cuenta corriente (igual que "Cargar consumo").
+  //    Si es interno, se marca para excluirlo de la facturación automática y manual.
+  const [serv] = await db
+    .select({ nombre: servicios.nombre })
+    .from(servicios)
+    .where(and(eq(servicios.id, data.servicioId), eq(servicios.guarderiaId, gId)))
+    .limit(1);
+  if (!serv) return { error: 'Servicio no encontrado.' };
+
+  const conceptoFinal = data.concepto.trim() || serv.nombre;
+
+  const [mov] = await db
+    .insert(movimientosCuentaCorriente)
+    .values({
+      socioId: data.socioId,
+      servicioId: data.servicioId,
+      concepto: conceptoFinal,
+      tipo: 'otro',
+      estado: 'no_pagado',
+      debe: data.monto,
+      fecha: data.fecha ? fechaCalendariaArg(data.fecha) : new Date(),
+      createdBy: ctx.profile.id,
+      comprobanteInterno: esInterno,
+    })
+    .returning({ id: movimientosCuentaCorriente.id });
+  const movimientoId = mov.id;
+
+  // 2a. Comprobante interno → documento no fiscal (estilo recibo), número RB-.
+  if (esInterno) {
+    const id = randomUUID();
+    const [{ n }] = await db
+      .select({ n: count() })
+      .from(facturacion)
+      .where(
+        and(
+          eq(facturacion.guarderiaId, gId),
+          eq(facturacion.tipoFactura, 'recibo'),
+          like(facturacion.codigo, 'RB-%'),
+        ),
+      );
+    const codigo = `RB-${String(Number(n) + 1).padStart(6, '0')}`;
+    const emision = data.fecha ? fechaCalendariaArg(data.fecha) : new Date();
+    await db.insert(facturacion).values({
+      id,
+      guarderiaId: gId,
+      socioId: data.socioId,
+      tipoFactura: 'recibo',
+      estado: 'pendiente',
+      importe: data.monto,
+      descripcion: conceptoFinal,
+      emision,
+      movimientoId,
+      codigo,
+    });
+    revalidatePath('/facturacion');
+    revalidatePath(`/usuarios/${data.socioId}`);
+    return { comprobante: 'interno', reciboId: id, comprobanteNro: codigo };
+  }
+
+  // 2b. Comprobante fiscal → factura AFIP del cargo (tipo derivado de la condición IVA).
+  const [guard] = await db
+    .select({ condicionIva: guarderias.condicionIva })
+    .from(guarderias)
+    .where(eq(guarderias.id, gId))
+    .limit(1);
+  const [socioRow] = await db
+    .select({
+      condicionIva: profiles.condicionIva,
+      condicionIvaPersonal: profiles.condicionIvaPersonal,
+      facturaFiscal: memberships.facturaFiscal,
+    })
+    .from(profiles)
+    .innerJoin(
+      memberships,
+      and(eq(memberships.userId, profiles.id), eq(memberships.guarderiaId, gId)),
+    )
+    .where(eq(profiles.id, data.socioId))
+    .limit(1);
+
+  const socioCond = socioRow?.facturaFiscal
+    ? socioRow.condicionIvaPersonal
+    : socioRow?.condicionIva;
+  const tipoFactura =
+    derivarTipoFactura(guard?.condicionIva ?? null, socioCond ?? null) ?? 'factura_c';
+
+  const hoy = data.fecha || new Date().toISOString().slice(0, 10);
+  const venc = (() => {
+    const d = new Date(`${hoy}T12:00:00.000Z`);
+    d.setUTCDate(d.getUTCDate() + 10);
+    return d.toISOString().slice(0, 10);
+  })();
+
+  const r = await crearFacturaCore({
+    guarderiaId: gId,
+    socioId: data.socioId,
+    tipoFactura,
+    condicionVenta: 'contado',
+    medioPago: 'efectivo',
+    estado: 'pendiente',
+    descripcion: conceptoFinal,
+    fecha: hoy,
+    vencimiento: venc,
+    desde: hoy,
+    hasta: hoy,
+    movimientoIds: [movimientoId],
+  });
+  if (r.error) {
+    // El cargo queda en la cuenta corriente (facturable después desde Comprobantes).
+    return { error: `Servicio cargado, pero la factura falló: ${r.error}` };
+  }
+  revalidatePath('/facturacion');
+  revalidatePath(`/usuarios/${data.socioId}`);
+  return {
+    comprobante: 'fiscal',
+    facturaId: r.facturaId,
+    comprobanteNro: r.comprobanteNro,
+    pdfUrl: r.pdfUrl,
+  };
 }
 
 // ─── Action: enviar recibo por mail al socio ──────────────────────────────────

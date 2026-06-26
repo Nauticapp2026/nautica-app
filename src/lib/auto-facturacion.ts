@@ -167,6 +167,8 @@ export async function runAutoEmision(
             eq(movimientosCuentaCorriente.socioId, socioId),
             eq(movimientosCuentaCorriente.estado, 'no_pagado'),
             sql`${movimientosCuentaCorriente.debe} > 0`,
+            // Excluir cargos que ya tienen comprobante interno (no van por TusFacturas).
+            eq(movimientosCuentaCorriente.comprobanteInterno, false),
           ),
         );
 

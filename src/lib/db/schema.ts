@@ -1031,6 +1031,9 @@ export const movimientosCuentaCorriente = pgTable(
     observacionesCheque: text('observaciones_cheque'),
     comprobanteChequeUrls: text('comprobante_cheque_urls').array(),
     datosPago: jsonb('datos_pago'),
+    // true = el cargo se documentó con un comprobante INTERNO (no fiscal) al
+    // cargar el servicio → se excluye de la facturación automática y manual.
+    comprobanteInterno: boolean('comprobante_interno').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
