@@ -9,6 +9,7 @@ import {
   espacios,
   memberships,
   naves,
+  porteria,
   profiles,
   solicitudesLavado,
   tareas,
@@ -94,9 +95,11 @@ export default async function TareasPage() {
         solicitudLavadoEstado: solicitudesLavado.estado,
         solicitudDiaUso: solicitudesLavado.diaUso,
         solicitudUpdatedAt: solicitudesLavado.updatedAt,
+        porteriaEstado: porteria.estado,
       })
       .from(tareas)
       .leftJoin(profiles, eq(profiles.id, tareas.operarioId))
+      .leftJoin(porteria, eq(porteria.id, tareas.porteriaId))
       .leftJoin(embarcaciones, eq(embarcaciones.id, tareas.embarcacionId))
       .leftJoin(socioProfile, eq(socioProfile.id, embarcaciones.profileId))
       .leftJoin(embEspacio, eq(embEspacio.id, embarcaciones.espacioId))
@@ -182,6 +185,9 @@ export default async function TareasPage() {
       | null,
     solicitudDiaUso: t.solicitudDiaUso ?? null,
     solicitudUpdatedAt: t.solicitudUpdatedAt ? t.solicitudUpdatedAt.toISOString() : null,
+    // El socio canceló la salida → porteria.estado = 'revocado'. La tarea sigue
+    // en 'salida_programada' pero se marca "Cancelada" en el tablero.
+    salidaCancelada: t.porteriaEstado === 'revocado',
   }));
 
   const operarios = operariosList.map((o) => ({

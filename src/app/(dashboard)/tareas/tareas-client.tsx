@@ -50,6 +50,7 @@ export type Tarea = {
   solicitudLavadoEstado: EstadoSolicitudLavado | null;
   solicitudDiaUso: string | null;
   solicitudUpdatedAt: string | null;
+  salidaCancelada: boolean;
 };
 
 const ESTADO_SOLICITUD_LAVADO_LABEL: Record<EstadoSolicitudLavado, string> = {
@@ -273,6 +274,12 @@ function TareaCard({
       <p className="text-base font-bold" style={{ color: '#101828' }}>
         {tarea.embarcacionNombre ?? 'Sin embarcación'}
       </p>
+
+      {tarea.salidaCancelada && (
+        <span className="mt-1 inline-flex items-center rounded-full bg-[#FCE8E8] px-2 py-0.5 text-xs font-semibold text-[#C0392B]">
+          Cancelada
+        </span>
+      )}
 
       {tarea.ubicacion && <p className="mt-0.5 text-xs text-gray-500">{tarea.ubicacion}</p>}
 
