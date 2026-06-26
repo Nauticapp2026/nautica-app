@@ -100,6 +100,7 @@ Desde **Usuarios → Socios** gestionás el padrón de socios de tu club.
 La tabla muestra: número de socio (#), nombre, email, embarcación asignada, ubicación, fecha de ingreso, estado y deuda.
 
 - Usá la barra de búsqueda para filtrar por nombre o email.
+- Al lado del buscador hay **filtros por columna**: **Nº socio**, **Nombre** y **Embarcación**. Filtran en vivo a medida que escribís y se combinan entre sí y con el buscador.
 - Hacé clic en el encabezado **#** para ordenar la lista por número de socio (ascendente o descendente).
 - La columna **Ingreso** muestra la fecha en que se incorporó el socio al club.
 - El **número de socio** (#NNN) aparece como un chip junto al nombre. Podés editarlo en el perfil del socio → pestaña **Generales**.
@@ -227,7 +228,9 @@ Arriba de la tabla hay tres tarjetas: **Ingresos por venta**, **Cobranzas** y **
 - **Estado** — Pagado o En Plazo. Un cargo figura **Pagado** cuando los pagos registrados alcanzan a cubrirlo (se asignan del más viejo al más nuevo); si todavía no está cubierto, figura **En Plazo**.
 - **Tipo de comprobante** — Factura A/B/C, Recibo, Nota de crédito o Sin comprobante.
 
-Al aplicar filtros, las tarjetas de **Ingresos por venta** y **Cobranzas** muestran los totales de lo filtrado. La tarjeta de **Saldo** siempre muestra el saldo real del socio (no se ve afectada por los filtros).
+Al aplicar **cualquier filtro**, la tarjeta de **Saldo** se **oculta**: su valor es el saldo total del socio y no se corresponde con el subconjunto de movimientos filtrados. Las tarjetas de **Ingresos por venta** y **Cobranzas** se mantienen. Al limpiar los filtros, la tarjeta de Saldo vuelve a aparecer.
+
+**Ordenar por fecha.** Hacé clic en el encabezado **Fecha** para alternar el orden de los movimientos entre **más nuevo primero** (por defecto) y **más antiguo primero**. La flechita del encabezado indica el orden actual.
 
 La tabla incluye una columna **Tipo de comprobante** (antes del Nº de comprobante) que indica el tipo de factura asociada a cada movimiento.
 
@@ -354,7 +357,7 @@ Cada tarjeta muestra:
 ### Visibilidad según estado
 
 - **Salida programada** — solo se muestran las salidas del día en curso. Las del futuro se ocultarán hasta que llegue su fecha.
-- **Guardada** — las embarcaciones guardadas aparecen en esa columna. Pasadas **24 horas** desde que se guardaron, la tarea desaparece del tablero y se **borra automáticamente** (no queda en el historial).
+- **Guardada** — las embarcaciones guardadas aparecen en esa columna. Solo se ven las del **día en curso**: a las **00:00 (medianoche)** la tarea desaparece del tablero y se **borra automáticamente** (no queda en el historial). Esto aplica tanto en el panel web como en la app.
 - **Lavado lista** — cuando marcás un lavado como **Lista**, la tarjeta se mantiene visible el resto del día y desaparece sola al día siguiente.
 
 ### Crear una tarea
@@ -652,6 +655,18 @@ Si necesitás anular parcial o totalmente una factura ya emitida, podés emitir 
 
 > El botón solo aparece en facturas tipo A, B o C que ya tienen **CAE** asignado. El CAE es el código que AFIP emite al autorizar una factura — sin él la factura no es válida fiscalmente ni puede tener nota de crédito asociada.
 
+### Emitir notas de crédito en lote
+
+Si necesitás **anular varias facturas a la vez** (anulación total), podés hacerlo desde el listado sin entrar una por una:
+
+1. En el tab **Comprobantes AFIP**, tildá la **casilla** al inicio de cada factura que quieras anular. La casilla del encabezado selecciona/deselecciona de una todas las elegibles.
+2. Solo se pueden seleccionar facturas **A, B o C con CAE** que **todavía no tengan una nota de crédito**. El resto (recibos, notas de crédito, facturas ya anuladas) tienen la casilla deshabilitada.
+3. Al haber al menos una seleccionada aparece una barra con la cantidad y el botón **Emitir NC en lote**.
+4. Confirmá en el modal (muestra el total a anular). El sistema emite una **nota de crédito por el total** de cada factura, **una por una**.
+5. Al terminar muestra un resumen de **emitidas** y **fallidas** (con el motivo de cada falla). Si una falla, continúa con las demás.
+
+> El lote es solo para **anulación total**. Para una nota de crédito **parcial**, usá la emisión individual (ícono ↩ en la fila). Como cada nota de crédito es una emisión real a AFIP, el proceso puede tardar unos segundos si seleccionás muchas.
+
 ### Filtrar y exportar comprobantes
 
 En el tab **Comprobantes AFIP** podés acotar la tabla con los siguientes filtros:
@@ -906,8 +921,8 @@ Si un cobro aparece como **Rechazado** o **Error**:
 
 1. En la tabla de **Débito automático**, buscá el cobro fallido.
 2. Hacé clic en **Reintentar**.
-3. El sistema vuelve a intentar el cobro con la misma tarjeta registrada.
-4. Si sale aprobado, los movimientos quedan marcados como pagados automáticamente.
+3. El sistema vuelve a intentar el cobro del **saldo actual** del socio con la misma tarjeta registrada (sirve también para los cobros generados por el cron mensual).
+4. Si sale aprobado, se registra el pago y el saldo del socio baja automáticamente.
 
 > Si el cobro vuelve a fallar, probablemente la tarjeta tiene un problema. Comunicarte con el socio para actualizar los datos.
 
