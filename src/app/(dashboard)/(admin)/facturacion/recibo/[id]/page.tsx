@@ -1,10 +1,20 @@
 import { notFound } from 'next/navigation';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, asc, inArray, ne } from 'drizzle-orm';
 
 import { getActiveMarina } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { facturacion, guarderias, profiles } from '@/lib/db/schema';
 import { PrintButton } from './print-button';
+import { EnviarReciboMailButton } from './enviar-recibo-mail-button';
+
+const TIPO_COMPROBANTE_LABEL: Record<string, string> = {
+  factura_a: 'Factura A',
+  factura_b: 'Factura B',
+  factura_c: 'Factura C',
+  nota_credito_a: 'Nota de crédito A',
+  nota_credito_b: 'Nota de crédito B',
+  nota_credito_c: 'Nota de crédito C',
+};
 
 function fmtMoney(value: string | null): string {
   const n = parseFloat(value ?? '0');
@@ -51,10 +61,14 @@ export default async function ReciboPage({ params }: { params: Promise<{ id: str
       guarderiaId: facturacion.guarderiaId,
       socioNombre: profiles.nombre,
       socioApellido: profiles.apellido,
+      socioCuit: profiles.cuit,
+      socioDocumento: profiles.numeroDocumento,
+      socioEmail: profiles.email,
       guarderiaName: guarderias.nombre,
       guarderiaRazonSocial: guarderias.razonSocial,
       guarderiaDireccion: guarderias.direccion,
       guarderiaCuit: guarderias.cuit,
+      guarderiaLogo: guarderias.logoUrl,
     })
     .from(facturacion)
     .leftJoin(profiles, eq(profiles.id, facturacion.socioId))
@@ -65,7 +79,42 @@ export default async function ReciboPage({ params }: { params: Promise<{ id: str
   if (!row || row.tipoFactura !== 'recibo') notFound();
 
   const socioNombre = [row.socioNombre, row.socioApellido].filter(Boolean).join(' ') || '—';
+  const socioDoc = row.socioCuit
+    ? `CUIT: ${row.socioCuit}`
+    : row.socioDocumento
+      ? `DNI: ${row.socioDocumento}`
+      : null;
   const clubNombre = row.guarderiaRazonSocial ?? row.guarderiaName;
+
+  // Comprobantes cancelados (criterio FIFO): facturas AFIP del socio, de la más
+  // antigua a la más nueva, hasta cubrir el importe del recibo.
+  const comprobantes: { codigo: string | null; tipoFactura: string | null }[] = [];
+  if (row.socioId) {
+    const facturasSocio = await db
+      .select({
+        codigo: facturacion.codigo,
+        tipoFactura: facturacion.tipoFactura,
+        importe: facturacion.importe,
+      })
+      .from(facturacion)
+      .where(
+        and(
+          eq(facturacion.socioId, row.socioId),
+          eq(facturacion.guarderiaId, gId),
+          ne(facturacion.tipoFactura, 'recibo'),
+          inArray(facturacion.tipoFactura, ['factura_a', 'factura_b', 'factura_c']),
+        ),
+      )
+      .orderBy(asc(facturacion.emision));
+
+    const importeRecibo = parseFloat(row.importe ?? '0');
+    let acumulado = 0;
+    for (const f of facturasSocio) {
+      if (acumulado >= importeRecibo - 0.001) break;
+      comprobantes.push({ codigo: f.codigo, tipoFactura: f.tipoFactura });
+      acumulado += parseFloat(f.importe ?? '0');
+    }
+  }
 
   return (
     <>
@@ -85,21 +134,34 @@ export default async function ReciboPage({ params }: { params: Promise<{ id: str
           <a href="/facturacion" className="text-sm text-gray-500 hover:text-gray-700">
             ← Volver a Comprobantes
           </a>
-          <PrintButton />
+          <div className="flex items-center gap-2">
+            <EnviarReciboMailButton reciboId={row.id} socioEmail={row.socioEmail} />
+            <PrintButton />
+          </div>
         </div>
 
         {/* Receipt */}
         <div className="print-area mx-auto max-w-2xl rounded-2xl border border-gray-200 bg-white p-8 shadow-sm print:max-w-none print:rounded-none print:p-6">
           {/* Header */}
           <div className="mb-6 flex items-start justify-between">
-            <div>
-              <p className="text-xl font-bold text-gray-900">{clubNombre}</p>
-              {row.guarderiaDireccion && (
-                <p className="mt-0.5 text-sm text-gray-500">{row.guarderiaDireccion}</p>
+            <div className="flex items-start gap-3">
+              {row.guarderiaLogo && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={row.guarderiaLogo}
+                  alt={clubNombre ?? 'Club'}
+                  className="h-14 w-14 shrink-0 rounded object-contain"
+                />
               )}
-              {row.guarderiaCuit && (
-                <p className="text-sm text-gray-500">CUIT: {row.guarderiaCuit}</p>
-              )}
+              <div>
+                <p className="text-xl font-bold text-gray-900">{clubNombre}</p>
+                {row.guarderiaDireccion && (
+                  <p className="mt-0.5 text-sm text-gray-500">{row.guarderiaDireccion}</p>
+                )}
+                {row.guarderiaCuit && (
+                  <p className="text-sm text-gray-500">CUIT: {row.guarderiaCuit}</p>
+                )}
+              </div>
             </div>
             <div className="text-right">
               <p className="text-2xl font-extrabold tracking-wide text-gray-900">RECIBO</p>
@@ -114,18 +176,32 @@ export default async function ReciboPage({ params }: { params: Promise<{ id: str
           <div className="space-y-4">
             <div className="grid grid-cols-[140px_1fr] gap-2 text-sm">
               <span className="font-semibold text-gray-500">Recibí de:</span>
-              <span className="text-gray-900">{socioNombre}</span>
+              <span className="text-gray-900">
+                {socioNombre}
+                {socioDoc && <span className="text-gray-500"> — {socioDoc}</span>}
+              </span>
             </div>
             <div className="grid grid-cols-[140px_1fr] gap-2 text-sm">
               <span className="font-semibold text-gray-500">La suma de:</span>
               <span className="text-lg font-bold text-gray-900">{fmtMoney(row.importe)}</span>
             </div>
-            {row.descripcion && (
-              <div className="grid grid-cols-[140px_1fr] gap-2 text-sm">
-                <span className="font-semibold text-gray-500">En concepto de:</span>
-                <span className="text-gray-900">{row.descripcion}</span>
-              </div>
-            )}
+            <div className="grid grid-cols-[140px_1fr] gap-2 text-sm">
+              <span className="font-semibold text-gray-500">En concepto de:</span>
+              <span className="text-gray-900">
+                {comprobantes.length > 0 ? (
+                  <span className="flex flex-col gap-0.5">
+                    {comprobantes.map((c, i) => (
+                      <span key={i}>
+                        {TIPO_COMPROBANTE_LABEL[c.tipoFactura ?? ''] ?? c.tipoFactura}{' '}
+                        {c.codigo ?? ''}
+                      </span>
+                    ))}
+                  </span>
+                ) : (
+                  (row.descripcion ?? 'Pago a cuenta')
+                )}
+              </span>
+            </div>
             {row.medioPago && (
               <div className="grid grid-cols-[140px_1fr] gap-2 text-sm">
                 <span className="font-semibold text-gray-500">Forma de pago:</span>
@@ -143,20 +219,6 @@ export default async function ReciboPage({ params }: { params: Promise<{ id: str
             <div className="text-right">
               <p className="text-xs font-semibold tracking-wide text-gray-400 uppercase">Total</p>
               <p className="text-2xl font-extrabold text-gray-900">{fmtMoney(row.importe)}</p>
-            </div>
-          </div>
-
-          {/* Firma */}
-          <div className="mt-12 grid grid-cols-2 gap-8">
-            <div>
-              <div className="border-t-2 border-gray-300 pt-2 text-center text-xs text-gray-500">
-                Firma y aclaración
-              </div>
-            </div>
-            <div>
-              <div className="border-t-2 border-gray-300 pt-2 text-center text-xs text-gray-500">
-                Sello del club
-              </div>
             </div>
           </div>
 

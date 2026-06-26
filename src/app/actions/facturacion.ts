@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, asc, count, eq, inArray, like, ne } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 
 import { db } from '@/lib/db';
@@ -16,6 +16,8 @@ import {
 } from '@/lib/db/schema';
 import { getActiveMarina } from '@/lib/auth/session';
 import { fechaCalendariaArg } from '@/lib/dates';
+import { sendEmail } from '@/lib/email/resend';
+import { reciboEmail } from '@/lib/email/templates/recibo';
 import {
   crearFactura,
   toTusFecha,
@@ -747,7 +749,18 @@ export async function crearReciboInternoAction(
 
   try {
     const id = randomUUID();
-    const codigo = `RCP-${id.slice(-6).toUpperCase()}`;
+    // Número de recibo secuencial por guardería: RB-000001, RB-000002, ...
+    const [{ n }] = await db
+      .select({ n: count() })
+      .from(facturacion)
+      .where(
+        and(
+          eq(facturacion.guarderiaId, gId),
+          eq(facturacion.tipoFactura, 'recibo'),
+          like(facturacion.codigo, 'RB-%'),
+        ),
+      );
+    const codigo = `RB-${String(Number(n) + 1).padStart(6, '0')}`;
     const emision = data.fecha ? fechaCalendariaArg(data.fecha) : new Date();
 
     await db.insert(facturacion).values({
@@ -770,6 +783,123 @@ export async function crearReciboInternoAction(
   } catch {
     return { error: 'Error al crear el comprobante interno.' };
   }
+}
+
+// ─── Action: enviar recibo por mail al socio ──────────────────────────────────
+
+const TIPO_COMPROBANTE_LABEL_MAIL: Record<string, string> = {
+  factura_a: 'Factura A',
+  factura_b: 'Factura B',
+  factura_c: 'Factura C',
+  nota_credito_a: 'Nota de crédito A',
+  nota_credito_b: 'Nota de crédito B',
+  nota_credito_c: 'Nota de crédito C',
+};
+
+export async function enviarReciboPorMailAction(
+  reciboId: string,
+): Promise<{ error?: string; email?: string }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+  const gId = ctx.activeMembership.guarderiaId;
+
+  const [row] = await db
+    .select({
+      id: facturacion.id,
+      codigo: facturacion.codigo,
+      tipoFactura: facturacion.tipoFactura,
+      importe: facturacion.importe,
+      descripcion: facturacion.descripcion,
+      medioPago: facturacion.medioPago,
+      emision: facturacion.emision,
+      socioId: facturacion.socioId,
+      socioNombre: profiles.nombre,
+      socioApellido: profiles.apellido,
+      socioCuit: profiles.cuit,
+      socioDocumento: profiles.numeroDocumento,
+      socioEmail: profiles.email,
+      socioEmailFacturacion: profiles.emailFacturacion,
+      guarderiaName: guarderias.nombre,
+      guarderiaRazonSocial: guarderias.razonSocial,
+      guarderiaDireccion: guarderias.direccion,
+      guarderiaCuit: guarderias.cuit,
+      guarderiaLogo: guarderias.logoUrl,
+    })
+    .from(facturacion)
+    .leftJoin(profiles, eq(profiles.id, facturacion.socioId))
+    .innerJoin(guarderias, eq(guarderias.id, facturacion.guarderiaId))
+    .where(and(eq(facturacion.id, reciboId), eq(facturacion.guarderiaId, gId)))
+    .limit(1);
+
+  if (!row || row.tipoFactura !== 'recibo') return { error: 'Recibo no encontrado.' };
+
+  const destino = row.socioEmailFacturacion?.trim() || row.socioEmail;
+  if (!destino) return { error: 'El socio no tiene email cargado.' };
+
+  // Comprobantes cancelados (FIFO), igual que la vista del recibo.
+  const comprobantes: string[] = [];
+  if (row.socioId) {
+    const facturasSocio = await db
+      .select({
+        codigo: facturacion.codigo,
+        tipoFactura: facturacion.tipoFactura,
+        importe: facturacion.importe,
+      })
+      .from(facturacion)
+      .where(
+        and(
+          eq(facturacion.socioId, row.socioId),
+          eq(facturacion.guarderiaId, gId),
+          ne(facturacion.tipoFactura, 'recibo'),
+          inArray(facturacion.tipoFactura, ['factura_a', 'factura_b', 'factura_c']),
+        ),
+      )
+      .orderBy(asc(facturacion.emision));
+    const importeRecibo = parseFloat(row.importe ?? '0');
+    let acumulado = 0;
+    for (const f of facturasSocio) {
+      if (acumulado >= importeRecibo - 0.001) break;
+      comprobantes.push(
+        `${TIPO_COMPROBANTE_LABEL_MAIL[f.tipoFactura ?? ''] ?? f.tipoFactura ?? ''} ${f.codigo ?? ''}`.trim(),
+      );
+      acumulado += parseFloat(f.importe ?? '0');
+    }
+  }
+
+  const socioNombre =
+    [row.socioNombre, row.socioApellido].filter(Boolean).join(' ').trim() || 'Socio';
+  const doc = row.socioCuit
+    ? `CUIT: ${row.socioCuit}`
+    : row.socioDocumento
+      ? `DNI: ${row.socioDocumento}`
+      : '';
+  const importeFmt = `$${parseFloat(row.importe ?? '0').toLocaleString('es-AR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+  const fecha = (row.emision ?? new Date()).toLocaleDateString('es-AR', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+
+  const { subject, html } = reciboEmail({
+    clubNombre: row.guarderiaRazonSocial ?? row.guarderiaName,
+    clubCuit: row.guarderiaCuit,
+    clubDireccion: row.guarderiaDireccion,
+    clubLogoUrl: row.guarderiaLogo,
+    numero: row.codigo ?? '',
+    fecha,
+    recibiDe: doc ? `${socioNombre} — ${doc}` : socioNombre,
+    importeFmt,
+    comprobantes,
+    formaPago: row.medioPago ? (FORMA_PAGO_LABEL[row.medioPago] ?? row.medioPago) : null,
+  });
+
+  const res = await sendEmail({ to: destino, subject, html });
+  if (!res.ok) return { error: 'No se pudo enviar el mail. Intentá de nuevo.' };
+  return { email: destino };
 }
 
 // ─── Action: emitir nota de crédito ───────────────────────────────────────────
