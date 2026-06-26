@@ -118,6 +118,7 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
         haber: movimientosCuentaCorriente.haber,
         servicioNombre: serviciosTable.nombre,
         servicioId: movimientosCuentaCorriente.servicioId,
+        servicioTipoCobro: serviciosTable.tipoCobro,
       })
       .from(movimientosCuentaCorriente)
       .leftJoin(serviciosTable, eq(serviciosTable.id, movimientosCuentaCorriente.servicioId))

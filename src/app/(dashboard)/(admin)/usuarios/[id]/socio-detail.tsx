@@ -120,6 +120,7 @@ type Movimiento = {
   haber: string | null;
   servicioNombre: string | null;
   servicioId: string | null;
+  servicioTipoCobro: 'fijo' | 'variable' | null;
   facturaCodigo: string | null;
   facturaArchivo: string | null;
   facturaTipo: string | null;
@@ -3550,6 +3551,7 @@ function ServiciosContratadosTab({
   type Resumen = {
     servicioId: string;
     servicioNombre: string;
+    tipoCobro: 'fijo' | 'variable' | null;
     cantidad: number;
     total: number;
     ultimaFecha: string | null;
@@ -3562,6 +3564,7 @@ function ServiciosContratadosTab({
     if (prev) {
       prev.cantidad += 1;
       prev.total += importe;
+      if (m.servicioTipoCobro && !prev.tipoCobro) prev.tipoCobro = m.servicioTipoCobro;
       if (m.fecha && (!prev.ultimaFecha || m.fecha > prev.ultimaFecha)) {
         prev.ultimaFecha = m.fecha;
       }
@@ -3569,6 +3572,7 @@ function ServiciosContratadosTab({
       mapaServicios.set(m.servicioId, {
         servicioId: m.servicioId,
         servicioNombre: m.servicioNombre,
+        tipoCobro: m.servicioTipoCobro,
         cantidad: 1,
         total: importe,
         ultimaFecha: m.fecha,
@@ -3683,6 +3687,17 @@ function ServiciosContratadosTab({
                           <span className="font-medium" style={{ color: '#101828' }}>
                             {s.servicioNombre}
                           </span>
+                          {s.tipoCobro && (
+                            <span
+                              className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                                s.tipoCobro === 'fijo'
+                                  ? 'bg-[#EFF8F7] text-[#175861]'
+                                  : 'bg-[#FFF4E6] text-[#B45309]'
+                              }`}
+                            >
+                              {s.tipoCobro === 'fijo' ? 'Fijo' : 'Variable'}
+                            </span>
+                          )}
                           {cancelado && (
                             <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-600">
                               Cancelado {fmtDate(cancelado)}
