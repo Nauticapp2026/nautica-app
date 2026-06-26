@@ -1,10 +1,17 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { and, desc, eq, gt, isNull, lt, ne, not, or, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, isNotNull, isNull, lt, ne, not, or, sql } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
-import { profiles, servicios, serviciosHistorial } from '@/lib/db/schema';
+import {
+  espacios,
+  movimientosCuentaCorriente,
+  profiles,
+  servicios,
+  serviciosHistorial,
+  socioServiciosCancelados,
+} from '@/lib/db/schema';
 import { getActiveMarina } from '@/lib/auth/session';
 
 type Origen = 'manual' | 'masivo_porcentaje' | 'masivo_monto';
@@ -267,12 +274,16 @@ export async function updateTarifaAction(data: UpdateTarifaData): Promise<{ erro
   const guarderiaId = ctx.activeMembership.guarderiaId;
 
   const [current] = await db
-    .select({ id: servicios.id })
+    .select({ id: servicios.id, estado: servicios.estado })
     .from(servicios)
     .where(and(eq(servicios.id, data.id), eq(servicios.guarderiaId, guarderiaId)))
     .limit(1);
 
   if (!current) return { error: 'Tarifa no encontrada.' };
+
+  // Si la tarifa está pausada, editar (precio, vigencia, etc.) NO debe des-pausarla.
+  // El estado pausado solo se cambia con Pausar/Reactivar (botones dedicados).
+  const estadoFinal = current.estado === 'pausado' ? 'pausado' : data.estado;
 
   const overlapErr = await checkVigenciaOverlap(guarderiaId, data, data.id);
   if (overlapErr) return { error: overlapErr };
@@ -300,7 +311,7 @@ export async function updateTarifaAction(data: UpdateTarifaData): Promise<{ erro
       .set({
         ...base,
         ...extras,
-        estado: data.estado,
+        estado: estadoFinal,
         updatedAt: new Date(),
       })
       .where(eq(servicios.id, data.id));
@@ -436,6 +447,87 @@ export async function getHistorialTarifaAction(
   });
 
   return { entries };
+}
+
+// Cuenta cuántos socios DISTINTOS tienen contratada la tarifa: los que tienen
+// algún movimiento con ese servicio o un espacio asignado con ese servicio,
+// excluyendo a los que ya lo cancelaron (socio_servicios_cancelados).
+async function contarSociosConServicio(servicioId: string): Promise<number> {
+  const [movs, esps, cancelados] = await Promise.all([
+    db
+      .selectDistinct({ socio: movimientosCuentaCorriente.socioId })
+      .from(movimientosCuentaCorriente)
+      .where(eq(movimientosCuentaCorriente.servicioId, servicioId)),
+    db
+      .selectDistinct({ socio: espacios.ocupanteId })
+      .from(espacios)
+      .where(and(eq(espacios.servicioId, servicioId), isNotNull(espacios.ocupanteId))),
+    db
+      .select({ socio: socioServiciosCancelados.socioId })
+      .from(socioServiciosCancelados)
+      .where(eq(socioServiciosCancelados.servicioId, servicioId)),
+  ]);
+
+  const cancelSet = new Set(cancelados.map((c) => c.socio));
+  const socios = new Set<string>();
+  for (const m of movs) if (m.socio && !cancelSet.has(m.socio)) socios.add(m.socio);
+  for (const e of esps) if (e.socio && !cancelSet.has(e.socio)) socios.add(e.socio);
+  return socios.size;
+}
+
+export async function pausarTarifaAction(id: string): Promise<{ error?: string }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+  if (!isAdmin(ctx)) return { error: 'Solo administradores pueden pausar tarifas.' };
+
+  const guarderiaId = ctx.activeMembership.guarderiaId;
+
+  const [current] = await db
+    .select({ id: servicios.id, estado: servicios.estado })
+    .from(servicios)
+    .where(and(eq(servicios.id, id), eq(servicios.guarderiaId, guarderiaId)))
+    .limit(1);
+  if (!current) return { error: 'Tarifa no encontrada.' };
+  if (current.estado === 'pausado') return { error: 'La tarifa ya está pausada.' };
+
+  // No se puede pausar si hay socios con el servicio contratado.
+  const n = await contarSociosConServicio(id);
+  if (n > 0) {
+    return {
+      error: `No se puede pausar: ${n} socio${n === 1 ? '' : 's'} ${
+        n === 1 ? 'tiene' : 'tienen'
+      } este servicio contratado. Cancelalo en esos socios antes de pausar la tarifa.`,
+    };
+  }
+
+  await db
+    .update(servicios)
+    .set({ estado: 'pausado', updatedAt: new Date() })
+    .where(eq(servicios.id, id));
+  revalidatePath('/tarifario');
+  return {};
+}
+
+export async function reactivarTarifaAction(id: string): Promise<{ error?: string }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+  if (!isAdmin(ctx)) return { error: 'Solo administradores pueden reactivar tarifas.' };
+
+  const guarderiaId = ctx.activeMembership.guarderiaId;
+
+  const [current] = await db
+    .select({ id: servicios.id })
+    .from(servicios)
+    .where(and(eq(servicios.id, id), eq(servicios.guarderiaId, guarderiaId)))
+    .limit(1);
+  if (!current) return { error: 'Tarifa no encontrada.' };
+
+  await db
+    .update(servicios)
+    .set({ estado: 'activo', updatedAt: new Date() })
+    .where(eq(servicios.id, id));
+  revalidatePath('/tarifario');
+  return {};
 }
 
 export async function deleteTarifaAction(id: string): Promise<{ error?: string }> {

@@ -1,0 +1,12 @@
+-- Estado 'pausado' para servicios (tarifas).
+--
+-- Una tarifa pausada NO se borra: queda fuera de circulación. Como los selectores
+-- de asignación a socios ya filtran por estado='activo' (espacios/page.tsx,
+-- usuarios/[id]/page.tsx), una tarifa 'pausado' deja de ofrecerse automáticamente.
+-- Solo se puede pausar una tarifa que ningún socio tenga contratada (validado en
+-- pausarTarifaAction).
+--
+-- ALTER TYPE ... ADD VALUE no puede ejecutarse dentro de una transacción ni usarse
+-- en el mismo statement que lo crea; por eso va solo en su propia migración. Correr
+-- desde el SQL Editor de Supabase.
+ALTER TYPE estado_servicio ADD VALUE IF NOT EXISTS 'pausado';

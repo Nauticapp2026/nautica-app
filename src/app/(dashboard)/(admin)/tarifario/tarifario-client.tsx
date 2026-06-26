@@ -2,12 +2,15 @@
 
 import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronDown, ChevronUp, Edit3, History, Plus, Tag, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Edit3, History, Pause, Play, Plus, Tag, X } from 'lucide-react';
+import { toast } from 'sonner';
 
 import {
   ajusteMasivoTarifasAction,
   createTarifaAction,
   getHistorialTarifaAction,
+  pausarTarifaAction,
+  reactivarTarifaAction,
   updateTarifaAction,
   type AjusteMasivoData,
   type HistorialEntry,
@@ -21,7 +24,7 @@ export type TipoTarifa =
   | 'expensas_ordinarias'
   | 'expensas_extraordinarias'
   | 'servicio_extra';
-export type EstadoTarifa = 'activo' | 'inactivo';
+export type EstadoTarifa = 'activo' | 'inactivo' | 'pausado';
 
 export type MedidaTarifa =
   | 'hasta_16'
@@ -151,6 +154,8 @@ export function TarifarioClient({ tarifas }: { tarifas: Tarifa[] }) {
   const [modal, setModal] = useState<ModalState>(null);
   const [ajusteOpen, setAjusteOpen] = useState(false);
 
+  const [pausando, startPausar] = useTransition();
+
   const grupos = useMemo(() => {
     const filtered = filtro === 'todas' ? tarifas : tarifas.filter((t) => t.tipo === filtro);
     const map = new Map<TipoTarifa, Tarifa[]>();
@@ -163,6 +168,31 @@ export function TarifarioClient({ tarifas }: { tarifas: Tarifa[] }) {
       tarifas: map.get(tipo)!,
     }));
   }, [tarifas, filtro]);
+
+  function handlePausar(t: Tarifa) {
+    startPausar(async () => {
+      const res = await pausarTarifaAction(t.id);
+      if (res.error) {
+        // Alerta cuando hay socios con el servicio contratado (u otro error).
+        toast.error(res.error);
+        return;
+      }
+      toast.success(`"${t.nombre}" quedó en pausa.`);
+      router.refresh();
+    });
+  }
+
+  function handleReactivar(t: Tarifa) {
+    startPausar(async () => {
+      const res = await reactivarTarifaAction(t.id);
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+      toast.success(`"${t.nombre}" reactivada.`);
+      router.refresh();
+    });
+  }
 
   return (
     <div className="p-4 md:p-8">
@@ -240,7 +270,13 @@ export function TarifarioClient({ tarifas }: { tarifas: Tarifa[] }) {
               <Tag className="h-4 w-4" style={{ color: '#669E9D' }} />
               {TIPO_LABELS[tipo]}
             </h3>
-            <TablaTarifas items={list} onEdit={(t) => setModal({ mode: 'edit', tarifa: t })} />
+            <TablaTarifas
+              items={list}
+              onEdit={(t) => setModal({ mode: 'edit', tarifa: t })}
+              onPausar={handlePausar}
+              onReactivar={handleReactivar}
+              accionDisabled={pausando}
+            />
           </section>
         ))
       )}
@@ -270,7 +306,19 @@ export function TarifarioClient({ tarifas }: { tarifas: Tarifa[] }) {
   );
 }
 
-function TablaTarifas({ items, onEdit }: { items: Tarifa[]; onEdit: (t: Tarifa) => void }) {
+function TablaTarifas({
+  items,
+  onEdit,
+  onPausar,
+  onReactivar,
+  accionDisabled,
+}: {
+  items: Tarifa[];
+  onEdit: (t: Tarifa) => void;
+  onPausar: (t: Tarifa) => void;
+  onReactivar: (t: Tarifa) => void;
+  accionDisabled: boolean;
+}) {
   return (
     <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
       <div className="overflow-x-auto">
@@ -296,7 +344,18 @@ function TablaTarifas({ items, onEdit }: { items: Tarifa[]; onEdit: (t: Tarifa) 
             {items.map((t) => (
               <tr key={t.id} className="border-b border-gray-100 last:border-b-0">
                 <td className="px-5 py-3" style={{ color: '#101828' }}>
-                  {t.nombre}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span>{t.nombre}</span>
+                    <span
+                      className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                        t.tipoCobro === 'fijo'
+                          ? 'bg-[#EFF8F7] text-[#175861]'
+                          : 'bg-[#FFF4E6] text-[#B45309]'
+                      }`}
+                    >
+                      {t.tipoCobro === 'fijo' ? 'Fijo' : 'Variable'}
+                    </span>
+                  </div>
                 </td>
                 <td className="px-5 py-3 text-xs text-gray-500">
                   {formatDate(t.vigenciaDesde)} – {formatDate(t.vigenciaHasta)}
@@ -321,6 +380,27 @@ function TablaTarifas({ items, onEdit }: { items: Tarifa[]; onEdit: (t: Tarifa) 
                 </td>
                 <td className="px-5 py-3">
                   <div className="flex justify-end gap-2">
+                    {t.estado === 'pausado' ? (
+                      <button
+                        type="button"
+                        onClick={() => onReactivar(t)}
+                        disabled={accionDisabled}
+                        title="Reactivar tarifa"
+                        className="rounded-[8px] p-1.5 text-[#027A48] hover:bg-green-50 disabled:opacity-40"
+                      >
+                        <Play className="h-4 w-4" />
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => onPausar(t)}
+                        disabled={accionDisabled}
+                        title="Pausar tarifa"
+                        className="rounded-[8px] p-1.5 text-[#669E9D] hover:bg-gray-100 disabled:opacity-40"
+                      >
+                        <Pause className="h-4 w-4" />
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => onEdit(t)}
@@ -344,13 +424,23 @@ function EstadoBadge({ estado, vigenciaHasta }: { estado: EstadoTarifa; vigencia
   const today = new Date().toISOString().slice(0, 10);
   const vencida = estado === 'activo' && vigenciaHasta < today;
 
-  const cls = vencida
-    ? 'bg-amber-50 text-amber-700'
-    : estado === 'activo'
-      ? 'bg-[#ECFDF3] text-[#027A48]'
-      : 'bg-gray-100 text-gray-500';
+  const cls =
+    estado === 'pausado'
+      ? 'bg-blue-50 text-blue-700'
+      : vencida
+        ? 'bg-amber-50 text-amber-700'
+        : estado === 'activo'
+          ? 'bg-[#ECFDF3] text-[#027A48]'
+          : 'bg-gray-100 text-gray-500';
 
-  const label = vencida ? 'Vencida' : estado === 'activo' ? 'Activa' : 'Inactiva';
+  const label =
+    estado === 'pausado'
+      ? 'Pausada'
+      : vencida
+        ? 'Vencida'
+        : estado === 'activo'
+          ? 'Activa'
+          : 'Inactiva';
 
   return (
     <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${cls}`}>
@@ -377,7 +467,11 @@ function TarifaModal({
   const [precio, setPrecio] = useState<string>(initial ? String(initial.precio) : '');
   const [alicuotaIva, setAlicuotaIva] = useState<number>(initial?.alicuotaIva ?? 21);
   const [plazoPagoDias, setPlazoPagoDias] = useState<number>(initial?.plazoPagoDias ?? 0);
-  const [estado, setEstado] = useState<EstadoTarifa>(initial?.estado ?? 'activo');
+  // El selector del modal solo maneja activo/inactivo. El estado 'pausado' se
+  // cambia con los botones Pausar/Reactivar y el server lo preserva al editar.
+  const [estado, setEstado] = useState<'activo' | 'inactivo'>(
+    initial?.estado === 'inactivo' ? 'inactivo' : 'activo',
+  );
   const [vigenciaDesde, setVigenciaDesde] = useState<string>(initial?.vigenciaDesde ?? '');
   const [vigenciaHasta, setVigenciaHasta] = useState<string>(initial?.vigenciaHasta ?? '');
 
@@ -728,7 +822,7 @@ function TarifaModal({
               <select
                 className={inputCls}
                 value={estado}
-                onChange={(e) => setEstado(e.target.value as EstadoTarifa)}
+                onChange={(e) => setEstado(e.target.value as 'activo' | 'inactivo')}
               >
                 <option value="activo">Activo</option>
                 <option value="inactivo">Inactivo</option>

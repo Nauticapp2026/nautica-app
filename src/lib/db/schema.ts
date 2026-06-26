@@ -81,7 +81,7 @@ export const estadoCtaCteEnum = pgEnum('estado_cta_cte', ['pagado', 'no_pagado',
 
 export const estadoQrEnum = pgEnum('estado_qr', ['activo', 'usado', 'revocado']);
 
-export const estadoServicioEnum = pgEnum('estado_servicio', ['activo', 'inactivo']);
+export const estadoServicioEnum = pgEnum('estado_servicio', ['activo', 'inactivo', 'pausado']);
 
 export const estadoProveedorEnum = pgEnum('estado_proveedor', ['activo', 'inactivo']);
 
