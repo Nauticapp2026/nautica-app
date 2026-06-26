@@ -8,8 +8,8 @@ Guía paso a paso para gestionar tu club o guardería náutica desde el panel we
 
 1. [Primeros pasos](#1-primeros-pasos)
 2. [Dashboard](#2-dashboard)
-3. [Usuarios — Socios](#3-usuarios--socios)
-4. [Usuarios — Carga masiva](#4-usuarios--carga-masiva)
+3. [Socios](#3-socios)
+4. [Carga masiva](#4-carga-masiva)
 5. [Solicitudes de membresía](#5-solicitudes-de-membresía)
 6. [Tareas](#6-tareas)
 7. [Espacios](#7-espacios)
@@ -17,7 +17,7 @@ Guía paso a paso para gestionar tu club o guardería náutica desde el panel we
 9. [Comunicaciones](#9-comunicaciones)
 10. [Comprobantes](#10-comprobantes)
 11. [Tarifario](#11-tarifario)
-12. [Configuración](#12-configuración)
+12. [Mi perfil](#12-mi-perfil)
 13. [Débito automático (Payway)](#13-débito-automático-payway)
 
 ---
@@ -35,7 +35,9 @@ Guía paso a paso para gestionar tu club o guardería náutica desde el panel we
 El menú lateral izquierdo es la navegación principal. Desde ahí accedés a todas las secciones:
 
 - **Dashboard** — resumen operativo del día
-- **Usuarios** — socios, invitados y proveedores
+- **Socios** — listado y perfil de los socios del club
+- **Ventas** — registro de ventas
+- **Cobranzas** — seguimiento de cobranzas
 - **Solicitudes** — pedidos de nuevos socios desde la app mobile
 - **Tareas** — tablero operativo para el equipo
 - **Espacios** — amarras, camas y ubicaciones
@@ -43,7 +45,7 @@ El menú lateral izquierdo es la navegación principal. Desde ahí accedés a to
 - **Comunicaciones** — anuncios y novedades para socios
 - **Comprobantes** — emisión y seguimiento de facturas
 - **Tarifario** — precios y servicios
-- **Configuración** — datos del club, equipo, plan y facturación
+- **Mi perfil** — datos del club, equipo, plan y datos impositivos
 
 En la parte inferior del menú encontrás el botón **¿Necesitás ayuda?** para contactar soporte por WhatsApp.
 
@@ -57,9 +59,11 @@ El Dashboard es la pantalla de inicio. Muestra el estado operativo del club en t
 
 - **Embarcaciones en guardería** — cantidad de embarcaciones actualmente activas.
 - **Socios activos** — total de socios con estado activo.
-- **Ingresos del mes** — monto facturado en el mes en curso.
+- **Ingresos del mes** — monto **cobrado** (facturas pagadas) en el mes en curso.
 - **Socios con deuda 2+ meses** — socios con movimientos pendientes de cobro desde hace más de dos meses.
 - **Socios con documentación incompleta** — socios a los que les falta subir documentación.
+
+Más abajo, el Dashboard también muestra un panel de **Operarios** y otro de **Comunicaciones recientes**.
 
 ### Alertas operativas
 
@@ -68,7 +72,7 @@ Las alertas aparecen cuando hay embarcaciones que salieron y no confirmaron su r
 - **Críticas** — sin respuesta del socio (marcadas en rojo).
 - **Retorno próximo** — esperando confirmación de arribo.
 
-Cada alerta muestra el nombre del socio, la embarcación, la hora prometida y la demora acumulada.
+Cada alerta muestra el nombre del socio, la embarcación, la hora prometida y el teléfono. En las **críticas** se suma la **demora acumulada**.
 
 **Resolver una alerta:**
 
@@ -81,23 +85,17 @@ Las acciones disponibles dependen del tipo de alerta.
 
 **Alertas de retorno próximo:**
 
-1. Si el socio tiene teléfono cargado, aparece el botón **Llamar**.
-2. Si el socio no responde y necesitás cerrar la salida manualmente, hacé clic en **Cerrar salida**. Esto registra el arribo en ese momento y desactiva la alerta de forma permanente.
-3. Una vez resuelto el tema, hacé clic en **Marcar resuelta** para cerrar la alerta sin registrar arribo.
+1. Tienen una única acción: **Marcar resuelta**, para cerrar la alerta sin registrar arribo. Los botones Llamar y Cerrar salida solo aparecen en las alertas **críticas**.
 
 ---
 
-## 3. Usuarios — Socios
+## 3. Socios
 
-La sección Usuarios tiene tres pestañas: **Socios**, **Invitados** y **Proveedores**. Cada una muestra los miembros del club con ese rol y permite gestionarlos individualmente.
-
-### Usuarios — Socios
-
-Desde **Usuarios → Socios** gestionás el padrón de socios de tu club.
+Desde **Socios** en el menú lateral gestionás el padrón de socios de tu club.
 
 ### Ver la lista de socios
 
-La tabla muestra: número de socio (#), nombre, email, embarcación asignada, ubicación, fecha de ingreso, estado y deuda.
+La tabla muestra: número de socio (#), nombre, email, embarcación asignada, ubicación, fecha de ingreso, estado y **Saldo**.
 
 - Usá la barra de búsqueda para filtrar por nombre o email.
 - Al lado del buscador hay **filtros por columna**: **Nº socio**, **Nombre** y **Embarcación**. Filtran en vivo a medida que escribís y se combinan entre sí y con el buscador.
@@ -110,7 +108,7 @@ La tabla muestra: número de socio (#), nombre, email, embarcación asignada, ub
   - **Gris (Inactivo)** — socio inactivo.
   - **Rojo (Moroso)** — socio con deuda pendiente.
 - Si un socio tiene un **ícono de alerta amarillo** junto a su nombre, significa que tiene datos de perfil o documentación incompletos. Hacé clic en su nombre para ver qué falta completar.
-- Cada fila tiene un **botón chevron (›)** a la derecha. Al hacerle clic se despliega un panel con:
+- Cada fila tiene un **botón chevron (▾)** a la derecha. Al hacerle clic se despliega un panel con:
   - **Invitados autorizados** — personas registradas por el socio como invitados permanentes. Cada nombre muestra la fecha hasta la que está autorizado (ej: `· válido hasta 30/06/2026`). No incluye accesos externos.
   - **Accesos externos recientes** — últimas entradas registradas por portería como acceso externo. Cada nombre muestra la fecha de la última entrada (ej: `· desde 19/06/2026`). Si la misma persona ingresó varias veces, aparece una sola vez con la entrada más reciente.
 
@@ -120,33 +118,34 @@ La tabla muestra: número de socio (#), nombre, email, embarcación asignada, ub
 2. Completá los datos en el formulario (las secciones se van desplegando):
 
    **Datos personales**
-   - Nombre y apellido
+   - Nombre y apellido _(requeridos)_
    - Email _(requerido)_
-   - Teléfono
+   - Teléfono _(requerido)_
    - Tipo de documento _(requerido)_: DNI / CUIT / CUIL / Pasaporte / CDI
    - Número de documento _(requerido)_
+   - Dirección _(requerida)_, ciudad, provincia, código postal
+   - Contacto de emergencia
+   - Condición frente al IVA
 
    **Datos impositivos**
-   - **Emite comprobante fiscal** — si está marcado, el socio aparece en los selectores de facturación (individual, ventanilla y lote) y se habilitan los campos de Razón social y Condición frente al IVA. Desmarcalo si el socio no requiere factura fiscal — esos campos se desactivan y el socio no aparecerá en ningún flujo de emisión de comprobantes AFIP.
-   - Razón social _(disponible solo si marcaste "Emite comprobante fiscal")_
-   - Condición frente al IVA _(disponible solo si marcaste "Emite comprobante fiscal")_: Consumidor Final / Responsable Monotributo / IVA Responsable Inscripto / IVA Sujeto Exento / Proveedor del Exterior / Cliente del Exterior / IVA No Alcanzado
-   - Dirección, ciudad, código postal
+   - **Usar datos personales para facturación** — define con qué datos se factura. **Desmarcado (por defecto)** se factura con los **datos impositivos** y se muestran sus campos (Razón social, CUIT, etc.). **Marcado**, se factura con los **datos personales** (nombre y documento) y los campos impositivos se ocultan.
+   - Razón social, CUIT, Dirección fiscal, Condición frente al IVA, Ingresos Brutos y Email de facturación _(visibles cuando "Usar datos personales para facturación" está **desmarcado**)_
 
    **Datos de embarcación** _(opcional al momento del alta)_
    - Nombre de la embarcación
    - Matrícula
+   - Astillero
    - Modelo
-   - Eslora: ingresá el valor y usá el toggle **m / pies** para elegir la unidad (siempre se guarda en metros)
-   - Manga
+   - Eslora: ingresá el valor y usá el toggle **m / ft** para elegir la unidad (siempre se guarda en metros)
 
    **Adjuntos** _(opcional)_
    - Podés subir documentación desde esta sección o hacerlo después desde el perfil del socio.
 
-3. Hacé clic en **Guardar**.
+3. Hacé clic en **Guardar socio**.
 
 ### Ver y editar el perfil de un socio
 
-Hacé clic en el nombre del socio en la tabla para abrir su perfil. El perfil tiene nueve pestañas:
+Hacé clic en el nombre del socio en la tabla para abrir su perfil. El perfil tiene diez pestañas:
 
 #### Pestaña Generales
 
@@ -198,7 +197,7 @@ Desde esta pestaña cargás nuevos consumos con el botón **Cargar Servicio** (a
 
 ### Ver cargos individuales
 
-Cada fila de servicio tiene un **chevron (›)** a la izquierda del nombre. Al hacerle clic se despliegan los cargos individuales de ese servicio, ordenados del más reciente al más viejo, con fecha, concepto y monto de cada uno.
+Cada fila de servicio tiene un **chevron (▾)** a la izquierda del nombre. Al hacerle clic se despliegan los cargos individuales de ese servicio, ordenados del más reciente al más viejo, con fecha, concepto y monto de cada uno.
 
 ### Editar un cargo
 
@@ -260,7 +259,7 @@ Cada registro muestra el nombre de la persona, el período autorizado (desde / h
 
 #### Pestaña Invitados
 
-Lista los invitados autorizados por el socio (los mismos que aparecen al desplegar la fila del socio en la lista de Usuarios). Cada invitado muestra su nombre, la fecha hasta la que está autorizado, teléfono, DNI y un badge **Titular** o **Autorizado**.
+Lista los invitados autorizados por el socio (los mismos que aparecen al desplegar la fila del socio en la lista de Socios). Cada invitado muestra su nombre, la fecha hasta la que está autorizado, teléfono, DNI y un badge **Invitado** o **Autorizado**.
 
 > No incluye los accesos externos (esos están en la pestaña Accesos Externos).
 
@@ -280,18 +279,18 @@ Registrá y gestioná la tarjeta de crédito o débito del socio para el cobro a
 
 ---
 
-## 4. Usuarios — Carga masiva
+## 4. Carga masiva
 
 Si tenés muchos socios o embarcaciones para cargar, podés hacerlo importando un archivo Excel.
 
 ### Importar socios desde Excel
 
-1. En **Usuarios → Socios**, hacé clic en **Importar socios**.
+1. En **Socios**, hacé clic en **Importar socios**.
 2. Descargá la plantilla haciendo clic en **Descargar plantilla**. Abrí el archivo `.xlsx` y completá los datos de cada socio en una fila. La plantilla incluye una columna **Número de socio** (opcional); si la completás, se asigna ese número al socio; si la dejás vacía, el sistema asigna el siguiente número disponible automáticamente.
-3. Guardá el archivo y volvé al panel. Hacé clic en **Elegir archivo .xlsx** y seleccioná tu archivo.
+3. Guardá el archivo y volvé al panel. Hacé clic en **Elegir archivo .xlsx**, seleccioná tu archivo y luego en **Ver previsualización**.
 4. El sistema mostrará una vista previa con el resultado del análisis:
    - **A crear** (verde) — socios nuevos que se van a agregar.
-   - **A vincular** (amarillo) — emails que ya existen en el sistema; el socio se va a vincular a tu club.
+   - **A vincular** (verde) — emails que ya existen en el sistema; el socio se va a vincular a tu club.
    - **Se saltan** (amarillo) — filas duplicadas o que ya están vinculadas.
    - **Con error** (rojo) — filas con datos inválidos; revisá el detalle para corregirlas.
 5. Si el resultado es correcto, hacé clic en **Confirmar importación**.
@@ -375,7 +374,7 @@ Cada tarjeta muestra:
 
 ### Crear una tarea
 
-1. Hacé clic en el botón **+** de la columna correspondiente, o en **Nueva tarea** (si lo tiene el header).
+1. Hacé clic en el botón **Nueva tarea** (arriba a la derecha de la pantalla).
 2. Completá el formulario:
    - **Descripción** _(requerida)_ — qué hay que hacer.
    - **Operario** — a quién se le asigna (opcional; el operario la verá en su lista).
@@ -383,7 +382,7 @@ Cada tarjeta muestra:
    - **Estado** — columna inicial del tablero.
    - **Fecha y hora** — cuándo debe realizarse.
    - **Nota** — información adicional para el operario.
-3. Hacé clic en **Guardar**.
+3. Hacé clic en **Crear tarea** (o **Guardar cambios** si estás editando una existente).
 
 ### Mover una tarea de estado
 
@@ -511,11 +510,11 @@ Si tu plan es Esencial, verás un aviso indicando que debés actualizar a Premiu
 2. Modificá los campos que necesitás y hacé clic en **Publicar** o **Guardar borrador**.
 3. Para eliminarla, hacé clic en **Eliminar** al pie del formulario y confirmá.
 
-> Solo podés editar una publicación dentro de las **24 horas** siguientes a su creación. Pasado ese tiempo el botón de edición desaparece.
+> Solo podés editar una publicación dentro de las **24 horas** siguientes a su creación. Pasado ese tiempo el botón de edición se bloquea (cambia a **BLOQUEADO** con un candado) y ya no se puede modificar.
 
 ### Filtros y búsqueda
 
-Podés filtrar las publicaciones por tipo (Amarras / Camas), por estado (Publicadas / Borradores) y ordenarlas por fecha o precio. También podés buscar por dirección usando el campo de búsqueda.
+Podés filtrar las publicaciones por tipo (Amarras / Camas), por estado (Publicadas / Borradores) y ordenarlas por fecha o precio.
 
 ---
 
@@ -556,9 +555,9 @@ Podés buscar por título usando la barra de búsqueda.
 
 ### Editar o despublicar
 
-Hacé clic en la comunicación en la lista para abrirla y editarla. Podés volver a guardarla como borrador si necesitás pausar su visibilidad.
+Hacé clic en el **ícono de lápiz** de la comunicación para abrirla y editarla. Podés volver a guardarla como borrador si necesitás pausar su visibilidad.
 
-> Solo podés editar una comunicación dentro de las **24 horas** siguientes a su creación. Pasado ese tiempo el botón de edición desaparece.
+> Solo podés editar una comunicación dentro de las **24 horas** siguientes a su creación. Pasado ese tiempo el lápiz se reemplaza por un **candado** grisado y ya no se puede modificar.
 
 ---
 
@@ -566,13 +565,13 @@ Hacé clic en la comunicación en la lista para abrirla y editarla. Podés volve
 
 Desde esta sección emitís y gestionás las facturas de tu club.
 
-> Para poder emitir facturas AFIP necesitás tener configurado el **Punto de Venta** y haber confirmado el **Certificado AFIP**. Podés hacerlo desde **Configuración → Datos de facturación**. Si la emisión está bloqueada, el panel muestra un aviso explicando qué falta. Los **recibos internos** se pueden emitir aunque el certificado todavía no esté configurado.
+> Para poder emitir facturas AFIP necesitás tener configurado el **Punto de Venta** y haber confirmado el **Certificado AFIP**. Podés hacerlo desde **Mi perfil → Datos Impositivos**. Si la emisión está bloqueada, el panel muestra un aviso explicando qué falta. Los **recibos internos** se pueden emitir aunque el certificado todavía no esté configurado.
 
 ### Datos requeridos para emitir facturas AFIP
 
 Para que la emisión no falle, tanto el **club** como cada **socio** deben tener ciertos datos completos:
 
-**Del club** (Configuración → Información general):
+**Del club** (Mi perfil → Información general):
 
 - CUIT del club
 - Condición frente al IVA
@@ -592,27 +591,29 @@ Si alguno de estos datos falta en el modo elegido, el sistema puede rechazar la 
 
 Las tarjetas superiores muestran:
 
-- **Pendientes de cobro** — monto total de facturas sin cobrar.
-- **Pagadas este mes** — monto cobrado en el mes.
-- **Vencidas** — facturas que superaron su fecha de vencimiento sin cobro.
-- **Total facturado** — acumulado histórico.
+- **Pendientes de cobro** — **cantidad** de facturas sin cobrar.
+- **Pagadas este mes** — **cantidad** de facturas cobradas en el mes.
+- **Vencidas** — cantidad de facturas que superaron su fecha de vencimiento sin cobro.
+- **Total facturado** — monto acumulado histórico.
 
 ### Emitir una factura individual
 
-1. Hacé clic en **Nueva factura**.
+1. Hacé clic en **Nuevo comprobante**.
 2. Seleccioná el **socio** en el campo Cliente.
-3. El sistema muestra automáticamente los **conceptos pendientes** del socio (movimientos mensuales sin facturar). Marcá los que querés incluir. Podés usar **Todos** o **Ninguno** para seleccionar rápido.
+3. El sistema muestra automáticamente los **conceptos pendientes** del socio (movimientos sin facturar). Marcá los que querés incluir. Podés usar **Todos** o **Ninguno** para seleccionar rápido.
 4. Completá los campos:
    - **Tipo de comprobante** — se determina automáticamente según la condición IVA del club y del socio (campo de solo lectura):
      - Club Monotributo → siempre **Factura C**.
      - Club Responsable Inscripto + Socio Responsable Inscripto → **Factura A**.
      - Club Responsable Inscripto + cualquier otra condición → **Factura B**.
-   - **Condición de venta**: Contado, Transferencia bancaria, Tarjeta de crédito, Mercado Pago, etc.
+   - **Condición de venta**: Contado, Cuenta corriente, 30 / 60 / 90 días.
+   - **Forma de pago**: Efectivo, Transferencia, Tarjeta de crédito, Mercado Pago, etc.
+   - **Estado** del comprobante: Pendiente, Pagada o Vencida.
    - **Fecha** y **Vencimiento**.
    - **Período desde / hasta**.
-5. Hacé clic en **Emitir factura**. La factura se envía a AFIP y queda registrada.
+5. Hacé clic en **Emitir**. La factura se envía a AFIP y queda registrada.
 
-> Solo aparecen en el selector los socios con **Emite comprobante fiscal** activado. Los socios sin ese flag no se muestran en este formulario.
+> En el selector aparecen **todos los socios del club**. Lo que define si la emisión sale bien son los **datos fiscales/personales completos** del socio (ver "Datos requeridos para emitir facturas AFIP"); si faltan, AFIP puede rechazar la emisión.
 
 ### Emitir comprobante por ventanilla
 
@@ -621,24 +622,24 @@ Para facturar servicios puntuales que no están cargados como movimientos del so
 1. Hacé clic en **Ventanilla**.
 2. Seleccioná el socio. El **tipo de comprobante** se asigna automáticamente (igual que en la factura individual) y aparece como campo de solo lectura.
 3. Agregá los ítems: descripción, cantidad y precio unitario de cada uno.
-4. Completá condición de venta y fecha.
-5. Hacé clic en **Emitir**. La factura se envía a AFIP de inmediato.
+4. Completá condición de venta, forma de pago, fecha y vencimiento.
+5. Hacé clic en **Emitir comprobante**. La factura se envía a AFIP de inmediato.
 
-> Solo disponible si el POS y el certificado AFIP están configurados. Solo aparecen socios con **Emite comprobante fiscal** activado.
+> Solo disponible si el POS y el certificado AFIP están configurados.
 
 ### Facturación en lote
 
 Emití facturas para múltiples socios al mismo tiempo.
 
 1. Hacé clic en **Factura en lote**.
-2. El sistema lista los socios con conceptos pendientes (solo socios con **Emite comprobante fiscal** activado). Cada socio puede tener uno o más conceptos expandibles.
+2. El sistema lista los socios con conceptos pendientes. Cada socio puede tener uno o más conceptos expandibles.
    - La **casilla del socio** selecciona o deselecciona todos sus conceptos de una vez.
    - Podés marcar o desmarcar conceptos individuales dentro del socio. Si solo algunos están marcados, la casilla del socio muestra el estado **intermedio** (guión) indicando selección parcial.
 3. Revisá el resumen y confirmá.
 
 El tipo de comprobante se determina automáticamente para cada socio según la condición IVA del club y de cada socio individualmente (igual que en la factura individual). La condición de venta es siempre **Contado**.
 
-> La facturación mensual automática corre el día del mes que configuraste en **Configuración → Información general** (campo "Día de facturación"). Solo aplica a socios que ya tuvieron al menos una factura emitida.
+> La facturación mensual automática corre el día del mes que configuraste en **Mi perfil → Información general** (campo "Día de facturación"). Solo aplica a socios que ya tuvieron al menos una factura emitida.
 
 **¿Qué conceptos entran en la factura automática?** La factura incluye **todos los cargos pendientes** del socio: la mensualidad del espacio que el sistema genera ese día **más cualquier consumo cargado durante el mes que siga pendiente**. No entran los pagos ni saldos a favor, ni los cargos que ya estaban facturados (no se duplican), **ni los cargos con comprobante interno** (esos nunca se facturan). Importante: como todo consumo fiscal cargado desde **Cargar Servicio** queda pendiente, cada consumo no cobrado antes del día de facturación se va a incluir en la factura mensual del socio.
 
@@ -707,33 +708,26 @@ Desde aquí definís los precios de los servicios que ofrece tu club.
 
 ### Ver las tarifas
 
-Las tarifas están agrupadas por categoría. Podés filtrar usando los botones:
+Las tarifas están agrupadas por categoría. Podés filtrar usando los botones: **Todas**, **Espacio de guarda**, **Cuota social**, **Membresía**, **Expensas ordinarias**, **Expensas extraordinarias** y **Servicio extra**.
 
-- **Todas** — muestra todo.
-- **Espacios** — tarifas para amarras o camas (por metro/pie de eslora o manga).
-- **Cuota mensual** — cuotas periódicas.
-- **Servicios Extra** — servicios adicionales (lavado, amarre de pasada, etc.).
-
-Cada tarifa muestra su concepto, período de vigencia, precio y estado. En la columna de precio se muestran dos valores:
+Cada tarifa muestra su concepto, un badge **Fijo** o **Variable** (fijo = precio único; variable = se cobra según el metraje de la embarcación), el período de vigencia, el precio y el estado. En la columna de precio se muestran dos valores:
 
 - **Precio c/IVA** — el precio de lista (incluye IVA).
-- **Precio s/IVA** — calculado automáticamente según la alícuota configurada (precio ÷ (1 + alícuota)). Si la alícuota es 0 %, aparece el texto "Sin IVA".
+- **Precio s/IVA** — calculado automáticamente según la alícuota configurada (precio ÷ (1 + alícuota)). La línea "s/IVA" solo aparece cuando la alícuota es mayor a 0; si la tarifa es **Exento / No gravado** (0 %), no se muestra.
 
-Si la fecha de vencimiento ya pasó, el estado aparece como **Vencida** (en ámbar) en lugar de Activa.
+**Estados de una tarifa:** **Activa**; **Vencida** (en ámbar, si pasó su fecha de vencimiento); o **Pausada**. Con el botón **Pausar** dejás de aplicar una tarifa sin borrarla (no se puede pausar una que tenga socios con ese servicio contratado), y con **Reactivar** la volvés a habilitar.
 
 ### Crear una tarifa
 
 1. Hacé clic en **Nueva tarifa**.
-2. Seleccioná la **Categoría**:
-   - **Espacios** — seleccioná si es para Camas o Amarra, la unidad de metraje (Metros o Pies), la eslora, la manga y opcionalmente un valor puntual.
-   - **Cuota mensual** — ingresá el concepto, la medida (rangos de eslora desde "Hasta 16" hasta "Hasta 105") y el precio.
-   - **Servicios Extra** — ingresá el concepto y el precio.
-3. Ingresá el **Precio** y la **Alícuota de IVA**: 0 %, 10,5 % o 21 %.
-4. Definí la **Vigencia**:
+2. Seleccioná la **Categoría**: Espacio de guarda, Cuota social, Membresía, Expensas ordinarias, Expensas extraordinarias o Servicio extra.
+3. Indicá si el servicio es **Fijo** (precio único) o **Variable** (se cobra según el metraje de la embarcación).
+4. Ingresá el **Precio** y la **Alícuota de IVA**: **Exento / No gravado**, **10,5 %** o **21 %**.
+5. Configurá el **Plazo de pago** (días) y la **Vigencia**:
    - **Vigencia desde** — fecha a partir de la cual la tarifa está activa.
    - **Vencimiento** — fecha hasta la que aplica.
    - No pueden existir dos tarifas del mismo concepto con fechas superpuestas.
-5. Hacé clic en **Guardar tarifa**.
+6. Hacé clic en **Guardar tarifa**.
 
 ### Editar una tarifa
 
@@ -741,13 +735,15 @@ Hacé clic en el ícono de edición (lápiz) en la fila de la tarifa. Podés cam
 
 ### Ajuste masivo de precios
 
-Si necesitás actualizar todos los precios a la vez:
+Si necesitás actualizar varios precios a la vez:
 
-1. En la sección **Ajuste Masivo de Tarifas**, seleccioná:
+1. Hacé clic en **Ajuste masivo**. Se abre un modal donde elegís:
+   - **Concepto** — Todos o una categoría específica (el ajuste aplica solo a esa categoría).
    - **Tipo**: Porcentaje o Monto fijo.
    - **Dirección** (si es Porcentaje): Aumentar o Descontar.
    - **Valor** — el porcentaje o monto a aplicar.
-2. Hacé clic en **Aplicar a todas**.
+   - **Vigencia desde** — fecha a partir de la cual rige el nuevo precio.
+2. Hacé clic en **Aplicar**.
 
 ### Historial de cambios
 
@@ -755,9 +751,9 @@ Cada tarifa tiene un acordeón **Historial de cambios** donde podés ver los pre
 
 ---
 
-## 12. Configuración
+## 12. Mi perfil
 
-Desde **Configuración** administrás los datos de tu club y las integraciones.
+Desde **Mi perfil** administrás los datos de tu club y las integraciones.
 
 ### Pestaña: Información general
 
@@ -786,14 +782,14 @@ Podés subir fotos que se muestran en el perfil público del club.
 
 Hacé clic en **Guardar cambios** al terminar.
 
-**Datos de facturación (AFIP):**
+**Datos Impositivos:**
 
-Esta sección aparece debajo de las fotos. Configurá aquí el Punto de Venta para poder emitir facturas electrónicas.
+Configurá aquí el Punto de Venta para poder emitir facturas electrónicas. Antes de configurarlo, esta sección aparece debajo de las fotos; una vez configurado el POS, pasa a una **pestaña propia "Datos impositivos"**.
 
 _Paso 1 — Configurar el Punto de Venta:_
 
 1. Completá los datos:
-   - **Número de Punto de Venta** _(requerido)_ — debe existir previamente en AFIP (Servicios → Administrador de Relaciones → POS de Facturación Electrónica).
+   - **Nº de referencia** _(requerido)_ — el número de Punto de Venta, que debe existir previamente en AFIP (Servicios → Administrador de Relaciones → POS de Facturación Electrónica).
    - **Razón social** _(requerida)_
    - **CUIT** _(requerido)_
    - **Condición frente al IVA** _(requerida)_ — la de tu club.
@@ -813,7 +809,7 @@ El certificado permite que el sistema emita facturas directamente a AFIP en nomb
 2. Instalá el certificado en el portal de AFIP siguiendo las instrucciones recibidas.
 3. Volvé al panel y hacé clic en **Confirmar instalación** para habilitar la emisión.
 
-> Hasta que no confirmes la instalación del certificado, el botón "Nueva factura" aparece deshabilitado.
+> Hasta que no confirmes la instalación del certificado, el botón "Nuevo comprobante" aparece deshabilitado.
 
 ### Pestaña: Equipo
 
@@ -836,7 +832,7 @@ Gestioná el personal del club que tiene acceso al panel web o a la app mobile.
 **Editar o eliminar un miembro:**
 Usá los íconos de edición y eliminación en la tarjeta del miembro.
 
-> Eliminar un miembro del equipo lo desvincula de tu club pero no borra su cuenta (puede estar en otro club). Si necesitás revocar el acceso completamente, contactá a soporte.
+> ⚠️ **Eliminar un miembro del equipo borra su cuenta de TODA la plataforma**, no solo de tu club. Si el usuario pertenece a otros clubes, también pierde el acceso ahí. Es una acción **destructiva e irreversible**; el sistema te pide confirmación antes de ejecutarla. (No se puede eliminar a un Super Admin desde acá.)
 
 ### Pestaña: Plan
 
@@ -848,7 +844,7 @@ Los tres planes disponibles son **Esencial**, **Premium** y **Élite**. Cada uno
 
 1. Hacé clic en **Cambiar a [nombre del plan]** bajo el plan deseado.
 2. Confirmá el cambio en el modal. El sistema te indica la fecha exacta en que se aplicará.
-3. El cambio **no es inmediato**: se programa para el **último día del mes en curso**. Hasta esa fecha seguís con tu plan actual.
+3. El cambio **no es inmediato**: se programa para el **primer día del mes siguiente**. Hasta esa fecha seguís con tu plan actual.
 
 Si confirmaste un cambio y querés cancelarlo antes de que se aplique, aparece un aviso ámbar en la parte superior de la pestaña con el detalle del cambio pendiente y un botón **Cancelar cambio**.
 
@@ -871,18 +867,18 @@ El débito automático permite cobrar la cuota mensual directamente desde la tar
 
 > **Requisito previo:** el débito automático requiere que Payway habilite la funcionalidad "Store Credential / MIT" en tu cuenta. Solicitalo a tu ejecutivo de cuentas o al soporte de Payway antes de empezar. Sin esta habilitación el sistema no puede generar los tokens para cobrar mensualmente.
 
-1. Andá a **Configuración** en el menú lateral.
+1. Andá a **Mi perfil** en el menú lateral.
 2. Hacé clic en la pestaña **Payway**.
-3. Ingresá tu **Clave pública** y tu **Clave privada**.
-4. Hacé clic en **Guardar credenciales**.
+3. Ingresá tu **Public Key** y tu **Private Key**.
+4. Hacé clic en **Conectar Payway** (si ya estaba configurado, el botón dice **Actualizar claves**).
 
-Una vez configurado, el tab muestra el estado **Conectado**.
+Una vez configurado, el tab muestra el mensaje **"Payway está conectado."**.
 
 Para desconectar Payway, usá el botón **Desconectar** en esa misma pantalla. Esto no elimina las tarjetas de los socios, pero los cobros automáticos dejarán de procesarse.
 
 ### Paso 2 — Registrar la tarjeta de un socio
 
-1. Andá a **Usuarios** y abrí el perfil del socio.
+1. Andá a **Socios** y abrí el perfil del socio.
 2. Hacé clic en la pestaña **Débito automático**.
 3. Completá los datos de la tarjeta:
    - Número de tarjeta
