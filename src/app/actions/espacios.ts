@@ -15,6 +15,7 @@ import {
   naves,
   pisos as pisosTable,
   servicios,
+  socioServiciosCancelados,
 } from '@/lib/db/schema';
 import { getActiveMarina } from '@/lib/auth/session';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -356,6 +357,16 @@ export async function updateEspacioAction(input: UpdateEspacioInput): Promise<{ 
       const concepto = esProporcional
         ? `${servicioNombre} (proporcional ${diasRestantes}/${diasMes} días)`
         : servicioNombre;
+      // Re-contratar: si el servicio estaba cancelado para este socio, limpiar la
+      // cancelación para que el cron vuelva a generar el cargo mensual.
+      await db
+        .delete(socioServiciosCancelados)
+        .where(
+          and(
+            eq(socioServiciosCancelados.socioId, input.ocupanteId),
+            eq(socioServiciosCancelados.servicioId, input.servicioId),
+          ),
+        );
       await ensureMonthlyMovimiento({
         socioId: input.ocupanteId,
         espacioId: input.id,
@@ -472,6 +483,15 @@ export async function assignEspacioToSocioAction(input: {
         const concepto = esProporcional
           ? `${servicio.nombre} (proporcional ${diasRestantes}/${diasMes} días)`
           : servicio.nombre;
+        // Re-contratar: limpiar la cancelación previa de este (socio, servicio).
+        await db
+          .delete(socioServiciosCancelados)
+          .where(
+            and(
+              eq(socioServiciosCancelados.socioId, input.socioId),
+              eq(socioServiciosCancelados.servicioId, espacio.servicioId),
+            ),
+          );
         await ensureMonthlyMovimiento({
           socioId: input.socioId,
           espacioId: input.espacioId,

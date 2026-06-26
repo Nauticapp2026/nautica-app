@@ -21,10 +21,16 @@
  * deprecado). Sigue siendo útil como historial del alta.
  */
 
-import { and, eq, gte, isNotNull, lte } from 'drizzle-orm';
+import { and, eq, gte, inArray, isNotNull, lte } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
-import { espacios, guarderias, movimientosCuentaCorriente, servicios } from '@/lib/db/schema';
+import {
+  espacios,
+  guarderias,
+  movimientosCuentaCorriente,
+  servicios,
+  socioServiciosCancelados,
+} from '@/lib/db/schema';
 
 function nextMonthStart(d: Date = new Date()): Date {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1, 0, 0, 0, 0));
@@ -198,12 +204,41 @@ export async function runMonthlyGeneration(now: Date = new Date()): Promise<{
       ),
     );
 
+  // Servicios cancelados por socio: si un (socio, servicio) está en
+  // socio_servicios_cancelados, NO se vuelve a generar el cargo mensual aunque
+  // el espacio siga asignado. El proporcional hasta la baja ya se cobró al
+  // cancelar; de acá en más no se cobra más. Liberar el espacio es aparte.
+  const ocupanteIds = [...new Set(rows.map((r) => r.ocupanteId).filter(Boolean) as string[])];
+  const servicioIds = [...new Set(rows.map((r) => r.servicioId).filter(Boolean) as string[])];
+  const canceladosSet = new Set<string>();
+  if (ocupanteIds.length > 0 && servicioIds.length > 0) {
+    const cancelados = await db
+      .select({
+        socioId: socioServiciosCancelados.socioId,
+        servicioId: socioServiciosCancelados.servicioId,
+      })
+      .from(socioServiciosCancelados)
+      .where(
+        and(
+          inArray(socioServiciosCancelados.socioId, ocupanteIds),
+          inArray(socioServiciosCancelados.servicioId, servicioIds),
+        ),
+      );
+    for (const c of cancelados) canceladosSet.add(`${c.socioId}:${c.servicioId}`);
+  }
+
   let created = 0;
   let skipped = 0;
   const guarderiasProcesadas = new Set<string>();
 
   for (const r of rows) {
     if (!r.ocupanteId || !r.servicioId) continue;
+
+    // Servicio cancelado para este socio → no generar el cargo mensual.
+    if (canceladosSet.has(`${r.ocupanteId}:${r.servicioId}`)) {
+      skipped++;
+      continue;
+    }
 
     const usaPrimerHabil = r.facturacionPrimerHabil ?? false;
     const diaObjetivo = usaPrimerHabil ? primerHabilDelMes : (r.diaFacturacion ?? 1);
