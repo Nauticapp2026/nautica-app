@@ -801,9 +801,7 @@ export async function cargarServicioAction(data: CargarServicioData): Promise<{
   error?: string;
   comprobante?: 'interno' | 'fiscal';
   reciboId?: string;
-  facturaId?: string;
   comprobanteNro?: string;
-  pdfUrl?: string;
 }> {
   const ctx = await getActiveMarina();
   if (!ctx) return { error: 'No autenticado' };
@@ -871,65 +869,12 @@ export async function cargarServicioAction(data: CargarServicioData): Promise<{
     return { comprobante: 'interno', reciboId: id, comprobanteNro: codigo };
   }
 
-  // 2b. Comprobante fiscal → factura AFIP del cargo (tipo derivado de la condición IVA).
-  const [guard] = await db
-    .select({ condicionIva: guarderias.condicionIva })
-    .from(guarderias)
-    .where(eq(guarderias.id, gId))
-    .limit(1);
-  const [socioRow] = await db
-    .select({
-      condicionIva: profiles.condicionIva,
-      condicionIvaPersonal: profiles.condicionIvaPersonal,
-      facturaFiscal: memberships.facturaFiscal,
-    })
-    .from(profiles)
-    .innerJoin(
-      memberships,
-      and(eq(memberships.userId, profiles.id), eq(memberships.guarderiaId, gId)),
-    )
-    .where(eq(profiles.id, data.socioId))
-    .limit(1);
-
-  const socioCond = socioRow?.facturaFiscal
-    ? socioRow.condicionIvaPersonal
-    : socioRow?.condicionIva;
-  const tipoFactura =
-    derivarTipoFactura(guard?.condicionIva ?? null, socioCond ?? null) ?? 'factura_c';
-
-  const hoy = data.fecha || new Date().toISOString().slice(0, 10);
-  const venc = (() => {
-    const d = new Date(`${hoy}T12:00:00.000Z`);
-    d.setUTCDate(d.getUTCDate() + 10);
-    return d.toISOString().slice(0, 10);
-  })();
-
-  const r = await crearFacturaCore({
-    guarderiaId: gId,
-    socioId: data.socioId,
-    tipoFactura,
-    condicionVenta: 'contado',
-    medioPago: 'efectivo',
-    estado: 'pendiente',
-    descripcion: conceptoFinal,
-    fecha: hoy,
-    vencimiento: venc,
-    desde: hoy,
-    hasta: hoy,
-    movimientoIds: [movimientoId],
-  });
-  if (r.error) {
-    // El cargo queda en la cuenta corriente (facturable después desde Comprobantes).
-    return { error: `Servicio cargado, pero la factura falló: ${r.error}` };
-  }
+  // 2b. Comprobante fiscal → NO se emite a AFIP ahora. El cargo queda como un
+  // consumo facturable normal (comprobante_interno = false), y la factura AFIP se
+  // emite después por la facturación manual o automática (como cualquier otro cargo).
   revalidatePath('/facturacion');
   revalidatePath(`/usuarios/${data.socioId}`);
-  return {
-    comprobante: 'fiscal',
-    facturaId: r.facturaId,
-    comprobanteNro: r.comprobanteNro,
-    pdfUrl: r.pdfUrl,
-  };
+  return { comprobante: 'fiscal' };
 }
 
 // ─── Action: enviar recibo por mail al socio ──────────────────────────────────

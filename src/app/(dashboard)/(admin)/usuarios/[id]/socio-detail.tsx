@@ -758,7 +758,6 @@ function AgregarServicioModal({
     comprobante: 'interno' | 'fiscal';
     nro?: string;
     reciboId?: string;
-    pdfUrl?: string;
   } | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -800,7 +799,6 @@ function AgregarServicioModal({
           comprobante: res.comprobante!,
           nro: res.comprobanteNro,
           reciboId: res.reciboId,
-          pdfUrl: res.pdfUrl,
         });
         router.refresh();
       }
@@ -835,11 +833,16 @@ function AgregarServicioModal({
             <div className="flex items-start gap-3 rounded-[10px] bg-teal-50 p-4">
               <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-teal-600" />
               <div>
-                <p className="font-semibold text-teal-900">
-                  Servicio cargado ·{' '}
-                  {result.comprobante === 'fiscal' ? 'Comprobante fiscal' : 'Comprobante interno'}
-                </p>
-                {result.nro && <p className="text-sm text-teal-700">Nro: {result.nro}</p>}
+                <p className="font-semibold text-teal-900">Servicio cargado</p>
+                {result.comprobante === 'interno' ? (
+                  <p className="text-sm text-teal-700">
+                    Comprobante interno{result.nro ? ` · Nro: ${result.nro}` : ''}
+                  </p>
+                ) : (
+                  <p className="text-sm text-teal-700">
+                    Se facturará por AFIP (manual o automático), como el resto.
+                  </p>
+                )}
               </div>
             </div>
             {result.comprobante === 'interno' && result.reciboId && (
@@ -850,16 +853,6 @@ function AgregarServicioModal({
               >
                 Ver / imprimir comprobante
               </Link>
-            )}
-            {result.comprobante === 'fiscal' && result.pdfUrl && (
-              <a
-                href={result.pdfUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex w-full items-center justify-center gap-2 rounded-[10px] border border-gray-200 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
-              >
-                Descargar factura (PDF)
-              </a>
             )}
             <button
               onClick={handleClose}
@@ -962,7 +955,7 @@ function AgregarServicioModal({
                 <p className="mt-1.5 text-xs text-gray-400">
                   {comprobante === 'interno'
                     ? 'Genera un comprobante interno (no fiscal). El cargo NO se factura por AFIP.'
-                    : 'Emite la factura AFIP del servicio en este momento.'}
+                    : 'El cargo se factura por AFIP después (manual o automático), como el resto.'}
                 </p>
               </div>
 
