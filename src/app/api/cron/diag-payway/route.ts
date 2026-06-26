@@ -17,13 +17,30 @@ const sdkModulo = require('sdk-node-payway');
 const DIAG_KEY = 'diag-2f9a7c41b8e34d56-payway-temp';
 const SOCIO_EMAIL = 'tempo.360.contacto@gmail.com';
 
+type PaywaySdk = {
+  payment: (
+    args: Record<string, unknown>,
+    cb: (result: Record<string, unknown> | null, err: unknown) => void,
+  ) => void;
+  tokens: (
+    args: Record<string, unknown>,
+    cb: (result: Record<string, unknown> | null, err: unknown) => void,
+  ) => void;
+};
+
 function makeSdk(ambient: string, pub: string, priv: string) {
-  return new sdkModulo.sdk(ambient, pub, priv, 'NauticaApp', 'sistema') as {
-    payment: (
-      args: Record<string, unknown>,
-      cb: (result: Record<string, unknown> | null, err: unknown) => void,
-    ) => void;
-  };
+  return new sdkModulo.sdk(ambient, pub, priv, 'NauticaApp', 'sistema') as PaywaySdk;
+}
+
+function tokensAsync(
+  sdk: PaywaySdk,
+  args: Record<string, unknown>,
+): Promise<{ result: Record<string, unknown> | null; err: string | null }> {
+  return new Promise((resolve) => {
+    sdk.tokens(args, (result, err) => {
+      resolve({ result: result ?? null, err: err ? String(err) : null });
+    });
+  });
 }
 
 function paymentAsync(
@@ -108,37 +125,45 @@ export async function GET(req: Request): Promise<Response> {
     fraud_detection: { send_to_cs: false },
   };
 
-  // Variante FIX: igual al actual pero con payment_type:'single' (valor válido).
-  const argsFix: Record<string, unknown> = {
-    site_transaction_id: randomUUID(),
-    token: token.customerToken,
-    user_id: p.id,
-    payment_method_id: token.paymentMethodId,
-    bin: token.bin,
-    amount,
-    currency: 'ARS',
-    installments: 1,
-    description: 'DIAG fix',
-    payment_type: 'single',
-    sub_payments: [],
-    customer: { id: p.id, email: p.email },
-    store_credential: true,
-    fraud_detection: { send_to_cs: false },
-  };
-
   const respActual = await paymentAsync(sdk, argsActual);
-  const respFix = await paymentAsync(sdk, argsFix);
+
+  // PASO 1: re-tokenizar el customer_token → token de pago fresco.
+  // Probamos sin CVV (MIT). Si Decidir exige CVV, lo dirá en la respuesta.
+  const retoken = await tokensAsync(sdk, { token: token.customerToken });
+  const freshToken =
+    (retoken.result?.id as string | undefined) ?? (retoken.result?.token as string | undefined);
+
+  // PASO 2: cobrar con el token fresco + payment_type:'single'.
+  let respFix: { result: Record<string, unknown> | null; err: string | null } | null = null;
+  if (freshToken) {
+    const argsFix: Record<string, unknown> = {
+      site_transaction_id: randomUUID(),
+      token: freshToken,
+      user_id: p.id,
+      payment_method_id: token.paymentMethodId,
+      bin: token.bin,
+      amount,
+      currency: 'ARS',
+      installments: 1,
+      description: 'DIAG fix',
+      payment_type: 'single',
+      sub_payments: [],
+      establishment_name: 'NauticaApp',
+      fraud_detection: { send_to_cs: false },
+    };
+    respFix = await paymentAsync(sdk, argsFix);
+  }
 
   return NextResponse.json({
     ambient,
     socio: SOCIO_EMAIL,
     amountCentavos: amount,
     saldoPesos: totalPesos,
-    tokenMasked: mask(token.customerToken),
-    actual: {
-      sentResumen: { payment_type: 'recurrente', store_credential: true },
-      response: respActual,
-    },
-    fix: { sentResumen: { payment_type: 'single' }, response: respFix },
+    customerTokenMasked: mask(token.customerToken),
+    actual: { sentResumen: { payment_type: 'recurrente' }, response: respActual },
+    paso1_retokenizar: { response: retoken, freshTokenObtenido: Boolean(freshToken) },
+    paso2_cobro: respFix
+      ? { sentResumen: { payment_type: 'single', tokenFresco: true }, response: respFix }
+      : 'no se ejecutó (no se obtuvo token fresco en paso 1)',
   });
 }
