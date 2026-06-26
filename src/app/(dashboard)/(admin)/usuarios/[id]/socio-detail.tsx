@@ -2820,8 +2820,14 @@ export function SocioDetail({
             )}
           </div>
 
-          {/* Metric cards */}
-          <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          {/* Metric cards. La card de Saldo se oculta cuando hay filtros aplicados:
+              su valor es el saldo TOTAL del socio, que no se corresponde con el
+              subconjunto filtrado y resultaría engañoso. */}
+          <div
+            className={`mb-6 grid grid-cols-1 gap-4 ${
+              hayFiltrosCC ? 'sm:grid-cols-2' : 'sm:grid-cols-3'
+            }`}
+          >
             <div className="flex items-center gap-4 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
               <div
                 className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl"
@@ -2854,26 +2860,28 @@ export function SocioDetail({
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-4 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-              <div
-                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl"
-                style={{ background: totalAFavor > 0 ? '#E6F8EC' : '#FEF0E6' }}
-              >
-                {totalAFavor > 0 ? (
-                  <DollarSign className="h-5 w-5" style={{ color: '#15803d' }} />
-                ) : (
-                  <AlertTriangle className="h-5 w-5" style={{ color: '#E87040' }} />
-                )}
+            {!hayFiltrosCC && (
+              <div className="flex items-center gap-4 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+                <div
+                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl"
+                  style={{ background: totalAFavor > 0 ? '#E6F8EC' : '#FEF0E6' }}
+                >
+                  {totalAFavor > 0 ? (
+                    <DollarSign className="h-5 w-5" style={{ color: '#15803d' }} />
+                  ) : (
+                    <AlertTriangle className="h-5 w-5" style={{ color: '#E87040' }} />
+                  )}
+                </div>
+                <div>
+                  <p className="text-xs font-semibold tracking-wide text-gray-400 uppercase">
+                    {totalAFavor > 0 ? 'Saldo a favor' : 'Saldo cliente'}
+                  </p>
+                  <p className="text-[18px] font-bold" style={{ color: '#101828' }}>
+                    {totalAFavor > 0 ? fmt(totalAFavor) : fmt(totalPendiente)}
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-xs font-semibold tracking-wide text-gray-400 uppercase">
-                  {totalAFavor > 0 ? 'Saldo a favor' : 'Saldo cliente'}
-                </p>
-                <p className="text-[18px] font-bold" style={{ color: '#101828' }}>
-                  {totalAFavor > 0 ? fmt(totalAFavor) : fmt(totalPendiente)}
-                </p>
-              </div>
-            </div>
+            )}
           </div>
 
           {/* Table */}
