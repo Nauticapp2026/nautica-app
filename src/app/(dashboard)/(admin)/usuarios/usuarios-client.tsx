@@ -116,9 +116,10 @@ const CONDICION_IIBB_OPTS = [
 const inputCls =
   'h-11 w-full rounded-[10px] border border-gray-200 bg-white px-4 text-sm text-[#101828] focus:border-[#175861] focus:outline-none focus:ring-1 focus:ring-[#175861]';
 
-// Input chico para los filtros por columna (fila bajo los encabezados de la tabla).
+// Inputs de filtro por columna (Nº socio / Nombre / Embarcación), en la barra
+// superior al lado del buscador.
 const colFilterCls =
-  'h-8 w-full rounded-[8px] border border-gray-200 bg-white px-2 text-xs font-normal text-[#101828] placeholder:text-gray-400 focus:border-[#175861] focus:outline-none focus:ring-1 focus:ring-[#175861]';
+  'h-10 w-full rounded-[10px] border border-gray-200 bg-white px-3 text-sm text-[#101828] placeholder:text-gray-400 focus:border-[#175861] focus:outline-none focus:ring-1 focus:ring-[#175861]';
 
 const EMPTY_FORM = {
   nombre: '',
@@ -950,9 +951,9 @@ export function UsuariosClient({
         </div>
 
         <div className="rounded-2xl border border-gray-200 bg-white">
-          {/* Search + button */}
-          <div className="flex flex-col gap-3 border-b border-gray-100 p-4 sm:flex-row sm:items-center">
-            <div className="relative flex-1">
+          {/* Buscador + filtros por columna + botones */}
+          <div className="flex flex-col gap-3 border-b border-gray-100 p-4 sm:flex-row sm:flex-wrap sm:items-center">
+            <div className="relative w-full sm:w-56">
               <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400" />
               <input
                 value={search}
@@ -961,28 +962,52 @@ export function UsuariosClient({
                 className="h-10 w-full rounded-[10px] border border-gray-200 bg-white pr-4 pl-10 text-sm focus:border-[#175861] focus:ring-1 focus:ring-[#175861] focus:outline-none"
               />
             </div>
-            <button
-              onClick={() => setImportModalOpen(true)}
-              className="flex shrink-0 items-center justify-center gap-2 rounded-[10px] border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
-            >
-              <Upload className="h-4 w-4" />
-              Importar socios
-            </button>
-            <button
-              onClick={() => setImportEmbModalOpen(true)}
-              className="flex shrink-0 items-center justify-center gap-2 rounded-[10px] border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
-            >
-              <Upload className="h-4 w-4" />
-              Importar embarcaciones
-            </button>
-            <button
-              onClick={() => setModalOpen(true)}
-              className="flex shrink-0 items-center justify-center gap-2 rounded-[10px] px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90"
-              style={{ background: '#175861' }}
-            >
-              <Plus className="h-4 w-4" />
-              Agregar socio
-            </button>
+            {/* Filtros por columna, al lado del buscador */}
+            <input
+              value={colNumero}
+              onChange={(e) => setColNumero(e.target.value)}
+              placeholder="Nº socio"
+              aria-label="Filtrar por número de socio"
+              className={`${colFilterCls} sm:w-24`}
+            />
+            <input
+              value={colNombre}
+              onChange={(e) => setColNombre(e.target.value)}
+              placeholder="Nombre"
+              aria-label="Filtrar por nombre"
+              className={`${colFilterCls} sm:w-36`}
+            />
+            <input
+              value={colEmbarcacion}
+              onChange={(e) => setColEmbarcacion(e.target.value)}
+              placeholder="Embarcación"
+              aria-label="Filtrar por embarcación"
+              className={`${colFilterCls} sm:w-40`}
+            />
+            <div className="flex flex-col gap-3 sm:ml-auto sm:flex-row">
+              <button
+                onClick={() => setImportModalOpen(true)}
+                className="flex shrink-0 items-center justify-center gap-2 rounded-[10px] border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+              >
+                <Upload className="h-4 w-4" />
+                Importar socios
+              </button>
+              <button
+                onClick={() => setImportEmbModalOpen(true)}
+                className="flex shrink-0 items-center justify-center gap-2 rounded-[10px] border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+              >
+                <Upload className="h-4 w-4" />
+                Importar embarcaciones
+              </button>
+              <button
+                onClick={() => setModalOpen(true)}
+                className="flex shrink-0 items-center justify-center gap-2 rounded-[10px] px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90"
+                style={{ background: '#175861' }}
+              >
+                <Plus className="h-4 w-4" />
+                Agregar socio
+              </button>
+            </div>
           </div>
 
           {filtro && (
@@ -1055,42 +1080,6 @@ export function UsuariosClient({
                         align="center"
                       />
                       <th className="px-4 py-3 text-right">Acciones</th>
-                    </tr>
-                    {/* Filtros por columna */}
-                    <tr className="bg-gray-50">
-                      <th className="px-4 pb-3" />
-                      <th className="px-4 pb-3">
-                        <input
-                          value={colNumero}
-                          onChange={(e) => setColNumero(e.target.value)}
-                          placeholder="Nº"
-                          aria-label="Filtrar por número de socio"
-                          className={`${colFilterCls} text-center`}
-                        />
-                      </th>
-                      <th className="px-4 pb-3">
-                        <input
-                          value={colNombre}
-                          onChange={(e) => setColNombre(e.target.value)}
-                          placeholder="Filtrar nombre"
-                          aria-label="Filtrar por nombre"
-                          className={colFilterCls}
-                        />
-                      </th>
-                      <th className="px-4 pb-3">
-                        <input
-                          value={colEmbarcacion}
-                          onChange={(e) => setColEmbarcacion(e.target.value)}
-                          placeholder="Filtrar embarcación"
-                          aria-label="Filtrar por embarcación"
-                          className={colFilterCls}
-                        />
-                      </th>
-                      <th className="px-4 pb-3" />
-                      <th className="px-4 pb-3" />
-                      <th className="px-4 pb-3" />
-                      <th className="px-4 pb-3" />
-                      <th className="px-4 pb-3" />
                     </tr>
                   </thead>
                   <tbody>
