@@ -205,12 +205,16 @@ Cada fila de servicio tiene un **chevron (›)** a la izquierda del nombre. Al h
 **Cancelar un servicio:**
 
 1. Hacé clic en **Cancelar** en el servicio que querés dar de baja.
-2. Si el servicio tiene precio fijo, el sistema pregunta si querés cobrar el proporcional del mes: días utilizados en el mes actual dividido la cantidad de días del mes, multiplicado por el precio.
+2. Si el servicio tiene precio fijo, el sistema pregunta si querés cobrar el **proporcional de los días usados** del mes (días utilizados ÷ días del mes × precio; ej. si cancelás el día 10 de un mes de 30, cobra 10/30 del precio):
    - **Solo cancelar** — registra la cancelación sin generar cargo adicional.
-   - **Cobrar y cancelar** — genera un movimiento en la Cuenta Corriente por el proporcional y registra la cancelación.
+   - **Cobrar y cancelar** — genera el cargo proporcional en la Cuenta Corriente y registra la cancelación. Ese cargo entra en la próxima factura.
 3. El servicio queda marcado como **Cancelado** con la fecha de baja. El historial de movimientos anteriores se conserva.
 
-> La cancelación no borra datos. Si necesitás reactivar el servicio, tenés que volver a cargarlo mediante Cargar consumo.
+**Servicio de guarda (espacio):** además del proporcional, al cancelar el sistema **deja de generar el cargo mensual** automáticamente de ahí en más. El espacio **sigue asignado** (la embarcación queda en su lugar); si querés **liberar el lugar** para otro socio, hacelo desde la sección **Espacios**. Si más adelante le volvés a asignar ese espacio al socio, la cancelación se limpia sola y vuelve a facturarse.
+
+> **Recordá:** el único cargo que se genera **automáticamente cada mes** es el del **espacio de guarda**. Los demás servicios (cuota social, extras, etc.) no se cobran solos — se van agregando a mano con **Cargar consumo** a medida que se usan. Por eso, cancelar uno de esos simplemente lo da de baja.
+
+> La cancelación no borra datos. Para reactivar un servicio que no es de guarda, volvé a cargarlo mediante Cargar consumo.
 
 #### Pestaña Cuenta Corriente
 
