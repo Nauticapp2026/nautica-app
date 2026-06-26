@@ -123,6 +123,7 @@ type Movimiento = {
   facturaCodigo: string | null;
   facturaArchivo: string | null;
   facturaTipo: string | null;
+  comprobanteInterno: boolean;
 };
 
 type Servicio = {
@@ -3022,9 +3023,11 @@ export function SocioDetail({
                               {detalle}
                             </td>
                             <td className="px-4 py-3 text-gray-500">
-                              {m.facturaTipo
-                                ? (TIPO_COMPROBANTE_LABEL[m.facturaTipo] ?? m.facturaTipo)
-                                : '—'}
+                              {m.comprobanteInterno
+                                ? 'Comprobante interno'
+                                : m.facturaTipo
+                                  ? (TIPO_COMPROBANTE_LABEL[m.facturaTipo] ?? m.facturaTipo)
+                                  : '—'}
                             </td>
                             <td className="px-4 py-3 text-gray-500">
                               <div className="flex items-center gap-1.5">

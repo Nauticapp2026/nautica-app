@@ -119,6 +119,7 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
         servicioNombre: serviciosTable.nombre,
         servicioId: movimientosCuentaCorriente.servicioId,
         servicioTipoCobro: serviciosTable.tipoCobro,
+        comprobanteInterno: movimientosCuentaCorriente.comprobanteInterno,
       })
       .from(movimientosCuentaCorriente)
       .leftJoin(serviciosTable, eq(serviciosTable.id, movimientosCuentaCorriente.servicioId))
@@ -331,6 +332,30 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
       facturasPorMovimiento.set(r.movimientoId, {
         codigo: r.codigo,
         archivo: r.archivo,
+        tipo: r.tipoFactura,
+      });
+    }
+
+    // Comprobantes internos (y cualquier facturación con vínculo directo
+    // movimiento↔comprobante): se guardan con facturacion.movimientoId, no por
+    // la tabla M:N de arriba. Los traemos aparte para mostrar su N° y tipo en la
+    // cuenta corriente. No pisan un vínculo M:N ya resuelto.
+    const directas = await db
+      .select({
+        id: facturacion.id,
+        movimientoId: facturacion.movimientoId,
+        codigo: facturacion.codigo,
+        archivo: facturacion.archivo,
+        tipoFactura: facturacion.tipoFactura,
+      })
+      .from(facturacion)
+      .where(inArray(facturacion.movimientoId, movimientoIds));
+    for (const r of directas) {
+      if (!r.movimientoId || facturasPorMovimiento.has(r.movimientoId)) continue;
+      facturasPorMovimiento.set(r.movimientoId, {
+        codigo: r.codigo,
+        // Sin PDF: el recibo interno se ve/imprime en su página dedicada.
+        archivo: r.archivo ?? `/facturacion/recibo/${r.id}`,
         tipo: r.tipoFactura,
       });
     }
