@@ -34,7 +34,6 @@ import {
 } from 'lucide-react';
 import {
   addMovimientoAction,
-  eliminarPagoAction,
   informarPagoAction,
   marcarPagadasAction,
   updateMovimientoAction,
@@ -1172,42 +1171,6 @@ function InformarPagoModal({
         </div>
       </div>
     </div>
-  );
-}
-
-// ─── Eliminar Pago Button ─────────────────────────────────────────────────────
-
-function EliminarPagoButton({ movimientoId, socioId }: { movimientoId: string; socioId: string }) {
-  const router = useRouter();
-  const [isPending, startTransition] = useTransition();
-
-  function handleClick() {
-    if (!window.confirm('¿Anular este pago a cuenta? El saldo del socio se va a recalcular.')) {
-      return;
-    }
-    startTransition(async () => {
-      const res = await eliminarPagoAction(movimientoId);
-      if (res.error) {
-        window.alert(res.error);
-        return;
-      }
-      router.refresh();
-    });
-  }
-
-  // socioId solo se usa para que el path quede claro al lector; revalidatePath ya lo maneja.
-  void socioId;
-
-  return (
-    <button
-      type="button"
-      onClick={handleClick}
-      disabled={isPending}
-      title="Anular pago"
-      className="rounded-[8px] p-1 text-red-400 transition hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
-    >
-      <X className="h-4 w-4" />
-    </button>
   );
 }
 
@@ -3016,18 +2979,14 @@ export function SocioDetail({
                             </td>
                             <td className="px-4 py-3 text-right">
                               <div className="flex items-center justify-end gap-2">
-                                {esPago ? (
-                                  <EliminarPagoButton movimientoId={m.id} socioId={socio.id} />
-                                ) : (
-                                  <span
-                                    className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${
-                                      ESTADO_BADGE[m.estadoDisplay ?? ''] ??
-                                      'bg-gray-100 text-gray-500'
-                                    }`}
-                                  >
-                                    {ESTADO_LABEL[m.estadoDisplay ?? ''] ?? m.estadoDisplay ?? '—'}
-                                  </span>
-                                )}
+                                <span
+                                  className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${
+                                    ESTADO_BADGE[m.estadoDisplay ?? ''] ??
+                                    'bg-gray-100 text-gray-500'
+                                  }`}
+                                >
+                                  {ESTADO_LABEL[m.estadoDisplay ?? ''] ?? m.estadoDisplay ?? '—'}
+                                </span>
                               </div>
                             </td>
                           </tr>
