@@ -124,7 +124,11 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
       .from(movimientosCuentaCorriente)
       .leftJoin(serviciosTable, eq(serviciosTable.id, movimientosCuentaCorriente.servicioId))
       .where(eq(movimientosCuentaCorriente.socioId, id))
-      .orderBy(desc(movimientosCuentaCorriente.fecha)),
+      // Desempate por created_at: si varios movimientos comparten la misma fecha
+      // (típico al cargar varios el mismo día), sin este segundo criterio el orden
+      // sería arbitrario y "saltaría" en cada alta. Además fija el orden del FIFO de
+      // "Pagado por cobertura" (el creado primero = el más viejo).
+      .orderBy(desc(movimientosCuentaCorriente.fecha), desc(movimientosCuentaCorriente.createdAt)),
 
     db
       .select({
