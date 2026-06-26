@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import QRCodeStyling from 'qr-code-styling';
-import { Logo } from '@/components/shared/logo';
 import { QrCode, Ship, X } from 'lucide-react';
 
 const PRIMARY = '#175861';
@@ -31,7 +30,7 @@ export function GuestQrView({ id, clubName, socioFullName, estado, arribadaEn }:
   return (
     <section className="flex w-full max-w-md flex-col gap-6 rounded-3xl bg-white p-6 shadow-2xl">
       <div className="flex items-center justify-center">
-        <Logo size={44} />
+        <Image src="/logo-nauticapp.png" alt="NauticApp" width={150} height={52} priority />
       </div>
 
       <div
