@@ -32,11 +32,7 @@ import {
   UserCheck,
   X,
 } from 'lucide-react';
-import {
-  informarPagoAction,
-  marcarPagadasAction,
-  updateMovimientoAction,
-} from '@/app/actions/movimientos';
+import { informarPagoAction, updateMovimientoAction } from '@/app/actions/movimientos';
 import { cargarServicioAction, crearReciboInternoAction } from '@/app/actions/facturacion';
 import {
   createEmbarcacionAction,
@@ -603,134 +599,6 @@ function FormaPagoFields({
   }
 
   return null;
-}
-
-// ─── Forma de Pago Modal ──────────────────────────────────────────────────────
-
-function FormaPagoModal({
-  open,
-  onClose,
-  selectedIds,
-  socioId,
-  onSuccess,
-}: {
-  open: boolean;
-  onClose: () => void;
-  selectedIds: string[];
-  socioId: string;
-  onSuccess: () => void;
-}) {
-  const router = useRouter();
-  const [formaDePago, setFormaDePago] = useState('');
-  const [datosPago, setDatosPago] = useState<Record<string, string>>({});
-  const [error, setError] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
-
-  function handleClose() {
-    setFormaDePago('');
-    setDatosPago({});
-    setError(null);
-    onClose();
-  }
-
-  function handleSubmit() {
-    if (!formaDePago) {
-      setError('Seleccioná una forma de pago.');
-      return;
-    }
-    setError(null);
-    startTransition(async () => {
-      const res = await marcarPagadasAction({
-        ids: selectedIds,
-        socioId,
-        formaDePago,
-        datosPago: datosPago as Record<string, unknown>,
-      });
-      if (res.error) {
-        setError(res.error);
-      } else {
-        handleClose();
-        onSuccess();
-        router.refresh();
-      }
-    });
-  }
-
-  if (!open) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="flex max-h-[90vh] w-full max-w-lg flex-col rounded-2xl bg-white shadow-2xl">
-        {/* Header */}
-        <div className="flex items-start justify-between p-6 pb-4">
-          <div>
-            <h2 className="text-[18px] font-bold" style={{ color: '#101828' }}>
-              Forma de pago
-            </h2>
-            <p className="mt-0.5 text-sm" style={{ color: '#669E9D' }}>
-              Completá los datos de la forma de pago
-            </p>
-          </div>
-          <button
-            onClick={handleClose}
-            className="rounded-[8px] p-1 text-gray-400 hover:bg-gray-100"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-        <div className="border-t border-gray-200" />
-
-        {/* Body */}
-        <div className="flex-1 space-y-4 overflow-y-auto p-6">
-          <Field label="Forma de pago">
-            <select
-              className={inputCls}
-              value={formaDePago}
-              onChange={(e) => {
-                setFormaDePago(e.target.value);
-                setDatosPago({});
-              }}
-            >
-              <option value="">Seleccione una opción...</option>
-              {FORMAS_PAGO.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </Field>
-
-          <FormaPagoFields
-            formaDePago={formaDePago}
-            datosPago={datosPago}
-            setDatosPago={setDatosPago}
-          />
-
-          {error && <p className="text-sm text-red-600">{error}</p>}
-        </div>
-
-        {/* Footer */}
-        <div className="border-t border-gray-200 p-6">
-          <div className="flex gap-3">
-            <button
-              onClick={handleClose}
-              className="flex-1 rounded-[10px] border border-[#d1d5dc] bg-white py-2.5 text-sm font-medium text-[#364153] transition hover:bg-gray-50"
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={handleSubmit}
-              disabled={isPending || !formaDePago}
-              className="flex-1 rounded-[10px] py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-              style={{ background: '#175861' }}
-            >
-              {isPending ? 'Guardando...' : 'Guardar'}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
 }
 
 // ─── Agregar Servicio Modal ───────────────────────────────────────────────────
@@ -2198,9 +2066,7 @@ export function SocioDetail({
 }) {
   const [activeTab, setActiveTab] = useState<TabId>('generales');
   const [modalServicioOpen, setModalServicioOpen] = useState(false);
-  const [modalPagoOpen, setModalPagoOpen] = useState(false);
   const [modalInformarPagoOpen, setModalInformarPagoOpen] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   // Filtros de la tabla de cuenta corriente.
   const [ccFechaDesde, setCcFechaDesde] = useState('');
@@ -2387,15 +2253,6 @@ export function SocioDetail({
     0,
   );
 
-  function toggleId(id: string) {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
   return (
     <div className="p-4 md:p-8">
       <AgregarServicioModal
@@ -2404,13 +2261,6 @@ export function SocioDetail({
         socioId={socio.id}
         socioNombre={nombre}
         servicios={servicios}
-      />
-      <FormaPagoModal
-        open={modalPagoOpen}
-        onClose={() => setModalPagoOpen(false)}
-        selectedIds={Array.from(selectedIds)}
-        socioId={socio.id}
-        onSuccess={() => setSelectedIds(new Set())}
       />
       <InformarPagoModal
         key={String(modalInformarPagoOpen)}
