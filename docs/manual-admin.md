@@ -185,7 +185,16 @@ Cada embarcación tiene su **propio espacio asignado**. Dentro de la tarjeta de 
 
 #### Pestaña Servicios Contratados
 
-Lista los servicios que el socio consume, cargados mediante **Cargar consumo** en la Cuenta Corriente. Los servicios se agrupan por tipo y muestran el historial de movimientos asociados.
+Lista los servicios que el socio tiene contratados o consume. Los servicios se agrupan por tipo, muestran un badge **Fijo** o **Variable** según su tarifa, y permiten ver el historial de movimientos asociados.
+
+Desde esta pestaña cargás nuevos consumos con el botón **Cargar Servicio** (antes se llamaba "Cargar consumo" y estaba en la Cuenta Corriente). Se alimenta del **Tarifario**:
+
+1. Hacé clic en **Cargar Servicio**.
+2. Elegí el servicio del tarifario, el concepto, el monto y la fecha.
+3. Elegí el **tipo de comprobante**:
+   - **Comprobante fiscal** — registra el cargo como facturable. **No se emite a AFIP en el momento**: queda pendiente y se factura después, manual o automáticamente, como cualquier otro cargo.
+   - **Comprobante interno** — genera un comprobante **no fiscal** imprimible (número RB-NNNNNN), pensado para cobros que no pasan por AFIP. El cargo **nunca se factura**: no aparece ni en la facturación automática ni en la manual.
+4. Confirmá. El cargo se suma a la Cuenta Corriente del socio.
 
 ### Ver cargos individuales
 
@@ -212,9 +221,9 @@ Cada fila de servicio tiene un **chevron (›)** a la izquierda del nombre. Al h
 
 **Servicio de guarda (espacio):** además del proporcional, al cancelar el sistema **deja de generar el cargo mensual** automáticamente de ahí en más. El espacio **sigue asignado** (la embarcación queda en su lugar); si querés **liberar el lugar** para otro socio, hacelo desde la sección **Espacios**. Si más adelante le volvés a asignar ese espacio al socio, la cancelación se limpia sola y vuelve a facturarse.
 
-> **Recordá:** el único cargo que se genera **automáticamente cada mes** es el del **espacio de guarda**. Los demás servicios (cuota social, extras, etc.) no se cobran solos — se van agregando a mano con **Cargar consumo** a medida que se usan. Por eso, cancelar uno de esos simplemente lo da de baja.
+> **Recordá:** el único cargo que se genera **automáticamente cada mes** es el del **espacio de guarda**. Los demás servicios (cuota social, extras, etc.) no se cobran solos — se van agregando a mano con **Cargar Servicio** a medida que se usan. Por eso, cancelar uno de esos simplemente lo da de baja.
 
-> La cancelación no borra datos. Para reactivar un servicio que no es de guarda, volvé a cargarlo mediante Cargar consumo.
+> La cancelación no borra datos. Para reactivar un servicio que no es de guarda, volvé a cargarlo mediante Cargar Servicio.
 
 #### Pestaña Cuenta Corriente
 
@@ -222,15 +231,15 @@ Muestra los movimientos del socio: facturas, cobros y saldo.
 
 Arriba de la tabla hay tres tarjetas: **Ingresos por venta**, **Cobranzas** y **Saldo** del socio.
 
-- **Agregar servicio** (Cargar consumo) — registrá un servicio o cargo adicional. El campo Fecha se pre-carga con el día de hoy; podés cambiarlo si el cargo corresponde a otra fecha. Todo consumo cargado queda como **pendiente**: para registrar su cobro usá **Informar pago** o **Marcar como pagadas**.
-- **Informar pago** (Registrar pago) — registrá un pago recibido sin emitir factura (el saldo queda como "saldo a favor" en la cuenta).
-- **Marcar como pagadas** — seleccioná una o más facturas con la casilla de verificación y hacé clic en este botón para registrarlas como cobradas. Te pedirá el medio de pago.
+- **Registrar pago** — registrá un pago recibido del socio (te pide el medio de pago). Se crea una cobranza que descuenta del saldo; los cargos cubiertos pasan a figurar **Pagado**, asignando del más viejo al más nuevo. Si el pago supera la deuda, el excedente queda como **saldo a favor**. Al confirmar, podés además emitir un recibo interno (ver sección Recibos internos).
+
+> Los consumos ya no se cargan desde esta pestaña: usá **Cargar Servicio** en la pestaña **Servicios Contratados**.
 
 **Filtros.** Sobre la tabla podés filtrar los movimientos por:
 
 - **Desde / Hasta** — rango de fechas.
 - **Estado** — Pagado o En Plazo. Un cargo figura **Pagado** cuando los pagos registrados alcanzan a cubrirlo (se asignan del más viejo al más nuevo); si todavía no está cubierto, figura **En Plazo**.
-- **Tipo de comprobante** — Factura A/B/C, Recibo, Nota de crédito o Sin comprobante.
+- **Tipo de comprobante** — Factura A/B/C, Recibo, Comprobante interno, Nota de crédito o Sin comprobante.
 
 Al aplicar **cualquier filtro**, la tarjeta de **Saldo** se **oculta**: su valor es el saldo total del socio y no se corresponde con el subconjunto de movimientos filtrados. Las tarjetas de **Ingresos por venta** y **Cobranzas** se mantienen. Al limpiar los filtros, la tarjeta de Saldo vuelve a aparecer.
 
@@ -631,19 +640,18 @@ El tipo de comprobante se determina automáticamente para cada socio según la c
 
 > La facturación mensual automática corre el día del mes que configuraste en **Configuración → Información general** (campo "Día de facturación"). Solo aplica a socios que ya tuvieron al menos una factura emitida.
 
-**¿Qué conceptos entran en la factura automática?** La factura incluye **todos los cargos pendientes** del socio: la mensualidad del espacio que el sistema genera ese día **más cualquier consumo cargado durante el mes que siga pendiente**. No entran los pagos ni saldos a favor, ni los cargos que ya estaban facturados (no se duplican). Importante: como todo consumo cargado desde **Cargar consumo** queda pendiente, cada consumo no cobrado antes del día de facturación se va a incluir en la factura mensual del socio.
+**¿Qué conceptos entran en la factura automática?** La factura incluye **todos los cargos pendientes** del socio: la mensualidad del espacio que el sistema genera ese día **más cualquier consumo cargado durante el mes que siga pendiente**. No entran los pagos ni saldos a favor, ni los cargos que ya estaban facturados (no se duplican), **ni los cargos con comprobante interno** (esos nunca se facturan). Importante: como todo consumo fiscal cargado desde **Cargar Servicio** queda pendiente, cada consumo no cobrado antes del día de facturación se va a incluir en la factura mensual del socio.
 
 ### Recibos internos
 
-Los recibos internos son comprobantes de pago propios del club, sin intervención de AFIP. Son útiles para registrar cobros cuando todavía no tenés el certificado AFIP configurado, o para socios que no requieren factura fiscal.
+Los recibos internos son comprobantes propios del club, sin intervención de AFIP (número RB-NNNNNN). Son útiles para registrar cobros cuando todavía no tenés el certificado AFIP configurado, o para socios que no requieren factura fiscal.
 
-Para emitir uno:
+Se generan de dos formas:
 
-1. En el perfil del socio → **Cuenta Corriente**, hacé clic en **Informar pago** y completá el formulario.
-2. Al confirmar el pago, el sistema muestra una pantalla preguntando si querés emitir un recibo interno.
-3. Hacé clic en **Emitir recibo** para generarlo. Queda disponible para imprimir o descargar.
+- Al **Registrar pago** en la Cuenta Corriente del socio: al confirmar, el sistema pregunta si querés emitir un recibo interno. Hacé clic en **Emitir recibo** para generarlo.
+- Al **Cargar Servicio** (pestaña Servicios Contratados) eligiendo **Comprobante interno**: genera el comprobante interno del cargo, que además queda **excluido de toda facturación**.
 
-Los recibos emitidos aparecen en **Comprobantes → tab Recibos internos**. No tienen CAE ni validez fiscal ante AFIP.
+Todos aparecen en **Comprobantes → tab Recibos internos** y, en la cuenta corriente del socio, con la columna **Tipo de comprobante** = "Comprobante interno" y su número RB-. Quedan disponibles para imprimir o descargar. No tienen CAE ni validez fiscal ante AFIP.
 
 ### Emitir una nota de crédito
 
@@ -685,7 +693,7 @@ Para exportar los comprobantes actualmente visibles (respetando los filtros acti
 
 Una vez que un socio abona, marcá la factura como pagada:
 
-1. En la tabla de facturas, encontrá la factura correspondiente y hacé clic en la acción **Marcar como pagada** (o usá la casilla en el perfil del socio → Cuenta Corriente).
+1. En la tabla de facturas, encontrá la factura correspondiente y hacé clic en la acción **Marcar como pagada**.
 2. Seleccioná el **medio de pago**.
 3. Confirmá.
 
