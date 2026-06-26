@@ -1355,6 +1355,189 @@ function NotaCreditoModal({
   );
 }
 
+// ─── Modal: nota de crédito en lote (anulación total) ─────────────────────
+
+type LoteNcResultado = { codigo: string; ok: boolean; mensaje: string };
+
+function LoteNotaCreditoModal({
+  open,
+  onClose,
+  facturas,
+}: {
+  open: boolean;
+  onClose: () => void;
+  facturas: Factura[];
+}) {
+  const router = useRouter();
+  const [running, setRunning] = useState(false);
+  const [progreso, setProgreso] = useState(0);
+  const [resultados, setResultados] = useState<LoteNcResultado[] | null>(null);
+
+  if (!open) return null;
+
+  const total = facturas.reduce((s, f) => s + parseFloat(f.importe ?? '0'), 0);
+
+  async function handleEmitir() {
+    setRunning(true);
+    setResultados(null);
+    const res: LoteNcResultado[] = [];
+    for (let i = 0; i < facturas.length; i++) {
+      const f = facturas[i];
+      setProgreso(i);
+      // Cada NC es una emisión AFIP real → secuencial. Si una falla, se sigue.
+      const r = await emitirNotaCreditoAction({
+        facturaOriginalId: f.id,
+        motivo: 'anulacion_total',
+      });
+      res.push({
+        codigo: f.codigo ?? f.id.slice(0, 8),
+        ok: !r.error,
+        mensaje: r.error ?? `NC ${r.comprobanteNro ?? 'emitida'}`,
+      });
+    }
+    setProgreso(facturas.length);
+    setResultados(res);
+    setRunning(false);
+    router.refresh();
+  }
+
+  function handleClose() {
+    if (running) return; // no cerrar a mitad de emisión
+    setProgreso(0);
+    setResultados(null);
+    onClose();
+  }
+
+  const okCount = resultados?.filter((r) => r.ok).length ?? 0;
+  const failCount = resultados?.filter((r) => !r.ok).length ?? 0;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="flex max-h-[85vh] w-full max-w-md flex-col rounded-2xl bg-white shadow-2xl">
+        <div className="flex items-start justify-between p-6 pb-4">
+          <div>
+            <h2 className="text-[18px] font-bold" style={{ color: '#101828' }}>
+              Anular en lote (Nota de Crédito)
+            </h2>
+            <p className="mt-0.5 text-sm" style={{ color: '#669E9D' }}>
+              {facturas.length} comprobante{facturas.length === 1 ? '' : 's'} — Total{' '}
+              {fmtMoney(total.toFixed(2))}
+            </p>
+          </div>
+          <button
+            onClick={handleClose}
+            disabled={running}
+            className="rounded-[8px] p-1 text-gray-400 hover:bg-gray-100 disabled:opacity-40"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="border-t border-gray-200" />
+
+        <div className="flex-1 space-y-4 overflow-y-auto p-6">
+          {!resultados && !running && (
+            <>
+              <div className="flex items-start gap-2 rounded-[10px] bg-amber-50 p-3 text-sm text-amber-800">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>
+                  Se va a emitir una <strong>nota de crédito por el total</strong> de cada factura
+                  seleccionada (anulación total). Es una emisión real a AFIP y revierte la cuenta
+                  corriente del socio. No se puede deshacer.
+                </span>
+              </div>
+              <div className="max-h-48 space-y-1 overflow-y-auto rounded-[10px] border border-gray-100 p-3">
+                {facturas.map((f) => (
+                  <div key={f.id} className="flex justify-between text-sm">
+                    <span className="text-gray-600">
+                      {f.codigo ?? f.id.slice(0, 8)} · {f.socioNombre}
+                    </span>
+                    <span className="font-medium text-gray-700">{fmtMoney(f.importe)}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
+          {running && (
+            <div className="flex flex-col items-center gap-2 py-6">
+              <p className="text-sm font-medium text-gray-700">
+                Emitiendo {Math.min(progreso + 1, facturas.length)} de {facturas.length}…
+              </p>
+              <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100">
+                <div
+                  className="h-full rounded-full transition-all"
+                  style={{
+                    width: `${(progreso / facturas.length) * 100}%`,
+                    background: '#175861',
+                  }}
+                />
+              </div>
+              <p className="text-xs text-gray-400">No cierres esta ventana.</p>
+            </div>
+          )}
+
+          {resultados && (
+            <>
+              <div className="flex gap-3">
+                <div className="flex-1 rounded-[10px] bg-teal-50 p-3 text-center">
+                  <p className="text-lg font-bold text-teal-700">{okCount}</p>
+                  <p className="text-xs text-teal-600">emitidas</p>
+                </div>
+                <div className="flex-1 rounded-[10px] bg-red-50 p-3 text-center">
+                  <p className="text-lg font-bold text-red-700">{failCount}</p>
+                  <p className="text-xs text-red-600">fallidas</p>
+                </div>
+              </div>
+              {failCount > 0 && (
+                <div className="space-y-1 rounded-[10px] border border-red-100 p-3">
+                  <p className="mb-1 text-xs font-semibold text-red-700">Fallidas:</p>
+                  {resultados
+                    .filter((r) => !r.ok)
+                    .map((r, i) => (
+                      <p key={i} className="text-xs text-gray-600">
+                        <span className="font-medium">{r.codigo}</span>: {r.mensaje}
+                      </p>
+                    ))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        <div className="border-t border-gray-200 p-6">
+          {resultados ? (
+            <button
+              onClick={handleClose}
+              className="w-full rounded-[10px] py-2.5 text-sm font-semibold text-white transition hover:opacity-90"
+              style={{ background: '#175861' }}
+            >
+              Cerrar
+            </button>
+          ) : (
+            <div className="flex gap-3">
+              <button
+                onClick={handleClose}
+                disabled={running}
+                className="flex-1 rounded-[10px] border border-[#d1d5dc] bg-white py-2.5 text-sm font-medium text-[#364153] transition hover:bg-gray-50 disabled:opacity-40"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleEmitir}
+                disabled={running || facturas.length === 0}
+                className="flex-1 rounded-[10px] py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+                style={{ background: '#175861' }}
+              >
+                {running ? 'Emitiendo…' : `Emitir ${facturas.length} NC`}
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Modal: ventanilla (consumo + factura en un paso) ─────────────────────
 
 type LineaItem = { descripcion: string; cantidad: string; importe: string };
@@ -1736,6 +1919,9 @@ export function FacturacionClient({
   const [ventanillaOpen, setVentanillaOpen] = useState(false);
   const [pagarFactura, setPagarFactura] = useState<Factura | null>(null);
   const [ncFactura, setNcFactura] = useState<Factura | null>(null);
+  // Selección para NC en lote (anulación total) sobre la tabla AFIP.
+  const [selectedNc, setSelectedNc] = useState<Set<string>>(() => new Set());
+  const [loteNcOpen, setLoteNcOpen] = useState(false);
 
   const puedeFacturar = posConfigurado && certificadoOk;
   const hasFiltrosAfip = Boolean(
@@ -1771,6 +1957,45 @@ export function FacturacionClient({
       });
   }, [facturas, search, filterEstado, filterTipo, filterDesde, filterHasta]);
 
+  // NC en lote: una factura es elegible si es AFIP (A/B/C), tiene CAE y todavía
+  // no tiene una NC asociada (otra factura cuyo facturaOriginalId la apunta).
+  const facturasConNc = useMemo(
+    () =>
+      new Set(
+        facturas.filter((f) => f.facturaOriginalId).map((f) => f.facturaOriginalId as string),
+      ),
+    [facturas],
+  );
+  const esNcEligible = (f: Factura) =>
+    ['factura_a', 'factura_b', 'factura_c'].includes(f.tipoFactura ?? '') &&
+    Boolean(f.cae) &&
+    !facturasConNc.has(f.id);
+
+  const elegiblesNc = useMemo(
+    () => filtradosAfip.filter(esNcEligible),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filtradosAfip, facturasConNc],
+  );
+  const facturasSeleccionadas = useMemo(
+    () => facturas.filter((f) => selectedNc.has(f.id)),
+    [facturas, selectedNc],
+  );
+
+  function toggleNc(id: string) {
+    setSelectedNc((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+  function toggleTodosNc() {
+    setSelectedNc((prev) => {
+      const todosElegidos = elegiblesNc.length > 0 && elegiblesNc.every((f) => prev.has(f.id));
+      return todosElegidos ? new Set() : new Set(elegiblesNc.map((f) => f.id));
+    });
+  }
+
   // Tabla Recibos internos
   const filtradosRecibos = useMemo(() => {
     return facturas
@@ -1799,6 +2024,7 @@ export function FacturacionClient({
   if (filterKey !== prevFilterKey) {
     setPrevFilterKey(filterKey);
     setPage(1);
+    setSelectedNc(new Set());
   }
 
   const afipPageCount = Math.max(1, Math.ceil(filtradosAfip.length / PAGE_SIZE));
@@ -1895,6 +2121,14 @@ export function FacturacionClient({
         factura={pagarFactura}
       />
       <NotaCreditoModal open={!!ncFactura} onClose={() => setNcFactura(null)} factura={ncFactura} />
+      <LoteNotaCreditoModal
+        open={loteNcOpen}
+        onClose={() => {
+          setLoteNcOpen(false);
+          setSelectedNc(new Set());
+        }}
+        facturas={facturasSeleccionadas}
+      />
       <VentanillaModal
         open={ventanillaOpen}
         onClose={() => setVentanillaOpen(false)}
@@ -2104,10 +2338,44 @@ export function FacturacionClient({
               />
             ) : (
               <>
+                {selectedNc.size > 0 && (
+                  <div className="flex flex-wrap items-center gap-3 border-b border-gray-100 bg-[#F3F8F7] px-4 py-2.5">
+                    <span className="text-sm font-medium text-[#175861]">
+                      {selectedNc.size} seleccionada{selectedNc.size === 1 ? '' : 's'}
+                    </span>
+                    <button
+                      onClick={() => setLoteNcOpen(true)}
+                      className="inline-flex items-center gap-1.5 rounded-[8px] px-3 py-1.5 text-sm font-semibold text-white transition hover:opacity-90"
+                      style={{ background: '#175861' }}
+                    >
+                      <CornerDownLeft className="h-4 w-4" />
+                      Emitir NC en lote
+                    </button>
+                    <button
+                      onClick={() => setSelectedNc(new Set())}
+                      className="text-sm text-gray-500 transition hover:text-gray-700"
+                    >
+                      Limpiar selección
+                    </button>
+                  </div>
+                )}
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[900px] text-sm">
                     <thead>
                       <tr className="bg-gray-50 text-left text-xs font-semibold text-gray-500">
+                        <th className="w-10 px-4 py-3">
+                          <input
+                            type="checkbox"
+                            aria-label="Seleccionar todas las facturas elegibles"
+                            className="h-4 w-4 cursor-pointer accent-[#175861] disabled:opacity-40"
+                            disabled={elegiblesNc.length === 0}
+                            checked={
+                              elegiblesNc.length > 0 &&
+                              elegiblesNc.every((f) => selectedNc.has(f.id))
+                            }
+                            onChange={toggleTodosNc}
+                          />
+                        </th>
                         <th className="px-4 py-3">Número</th>
                         <th className="px-4 py-3">Tipo</th>
                         <th className="px-4 py-3">Cliente</th>
@@ -2120,112 +2388,133 @@ export function FacturacionClient({
                       </tr>
                     </thead>
                     <tbody>
-                      {afipPaginados.map((f) => (
-                        <tr
-                          key={f.id}
-                          className="border-t border-gray-100 transition hover:bg-gray-50/50"
-                        >
-                          <td className="px-4 py-3 font-medium" style={{ color: '#101828' }}>
-                            {f.codigo ?? '—'}
-                          </td>
-                          <td className="px-4 py-3 text-gray-500">
-                            {TIPO_FACTURA_LABEL[f.tipoFactura ?? ''] ?? '—'}
-                          </td>
-                          <td className="px-4 py-3 font-medium" style={{ color: '#175861' }}>
-                            {f.socioNombre}
-                          </td>
-                          <td className="px-4 py-3 text-gray-500">{fmtDate(f.emision)}</td>
-                          <td className="px-4 py-3 text-gray-500">{fmtDate(f.vencimiento)}</td>
-                          <td className="px-4 py-3 text-xs text-gray-500">
-                            {f.desde ? (
-                              <div>
-                                <div>Desde {fmtDate(f.desde)}</div>
-                                <div>Hasta {fmtDate(f.hasta)}</div>
-                              </div>
-                            ) : (
-                              '—'
-                            )}
-                          </td>
-                          <td
-                            className="px-4 py-3 text-right font-medium"
-                            style={{ color: '#101828' }}
+                      {afipPaginados.map((f) => {
+                        const eligible = esNcEligible(f);
+                        return (
+                          <tr
+                            key={f.id}
+                            className={`border-t border-gray-100 transition hover:bg-gray-50/50 ${
+                              selectedNc.has(f.id) ? 'bg-[#F3F8F7]' : ''
+                            }`}
                           >
-                            {fmtMoney(f.importe)}
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <span
-                              className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${
-                                ESTADO_BADGE[f.estado ?? 'pendiente'] ?? 'bg-gray-100 text-gray-600'
-                              }`}
+                            <td className="w-10 px-4 py-3">
+                              <input
+                                type="checkbox"
+                                aria-label={`Seleccionar comprobante ${f.codigo ?? ''}`}
+                                className="h-4 w-4 cursor-pointer accent-[#175861] disabled:cursor-not-allowed disabled:opacity-30"
+                                disabled={!eligible}
+                                title={
+                                  eligible
+                                    ? 'Seleccionar para NC en lote'
+                                    : 'No elegible (no es factura AFIP con CAE, o ya tiene NC)'
+                                }
+                                checked={selectedNc.has(f.id)}
+                                onChange={() => toggleNc(f.id)}
+                              />
+                            </td>
+                            <td className="px-4 py-3 font-medium" style={{ color: '#101828' }}>
+                              {f.codigo ?? '—'}
+                            </td>
+                            <td className="px-4 py-3 text-gray-500">
+                              {TIPO_FACTURA_LABEL[f.tipoFactura ?? ''] ?? '—'}
+                            </td>
+                            <td className="px-4 py-3 font-medium" style={{ color: '#175861' }}>
+                              {f.socioNombre}
+                            </td>
+                            <td className="px-4 py-3 text-gray-500">{fmtDate(f.emision)}</td>
+                            <td className="px-4 py-3 text-gray-500">{fmtDate(f.vencimiento)}</td>
+                            <td className="px-4 py-3 text-xs text-gray-500">
+                              {f.desde ? (
+                                <div>
+                                  <div>Desde {fmtDate(f.desde)}</div>
+                                  <div>Hasta {fmtDate(f.hasta)}</div>
+                                </div>
+                              ) : (
+                                '—'
+                              )}
+                            </td>
+                            <td
+                              className="px-4 py-3 text-right font-medium"
+                              style={{ color: '#101828' }}
                             >
-                              {ESTADO_LABEL[f.estado ?? 'pendiente'] ?? f.estado}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="flex items-center justify-end gap-2">
-                              <button
-                                onClick={() => setPagarFactura(f)}
-                                disabled={f.estado === 'pagada'}
-                                title="Marcar como pagada"
-                                className="rounded-[6px] p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-[#175861] disabled:opacity-30 disabled:hover:bg-transparent"
+                              {fmtMoney(f.importe)}
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              <span
+                                className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${
+                                  ESTADO_BADGE[f.estado ?? 'pendiente'] ??
+                                  'bg-gray-100 text-gray-600'
+                                }`}
                               >
-                                <Edit3 className="h-4 w-4" />
-                              </button>
-                              {f.archivo ? (
-                                <a
-                                  href={f.archivo}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  title="Ver PDF"
-                                  className="rounded-[6px] p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-[#175861]"
-                                >
-                                  <Send className="h-4 w-4" />
-                                </a>
-                              ) : (
+                                {ESTADO_LABEL[f.estado ?? 'pendiente'] ?? f.estado}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center justify-end gap-2">
                                 <button
-                                  disabled
-                                  title="PDF no disponible"
-                                  className="rounded-[6px] p-1.5 text-gray-400 opacity-30"
+                                  onClick={() => setPagarFactura(f)}
+                                  disabled={f.estado === 'pagada'}
+                                  title="Marcar como pagada"
+                                  className="rounded-[6px] p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-[#175861] disabled:opacity-30 disabled:hover:bg-transparent"
                                 >
-                                  <Send className="h-4 w-4" />
+                                  <Edit3 className="h-4 w-4" />
                                 </button>
-                              )}
-                              {f.archivo ? (
-                                <a
-                                  href={f.archivo}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  download
-                                  title="Descargar"
-                                  className="rounded-[6px] p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-[#175861]"
-                                >
-                                  <Download className="h-4 w-4" />
-                                </a>
-                              ) : (
-                                <button
-                                  disabled
-                                  title="PDF no disponible"
-                                  className="rounded-[6px] p-1.5 text-gray-400 opacity-30"
-                                >
-                                  <Download className="h-4 w-4" />
-                                </button>
-                              )}
-                              {(f.tipoFactura === 'factura_a' ||
-                                f.tipoFactura === 'factura_b' ||
-                                f.tipoFactura === 'factura_c') &&
-                              f.cae ? (
-                                <button
-                                  onClick={() => setNcFactura(f)}
-                                  title="Emitir Nota de Crédito"
-                                  className="rounded-[6px] p-1.5 text-gray-400 transition hover:bg-amber-50 hover:text-amber-600"
-                                >
-                                  <CornerDownLeft className="h-4 w-4" />
-                                </button>
-                              ) : null}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
+                                {f.archivo ? (
+                                  <a
+                                    href={f.archivo}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    title="Ver PDF"
+                                    className="rounded-[6px] p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-[#175861]"
+                                  >
+                                    <Send className="h-4 w-4" />
+                                  </a>
+                                ) : (
+                                  <button
+                                    disabled
+                                    title="PDF no disponible"
+                                    className="rounded-[6px] p-1.5 text-gray-400 opacity-30"
+                                  >
+                                    <Send className="h-4 w-4" />
+                                  </button>
+                                )}
+                                {f.archivo ? (
+                                  <a
+                                    href={f.archivo}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    download
+                                    title="Descargar"
+                                    className="rounded-[6px] p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-[#175861]"
+                                  >
+                                    <Download className="h-4 w-4" />
+                                  </a>
+                                ) : (
+                                  <button
+                                    disabled
+                                    title="PDF no disponible"
+                                    className="rounded-[6px] p-1.5 text-gray-400 opacity-30"
+                                  >
+                                    <Download className="h-4 w-4" />
+                                  </button>
+                                )}
+                                {(f.tipoFactura === 'factura_a' ||
+                                  f.tipoFactura === 'factura_b' ||
+                                  f.tipoFactura === 'factura_c') &&
+                                f.cae ? (
+                                  <button
+                                    onClick={() => setNcFactura(f)}
+                                    title="Emitir Nota de Crédito"
+                                    className="rounded-[6px] p-1.5 text-gray-400 transition hover:bg-amber-50 hover:text-amber-600"
+                                  >
+                                    <CornerDownLeft className="h-4 w-4" />
+                                  </button>
+                                ) : null}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
