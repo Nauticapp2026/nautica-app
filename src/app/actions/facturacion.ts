@@ -665,6 +665,8 @@ export async function getSocioPendientesAction(
       and(
         eq(movimientosCuentaCorriente.socioId, socioId),
         eq(movimientosCuentaCorriente.estado, 'no_pagado'),
+        // Excluir cargos con comprobante interno: no se facturan por TusFacturas.
+        eq(movimientosCuentaCorriente.comprobanteInterno, false),
       ),
     )
     .orderBy(movimientosCuentaCorriente.fecha);
