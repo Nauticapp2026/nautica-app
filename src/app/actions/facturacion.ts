@@ -953,10 +953,9 @@ export async function emitirNotaCreditoAction(data: EmitirNcData): Promise<Emiti
       tipoOriginal,
     ),
     total: ncImporte.toFixed(2),
-    pagos: {
-      formas_pago: [{ descripcion: 'Nota de crédito', importe: ncImporte }],
-      total: ncImporte,
-    },
+    // Sin `pagos`: a una nota de crédito NO se le aplica un pago (AFIP/TusFacturas
+    // lo rechaza). Confirmado por soporte de TusFacturas — era la causa del error
+    // "no se puede emitir la NC por API".
     comprobantes_asociados: [asociado],
   };
 

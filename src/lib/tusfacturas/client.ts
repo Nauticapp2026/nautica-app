@@ -82,7 +82,9 @@ export type TusFacturasComprobante = {
   rubro_grupo_contable: string;
   detalle: TusFacturasDetalleItem[];
   total: string;
-  pagos: {
+  /** Pago aplicado al comprobante. NO se manda en notas de crédito: AFIP/TusFacturas
+   *  no permite aplicarle un pago a una NC (confirmado por soporte de TusFacturas). */
+  pagos?: {
     formas_pago: TusFacturasFormaPago[];
     total: number;
   };
