@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { eq, and, inArray } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 
 import { db } from '@/lib/db';
@@ -209,32 +209,29 @@ export async function reintentarCobroPaywayAction(cobroId: string): Promise<{ er
 
   const guarderiaId = ctx.activeMembership.guarderiaId;
 
-  // Verificar que el cobro pertenece a esta guardería y está en estado fallido
+  // Verificar que el cobro pertenece a esta guardería.
   const [cobro] = await db
-    .select({
-      id: paywayCobros.id,
-      socioId: paywayCobros.socioId,
-      movimientosIds: paywayCobros.movimientosIds,
-    })
+    .select({ id: paywayCobros.id, socioId: paywayCobros.socioId })
     .from(paywayCobros)
     .where(and(eq(paywayCobros.id, cobroId), eq(paywayCobros.guarderiaId, guarderiaId)))
     .limit(1);
   if (!cobro) return { error: 'Cobro no encontrado.' };
 
-  // Verificar que los movimientos aún estén pendientes de pago
-  const movsPendientes = await db
-    .select({ id: movimientosCuentaCorriente.id, debe: movimientosCuentaCorriente.debe })
+  // El monto a reintentar es el SALDO NETO actual del socio (misma fórmula que el
+  // cobro del cron: SUM(debe) - SUM(haber)). No se usa movimientosIds porque los
+  // cobros del cron se guardan con la lista vacía (el cobro es del neto, no mapea
+  // 1:1 a movimientos puntuales).
+  const movimientos = await db
+    .select({
+      debe: movimientosCuentaCorriente.debe,
+      haber: movimientosCuentaCorriente.haber,
+    })
     .from(movimientosCuentaCorriente)
-    .where(
-      and(
-        inArray(movimientosCuentaCorriente.id, cobro.movimientosIds),
-        eq(movimientosCuentaCorriente.estado, 'no_pagado'),
-      ),
-    );
-  if (!movsPendientes.length) return { error: 'Los movimientos ya están pagados.' };
-
-  const totalPesos = movsPendientes.reduce((acc, m) => acc + parseFloat(m.debe ?? '0'), 0);
-  if (totalPesos < 0.01) return { error: 'El monto a cobrar es cero.' };
+    .where(eq(movimientosCuentaCorriente.socioId, cobro.socioId));
+  const sumDebe = movimientos.reduce((acc, m) => acc + parseFloat(m.debe ?? '0'), 0);
+  const sumHaber = movimientos.reduce((acc, m) => acc + parseFloat(m.haber ?? '0'), 0);
+  const totalPesos = Math.round((sumDebe - sumHaber) * 100) / 100;
+  if (totalPesos < 0.01) return { error: 'El socio no tiene saldo pendiente para cobrar.' };
 
   // Token del socio + email para customer
   const [token] = await db
@@ -269,9 +266,8 @@ export async function reintentarCobroPaywayAction(cobroId: string): Promise<{ er
   const ambient = useSandbox ? 'developer' : 'production';
   const sdk = makePaywaySdk(ambient, g.publicKey, g.privateKey);
   const siteTransactionId = randomUUID();
-  const movimientosIds = movsPendientes.map((m) => m.id);
 
-  // Nuevo registro de intento
+  // Nuevo registro de intento (pago del neto: movimientosIds vacío, como el cron).
   const [nuevoCobro] = await db
     .insert(paywayCobros)
     .values({
@@ -280,7 +276,7 @@ export async function reintentarCobroPaywayAction(cobroId: string): Promise<{ er
       monto: Math.round(totalPesos * 100),
       siteTransactionId,
       estado: 'pendiente',
-      movimientosIds,
+      movimientosIds: [],
     })
     .returning({ id: paywayCobros.id });
 
@@ -321,10 +317,20 @@ export async function reintentarCobroPaywayAction(cobroId: string): Promise<{ er
   const paywayPaymentId = result.id != null ? String(result.id) : null;
 
   if (approved) {
-    await db
-      .update(movimientosCuentaCorriente)
-      .set({ estado: 'pagado', formaDePago: 'debito_automatico' })
-      .where(inArray(movimientosCuentaCorriente.id, movimientosIds));
+    // Registrar el cobro como movimiento de pago (haber), igual que el cron y el
+    // flujo manual de "Registrar pago": lleva el saldo neto del socio a 0.
+    await db.insert(movimientosCuentaCorriente).values({
+      socioId: cobro.socioId,
+      concepto: 'Pago — Débito automático',
+      tipo: 'otro',
+      estado: 'pagado',
+      debe: '0',
+      haber: totalPesos.toFixed(2),
+      importeSigned: `-${totalPesos.toFixed(2)}`,
+      fecha: new Date(),
+      formaDePago: 'debito_automatico',
+      datosPago: null,
+    });
     await db
       .update(paywayCobros)
       .set({ estado: 'aprobado', paywayPaymentId })
