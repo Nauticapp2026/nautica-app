@@ -26,6 +26,10 @@ function makePaywaySdk(ambient: string, publicKey: string, privateKey: string) {
       args: Record<string, unknown>,
       cb: (result: Record<string, unknown>, err: unknown) => void,
     ) => void;
+    tokens: (
+      args: Record<string, unknown>,
+      cb: (result: Record<string, unknown>, err: unknown) => void,
+    ) => void;
   };
 }
 
@@ -35,6 +39,20 @@ function paymentAsync(
 ): Promise<Record<string, unknown>> {
   return new Promise((resolve, reject) => {
     sdk.payment(args, (result, err) => {
+      if (err) reject(err);
+      else resolve(result);
+    });
+  });
+}
+
+// Re-tokeniza el customer_token guardado para obtener un token de pago fresco.
+// Payway no acepta el customer_token directo en /payments. Ver payway-cobros.ts.
+function tokensAsync(
+  sdk: ReturnType<typeof makePaywaySdk>,
+  args: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  return new Promise((resolve, reject) => {
+    sdk.tokens(args, (result, err) => {
       if (err) reject(err);
       else resolve(result);
     });
@@ -268,9 +286,16 @@ export async function reintentarCobroPaywayAction(cobroId: string): Promise<{ er
 
   let result: Record<string, unknown>;
   try {
+    // Paso 1: re-tokenizar el customer_token (MIT, sin CVV) → token de pago fresco.
+    const tokenResult = await tokensAsync(sdk, { token: token.customerToken });
+    const freshToken = tokenResult.id as string | undefined;
+    if (!freshToken) {
+      throw new Error(`Payway no devolvió token de pago: ${JSON.stringify(tokenResult)}`);
+    }
+    // Paso 2: cobrar con el token fresco y payment_type 'single' (no 'recurrente').
     result = await paymentAsync(sdk, {
       site_transaction_id: siteTransactionId,
-      token: token.customerToken,
+      token: freshToken,
       user_id: cobro.socioId,
       payment_method_id: token.paymentMethodId,
       bin: token.bin,
@@ -278,11 +303,10 @@ export async function reintentarCobroPaywayAction(cobroId: string): Promise<{ er
       currency: 'ARS',
       installments: 1,
       description: 'Cuota mensual (reintento) — NauticaApp',
-      payment_type: 'recurrente',
+      payment_type: 'single',
       sub_payments: [],
-      customer: { id: cobro.socioId, email: token.email },
+      establishment_name: 'NauticaApp',
       fraud_detection: { send_to_cs: false },
-      store_credential: true,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

@@ -31,6 +31,10 @@ function makePaywaySdk(ambient: string, publicKey: string, privateKey: string) {
       args: Record<string, unknown>,
       cb: (result: Record<string, unknown>, err: unknown) => void,
     ) => void;
+    tokens: (
+      args: Record<string, unknown>,
+      cb: (result: Record<string, unknown>, err: unknown) => void,
+    ) => void;
   };
 }
 
@@ -40,6 +44,22 @@ function paymentAsync(
 ): Promise<Record<string, unknown>> {
   return new Promise((resolve, reject) => {
     sdk.payment(args, (result, err) => {
+      if (err) reject(err);
+      else resolve(result);
+    });
+  });
+}
+
+// Re-tokeniza el customer_token guardado (MIT, sin CVV) y devuelve un token de
+// pago fresco. Payway NO acepta el customer_token directo en /payments (devuelve
+// "OperationResource not found"): hay que pedir un token nuevo en /tokens y cobrar
+// con ese. El token vence a los ~15 min, así que se genera justo antes del cobro.
+function tokensAsync(
+  sdk: ReturnType<typeof makePaywaySdk>,
+  args: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  return new Promise((resolve, reject) => {
+    sdk.tokens(args, (result, err) => {
       if (err) reject(err);
       else resolve(result);
     });
@@ -151,9 +171,18 @@ export async function runPaywayCharges(guarderiaIds: string[]): Promise<PaywayCh
 
       let paywayResult: Record<string, unknown>;
       try {
+        // Paso 1: re-tokenizar el customer_token para obtener un token de pago
+        // fresco (MIT, sin CVV). Sin esto Payway responde "OperationResource not found".
+        const tokenResult = await tokensAsync(sdk, { token: token.customerToken });
+        const freshToken = tokenResult.id as string | undefined;
+        if (!freshToken) {
+          throw new Error(`Payway no devolvió token de pago: ${JSON.stringify(tokenResult)}`);
+        }
+        // Paso 2: cobrar con el token fresco. payment_type debe ser 'single'
+        // ('recurrente' es inválido en Decidir; los valores válidos son single/distributed).
         paywayResult = await paymentAsync(sdk, {
           site_transaction_id: siteTransactionId,
-          token: token.customerToken,
+          token: freshToken,
           user_id: token.socioId,
           payment_method_id: token.paymentMethodId,
           bin: token.bin,
@@ -161,10 +190,9 @@ export async function runPaywayCharges(guarderiaIds: string[]): Promise<PaywayCh
           currency: 'ARS',
           installments: 1,
           description: 'Cuota mensual — NauticaApp',
-          payment_type: 'recurrente',
+          payment_type: 'single',
           sub_payments: [],
-          customer: { id: token.socioId, email: token.email },
-          store_credential: true,
+          establishment_name: 'NauticaApp',
           fraud_detection: { send_to_cs: false },
         });
       } catch (err) {
