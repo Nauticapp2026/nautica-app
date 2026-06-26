@@ -108,20 +108,26 @@ export async function GET(req: Request): Promise<Response> {
     fraud_detection: { send_to_cs: false },
   };
 
-  // Variante B: payload MÍNIMO alineado a la doc oficial de tarjeta tokenizada.
-  const argsMinimo: Record<string, unknown> = {
+  // Variante FIX: igual al actual pero con payment_type:'single' (valor válido).
+  const argsFix: Record<string, unknown> = {
     site_transaction_id: randomUUID(),
     token: token.customerToken,
     user_id: p.id,
     payment_method_id: token.paymentMethodId,
+    bin: token.bin,
     amount,
     currency: 'ARS',
     installments: 1,
+    description: 'DIAG fix',
+    payment_type: 'single',
+    sub_payments: [],
+    customer: { id: p.id, email: p.email },
+    store_credential: true,
     fraud_detection: { send_to_cs: false },
   };
 
   const respActual = await paymentAsync(sdk, argsActual);
-  const respMinimo = await paymentAsync(sdk, argsMinimo);
+  const respFix = await paymentAsync(sdk, argsFix);
 
   return NextResponse.json({
     ambient,
@@ -133,6 +139,6 @@ export async function GET(req: Request): Promise<Response> {
       sentResumen: { payment_type: 'recurrente', store_credential: true },
       response: respActual,
     },
-    minimo: { sentResumen: { sinPaymentType: true }, response: respMinimo },
+    fix: { sentResumen: { payment_type: 'single' }, response: respFix },
   });
 }
