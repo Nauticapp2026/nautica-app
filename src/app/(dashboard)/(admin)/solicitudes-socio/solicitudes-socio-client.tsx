@@ -388,5 +388,10 @@ function formatearRelativa(iso: string): string {
   if (hs < 24) return `hace ${hs} h`;
   const days = Math.floor(hs / 24);
   if (days < 30) return `hace ${days} d`;
-  return date.toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' });
+  return date.toLocaleDateString('es-AR', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
 }

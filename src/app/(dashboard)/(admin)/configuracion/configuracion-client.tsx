@@ -1270,13 +1270,21 @@ function PlanTab({
   const lastDayOfMonth = useMemo(() => {
     const d = new Date();
     d.setMonth(d.getMonth() + 1, 0);
-    return d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' });
+    return d.toLocaleDateString('es-AR', {
+      timeZone: 'America/Argentina/Buenos_Aires',
+      day: '2-digit',
+      month: '2-digit',
+    });
   }, []);
 
   const firstDayNextMonth = useMemo(() => {
     const d = new Date();
     d.setMonth(d.getMonth() + 1, 1);
-    return d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' });
+    return d.toLocaleDateString('es-AR', {
+      timeZone: 'America/Argentina/Buenos_Aires',
+      day: '2-digit',
+      month: '2-digit',
+    });
   }, []);
 
   const pendingPlanInfo = pendingPlan ? planes.find((p) => p.slug === pendingPlan) : null;
