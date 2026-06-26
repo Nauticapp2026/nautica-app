@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation';
 import Script from 'next/script';
 import {
   ArrowLeft,
+  ArrowUp,
+  ArrowDown,
   User,
   Anchor,
   CheckCircle2,
@@ -2157,9 +2159,12 @@ export function SocioDetail({
   // vuelve a la primera página.
   const CC_PAGE_SIZE = 20;
   const [ccPage, setCcPage] = useState(1);
-  // Reset a la primera página cuando cambian los filtros. Patrón "ajustar estado
-  // en render" (recomendado por React) en vez de un efecto con setState.
-  const ccFiltroSig = `${ccFechaDesde}|${ccFechaHasta}|${ccEstado}|${ccTipoComp}`;
+  // Orden por fecha de la cuenta corriente. 'desc' = más nuevo primero (default,
+  // como venía); 'asc' = más antiguo primero.
+  const [ccSortDir, setCcSortDir] = useState<'asc' | 'desc'>('desc');
+  // Reset a la primera página cuando cambian los filtros o el orden. Patrón
+  // "ajustar estado en render" (recomendado por React) en vez de un efecto.
+  const ccFiltroSig = `${ccFechaDesde}|${ccFechaHasta}|${ccEstado}|${ccTipoComp}|${ccSortDir}`;
   const [ccPrevFiltroSig, setCcPrevFiltroSig] = useState(ccFiltroSig);
   if (ccFiltroSig !== ccPrevFiltroSig) {
     setCcPrevFiltroSig(ccFiltroSig);
@@ -2896,7 +2901,25 @@ export function SocioDetail({
                 <table className="w-full min-w-[640px] text-sm">
                   <thead>
                     <tr className="bg-gray-50 text-left text-xs font-semibold text-gray-500">
-                      <th className="px-4 py-3">Fecha</th>
+                      <th className="px-4 py-3">
+                        <button
+                          type="button"
+                          onClick={() => setCcSortDir((d) => (d === 'desc' ? 'asc' : 'desc'))}
+                          title={
+                            ccSortDir === 'desc'
+                              ? 'Más nuevo primero (clic para más antiguo)'
+                              : 'Más antiguo primero (clic para más nuevo)'
+                          }
+                          className="inline-flex items-center gap-1 font-semibold text-gray-500 uppercase transition hover:text-[#175861]"
+                        >
+                          Fecha
+                          {ccSortDir === 'desc' ? (
+                            <ArrowDown className="h-3 w-3" />
+                          ) : (
+                            <ArrowUp className="h-3 w-3" />
+                          )}
+                        </button>
+                      </th>
                       <th className="px-4 py-3">Detalle</th>
                       <th className="px-4 py-3">Tipo de comprobante</th>
                       <th className="px-4 py-3">Nº Comprobante</th>
@@ -2909,10 +2932,13 @@ export function SocioDetail({
                   <tbody>
                     {(() => {
                       // Saldo acumulado + estado mostrado ya calculados en
-                      // movimientosCalc (FIFO de pagos). Acá solo filtramos.
-                      const visibles = movimientosCalc.filter((m) =>
+                      // movimientosCalc (FIFO de pagos, queda más nuevo primero).
+                      // Acá filtramos y aplicamos el orden por fecha elegido: el
+                      // saldo por fila no cambia, solo se invierte el orden visual.
+                      const filtradas = movimientosCalc.filter((m) =>
                         pasaFiltrosCC(m, m.estadoDisplay),
                       );
+                      const visibles = ccSortDir === 'asc' ? [...filtradas].reverse() : filtradas;
                       if (visibles.length === 0) {
                         return (
                           <tr>
