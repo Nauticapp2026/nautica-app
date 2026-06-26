@@ -689,13 +689,15 @@ En el tab **Comprobantes AFIP** podés acotar la tabla con los siguientes filtro
 
 Para exportar los comprobantes actualmente visibles (respetando los filtros activos), hacé clic en **Exportar** — se descarga un archivo CSV.
 
-### Registrar un pago
+### Marcar una factura como pagada
 
-Una vez que un socio abona, marcá la factura como pagada:
+Cuando un socio te abona **una factura puntual** que le emitiste, marcala como pagada:
 
-1. En la tabla de facturas, encontrá la factura correspondiente y hacé clic en la acción **Marcar como pagada**.
+1. En el tab **Comprobantes AFIP**, ubicá la factura en la tabla. En la última columna (acciones) hacé clic en el **ícono de lápiz (✏️)** — al pasar el mouse aparece el texto "Marcar como pagada". Si la factura ya está pagada, el ícono se ve deshabilitado.
 2. Seleccioná el **medio de pago**.
-3. Confirmá.
+3. Confirmá. La factura pasa de **Pendiente** a **Pagada** y los cargos vinculados a ella quedan saldados.
+
+> **No la confundas con "Registrar pago"** (pestaña Cuenta Corriente del socio): esa registra un **cobro** que descuenta del **saldo** del socio. Esta acción solo cambia el estado de **una factura** y **no modifica el saldo** de la cuenta corriente. Si necesitás que baje la deuda del socio, registrá el cobro con **Registrar pago** o por débito automático.
 
 ---
 
