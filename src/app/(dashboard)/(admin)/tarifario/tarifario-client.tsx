@@ -774,7 +774,7 @@ function TarifaModal({
             </div>
             <div>
               <label className="mb-1 block text-sm font-semibold text-gray-700">
-                Plazo de pago
+                Plazo de pago <span className="font-normal text-gray-400">(fecha de factura)</span>
               </label>
               <select
                 className={inputCls}
