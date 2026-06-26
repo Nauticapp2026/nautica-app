@@ -8,6 +8,7 @@ const REALTIME_TABLES = [
   'alertas',
   'tareas',
   'porteria',
+  'actividad_porteria',
   'solicitudes_membership',
   'memberships',
   'embarcaciones',
