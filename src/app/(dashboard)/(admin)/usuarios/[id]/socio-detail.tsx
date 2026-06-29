@@ -19,7 +19,6 @@ import {
   FileText,
   Package,
   Pencil,
-  Printer,
   Ship,
   Star,
   TrendingUp,
@@ -32,8 +31,8 @@ import {
   UserCheck,
   X,
 } from 'lucide-react';
-import { informarPagoAction, updateMovimientoAction } from '@/app/actions/movimientos';
-import { cargarServicioAction, crearReciboInternoAction } from '@/app/actions/facturacion';
+import { updateMovimientoAction } from '@/app/actions/movimientos';
+import { cargarServicioAction } from '@/app/actions/facturacion';
 import {
   createEmbarcacionAction,
   deleteEmbarcacionAction,
@@ -61,6 +60,12 @@ import { formatArgentinaDate, formatArgentinaDateTime, formatNaiveDateTime } fro
 import { ASTILLEROS } from '../astilleros';
 import { EmptyState } from '@/components/shared/empty-state';
 import { Pagination } from '@/components/shared/pagination';
+import {
+  inputCls,
+  Field,
+  sanitizeMontoInput,
+  montoToNumberStr,
+} from '@/components/shared/forma-pago';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -186,16 +191,6 @@ const TIPO_DOC_OPTS = [
   { value: 'cdi', label: 'CDI' },
 ];
 
-const FORMAS_PAGO = [
-  { value: 'efectivo', label: 'Efectivo' },
-  { value: 'tarjeta_credito', label: 'Tarjeta de crédito' },
-  { value: 'tarjeta_debito', label: 'Tarjeta de débito' },
-  { value: 'debito_automatico', label: 'Débito automático' },
-  { value: 'transferencia', label: 'Transferencia' },
-  { value: 'cheque', label: 'Cheque' },
-  { value: 'mercado_pago', label: 'Mercado Pago' },
-];
-
 const TABS = [
   { id: 'generales', label: 'Generales', icon: User },
   { id: 'impositivos', label: 'Datos Impositivos', icon: FileText },
@@ -210,9 +205,6 @@ const TABS = [
 ] as const;
 
 type TabId = (typeof TABS)[number]['id'];
-
-const inputCls =
-  'h-11 w-full rounded-[10px] border border-gray-200 bg-white px-4 text-sm text-[#101828] focus:border-[#175861] focus:outline-none focus:ring-1 focus:ring-[#175861]';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -300,317 +292,6 @@ const TIPO_COMPROBANTE_LABEL: Record<string, string> = {
   nota_credito_b: 'Nota de crédito B',
   nota_credito_c: 'Nota de crédito C',
 };
-
-// ─── Field helper ─────────────────────────────────────────────────────────────
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
-        {label}
-      </label>
-      {children}
-    </div>
-  );
-}
-
-// ─── Forma de Pago Fields ─────────────────────────────────────────────────────
-
-function FormaPagoFields({
-  formaDePago,
-  datosPago,
-  setDatosPago,
-}: {
-  formaDePago: string;
-  datosPago: Record<string, string>;
-  setDatosPago: React.Dispatch<React.SetStateAction<Record<string, string>>>;
-}) {
-  const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-    setDatosPago((prev) => ({ ...prev, [k]: e.target.value }));
-  const val = (k: string) => datosPago[k] ?? '';
-
-  if (!formaDePago || formaDePago === 'efectivo') return null;
-
-  if (formaDePago === 'tarjeta_credito') {
-    return (
-      <>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Field label="Banco / Entidad">
-            <input
-              className={inputCls}
-              placeholder="Banco"
-              value={val('banco')}
-              onChange={set('banco')}
-            />
-          </Field>
-          <Field label="Últimos 4 dígitos">
-            <input
-              className={inputCls}
-              placeholder="1234"
-              maxLength={4}
-              value={val('ultimos4')}
-              onChange={set('ultimos4')}
-            />
-          </Field>
-        </div>
-        <Field label="Cuotas">
-          <select className={inputCls} value={val('cuotas')} onChange={set('cuotas')}>
-            <option value="">Seleccione...</option>
-            {[1, 2, 3, 6, 9, 12, 18, 24].map((n) => (
-              <option key={n} value={String(n)}>
-                {n === 1 ? 'Contado' : `${n} cuotas`}
-              </option>
-            ))}
-          </select>
-        </Field>
-      </>
-    );
-  }
-
-  if (formaDePago === 'tarjeta_debito') {
-    return (
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <Field label="Banco / Entidad">
-          <input
-            className={inputCls}
-            placeholder="Banco"
-            value={val('banco')}
-            onChange={set('banco')}
-          />
-        </Field>
-        <Field label="Últimos 4 dígitos">
-          <input
-            className={inputCls}
-            placeholder="1234"
-            maxLength={4}
-            value={val('ultimos4')}
-            onChange={set('ultimos4')}
-          />
-        </Field>
-      </div>
-    );
-  }
-
-  if (formaDePago === 'debito_automatico') {
-    return (
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <Field label="Banco / Entidad">
-          <input
-            className={inputCls}
-            placeholder="Banco"
-            value={val('banco')}
-            onChange={set('banco')}
-          />
-        </Field>
-        <Field label="CBU / Alias">
-          <input
-            className={inputCls}
-            placeholder="CBU / Alias"
-            value={val('cbuAlias')}
-            onChange={set('cbuAlias')}
-          />
-        </Field>
-      </div>
-    );
-  }
-
-  if (formaDePago === 'transferencia') {
-    return (
-      <>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Field label="Banco origen">
-            <input
-              className={inputCls}
-              placeholder="Banco"
-              value={val('banco')}
-              onChange={set('banco')}
-            />
-          </Field>
-          <Field label="Nombre del titular">
-            <input
-              className={inputCls}
-              placeholder="Nombre"
-              value={val('titular')}
-              onChange={set('titular')}
-            />
-          </Field>
-        </div>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Field label="CBU / Alias">
-            <input
-              className={inputCls}
-              placeholder="CBU / Alias"
-              value={val('cbuAlias')}
-              onChange={set('cbuAlias')}
-            />
-          </Field>
-          <Field label="Importe">
-            <input
-              className={inputCls}
-              inputMode="decimal"
-              placeholder="0,00"
-              value={val('importe')}
-              onChange={set('importe')}
-            />
-          </Field>
-        </div>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Field label="Fecha de transferencia">
-            <input type="date" className={inputCls} value={val('fecha')} onChange={set('fecha')} />
-          </Field>
-          <Field label="Nro. de operación / ref.">
-            <input
-              className={inputCls}
-              placeholder="Número"
-              value={val('nroOperacion')}
-              onChange={set('nroOperacion')}
-            />
-          </Field>
-        </div>
-        <Field label="Observaciones">
-          <input
-            className={inputCls}
-            placeholder="Observaciones"
-            value={val('observaciones')}
-            onChange={set('observaciones')}
-          />
-        </Field>
-      </>
-    );
-  }
-
-  if (formaDePago === 'cheque') {
-    return (
-      <>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Field label="Número de cheque">
-            <input
-              className={inputCls}
-              placeholder="Número"
-              value={val('numeroCheque')}
-              onChange={set('numeroCheque')}
-            />
-          </Field>
-          <Field label="Banco emisor">
-            <input
-              className={inputCls}
-              placeholder="Banco"
-              value={val('banco')}
-              onChange={set('banco')}
-            />
-          </Field>
-        </div>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Field label="Sucursal">
-            <input
-              className={inputCls}
-              placeholder="Sucursal"
-              value={val('sucursal')}
-              onChange={set('sucursal')}
-            />
-          </Field>
-          <Field label="CUIT / CUIL del emisor">
-            <input
-              className={inputCls}
-              placeholder="CUIT/CUIL"
-              value={val('cuitCuil')}
-              onChange={set('cuitCuil')}
-            />
-          </Field>
-        </div>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Field label="Nombre del titular del cheque">
-            <input
-              className={inputCls}
-              placeholder="Nombre"
-              value={val('titular')}
-              onChange={set('titular')}
-            />
-          </Field>
-          <Field label="Importe del cheque">
-            <input
-              className={inputCls}
-              inputMode="decimal"
-              placeholder="0,00"
-              value={val('importe')}
-              onChange={set('importe')}
-            />
-          </Field>
-        </div>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Field label="Tipo de cheque">
-            <select className={inputCls} value={val('tipoCheque')} onChange={set('tipoCheque')}>
-              <option value="">Seleccione una opción...</option>
-              <option value="al_dia">Al día</option>
-              <option value="diferido">Diferido</option>
-            </select>
-          </Field>
-          <Field label="Moneda">
-            <select className={inputCls} value={val('moneda')} onChange={set('moneda')}>
-              <option value="">Seleccione una opción...</option>
-              <option value="pesos">Pesos</option>
-              <option value="dolares">Dólares</option>
-            </select>
-          </Field>
-        </div>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Field label="Cuenta donde se deposita">
-            <input
-              className={inputCls}
-              placeholder="Cuenta"
-              value={val('cuenta')}
-              onChange={set('cuenta')}
-            />
-          </Field>
-          <Field label="Observaciones">
-            <input
-              className={inputCls}
-              placeholder="Observaciones"
-              value={val('observaciones')}
-              onChange={set('observaciones')}
-            />
-          </Field>
-        </div>
-      </>
-    );
-  }
-
-  if (formaDePago === 'mercado_pago') {
-    return (
-      <>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Field label="Nombre / Email del pagador">
-            <input
-              className={inputCls}
-              placeholder="Nombre o email"
-              value={val('pagador')}
-              onChange={set('pagador')}
-            />
-          </Field>
-          <Field label="Nro. de operación">
-            <input
-              className={inputCls}
-              placeholder="Número"
-              value={val('nroOperacion')}
-              onChange={set('nroOperacion')}
-            />
-          </Field>
-        </div>
-        <Field label="Importe">
-          <input
-            className={inputCls}
-            inputMode="decimal"
-            placeholder="0,00"
-            value={val('importe')}
-            onChange={set('importe')}
-          />
-        </Field>
-      </>
-    );
-  }
-
-  return null;
-}
 
 // ─── Agregar Servicio Modal ───────────────────────────────────────────────────
 
@@ -867,284 +548,6 @@ function AgregarServicioModal({
   );
 }
 
-// ─── Informar Pago Modal ──────────────────────────────────────────────────────
-
-function InformarPagoModal({
-  open,
-  onClose,
-  socioId,
-  socioNombre,
-  saldoBruto,
-}: {
-  open: boolean;
-  onClose: () => void;
-  socioId: string;
-  socioNombre: string;
-  saldoBruto: number;
-}) {
-  const router = useRouter();
-  const [step, setStep] = useState<'form' | 'post-pago' | 'recibo-creado'>('form');
-  const [pagoResult, setPagoResult] = useState<{
-    movimientoId: string;
-    concepto: string;
-    importe: string;
-    fecha: string;
-    formaDePago: string;
-  } | null>(null);
-  const [reciboId, setReciboId] = useState<string | null>(null);
-  const [formaDePago, setFormaDePago] = useState('');
-  const [datosPago, setDatosPago] = useState<Record<string, string>>({});
-  // Lazy init — monto se pre-llena con el saldo deudor en cada remount (key cambia al abrir).
-  const [monto, setMonto] = useState(() =>
-    saldoBruto > 0 ? saldoBruto.toFixed(2).replace('.', ',') : '',
-  );
-  const [fecha, setFecha] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
-
-  const isValid = Boolean(formaDePago && monto && parseFloat(montoToNumberStr(monto)) > 0);
-
-  function handleFinalClose() {
-    onClose();
-    router.refresh();
-  }
-
-  function handleSubmit() {
-    setError(null);
-    startTransition(async () => {
-      const res = await informarPagoAction({
-        socioId,
-        monto: montoToNumberStr(monto),
-        fecha,
-        formaDePago,
-        datosPago: datosPago as Record<string, unknown>,
-      });
-      if (res.error) {
-        setError(res.error);
-      } else {
-        setPagoResult({
-          movimientoId: res.movimientoId!,
-          concepto: res.concepto!,
-          importe: res.importe!,
-          fecha: fecha || new Date().toISOString().slice(0, 10),
-          formaDePago,
-        });
-        setStep('post-pago');
-      }
-    });
-  }
-
-  function handleCrearRecibo() {
-    if (!pagoResult) return;
-    startTransition(async () => {
-      const res = await crearReciboInternoAction({
-        socioId,
-        movimientoId: pagoResult.movimientoId,
-        importe: pagoResult.importe,
-        descripcion: pagoResult.concepto,
-        medioPago: pagoResult.formaDePago,
-        fecha: pagoResult.fecha,
-      });
-      if (res.error) {
-        setError(res.error);
-      } else {
-        setReciboId(res.id!);
-        setStep('recibo-creado');
-      }
-    });
-  }
-
-  if (!open) return null;
-
-  // ── Step: post-pago ──────────────────────────────────────────────────────────
-  if (step === 'post-pago') {
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-        <div className="w-full max-w-sm rounded-2xl bg-white shadow-2xl">
-          <div className="p-6 pb-4">
-            <h2 className="text-[18px] font-bold" style={{ color: '#101828' }}>
-              Pago registrado
-            </h2>
-            <p className="mt-0.5 text-sm" style={{ color: '#669E9D' }}>
-              ¿Desea emitir un comprobante para {socioNombre}?
-            </p>
-          </div>
-          <div className="border-t border-gray-200" />
-          <div className="space-y-3 p-6">
-            <button
-              onClick={() => {
-                toast.success('Pago registrado');
-                onClose();
-                router.push('/facturacion');
-                router.refresh();
-              }}
-              className="w-full rounded-[10px] border border-[#175861] bg-white px-4 py-3 text-left text-sm font-medium text-[#175861] transition hover:bg-teal-50"
-            >
-              <span className="font-semibold">Factura ARCA</span>
-              <span className="ml-2 text-xs text-gray-400">Se emite con CAE</span>
-            </button>
-            <button
-              onClick={handleCrearRecibo}
-              disabled={isPending}
-              className="w-full rounded-[10px] border border-gray-200 bg-white px-4 py-3 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
-            >
-              <span className="font-semibold">Comprobante interno</span>
-              <span className="ml-2 text-xs text-gray-400">Sin valor fiscal</span>
-            </button>
-            <button
-              onClick={() => {
-                toast.success('Pago registrado');
-                handleFinalClose();
-              }}
-              className="w-full rounded-[10px] px-4 py-3 text-left text-sm font-medium text-gray-500 transition hover:bg-gray-50"
-            >
-              Sin comprobante
-              <span className="ml-2 text-xs text-gray-400">Solo movimiento</span>
-            </button>
-            {error && <p className="text-sm text-red-600">{error}</p>}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ── Step: recibo-creado ──────────────────────────────────────────────────────
-  if (step === 'recibo-creado') {
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-        <div className="w-full max-w-sm rounded-2xl bg-white shadow-2xl">
-          <div className="flex flex-col items-center p-6 text-center">
-            <CheckCircle2 className="mb-3 h-12 w-12 text-teal-600" />
-            <h2 className="text-[18px] font-bold" style={{ color: '#101828' }}>
-              Comprobante creado
-            </h2>
-            <p className="mt-1 text-sm" style={{ color: '#669E9D' }}>
-              El pago y el recibo interno fueron registrados.
-            </p>
-          </div>
-          <div className="border-t border-gray-200" />
-          <div className="flex gap-3 p-6">
-            <button
-              onClick={() => {
-                toast.success('Pago registrado');
-                handleFinalClose();
-              }}
-              className="flex-1 rounded-[10px] border border-[#d1d5dc] bg-white py-2.5 text-sm font-medium text-[#364153] transition hover:bg-gray-50"
-            >
-              Cerrar
-            </button>
-            <a
-              href={`/facturacion/recibo/${reciboId}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex flex-1 items-center justify-center gap-2 rounded-[10px] py-2.5 text-sm font-semibold text-white transition hover:opacity-90"
-              style={{ background: '#175861' }}
-            >
-              <Printer className="h-4 w-4" />
-              Imprimir
-            </a>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ── Step: form ───────────────────────────────────────────────────────────────
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="flex max-h-[90vh] w-full max-w-lg flex-col rounded-2xl bg-white shadow-2xl">
-        <div className="flex items-start justify-between p-6 pb-4">
-          <div>
-            <h2 className="text-[18px] font-bold" style={{ color: '#101828' }}>
-              Registrar pago
-            </h2>
-            <p className="mt-0.5 text-sm" style={{ color: '#669E9D' }}>
-              Registre un pago a cuenta de {socioNombre}
-            </p>
-          </div>
-          <button onClick={onClose} className="rounded-[8px] p-1 text-gray-400 hover:bg-gray-100">
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-        <div className="border-t border-gray-200" />
-
-        <div className="flex-1 space-y-4 overflow-y-auto p-6">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div>
-              <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
-                Monto
-              </label>
-              <input
-                className={inputCls}
-                inputMode="decimal"
-                placeholder="0,00"
-                value={monto}
-                onChange={(e) => setMonto(sanitizeMontoInput(e.target.value))}
-              />
-            </div>
-            <div>
-              <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
-                Fecha
-              </label>
-              <input
-                type="date"
-                className={inputCls}
-                value={fecha}
-                onChange={(e) => setFecha(e.target.value)}
-              />
-            </div>
-          </div>
-
-          <Field label="Forma de pago">
-            <select
-              className={inputCls}
-              value={formaDePago}
-              onChange={(e) => {
-                setFormaDePago(e.target.value);
-                setDatosPago({});
-              }}
-            >
-              <option value="">Seleccione una opción...</option>
-              {FORMAS_PAGO.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </Field>
-
-          <FormaPagoFields
-            formaDePago={formaDePago}
-            datosPago={datosPago}
-            setDatosPago={setDatosPago}
-          />
-
-          {error && <p className="text-sm text-red-600">{error}</p>}
-        </div>
-
-        <div className="border-t border-gray-200 p-6">
-          <div className="flex gap-3">
-            <button
-              onClick={onClose}
-              className="flex-1 rounded-[10px] border border-[#d1d5dc] bg-white py-2.5 text-sm font-medium text-[#364153] transition hover:bg-gray-50"
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={handleSubmit}
-              disabled={isPending || !isValid}
-              className="flex-1 rounded-[10px] py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-              style={{ background: '#175861' }}
-            >
-              {isPending ? 'Guardando...' : 'Guardar pago'}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export type DocumentoItem = {
@@ -1173,23 +576,6 @@ export type SalidaItem = {
 };
 
 const fmtFechaHoraSalida = formatArgentinaDateTime;
-
-// Filtra a digitos + un separador decimal (acepta coma o punto).
-// El usuario ve lo que tipea sin reformatear en cada keystroke.
-function sanitizeMontoInput(raw: string): string {
-  let out = raw.replace(/[^0-9.,]/g, '');
-  // Permitir solo un separador decimal: dejar el primero, sacar los siguientes.
-  const firstSep = out.search(/[.,]/);
-  if (firstSep >= 0) {
-    out = out.slice(0, firstSep + 1) + out.slice(firstSep + 1).replace(/[.,]/g, '');
-  }
-  return out;
-}
-
-// Convierte el input del usuario al formato que esperan los actions (parseFloat).
-function montoToNumberStr(input: string): string {
-  return input.replace(',', '.');
-}
 
 // ─── Embarcaciones tab ───────────────────────────────────────────────────────
 
@@ -2077,7 +1463,6 @@ export function SocioDetail({
 }) {
   const [activeTab, setActiveTab] = useState<TabId>('generales');
   const [modalServicioOpen, setModalServicioOpen] = useState(false);
-  const [modalInformarPagoOpen, setModalInformarPagoOpen] = useState(false);
 
   // Filtros de la tabla de cuenta corriente.
   const [ccFechaDesde, setCcFechaDesde] = useState('');
@@ -2272,14 +1657,6 @@ export function SocioDetail({
         socioId={socio.id}
         socioNombre={nombre}
         servicios={servicios}
-      />
-      <InformarPagoModal
-        key={String(modalInformarPagoOpen)}
-        open={modalInformarPagoOpen}
-        onClose={() => setModalInformarPagoOpen(false)}
-        socioId={socio.id}
-        socioNombre={nombre}
-        saldoBruto={saldoBruto}
       />
 
       {/* Back */}
@@ -2658,18 +2035,10 @@ export function SocioDetail({
       {activeTab === 'cuenta-corriente' && (
         <div className="rounded-2xl border border-gray-200 bg-white p-4 md:p-6">
           {/* Header */}
-          <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="mb-5">
             <p className="text-[18px] font-bold" style={{ color: '#101828' }}>
               Movimientos de cuenta
             </p>
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() => setModalInformarPagoOpen(true)}
-                className="shrink-0 justify-center rounded-[10px] border border-[#d1d5dc] px-4 py-2 text-sm font-medium text-[#364153] transition hover:bg-gray-50"
-              >
-                Registrar pago
-              </button>
-            </div>
           </div>
 
           {/* Filtros */}

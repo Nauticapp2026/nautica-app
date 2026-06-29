@@ -1,15 +1,72 @@
-import { Clock } from 'lucide-react';
+import { and, eq } from 'drizzle-orm';
 
-export default function CobranzasPage() {
+import { getActiveMarina } from '@/lib/auth/session';
+import { db } from '@/lib/db';
+import { embarcaciones, memberships, profiles } from '@/lib/db/schema';
+
+import { CobranzaClient, type SocioOption } from './cobranza-client';
+
+export default async function CobranzasPage() {
+  const ctx = await getActiveMarina();
+  if (!ctx) return null;
+
+  const gId = ctx.activeMembership.guarderiaId;
+
+  const [socios, barcos] = await Promise.all([
+    db
+      .select({
+        id: profiles.id,
+        nombre: profiles.nombre,
+        apellido: profiles.apellido,
+        numeroSocio: memberships.numeroSocio,
+      })
+      .from(memberships)
+      .innerJoin(profiles, eq(profiles.id, memberships.userId))
+      .where(
+        and(
+          eq(memberships.guarderiaId, gId),
+          eq(memberships.rol, 'socio'),
+          eq(memberships.status, 'active'),
+        ),
+      )
+      .orderBy(profiles.apellido, profiles.nombre),
+
+    db
+      .select({
+        profileId: embarcaciones.profileId,
+        nombre: embarcaciones.nombre,
+        matricula: embarcaciones.matricula,
+      })
+      .from(embarcaciones)
+      .where(eq(embarcaciones.guarderiaId, gId)),
+  ]);
+
+  // Agrupar embarcaciones (nombre/matrícula) por socio para el filtro.
+  const barcosPorSocio = new Map<string, string[]>();
+  for (const b of barcos) {
+    if (!b.profileId) continue;
+    const arr = barcosPorSocio.get(b.profileId) ?? [];
+    if (b.nombre) arr.push(b.nombre);
+    if (b.matricula) arr.push(b.matricula);
+    barcosPorSocio.set(b.profileId, arr);
+  }
+
+  const sociosOptions: SocioOption[] = socios.map((s) => ({
+    id: s.id,
+    nombre: [s.nombre, s.apellido].filter(Boolean).join(' ') || 'Sin nombre',
+    numeroSocio: s.numeroSocio,
+    embarcaciones: barcosPorSocio.get(s.id) ?? [],
+  }));
+
   return (
-    <div className="flex min-h-[60vh] flex-col items-center justify-center p-8 text-center">
-      <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gray-100">
-        <Clock className="h-8 w-8 text-gray-400" />
+    <div className="p-4 md:p-8">
+      <div className="mb-6">
+        <h1 className="page-title">Registro de Cobranza</h1>
+        <p className="page-subtitle">
+          Registrá los pagos de tus socios y aplicalos a sus comprobantes.
+        </p>
       </div>
-      <h1 className="text-2xl font-bold text-[#101828]">Cobranzas</h1>
-      <p className="mt-2 max-w-sm text-sm text-gray-500">
-        Esta sección estará disponible próximamente.
-      </p>
+      <CobranzaClient socios={sociosOptions} />
     </div>
   );
 }
