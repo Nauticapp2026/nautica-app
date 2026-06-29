@@ -275,10 +275,10 @@
 
 <p><strong>Alertas críticas (sin respuesta del socio):</strong></p>
 
-<ol><li>Si el socio tiene teléfono cargado, aparece el botón <strong>Llamar</strong>. Al tocarlo desde el celular abre el marcador directamente con el número del socio.</li><li>Si el socio no responde y necesitás cerrar la salida manualmente, hacé clic en <strong>Cerrar salida</strong>. Esto registra el arribo en ese momento y desactiva la alerta de forma permanente.</li></ol>
+<ol><li>Si el socio tiene teléfono cargado, aparece el botón <strong>WhatsApp</strong>. Al tocarlo abre la conversación de WhatsApp con el socio (WhatsApp Web o la app de escritorio desde la computadora, o la app desde el celular). Reemplaza al antiguo botón "Llamar", que no funcionaba desde la computadora.</li><li>Si el socio no responde y necesitás cerrar la salida manualmente, hacé clic en <strong>Cerrar salida</strong>. Esto registra el arribo en ese momento y desactiva la alerta de forma permanente.</li></ol>
 <p><strong>Alertas de retorno próximo:</strong></p>
 
-<ol><li>Tienen una única acción: <strong>Marcar resuelta</strong>, para cerrar la alerta sin registrar arribo. Los botones Llamar y Cerrar salida solo aparecen en las alertas <strong>críticas</strong>.</li></ol>
+<ol><li>Tienen una única acción: <strong>Marcar resuelta</strong>, para cerrar la alerta sin registrar arribo. Los botones WhatsApp y Cerrar salida solo aparecen en las alertas <strong>críticas</strong>.</li></ol>
 <hr>
 
 <h2>3. Socios</h2>
@@ -400,8 +400,9 @@
 
 <p><strong>Ordenar por fecha.</strong> Hacé clic en el encabezado <strong>Fecha</strong> para alternar el orden de los movimientos entre <strong>más nuevo primero</strong> (por defecto) y <strong>más antiguo primero</strong>. La flechita del encabezado indica el orden actual.</p>
 
-<p>La tabla incluye una columna <strong>Tipo de comprobante</strong> (antes del Nº de comprobante) que indica el tipo de factura asociada a cada movimiento.</p>
+<p><strong>Columnas de la tabla.</strong> En orden: <strong>Fecha</strong>, <strong>Tipo de comprobante</strong>, <strong>Nº Comprobante</strong>, <strong>Detalle</strong>, <strong>Vencimiento</strong>, <strong>Situación</strong>, <strong>Ventas</strong>, <strong>Cobranzas</strong>, <strong>Saldo</strong> y <strong>Estado</strong>.</p>
 
+<ul><li><strong>Vencimiento</strong> — fecha límite de pago del cargo. Se calcula como la <strong>fecha de la factura más el Plazo de pago</strong> definido en la tarifa del Tarifario (Contado, 5, 10, 15, 20 o 30 días). Ejemplo: una factura del 26/06 con plazo de 30 días vence el 26/07. Solo aparece en cargos con <strong>comprobante fiscal</strong>; en cargos sin facturar, recibos internos o cobranzas muestra "—".</li><li><strong>Situación</strong> — estado según esa fecha: <strong>En término</strong> (verde) o <strong>Vencida</strong> (rojo). Una fila pasa a <strong>Vencida</strong> el día siguiente al vencimiento (siguiendo el ejemplo, el 27/07). Es <strong>puramente por fecha</strong>: un cargo pagado tarde también puede figurar Vencida. Es independiente de la columna <strong>Estado</strong> (que refleja el estado de pago: Pagado / En Plazo).</li></ul>
 <h4>Pestaña Accesos Externos</h4>
 
 <p>Historial de accesos externos registrados por el socio. Muestra todas las personas que ingresaron al club bajo la autorización del socio como acceso externo.</p>
@@ -538,7 +539,9 @@
 <ul><li><strong>Teal</strong> — disponible</li><li><strong>Rojo</strong> — ocupado</li><li><strong>Amarillo</strong> — reservado</li></ul>
 <h3>Asignar operarios a un área</h3>
 
-<p>En la sección <strong>Áreas</strong> (arriba de Espacios), cada tarjeta de área tiene un botón <strong>Asignar</strong> junto a "Operarios". Ahí elegís uno o más operarios para esa área. Esos operarios son los que van a ver y poder tomar las tareas de las embarcaciones ubicadas en esa área (lavados, salidas, etc.). También podés asignar operarios <strong>al crear el área</strong> (ver abajo); después los cambiás desde la tarjeta.</p>
+<p>En la sección <strong>Áreas</strong> (arriba de Espacios), cada tarjeta de área tiene un botón <strong>Asignar</strong> junto a la lista de personal. Ahí elegís uno o más operarios para esa área. Esos operarios son los que van a ver y poder tomar las tareas de las embarcaciones ubicadas en esa área (lavados, salidas, etc.). También podés asignar operarios <strong>al crear el área</strong> (ver abajo); después los cambiás desde la tarjeta.</p>
+
+<blockquote><strong>Marineros vs. Operarios.</strong> La etiqueta del personal cambia según el tipo de área: en un área <strong>Marina</strong> se muestran como <strong>Marineros</strong> y en un área <strong>Nave</strong> como <strong>Operarios</strong>. Es solo el nombre que ves en pantalla: el rol y los permisos son los mismos (operario) en ambos casos.</blockquote>
 
 <h3>Crear una nueva área</h3>
 
@@ -745,7 +748,8 @@
 
 <h3>Crear una tarifa</h3>
 
-<ol><li>Hacé clic en <strong>Nueva tarifa</strong>.</li><li>Seleccioná la <strong>Categoría</strong>: Espacio de guarda, Cuota social, Membresía, Expensas ordinarias, Expensas extraordinarias o Servicio extra.</li><li>Indicá si el servicio es <strong>Fijo</strong> (precio único) o <strong>Variable</strong> (se cobra según el metraje de la embarcación).</li><li>Ingresá el <strong>Precio</strong> y la <strong>Alícuota de IVA</strong>: <strong>Exento / No gravado</strong>, <strong>10,5 %</strong> o <strong>21 %</strong>.</li><li>Configurá el <strong>Plazo de pago</strong> (días) y la <strong>Vigencia</strong>:</li></ol>   - <strong>Vigencia desde</strong> — fecha a partir de la cual la tarifa está activa.
+<ol><li>Hacé clic en <strong>Nueva tarifa</strong>.</li><li>Seleccioná la <strong>Categoría</strong>: Espacio de guarda, Cuota social, Membresía, Expensas ordinarias, Expensas extraordinarias o Servicio extra.</li><li>Indicá si el servicio es <strong>Fijo</strong> (precio único) o <strong>Variable</strong> (se cobra según el metraje de la embarcación).</li><li>Ingresá el <strong>Precio</strong> y la <strong>Alícuota de IVA</strong>: <strong>Exento / No gravado</strong>, <strong>10,5 %</strong> o <strong>21 %</strong>.</li><li>Configurá el <strong>Plazo de pago</strong> (días) y la <strong>Vigencia</strong>:</li></ol>   - El <strong>Plazo de pago</strong> (Contado, 5, 10, 15, 20 o 30 días) define la <strong>fecha de vencimiento</strong> de los cargos de esa tarifa en la Cuenta Corriente del socio: vencimiento = fecha de la factura + el plazo elegido.
+<p>- <strong>Vigencia desde</strong> — fecha a partir de la cual la tarifa está activa.</p>
 <p>- <strong>Vencimiento</strong> — fecha hasta la que aplica.</p>
 <p>- No pueden existir dos tarifas del mismo concepto con fechas superpuestas.</p>
 <ol><li>Hacé clic en <strong>Guardar tarifa</strong>.</li></ol>
@@ -757,12 +761,14 @@
 
 <p>Si necesitás actualizar varios precios a la vez:</p>
 
-<ol><li>Hacé clic en <strong>Ajuste masivo</strong>. Se abre un modal donde elegís:</li></ol>   - <strong>Concepto</strong> — Todos o una categoría específica (el ajuste aplica solo a esa categoría).
+<ol><li>Hacé clic en <strong>Ajuste masivo</strong>. Se abre un modal donde elegís:</li></ol>   - <strong>Categoría</strong> — Todos o una categoría específica (el ajuste aplica solo a esa categoría).
 <p>- <strong>Tipo</strong>: Porcentaje o Monto fijo.</p>
-<p>- <strong>Dirección</strong> (si es Porcentaje): Aumentar o Descontar.</p>
+<p>- <strong>Acción</strong> (si es Porcentaje): Aumentar o Descontar.</p>
 <p>- <strong>Valor</strong> — el porcentaje o monto a aplicar.</p>
 <p>- <strong>Vigencia desde</strong> — fecha a partir de la cual rige el nuevo precio.</p>
-<ol><li>Hacé clic en <strong>Aplicar</strong>.</li></ol>
+<ol><li>Hacé clic en <strong>Aplicar</strong> y confirmá.</li></ol>
+<blockquote><strong>Ajustes programados a futuro.</strong> Si en <strong>Vigencia desde</strong> elegís una fecha <strong>futura</strong>, el precio <strong>no cambia en el momento</strong>: el ajuste queda <strong>programado</strong> y el sistema lo aplica solo el día indicado. Hasta entonces la tarifa sigue cobrándose al precio actual y muestra un cartelito ámbar con el precio y la fecha programada (ej. "$X desde DD/MM"). Si la fecha es <strong>hoy o pasada</strong>, el cambio se aplica al instante. Solo puede haber un ajuste programado por tarifa: si cargás otro, reemplaza al anterior.</blockquote>
+
 <h3>Historial de cambios</h3>
 
 <p>Cada tarifa tiene un acordeón <strong>Historial de cambios</strong> donde podés ver los precios anteriores, la variación porcentual, la fecha del cambio, el origen (manual o ajuste masivo) y quién lo realizó.</p>

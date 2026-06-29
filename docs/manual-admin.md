@@ -80,12 +80,12 @@ Las acciones disponibles dependen del tipo de alerta.
 
 **Alertas críticas (sin respuesta del socio):**
 
-1. Si el socio tiene teléfono cargado, aparece el botón **Llamar**. Al tocarlo desde el celular abre el marcador directamente con el número del socio.
+1. Si el socio tiene teléfono cargado, aparece el botón **WhatsApp**. Al tocarlo abre la conversación de WhatsApp con el socio (WhatsApp Web o la app de escritorio desde la computadora, o la app desde el celular). Reemplaza al antiguo botón "Llamar", que no funcionaba desde la computadora.
 2. Si el socio no responde y necesitás cerrar la salida manualmente, hacé clic en **Cerrar salida**. Esto registra el arribo en ese momento y desactiva la alerta de forma permanente.
 
 **Alertas de retorno próximo:**
 
-1. Tienen una única acción: **Marcar resuelta**, para cerrar la alerta sin registrar arribo. Los botones Llamar y Cerrar salida solo aparecen en las alertas **críticas**.
+1. Tienen una única acción: **Marcar resuelta**, para cerrar la alerta sin registrar arribo. Los botones WhatsApp y Cerrar salida solo aparecen en las alertas **críticas**.
 
 ---
 
@@ -244,7 +244,10 @@ Al aplicar **cualquier filtro**, la tarjeta de **Saldo** se **oculta**: su valor
 
 **Ordenar por fecha.** Hacé clic en el encabezado **Fecha** para alternar el orden de los movimientos entre **más nuevo primero** (por defecto) y **más antiguo primero**. La flechita del encabezado indica el orden actual.
 
-La tabla incluye una columna **Tipo de comprobante** (antes del Nº de comprobante) que indica el tipo de factura asociada a cada movimiento.
+**Columnas de la tabla.** En orden: **Fecha**, **Tipo de comprobante**, **Nº Comprobante**, **Detalle**, **Vencimiento**, **Situación**, **Ventas**, **Cobranzas**, **Saldo** y **Estado**.
+
+- **Vencimiento** — fecha límite de pago del cargo. Se calcula como la **fecha de la factura más el Plazo de pago** definido en la tarifa del Tarifario (Contado, 5, 10, 15, 20 o 30 días). Ejemplo: una factura del 26/06 con plazo de 30 días vence el 26/07. Solo aparece en cargos con **comprobante fiscal**; en cargos sin facturar, recibos internos o cobranzas muestra "—".
+- **Situación** — estado según esa fecha: **En término** (verde) o **Vencida** (rojo). Una fila pasa a **Vencida** el día siguiente al vencimiento (siguiendo el ejemplo, el 27/07). Es **puramente por fecha**: un cargo pagado tarde también puede figurar Vencida. Es independiente de la columna **Estado** (que refleja el estado de pago: Pagado / En Plazo).
 
 #### Pestaña Accesos Externos
 
@@ -435,7 +438,9 @@ Los espacios se muestran con colores:
 
 ### Asignar operarios a un área
 
-En la sección **Áreas** (arriba de Espacios), cada tarjeta de área tiene un botón **Asignar** junto a "Operarios". Ahí elegís uno o más operarios para esa área. Esos operarios son los que van a ver y poder tomar las tareas de las embarcaciones ubicadas en esa área (lavados, salidas, etc.). También podés asignar operarios **al crear el área** (ver abajo); después los cambiás desde la tarjeta.
+En la sección **Áreas** (arriba de Espacios), cada tarjeta de área tiene un botón **Asignar** junto a la lista de personal. Ahí elegís uno o más operarios para esa área. Esos operarios son los que van a ver y poder tomar las tareas de las embarcaciones ubicadas en esa área (lavados, salidas, etc.). También podés asignar operarios **al crear el área** (ver abajo); después los cambiás desde la tarjeta.
+
+> **Marineros vs. Operarios.** La etiqueta del personal cambia según el tipo de área: en un área **Marina** se muestran como **Marineros** y en un área **Nave** como **Operarios**. Es solo el nombre que ves en pantalla: el rol y los permisos son los mismos (operario) en ambos casos.
 
 ### Crear una nueva área
 
@@ -724,6 +729,7 @@ Cada tarifa muestra su concepto, un badge **Fijo** o **Variable** (fijo = precio
 3. Indicá si el servicio es **Fijo** (precio único) o **Variable** (se cobra según el metraje de la embarcación).
 4. Ingresá el **Precio** y la **Alícuota de IVA**: **Exento / No gravado**, **10,5 %** o **21 %**.
 5. Configurá el **Plazo de pago** (días) y la **Vigencia**:
+   - El **Plazo de pago** (Contado, 5, 10, 15, 20 o 30 días) define la **fecha de vencimiento** de los cargos de esa tarifa en la Cuenta Corriente del socio: vencimiento = fecha de la factura + el plazo elegido.
    - **Vigencia desde** — fecha a partir de la cual la tarifa está activa.
    - **Vencimiento** — fecha hasta la que aplica.
    - No pueden existir dos tarifas del mismo concepto con fechas superpuestas.
@@ -738,12 +744,14 @@ Hacé clic en el ícono de edición (lápiz) en la fila de la tarifa. Podés cam
 Si necesitás actualizar varios precios a la vez:
 
 1. Hacé clic en **Ajuste masivo**. Se abre un modal donde elegís:
-   - **Concepto** — Todos o una categoría específica (el ajuste aplica solo a esa categoría).
+   - **Categoría** — Todos o una categoría específica (el ajuste aplica solo a esa categoría).
    - **Tipo**: Porcentaje o Monto fijo.
-   - **Dirección** (si es Porcentaje): Aumentar o Descontar.
+   - **Acción** (si es Porcentaje): Aumentar o Descontar.
    - **Valor** — el porcentaje o monto a aplicar.
    - **Vigencia desde** — fecha a partir de la cual rige el nuevo precio.
-2. Hacé clic en **Aplicar**.
+2. Hacé clic en **Aplicar** y confirmá.
+
+> **Ajustes programados a futuro.** Si en **Vigencia desde** elegís una fecha **futura**, el precio **no cambia en el momento**: el ajuste queda **programado** y el sistema lo aplica solo el día indicado. Hasta entonces la tarifa sigue cobrándose al precio actual y muestra un cartelito ámbar con el precio y la fecha programada (ej. "$X desde DD/MM"). Si la fecha es **hoy o pasada**, el cambio se aplica al instante. Solo puede haber un ajuste programado por tarifa: si cargás otro, reemplaza al anterior.
 
 ### Historial de cambios
 
