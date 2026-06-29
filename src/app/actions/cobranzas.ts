@@ -10,6 +10,7 @@ import {
   facturacionItems,
   memberships,
   movimientosCuentaCorriente,
+  paywayTokens,
 } from '@/lib/db/schema';
 import { getActiveMarina } from '@/lib/auth/session';
 import { fechaCalendariaArg } from '@/lib/dates';
@@ -25,37 +26,26 @@ function isAdmin(ctx: Ctx): boolean {
   );
 }
 
-const FORMAS_PAGO_LABEL: Record<string, string> = {
-  efectivo: 'Efectivo',
-  tarjeta_credito: 'Tarjeta de crédito',
-  tarjeta_debito: 'Tarjeta de débito',
-  debito_automatico: 'Débito automático',
-  transferencia: 'Transferencia',
-  cheque: 'Cheque',
-  mercado_pago: 'Mercado Pago',
+// Mapeo de la forma de cobranza (UI) al enum medio_pago de la DB. Las formas que
+// no mapean 1:1 (dólares → efectivo) o no existen en el enum (otro) caen a null.
+// En un pago combinado (más de una forma) se guarda null y el detalle va en datos_pago.
+const FORMA_TO_MEDIO: Record<string, string | null> = {
+  efectivo: 'efectivo',
+  efectivo_usd: 'efectivo',
+  tarjeta_credito: 'tarjeta_credito',
+  tarjeta_debito: 'tarjeta_debito',
+  transferencia: 'transferencia',
+  cheque: 'cheque',
+  mercado_pago: 'mercado_pago',
+  otro: null,
 };
 
-// Mismo criterio de concepto que informarPagoAction (movimientos.ts).
-function conceptoFromPago(formaDePago: string, datosPago?: Record<string, unknown>): string {
-  const label = FORMAS_PAGO_LABEL[formaDePago] ?? 'Pago';
-  switch (formaDePago) {
-    case 'transferencia': {
-      const banco = datosPago?.banco ? ` ${datosPago.banco}` : '';
-      const nro = datosPago?.nroOperacion ? ` Op. ${datosPago.nroOperacion}` : '';
-      return `Pago — Transferencia${banco}${nro}`;
-    }
-    case 'cheque': {
-      const nro = datosPago?.numeroCheque ? ` #${datosPago.numeroCheque}` : '';
-      return `Pago — Cheque${nro}`;
-    }
-    case 'mercado_pago': {
-      const nro = datosPago?.nroOperacion ? ` Op. ${datosPago.nroOperacion}` : '';
-      return `Pago — Mercado Pago${nro}`;
-    }
-    default:
-      return `Pago — ${label}`;
-  }
+function medioPagoDeFormas(formas: { tipo: string }[]): string | null {
+  if (formas.length === 1) return FORMA_TO_MEDIO[formas[0].tipo] ?? null;
+  return null; // pago combinado
 }
+
+const MARCA_TARJETA: Record<string, string> = { '1': 'Visa', '2': 'Mastercard', '65': 'Amex' };
 
 // Tipos de comprobante que entran a la cobranza: facturas fiscales + recibos
 // internos. Se excluyen explícitamente las notas de crédito.
@@ -89,15 +79,36 @@ async function assertSocioEnGuarderia(ctx: Ctx, socioId: string) {
 
 // ─── Comprobantes pendientes de cobro de un socio ──────────────────────────────
 
-export async function getComprobantesPendientesAction(
-  socioId: string,
-): Promise<{ error?: string; comprobantes?: ComprobantePendiente[] }> {
+export async function getComprobantesPendientesAction(socioId: string): Promise<{
+  error?: string;
+  comprobantes?: ComprobantePendiente[];
+  tarjeta?: { marca: string; lastFour: string } | null;
+}> {
   const ctx = await getActiveMarina();
   if (!ctx) return { error: 'No autenticado' };
   if (!isAdmin(ctx)) return { error: 'Solo administradores pueden registrar cobranzas.' };
 
   const m = await assertSocioEnGuarderia(ctx, socioId);
   if (!m) return { error: 'El socio no pertenece a esta guardería.' };
+
+  // Tarjeta guardada del socio (token Payway) — para "usar la que tiene cargada".
+  const [tok] = await db
+    .select({
+      paymentMethodId: paywayTokens.paymentMethodId,
+      lastFour: paywayTokens.lastFour,
+    })
+    .from(paywayTokens)
+    .where(
+      and(
+        eq(paywayTokens.socioId, socioId),
+        eq(paywayTokens.guarderiaId, ctx.activeMembership.guarderiaId),
+        eq(paywayTokens.activo, true),
+      ),
+    )
+    .limit(1);
+  const tarjeta = tok
+    ? { marca: MARCA_TARJETA[String(tok.paymentMethodId)] ?? 'Tarjeta', lastFour: tok.lastFour }
+    : null;
 
   const rows = await db
     .select({
@@ -122,7 +133,7 @@ export async function getComprobantesPendientesAction(
     )
     .orderBy(facturacion.emision);
 
-  if (rows.length === 0) return { comprobantes: [] };
+  if (rows.length === 0) return { comprobantes: [], tarjeta };
 
   // Un comprobante puede figurar 'pendiente' en facturacion pero estar ya cubierto
   // por un pago neto (haber) vía el FIFO de la cuenta corriente — la cuenta corriente
@@ -174,6 +185,7 @@ export async function getComprobantesPendientesAction(
   });
 
   return {
+    tarjeta,
     comprobantes: visibles.map((r) => ({
       id: r.id,
       codigo: r.codigo,
@@ -223,33 +235,46 @@ async function getCargosPagadosFifo(socioId: string): Promise<Set<string>> {
 
 // ─── Registrar una cobranza ────────────────────────────────────────────────────
 
+export type FormaCobranzaInput = {
+  tipo: string;
+  monto: string; // pesos
+  datos: Record<string, string>;
+};
+
 export type RegistrarCobranzaData = {
   socioId: string;
   comprobanteIds: string[];
   fecha: string;
-  formaDePago: string;
-  datosPago?: Record<string, unknown>;
+  montoAPagar: string;
+  formas: FormaCobranzaInput[];
 };
 
 export async function registrarCobranzaAction(data: RegistrarCobranzaData): Promise<{
   error?: string;
   movimientoId?: string;
-  concepto?: string;
   importe?: string;
 }> {
   const ctx = await getActiveMarina();
   if (!ctx) return { error: 'No autenticado' };
   if (!isAdmin(ctx)) return { error: 'Solo administradores pueden registrar cobranzas.' };
-  if (!data.formaDePago) return { error: 'La forma de pago es obligatoria.' };
+  if (!data.formas?.length) return { error: 'Cargá al menos una forma de pago.' };
   if (!data.comprobanteIds?.length) return { error: 'Seleccioná al menos un comprobante.' };
+
+  const montoAPagar = parseFloat(data.montoAPagar);
+  if (!Number.isFinite(montoAPagar) || montoAPagar <= 0)
+    return { error: 'El monto a pagar debe ser mayor a 0.' };
+
+  // La suma de las formas tiene que dar el monto a pagar (no se confía en el cliente).
+  const sumaFormas = data.formas.reduce((acc, f) => acc + (parseFloat(f.monto) || 0), 0);
+  if (Math.abs(sumaFormas - montoAPagar) > 0.01)
+    return { error: 'La suma de las formas de pago no coincide con el monto a pagar.' };
 
   const gId = ctx.activeMembership.guarderiaId;
 
   const m = await assertSocioEnGuarderia(ctx, data.socioId);
   if (!m) return { error: 'El socio no pertenece a esta guardería.' };
 
-  // Traer los comprobantes seleccionados, validando que sean del socio + guardería
-  // y que sigan pendientes/vencidos. El total se recalcula acá (no se confía en el cliente).
+  // Comprobantes seleccionados, ordenados del más viejo al más nuevo (FIFO).
   const comprobantes = await db
     .select({
       id: facturacion.id,
@@ -265,7 +290,8 @@ export async function registrarCobranzaAction(data: RegistrarCobranzaData): Prom
         inArray(facturacion.estado, ['pendiente', 'vencida']),
         inArray(facturacion.tipoFactura, [...TIPOS_COBRABLES]),
       ),
-    );
+    )
+    .orderBy(asc(facturacion.emision));
 
   if (comprobantes.length !== data.comprobanteIds.length) {
     return {
@@ -273,78 +299,30 @@ export async function registrarCobranzaAction(data: RegistrarCobranzaData): Prom
     };
   }
 
-  const total = comprobantes.reduce((acc, c) => acc + parseFloat(c.importe ?? '0'), 0);
-  if (!Number.isFinite(total) || total <= 0)
-    return { error: 'El total a cobrar debe ser mayor a 0.' };
+  // FIFO: el monto cubre los comprobantes del más viejo al más nuevo. Solo los que
+  // se cubren ENTEROS quedan pagados; el primero que no alcanza (y el resto) sigue
+  // pendiente. El excedente (si pagó de más) queda como saldo a favor.
+  let remaining = montoAPagar;
+  const pagados: typeof comprobantes = [];
+  for (const c of comprobantes) {
+    const imp = parseFloat(c.importe ?? '0');
+    if (remaining >= imp - 0.001) {
+      remaining -= imp;
+      pagados.push(c);
+    } else {
+      break;
+    }
+  }
+  const pagadosIds = pagados.map((c) => c.id);
 
-  const importe = total.toFixed(2);
-  const concepto = conceptoFromPago(data.formaDePago, data.datosPago);
+  const importe = montoAPagar.toFixed(2);
   const fecha = data.fecha ? fechaCalendariaArg(data.fecha) : new Date();
-  const medioPago = data.formaDePago as never;
-  const facturaIds = comprobantes.map((c) => c.id);
+  const medioPago = medioPagoDeFormas(data.formas) as never;
+  const datosPago = { montoAPagar: importe, formas: data.formas };
 
   try {
     const movimientoId = await db.transaction(async (tx) => {
-      // 1. Movimiento de pago (haber) por el total cobrado.
-      const [pago] = await tx
-        .insert(movimientosCuentaCorriente)
-        .values({
-          socioId: data.socioId,
-          concepto,
-          tipo: 'otro',
-          estado: 'pagado',
-          debe: '0',
-          haber: importe,
-          importeSigned: `-${importe}`,
-          fecha,
-          formaDePago: medioPago,
-          datosPago: data.datosPago ?? null,
-          createdBy: ctx.user.id,
-        })
-        .returning({ id: movimientosCuentaCorriente.id });
-
-      // 2. Marcar los comprobantes como pagados.
-      await tx
-        .update(facturacion)
-        .set({ estado: 'pagada', medioPago, updatedAt: new Date() })
-        .where(inArray(facturacion.id, facturaIds));
-
-      // 3. Propagar 'pagado' a los cargos vinculados — por las dos vías de enlace:
-      //    a) link directo facturacion.movimiento_id (recibos internos de un cargo).
-      const directMovIds = comprobantes
-        .map((c) => c.movimientoId)
-        .filter((id): id is string => Boolean(id));
-
-      //    b) relación M:N facturacion_items → facturacion_item_movimientos (facturas).
-      const items = await tx
-        .select({ id: facturacionItems.id })
-        .from(facturacionItems)
-        .where(inArray(facturacionItems.facturacionId, facturaIds));
-
-      let linkMovIds: string[] = [];
-      if (items.length > 0) {
-        const links = await tx
-          .select({ movimientoId: facturacionItemMovimientos.movimientoId })
-          .from(facturacionItemMovimientos)
-          .where(
-            inArray(
-              facturacionItemMovimientos.facturacionItemId,
-              items.map((i) => i.id),
-            ),
-          );
-        linkMovIds = links.map((l) => l.movimientoId);
-      }
-
-      const movIds = Array.from(new Set([...directMovIds, ...linkMovIds]));
-      if (movIds.length > 0) {
-        await tx
-          .update(movimientosCuentaCorriente)
-          .set({ estado: 'pagado' })
-          .where(inArray(movimientosCuentaCorriente.id, movIds));
-      }
-
-      // 4. Generar el recibo de cobranza (RC-NNNNNN), distinto de los RB- de cargo.
-      //    Guarda los comprobantes que cobró para poder revertirlos al anular.
+      // 1. Numerar el recibo de cobranza (RC-NNNNNN), distinto de los RB- de cargo.
       const [{ n }] = await tx
         .select({ n: count() })
         .from(facturacion)
@@ -356,6 +334,66 @@ export async function registrarCobranzaAction(data: RegistrarCobranzaData): Prom
           ),
         );
       const codigo = `RC-${String(Number(n) + 1).padStart(6, '0')}`;
+
+      // 2. Movimiento de pago (haber) por el monto pagado.
+      const [pago] = await tx
+        .insert(movimientosCuentaCorriente)
+        .values({
+          socioId: data.socioId,
+          concepto: `Cobranza ${codigo}`,
+          tipo: 'otro',
+          estado: 'pagado',
+          debe: '0',
+          haber: importe,
+          importeSigned: `-${importe}`,
+          fecha,
+          formaDePago: medioPago,
+          datosPago,
+          createdBy: ctx.user.id,
+        })
+        .returning({ id: movimientosCuentaCorriente.id });
+
+      // 3. Marcar como pagados solo los comprobantes cubiertos enteros (FIFO).
+      if (pagadosIds.length > 0) {
+        await tx
+          .update(facturacion)
+          .set({ estado: 'pagada', medioPago, updatedAt: new Date() })
+          .where(inArray(facturacion.id, pagadosIds));
+
+        // Propagar 'pagado' a los cargos vinculados (link directo + M:N).
+        const directMovIds = pagados
+          .map((c) => c.movimientoId)
+          .filter((id): id is string => Boolean(id));
+
+        const items = await tx
+          .select({ id: facturacionItems.id })
+          .from(facturacionItems)
+          .where(inArray(facturacionItems.facturacionId, pagadosIds));
+
+        let linkMovIds: string[] = [];
+        if (items.length > 0) {
+          const links = await tx
+            .select({ movimientoId: facturacionItemMovimientos.movimientoId })
+            .from(facturacionItemMovimientos)
+            .where(
+              inArray(
+                facturacionItemMovimientos.facturacionItemId,
+                items.map((i) => i.id),
+              ),
+            );
+          linkMovIds = links.map((l) => l.movimientoId);
+        }
+
+        const movIds = Array.from(new Set([...directMovIds, ...linkMovIds]));
+        if (movIds.length > 0) {
+          await tx
+            .update(movimientosCuentaCorriente)
+            .set({ estado: 'pagado' })
+            .where(inArray(movimientosCuentaCorriente.id, movIds));
+        }
+      }
+
+      // 4. Crear el recibo de cobranza (guarda las formas y los comprobantes pagados).
       await tx.insert(facturacion).values({
         guarderiaId: gId,
         socioId: data.socioId,
@@ -367,7 +405,7 @@ export async function registrarCobranzaAction(data: RegistrarCobranzaData): Prom
         emision: fecha,
         movimientoId: pago.id,
         codigo,
-        cobranzaComprobanteIds: facturaIds,
+        cobranzaComprobanteIds: pagadosIds,
       });
 
       return pago.id;
@@ -376,7 +414,7 @@ export async function registrarCobranzaAction(data: RegistrarCobranzaData): Prom
     revalidatePath(`/usuarios/${data.socioId}`);
     revalidatePath('/facturacion');
     revalidatePath('/cobranzas');
-    return { movimientoId, concepto, importe };
+    return { movimientoId, importe };
   } catch {
     return { error: 'Error al registrar la cobranza.' };
   }

@@ -5,13 +5,24 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Plus, Search, X } from 'lucide-react';
 
-import { FORMAS_PAGO, Field, FormaPagoFields, inputCls } from '@/components/shared/forma-pago';
+import {
+  Field,
+  inputCls,
+  montoToNumberStr,
+  sanitizeMontoInput,
+} from '@/components/shared/forma-pago';
 import { formatArgentinaDate } from '@/lib/dates';
 import {
   getComprobantesPendientesAction,
   registrarCobranzaAction,
   type ComprobantePendiente,
 } from '@/app/actions/cobranzas';
+import {
+  FormasDePago,
+  nuevaForma,
+  type FormaCobranza,
+  type TarjetaGuardada,
+} from './cobranza-formas';
 
 export type SocioOption = {
   id: string;
@@ -64,6 +75,7 @@ function NuevaCobranzaModal({ socios, onClose }: { socios: SocioOption[]; onClos
   // Paso socio
   const [query, setQuery] = useState('');
   const [socio, setSocio] = useState<SocioOption | null>(null);
+  const [tarjetaGuardada, setTarjetaGuardada] = useState<TarjetaGuardada>(null);
 
   // Paso comprobantes
   const [comprobantes, setComprobantes] = useState<ComprobantePendiente[]>([]);
@@ -71,9 +83,9 @@ function NuevaCobranzaModal({ socios, onClose }: { socios: SocioOption[]; onClos
   const [loadingComps, setLoadingComps] = useState(false);
 
   // Paso pago
-  const [formaDePago, setFormaDePago] = useState('');
-  const [datosPago, setDatosPago] = useState<Record<string, string>>({});
   const [fecha, setFecha] = useState(todayISODate);
+  const [montoAPagar, setMontoAPagar] = useState('');
+  const [formas, setFormas] = useState<FormaCobranza[]>([]);
 
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -99,6 +111,14 @@ function NuevaCobranzaModal({ socios, onClose }: { socios: SocioOption[]; onClos
     [comprobantes, selected],
   );
 
+  const montoNum = parseFloat(montoToNumberStr(montoAPagar)) || 0;
+  const totalCargado = useMemo(
+    () => formas.reduce((acc, f) => acc + (parseFloat(montoToNumberStr(f.monto)) || 0), 0),
+    [formas],
+  );
+  const cuadra = Math.abs(totalCargado - montoNum) < 0.01;
+  const pagoValido = montoNum > 0 && cuadra && formas.length > 0;
+
   function handleSelectSocio(s: SocioOption) {
     setSocio(s);
     setError(null);
@@ -113,6 +133,7 @@ function NuevaCobranzaModal({ socios, onClose }: { socios: SocioOption[]; onClos
         return;
       }
       setComprobantes(res.comprobantes ?? []);
+      setTarjetaGuardada(res.tarjeta ?? null);
       setSelected(new Set());
     });
   }
@@ -132,6 +153,14 @@ function NuevaCobranzaModal({ socios, onClose }: { socios: SocioOption[]; onClos
     );
   }
 
+  function irAPago() {
+    // Pre-llenar el monto a pagar con el total seleccionado y una forma vacía.
+    setMontoAPagar(totalSeleccionado > 0 ? totalSeleccionado.toFixed(2) : '');
+    setFormas([nuevaForma()]);
+    setError(null);
+    setStep('pago');
+  }
+
   function handleRegistrar() {
     if (!socio) return;
     setError(null);
@@ -140,8 +169,12 @@ function NuevaCobranzaModal({ socios, onClose }: { socios: SocioOption[]; onClos
         socioId: socio.id,
         comprobanteIds: [...selected],
         fecha,
-        formaDePago,
-        datosPago: datosPago as Record<string, unknown>,
+        montoAPagar: montoToNumberStr(montoAPagar),
+        formas: formas.map((f) => ({
+          tipo: f.tipo,
+          monto: montoToNumberStr(f.monto),
+          datos: f.datos,
+        })),
       });
       if (res.error) {
         setError(res.error);
@@ -153,9 +186,6 @@ function NuevaCobranzaModal({ socios, onClose }: { socios: SocioOption[]; onClos
     });
   }
 
-  const formaValida = Boolean(formaDePago);
-
-  // ─── Pasos socio / comprobantes / pago ───────────────────────────────────────
   return (
     <Overlay>
       <div className="flex max-h-[90vh] w-full max-w-lg flex-col rounded-2xl bg-white shadow-2xl">
@@ -279,41 +309,68 @@ function NuevaCobranzaModal({ socios, onClose }: { socios: SocioOption[]; onClos
           {step === 'pago' && (
             <>
               <div className="flex items-center justify-between rounded-[10px] bg-gray-50 px-4 py-3">
-                <span className="text-sm font-medium text-gray-600">Total a cobrar</span>
-                <span className="text-[18px] font-bold text-[#101828]">
+                <span className="text-sm font-medium text-gray-600">Total seleccionado</span>
+                <span className="text-base font-bold text-[#101828]">
                   {fmtMoney(totalSeleccionado)}
                 </span>
               </div>
-              <Field label="Fecha">
-                <input
-                  type="date"
-                  className={inputCls}
-                  value={fecha}
-                  onChange={(e) => setFecha(e.target.value)}
+
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Monto a pagar">
+                  <input
+                    className={inputCls}
+                    inputMode="decimal"
+                    placeholder="0,00"
+                    value={montoAPagar}
+                    onChange={(e) => setMontoAPagar(sanitizeMontoInput(e.target.value))}
+                  />
+                </Field>
+                <Field label="Fecha">
+                  <input
+                    type="date"
+                    className={inputCls}
+                    value={fecha}
+                    onChange={(e) => setFecha(e.target.value)}
+                  />
+                </Field>
+              </div>
+
+              {montoNum > totalSeleccionado + 0.01 && (
+                <p className="text-xs text-amber-600">
+                  El excedente de {fmtMoney(montoNum - totalSeleccionado)} queda como saldo a favor.
+                </p>
+              )}
+              {montoNum > 0 && montoNum < totalSeleccionado - 0.01 && (
+                <p className="text-xs text-amber-600">
+                  Pago parcial: se cubren los comprobantes más viejos hasta donde alcance; el resto
+                  queda pendiente.
+                </p>
+              )}
+
+              <div className="border-t border-gray-100 pt-3">
+                <p className="mb-2 text-xs font-semibold text-gray-500">Formas de pago</p>
+                <FormasDePago
+                  formas={formas}
+                  setFormas={setFormas}
+                  tarjetaGuardada={tarjetaGuardada}
                 />
-              </Field>
-              <Field label="Forma de pago">
-                <select
-                  className={inputCls}
-                  value={formaDePago}
-                  onChange={(e) => {
-                    setFormaDePago(e.target.value);
-                    setDatosPago({});
-                  }}
-                >
-                  <option value="">Seleccione una opción...</option>
-                  {FORMAS_PAGO.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-              <FormaPagoFields
-                formaDePago={formaDePago}
-                datosPago={datosPago}
-                setDatosPago={setDatosPago}
-              />
+              </div>
+
+              <div
+                className={`flex items-center justify-between rounded-[10px] px-4 py-3 ${
+                  cuadra ? 'bg-gray-50' : 'bg-amber-50'
+                }`}
+              >
+                <span className="text-sm font-medium text-gray-600">Cargado</span>
+                <span className="text-sm font-bold text-[#101828]">
+                  {fmtMoney(totalCargado)}
+                  {!cuadra && (
+                    <span className="ml-2 text-xs font-normal text-amber-600">
+                      ≠ {fmtMoney(montoNum)}
+                    </span>
+                  )}
+                </span>
+              </div>
             </>
           )}
 
@@ -335,7 +392,7 @@ function NuevaCobranzaModal({ socios, onClose }: { socios: SocioOption[]; onClos
                   Atrás
                 </button>
                 <button
-                  onClick={() => setStep('pago')}
+                  onClick={irAPago}
                   disabled={selected.size === 0}
                   className="flex-1 rounded-[10px] py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
                   style={{ background: '#175861' }}
@@ -357,7 +414,7 @@ function NuevaCobranzaModal({ socios, onClose }: { socios: SocioOption[]; onClos
                 </button>
                 <button
                   onClick={handleRegistrar}
-                  disabled={isPending || !formaValida || selected.size === 0}
+                  disabled={isPending || !pagoValido}
                   className="flex-1 rounded-[10px] py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
                   style={{ background: '#175861' }}
                 >

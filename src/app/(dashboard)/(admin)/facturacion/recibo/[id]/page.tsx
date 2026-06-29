@@ -3,7 +3,7 @@ import { eq, and, asc, inArray, ne } from 'drizzle-orm';
 
 import { getActiveMarina } from '@/lib/auth/session';
 import { db } from '@/lib/db';
-import { facturacion, guarderias, profiles } from '@/lib/db/schema';
+import { facturacion, guarderias, movimientosCuentaCorriente, profiles } from '@/lib/db/schema';
 import { PrintButton } from './print-button';
 import { EnviarReciboMailButton } from './enviar-recibo-mail-button';
 
@@ -42,6 +42,18 @@ const FORMA_PAGO_LABEL: Record<string, string> = {
   mercado_pago: 'Mercado Pago',
 };
 
+// Formas de cobranza (UI de Registro de Cobranza), para el desglose del recibo.
+const FORMA_COBRANZA_LABEL: Record<string, string> = {
+  efectivo: 'Efectivo (pesos)',
+  efectivo_usd: 'Efectivo (dólares)',
+  tarjeta_credito: 'Tarjeta de crédito',
+  tarjeta_debito: 'Tarjeta de débito',
+  transferencia: 'Transferencia bancaria',
+  cheque: 'Cheque',
+  mercado_pago: 'Mercado Pago',
+  otro: 'Otro',
+};
+
 export default async function ReciboPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const ctx = await getActiveMarina();
@@ -60,6 +72,7 @@ export default async function ReciboPage({ params }: { params: Promise<{ id: str
       emision: facturacion.emision,
       socioId: facturacion.socioId,
       guarderiaId: facturacion.guarderiaId,
+      movimientoId: facturacion.movimientoId,
       cobranzaComprobanteIds: facturacion.cobranzaComprobanteIds,
       socioNombre: profiles.nombre,
       socioApellido: profiles.apellido,
@@ -126,6 +139,19 @@ export default async function ReciboPage({ params }: { params: Promise<{ id: str
       comprobantes.push({ codigo: f.codigo, tipoFactura: f.tipoFactura });
       acumulado += parseFloat(f.importe ?? '0');
     }
+  }
+
+  // Desglose de formas de pago (cobranzas con pago combinado) — guardado en el
+  // movimiento de pago vinculado al recibo.
+  let formasPago: { tipo: string; monto: string }[] = [];
+  if (row.movimientoId) {
+    const [mov] = await db
+      .select({ datosPago: movimientosCuentaCorriente.datosPago })
+      .from(movimientosCuentaCorriente)
+      .where(eq(movimientosCuentaCorriente.id, row.movimientoId))
+      .limit(1);
+    const dp = mov?.datosPago as { formas?: { tipo: string; monto: string }[] } | null;
+    if (dp?.formas?.length) formasPago = dp.formas;
   }
 
   return (
@@ -214,14 +240,25 @@ export default async function ReciboPage({ params }: { params: Promise<{ id: str
                 )}
               </span>
             </div>
-            {row.medioPago && (
+            {formasPago.length > 0 ? (
+              <div className="grid grid-cols-[140px_1fr] gap-2 text-sm">
+                <span className="font-semibold text-gray-500">Forma de pago:</span>
+                <span className="flex flex-col gap-0.5 text-gray-900">
+                  {formasPago.map((f, i) => (
+                    <span key={i}>
+                      {FORMA_COBRANZA_LABEL[f.tipo] ?? f.tipo} — {fmtMoney(f.monto)}
+                    </span>
+                  ))}
+                </span>
+              </div>
+            ) : row.medioPago ? (
               <div className="grid grid-cols-[140px_1fr] gap-2 text-sm">
                 <span className="font-semibold text-gray-500">Forma de pago:</span>
                 <span className="text-gray-900">
                   {FORMA_PAGO_LABEL[row.medioPago] ?? row.medioPago}
                 </span>
               </div>
-            )}
+            ) : null}
           </div>
 
           <div className="mt-6 mb-6 border-t border-gray-200" />
