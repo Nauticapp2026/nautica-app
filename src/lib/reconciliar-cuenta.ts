@@ -44,7 +44,12 @@ export async function reconciliarCuentaSocio(socioId: string): Promise<string[]>
   for (const m of movs) {
     const debe = parseFloat(m.debe ?? '0');
     if (debe <= 0) continue;
-    if (m.estado === 'pagado') continue;
+    if (m.estado === 'pagado') {
+      // Ya pagado: consume su parte del pool (su haber está comprometido), para
+      // no inflar la cobertura de otros cargos. Igual que calcularSaldoYEstado.
+      pool -= debe;
+      continue;
+    }
     if (pool >= debe - 0.001) {
       pool -= debe;
       if (m.estado === 'no_pagado' && !m.comprobanteInterno) toMark.push(m.id);

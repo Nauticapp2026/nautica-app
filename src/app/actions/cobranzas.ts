@@ -219,11 +219,14 @@ async function getCargosPagadosFifo(socioId: string): Promise<Set<string>> {
 
   for (const m of movs) {
     const debe = parseFloat(m.debe ?? '0');
+    if (debe <= 0) continue;
     if (m.estado === 'pagado') {
-      if (debe > 0) pagados.add(m.id);
+      // Ya pagado: consume su parte del pool (su haber está comprometido), igual
+      // que calcularSaldoYEstado, para no inflar la cobertura de otros cargos.
+      pagados.add(m.id);
+      pool -= debe;
       continue;
     }
-    if (debe <= 0) continue;
     if (pool >= debe - 0.001) {
       pool -= debe;
       pagados.add(m.id);
