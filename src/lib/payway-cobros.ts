@@ -22,6 +22,7 @@ import {
   profiles,
 } from '@/lib/db/schema';
 import { formatPaywayError } from '@/lib/payway/format-error';
+import { reconciliarCuentaSocio } from '@/lib/reconciliar-cuenta';
 
 const sdkModulo = require('sdk-node-payway');
 
@@ -210,10 +211,8 @@ export async function runPaywayCharges(guarderiaIds: string[]): Promise<PaywayCh
       const paywayPaymentId = paywayResult.id != null ? String(paywayResult.id) : null;
 
       if (approved) {
-        // Registrar el cobro como un movimiento de pago (haber), igual que
-        // informarPagoAction. Lleva el saldo del socio a 0 sin marcar cargos
-        // puntuales (el monto es el neto, no mapea 1:1 a movimientos). Mantiene
-        // consistencia con el flujo manual de "Registrar pago".
+        // Registrar el cobro como un movimiento de pago (haber). El monto es el
+        // neto del socio, no mapea 1:1 a cargos.
         await db.insert(movimientosCuentaCorriente).values({
           socioId: token.socioId,
           concepto: 'Pago — Débito automático',
@@ -226,6 +225,15 @@ export async function runPaywayCharges(guarderiaIds: string[]): Promise<PaywayCh
           formaDePago: 'debito_automatico',
           datosPago: null,
         });
+
+        // Reconciliar FIFO: marcar los cargos cubiertos por el pago como
+        // 'pagado' para que la auto-emisión no los vuelva a facturar (evita la
+        // deuda fantasma). Si falla, no abortar el cobro (ya está aprobado).
+        try {
+          await reconciliarCuentaSocio(token.socioId);
+        } catch (err) {
+          console.error(`[payway-cobros] reconciliación falló socio=${token.socioId}`, err);
+        }
 
         await db
           .update(paywayCobros)
