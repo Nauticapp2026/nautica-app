@@ -26,14 +26,6 @@ export const TIPOS_COBRANZA = [
   { value: 'otro', label: 'Otro' },
 ] as const;
 
-const MARCA_TARJETA: Record<string, string> = { '1': 'Visa', '2': 'Mastercard', '65': 'Amex' };
-
-export function marcaTarjeta(paymentMethodId: number | null): string {
-  return paymentMethodId != null
-    ? (MARCA_TARJETA[String(paymentMethodId)] ?? 'Tarjeta')
-    : 'Tarjeta';
-}
-
 function todayISODate(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -105,6 +97,8 @@ function Linea({
 }) {
   const d = forma.datos;
   const setDato = (k: string, v: string) => onChange({ datos: { ...d, [k]: v } });
+  // Merge de varios campos en una sola actualización (evita pisarse entre setDato).
+  const setDatos = (patch: Record<string, string>) => onChange({ datos: { ...d, ...patch } });
 
   // Para dólares el monto en pesos se deriva de usd * tc.
   function setUsd(usd: string, tc: string) {
@@ -180,7 +174,12 @@ function Linea({
             </div>
           </>
         ) : (
-          <CamposPorTipo forma={forma} setDato={setDato} tarjetaGuardada={tarjetaGuardada} />
+          <CamposPorTipo
+            forma={forma}
+            setDato={setDato}
+            setDatos={setDatos}
+            tarjetaGuardada={tarjetaGuardada}
+          />
         )}
 
         {/* Monto en pesos (no para dólares, que es derivado) */}
@@ -203,10 +202,12 @@ function Linea({
 function CamposPorTipo({
   forma,
   setDato,
+  setDatos,
   tarjetaGuardada,
 }: {
   forma: FormaCobranza;
   setDato: (k: string, v: string) => void;
+  setDatos: (patch: Record<string, string>) => void;
   tarjetaGuardada: TarjetaGuardada;
 }) {
   const d = forma.datos;
@@ -224,9 +225,11 @@ function CamposPorTipo({
               checked={usarGuardada}
               onChange={(e) => {
                 if (e.target.checked) {
-                  setDato('usarGuardada', '1');
-                  setDato('tarjeta', tarjetaGuardada.marca);
-                  setDato('ultimos4', tarjetaGuardada.lastFour);
+                  setDatos({
+                    usarGuardada: '1',
+                    tarjeta: tarjetaGuardada.marca,
+                    ultimos4: tarjetaGuardada.lastFour,
+                  });
                 } else {
                   setDato('usarGuardada', '');
                 }
