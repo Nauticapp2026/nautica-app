@@ -3,9 +3,10 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { Eye } from 'lucide-react';
+import { Eye, Receipt } from 'lucide-react';
 
 import { formatArgentinaDate } from '@/lib/dates';
+import { EmptyState } from '@/components/shared/empty-state';
 import { anularCobranzaAction } from '@/app/actions/cobranzas';
 
 export type CobranzaRow = {
@@ -43,9 +44,12 @@ export function CobranzaTabla({ cobranzas }: { cobranzas: CobranzaRow[] }) {
 
   if (cobranzas.length === 0) {
     return (
-      <div className="rounded-2xl border border-gray-200 bg-white p-10 text-center text-sm text-gray-400">
-        Todavía no hay cobranzas registradas.
-      </div>
+      <EmptyState
+        icon={<Receipt className="h-6 w-6 text-gray-400" />}
+        text="Todavía no hay cobranzas registradas."
+        description="Cuando registres una cobranza con “Nueva cobranza”, va a aparecer acá."
+        className="rounded-2xl border border-gray-200 bg-white"
+      />
     );
   }
 
