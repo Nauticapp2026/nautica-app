@@ -1,10 +1,11 @@
-import { and, eq } from 'drizzle-orm';
+import { and, desc, eq, like } from 'drizzle-orm';
 
 import { getActiveMarina } from '@/lib/auth/session';
 import { db } from '@/lib/db';
-import { embarcaciones, memberships, profiles } from '@/lib/db/schema';
+import { embarcaciones, facturacion, memberships, profiles } from '@/lib/db/schema';
 
 import { CobranzaClient, type SocioOption } from './cobranza-client';
+import { CobranzaTabla, type CobranzaRow } from './cobranza-tabla';
 
 export default async function CobranzasPage() {
   const ctx = await getActiveMarina();
@@ -12,7 +13,7 @@ export default async function CobranzasPage() {
 
   const gId = ctx.activeMembership.guarderiaId;
 
-  const [socios, barcos] = await Promise.all([
+  const [socios, barcos, recibos] = await Promise.all([
     db
       .select({
         id: profiles.id,
@@ -39,6 +40,35 @@ export default async function CobranzasPage() {
       })
       .from(embarcaciones)
       .where(eq(embarcaciones.guarderiaId, gId)),
+
+    // Recibos de cobranza (RC-).
+    db
+      .select({
+        id: facturacion.id,
+        codigo: facturacion.codigo,
+        emision: facturacion.emision,
+        importe: facturacion.importe,
+        anulada: facturacion.anulada,
+        anuladaAt: facturacion.anuladaAt,
+        socioNombre: profiles.nombre,
+        socioApellido: profiles.apellido,
+        numeroSocio: memberships.numeroSocio,
+      })
+      .from(facturacion)
+      .leftJoin(profiles, eq(profiles.id, facturacion.socioId))
+      .leftJoin(
+        memberships,
+        and(eq(memberships.userId, facturacion.socioId), eq(memberships.guarderiaId, gId)),
+      )
+      .where(
+        and(
+          eq(facturacion.guarderiaId, gId),
+          eq(facturacion.tipoFactura, 'recibo'),
+          like(facturacion.codigo, 'RC-%'),
+        ),
+      )
+      .orderBy(desc(facturacion.emision))
+      .limit(300),
   ]);
 
   // Agrupar embarcaciones (nombre/matrícula) por socio para el filtro.
@@ -58,15 +88,29 @@ export default async function CobranzasPage() {
     embarcaciones: barcosPorSocio.get(s.id) ?? [],
   }));
 
+  const cobranzas: CobranzaRow[] = recibos.map((r) => ({
+    id: r.id,
+    codigo: r.codigo,
+    fecha: r.emision ? r.emision.toISOString() : null,
+    importe: r.importe ?? '0',
+    anulada: r.anulada,
+    anuladaAt: r.anuladaAt ? r.anuladaAt.toISOString() : null,
+    socioNombre: [r.socioNombre, r.socioApellido].filter(Boolean).join(' ') || '—',
+    numeroSocio: r.numeroSocio,
+  }));
+
   return (
     <div className="p-4 md:p-8">
-      <div className="mb-6">
-        <h1 className="page-title">Registro de Cobranza</h1>
-        <p className="page-subtitle">
-          Registrá los pagos de tus socios y aplicalos a sus comprobantes.
-        </p>
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="page-title">Registro de Cobranza</h1>
+          <p className="page-subtitle">
+            Registrá los pagos de tus socios y aplicalos a sus comprobantes.
+          </p>
+        </div>
+        <CobranzaClient socios={sociosOptions} />
       </div>
-      <CobranzaClient socios={sociosOptions} />
+      <CobranzaTabla cobranzas={cobranzas} />
     </div>
   );
 }

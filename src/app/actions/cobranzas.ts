@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { and, asc, eq, inArray } from 'drizzle-orm';
+import { and, asc, count, eq, inArray, like } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import {
@@ -343,6 +343,33 @@ export async function registrarCobranzaAction(data: RegistrarCobranzaData): Prom
           .where(inArray(movimientosCuentaCorriente.id, movIds));
       }
 
+      // 4. Generar el recibo de cobranza (RC-NNNNNN), distinto de los RB- de cargo.
+      //    Guarda los comprobantes que cobró para poder revertirlos al anular.
+      const [{ n }] = await tx
+        .select({ n: count() })
+        .from(facturacion)
+        .where(
+          and(
+            eq(facturacion.guarderiaId, gId),
+            eq(facturacion.tipoFactura, 'recibo'),
+            like(facturacion.codigo, 'RC-%'),
+          ),
+        );
+      const codigo = `RC-${String(Number(n) + 1).padStart(6, '0')}`;
+      await tx.insert(facturacion).values({
+        guarderiaId: gId,
+        socioId: data.socioId,
+        tipoFactura: 'recibo',
+        estado: 'pagada',
+        importe,
+        descripcion: 'Cobranza',
+        medioPago,
+        emision: fecha,
+        movimientoId: pago.id,
+        codigo,
+        cobranzaComprobanteIds: facturaIds,
+      });
+
       return pago.id;
     });
 
@@ -352,5 +379,138 @@ export async function registrarCobranzaAction(data: RegistrarCobranzaData): Prom
     return { movimientoId, concepto, importe };
   } catch {
     return { error: 'Error al registrar la cobranza.' };
+  }
+}
+
+// ─── Anular un recibo de cobranza (reversa total) ──────────────────────────────
+
+const TIPOS_FISCALES = ['factura_a', 'factura_b', 'factura_c'];
+
+// Anular = deshacer el cobro: revierte el pago (borra el haber), devuelve los
+// comprobantes cobrados a 'pendiente' y sus cargos al estado previo (fiscal →
+// 'facturado', recibo interno → 'no_pagado'), y marca el recibo anulado con
+// fecha. No genera comprobante. Siempre por el total.
+export async function anularCobranzaAction(reciboId: string): Promise<{ error?: string }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+  if (!isAdmin(ctx)) return { error: 'Solo administradores pueden anular cobranzas.' };
+
+  const gId = ctx.activeMembership.guarderiaId;
+
+  const [recibo] = await db
+    .select({
+      id: facturacion.id,
+      socioId: facturacion.socioId,
+      codigo: facturacion.codigo,
+      tipoFactura: facturacion.tipoFactura,
+      movimientoId: facturacion.movimientoId,
+      anulada: facturacion.anulada,
+      cobranzaComprobanteIds: facturacion.cobranzaComprobanteIds,
+    })
+    .from(facturacion)
+    .where(and(eq(facturacion.id, reciboId), eq(facturacion.guarderiaId, gId)))
+    .limit(1);
+
+  if (!recibo) return { error: 'Recibo no encontrado.' };
+  if (recibo.tipoFactura !== 'recibo' || !recibo.codigo?.startsWith('RC-')) {
+    return { error: 'Solo se pueden anular recibos de cobranza.' };
+  }
+  if (recibo.anulada) return { error: 'El recibo ya está anulado.' };
+
+  const comprobanteIds = recibo.cobranzaComprobanteIds ?? [];
+
+  try {
+    await db.transaction(async (tx) => {
+      if (comprobanteIds.length > 0) {
+        // Comprobantes cobrados + su tipo, para saber a qué estado volver el cargo.
+        const comps = await tx
+          .select({
+            id: facturacion.id,
+            tipoFactura: facturacion.tipoFactura,
+            movimientoId: facturacion.movimientoId,
+          })
+          .from(facturacion)
+          .where(inArray(facturacion.id, comprobanteIds));
+
+        // Cargos por las dos vías de enlace (directo + M:N).
+        const items = await tx
+          .select({ id: facturacionItems.id, facturacionId: facturacionItems.facturacionId })
+          .from(facturacionItems)
+          .where(inArray(facturacionItems.facturacionId, comprobanteIds));
+        const itemToFac = new Map(items.map((i) => [i.id, i.facturacionId]));
+        const links = items.length
+          ? await tx
+              .select({
+                facturacionItemId: facturacionItemMovimientos.facturacionItemId,
+                movimientoId: facturacionItemMovimientos.movimientoId,
+              })
+              .from(facturacionItemMovimientos)
+              .where(
+                inArray(
+                  facturacionItemMovimientos.facturacionItemId,
+                  items.map((i) => i.id),
+                ),
+              )
+          : [];
+
+        const cargosPorComprobante = new Map<string, Set<string>>();
+        for (const c of comps) {
+          const s = new Set<string>();
+          if (c.movimientoId) s.add(c.movimientoId);
+          cargosPorComprobante.set(c.id, s);
+        }
+        for (const l of links) {
+          const facId = itemToFac.get(l.facturacionItemId);
+          if (facId) cargosPorComprobante.get(facId)?.add(l.movimientoId);
+        }
+
+        const cargosAFacturado: string[] = [];
+        const cargosANoPagado: string[] = [];
+        for (const c of comps) {
+          const cargos = [...(cargosPorComprobante.get(c.id) ?? [])];
+          if (TIPOS_FISCALES.includes(c.tipoFactura ?? '')) cargosAFacturado.push(...cargos);
+          else cargosANoPagado.push(...cargos);
+        }
+
+        if (cargosAFacturado.length > 0) {
+          await tx
+            .update(movimientosCuentaCorriente)
+            .set({ estado: 'facturado' })
+            .where(inArray(movimientosCuentaCorriente.id, cargosAFacturado));
+        }
+        if (cargosANoPagado.length > 0) {
+          await tx
+            .update(movimientosCuentaCorriente)
+            .set({ estado: 'no_pagado' })
+            .where(inArray(movimientosCuentaCorriente.id, cargosANoPagado));
+        }
+
+        // Comprobantes vuelven a pendiente.
+        await tx
+          .update(facturacion)
+          .set({ estado: 'pendiente', updatedAt: new Date() })
+          .where(inArray(facturacion.id, comprobanteIds));
+      }
+
+      // Revertir el pago: borrar el haber de la cobranza.
+      if (recibo.movimientoId) {
+        await tx
+          .delete(movimientosCuentaCorriente)
+          .where(eq(movimientosCuentaCorriente.id, recibo.movimientoId));
+      }
+
+      // Marcar el recibo anulado.
+      await tx
+        .update(facturacion)
+        .set({ anulada: true, anuladaAt: new Date(), updatedAt: new Date() })
+        .where(eq(facturacion.id, reciboId));
+    });
+
+    if (recibo.socioId) revalidatePath(`/usuarios/${recibo.socioId}`);
+    revalidatePath('/facturacion');
+    revalidatePath('/cobranzas');
+    return {};
+  } catch {
+    return { error: 'Error al anular la cobranza.' };
   }
 }

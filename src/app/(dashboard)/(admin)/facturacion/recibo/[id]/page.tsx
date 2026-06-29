@@ -11,6 +11,7 @@ const TIPO_COMPROBANTE_LABEL: Record<string, string> = {
   factura_a: 'Factura A',
   factura_b: 'Factura B',
   factura_c: 'Factura C',
+  recibo: 'Recibo interno',
   nota_credito_a: 'Nota de crédito A',
   nota_credito_b: 'Nota de crédito B',
   nota_credito_c: 'Nota de crédito C',
@@ -59,6 +60,7 @@ export default async function ReciboPage({ params }: { params: Promise<{ id: str
       emision: facturacion.emision,
       socioId: facturacion.socioId,
       guarderiaId: facturacion.guarderiaId,
+      cobranzaComprobanteIds: facturacion.cobranzaComprobanteIds,
       socioNombre: profiles.nombre,
       socioApellido: profiles.apellido,
       socioCuit: profiles.cuit,
@@ -86,10 +88,20 @@ export default async function ReciboPage({ params }: { params: Promise<{ id: str
       : null;
   const clubNombre = row.guarderiaRazonSocial ?? row.guarderiaName;
 
-  // Comprobantes cancelados (criterio FIFO): facturas AFIP del socio, de la más
-  // antigua a la más nueva, hasta cubrir el importe del recibo.
+  // Comprobantes que cobró el recibo. Para recibos de cobranza (RC-) están
+  // guardados exactos en cobranza_comprobante_ids. Para el resto, heurística FIFO:
+  // facturas AFIP del socio, de la más antigua a la más nueva, hasta cubrir el importe.
   const comprobantes: { codigo: string | null; tipoFactura: string | null }[] = [];
-  if (row.socioId) {
+  if (row.cobranzaComprobanteIds && row.cobranzaComprobanteIds.length > 0) {
+    const cobrados = await db
+      .select({ codigo: facturacion.codigo, tipoFactura: facturacion.tipoFactura })
+      .from(facturacion)
+      .where(
+        and(inArray(facturacion.id, row.cobranzaComprobanteIds), eq(facturacion.guarderiaId, gId)),
+      )
+      .orderBy(asc(facturacion.emision));
+    comprobantes.push(...cobrados);
+  } else if (row.socioId) {
     const facturasSocio = await db
       .select({
         codigo: facturacion.codigo,

@@ -1103,6 +1103,10 @@ export const facturacion = pgTable(
     movimientoId: uuid('movimiento_id').references(() => movimientosCuentaCorriente.id, {
       onDelete: 'set null',
     }),
+    // Recibo de cobranza (RC-): anulación + comprobantes que cobró (para revertir).
+    anulada: boolean('anulada').notNull().default(false),
+    anuladaAt: timestamp('anulada_at', { withTimezone: true }),
+    cobranzaComprobanteIds: uuid('cobranza_comprobante_ids').array(),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
