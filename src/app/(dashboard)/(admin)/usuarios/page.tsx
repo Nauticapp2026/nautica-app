@@ -299,6 +299,9 @@ export default async function UsuariosPage({
     return {
       ...s,
       deuda: deuda.toFixed(2),
+      // Saldo neto real (debe − haber): positivo = nos debe, negativo = saldo a
+      // favor. Permite mostrar el "a favor" en la lista (deuda lo recorta a 0).
+      saldoNeto: (debe - haber).toFixed(2),
       // Moroso solo si además tiene saldo neto positivo: si pagó (aunque sea con
       // "Registrar pago", que deja los cargos viejos en no_pagado), deuda = 0 y
       // deja de figurar como moroso.

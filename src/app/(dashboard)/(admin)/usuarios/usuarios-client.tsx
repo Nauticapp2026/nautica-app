@@ -55,6 +55,8 @@ type Socio = {
   telefono: string | null;
   direccion: string | null;
   deuda: string | null;
+  // Saldo neto: positivo = nos debe, negativo = saldo a favor.
+  saldoNeto: string | null;
   estadoSocio: 'activo' | 'moroso' | null;
   membershipStatus: 'active' | 'suspended' | 'inactivo';
   numeroSocio: number | null;
@@ -892,7 +894,9 @@ export function UsuariosClient({
         return aNum - bNum;
       }
       if (sortKey === 'deuda') {
-        return parseFloat(a.deuda ?? '0') - parseFloat(b.deuda ?? '0');
+        return (
+          parseFloat(a.saldoNeto ?? a.deuda ?? '0') - parseFloat(b.saldoNeto ?? b.deuda ?? '0')
+        );
       }
       const aStr =
         sortKey === 'socio'
@@ -1092,7 +1096,8 @@ export function UsuariosClient({
                     ) : (
                       paginados.map((s) => {
                         const nombre = [s.nombre, s.apellido].filter(Boolean).join(' ') || '—';
-                        const deuda = parseFloat(s.deuda ?? '0');
+                        const saldoNeto = parseFloat(s.saldoNeto ?? s.deuda ?? '0');
+                        const aFavor = saldoNeto < 0;
                         const isExpanded = expandedIds.has(s.profileId);
                         return (
                           <Fragment key={s.membresiaId}>
@@ -1163,9 +1168,14 @@ export function UsuariosClient({
                               </td>
                               <td
                                 className="px-4 py-3 text-center font-medium"
-                                style={{ color: '#669E9D' }}
+                                style={{ color: aFavor ? '#15803d' : '#669E9D' }}
                               >
-                                ${deuda.toLocaleString('es-AR')}
+                                ${Math.abs(saldoNeto).toLocaleString('es-AR')}
+                                {aFavor && (
+                                  <span className="ml-1 text-xs font-normal text-green-600">
+                                    a favor
+                                  </span>
+                                )}
                               </td>
                               <td
                                 className="px-4 py-3 text-right"
