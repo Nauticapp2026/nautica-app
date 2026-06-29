@@ -101,6 +101,7 @@ La tabla muestra: número de socio (#), nombre, email, embarcación asignada, ub
 - Al lado del buscador hay **filtros por columna**: **Nº socio**, **Nombre** y **Embarcación**. Filtran en vivo a medida que escribís y se combinan entre sí y con el buscador.
 - Hacé clic en el encabezado **#** para ordenar la lista por número de socio (ascendente o descendente).
 - La columna **Ingreso** muestra la fecha en que se incorporó el socio al club.
+- La columna **Saldo** muestra el saldo de la cuenta del socio. Si **debe**, aparece el monto adeudado. Si tiene **saldo a favor** (pagó de más), aparece el monto en verde con la etiqueta **"a favor"**. Podés ordenar por esta columna haciendo clic en su encabezado (de mayor deuda a saldo a favor).
 - El **número de socio** (#NNN) aparece como un chip junto al nombre. Podés editarlo en el perfil del socio → pestaña **Generales**.
 - El **estado** de la membresía se indica con un badge de color:
   - **Verde (Activo)** — socio con membresía vigente.
