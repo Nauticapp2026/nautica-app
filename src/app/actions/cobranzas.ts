@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, asc, eq, inArray } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import {
@@ -109,6 +109,7 @@ export async function getComprobantesPendientesAction(
       emision: facturacion.emision,
       vencimiento: facturacion.vencimiento,
       descripcion: facturacion.descripcion,
+      movimientoId: facturacion.movimientoId,
     })
     .from(facturacion)
     .where(
@@ -121,8 +122,59 @@ export async function getComprobantesPendientesAction(
     )
     .orderBy(facturacion.emision);
 
+  if (rows.length === 0) return { comprobantes: [] };
+
+  // Un comprobante puede figurar 'pendiente' en facturacion pero estar ya cubierto
+  // por un pago neto (haber) vía el FIFO de la cuenta corriente — la cuenta corriente
+  // lo muestra "Pagado". No hay que ofrecerlo para cobrar de nuevo. Calculamos qué
+  // cargos están saldados (mismo criterio que calcularSaldoYEstado en el display) y
+  // ocultamos los comprobantes cuyos cargos ya estén todos cubiertos.
+  const cargosPagados = await getCargosPagadosFifo(socioId);
+
+  // Mapear cada comprobante a sus cargos: link directo (recibos internos) + M:N (facturas).
+  const facIds = rows.map((r) => r.id);
+  const items = await db
+    .select({ id: facturacionItems.id, facturacionId: facturacionItems.facturacionId })
+    .from(facturacionItems)
+    .where(inArray(facturacionItems.facturacionId, facIds));
+  const itemToFac = new Map(items.map((i) => [i.id, i.facturacionId]));
+  const links = items.length
+    ? await db
+        .select({
+          facturacionItemId: facturacionItemMovimientos.facturacionItemId,
+          movimientoId: facturacionItemMovimientos.movimientoId,
+        })
+        .from(facturacionItemMovimientos)
+        .where(
+          inArray(
+            facturacionItemMovimientos.facturacionItemId,
+            items.map((i) => i.id),
+          ),
+        )
+    : [];
+
+  const cargosPorComprobante = new Map<string, Set<string>>();
+  for (const r of rows) {
+    const s = new Set<string>();
+    if (r.movimientoId) s.add(r.movimientoId);
+    cargosPorComprobante.set(r.id, s);
+  }
+  for (const l of links) {
+    const facId = itemToFac.get(l.facturacionItemId);
+    if (facId) cargosPorComprobante.get(facId)?.add(l.movimientoId);
+  }
+
+  // Mostrar el comprobante salvo que TODOS sus cargos estén saldados. Si no tiene
+  // cargos vinculados, no podemos inferir cobertura → se muestra.
+  const visibles = rows.filter((r) => {
+    const cargos = cargosPorComprobante.get(r.id);
+    if (!cargos || cargos.size === 0) return true;
+    for (const c of cargos) if (!cargosPagados.has(c)) return true;
+    return false;
+  });
+
   return {
-    comprobantes: rows.map((r) => ({
+    comprobantes: visibles.map((r) => ({
       id: r.id,
       codigo: r.codigo,
       tipoFactura: r.tipoFactura,
@@ -133,6 +185,40 @@ export async function getComprobantesPendientesAction(
       descripcion: r.descripcion,
     })),
   };
+}
+
+// Conjunto de ids de cargos (movimientos con debe>0) que están saldados para el
+// socio: los ya `pagado`, más los cubiertos por el pool de haberes vía FIFO (del
+// más viejo al más nuevo). Mismo criterio que `calcularSaldoYEstado` en el display.
+async function getCargosPagadosFifo(socioId: string): Promise<Set<string>> {
+  const movs = await db
+    .select({
+      id: movimientosCuentaCorriente.id,
+      debe: movimientosCuentaCorriente.debe,
+      haber: movimientosCuentaCorriente.haber,
+      estado: movimientosCuentaCorriente.estado,
+    })
+    .from(movimientosCuentaCorriente)
+    .where(eq(movimientosCuentaCorriente.socioId, socioId))
+    .orderBy(asc(movimientosCuentaCorriente.fecha), asc(movimientosCuentaCorriente.createdAt));
+
+  let pool = movs.reduce((acc, m) => acc + parseFloat(m.haber ?? '0'), 0);
+  const pagados = new Set<string>();
+
+  for (const m of movs) {
+    const debe = parseFloat(m.debe ?? '0');
+    if (m.estado === 'pagado') {
+      if (debe > 0) pagados.add(m.id);
+      continue;
+    }
+    if (debe <= 0) continue;
+    if (pool >= debe - 0.001) {
+      pool -= debe;
+      pagados.add(m.id);
+    }
+  }
+
+  return pagados;
 }
 
 // ─── Registrar una cobranza ────────────────────────────────────────────────────
