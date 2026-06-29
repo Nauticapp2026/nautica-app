@@ -1202,14 +1202,19 @@ function AreaCard({
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [sel, setSel] = useState<string[]>(area.operarioIds);
+  // Solo conservamos los ids que siguen siendo operarios activos de la guardería.
+  // Un operario asignado que dejó de serlo (cambió de rol, se desactivó o salió
+  // del club) queda huérfano en areaOperarios: no tiene checkbox para destildarlo
+  // pero viajaba en el payload y el server lo rechazaba. Lo descartamos acá.
+  const validIds = useMemo(() => new Set(operarios.map((o) => o.id)), [operarios]);
+  const [sel, setSel] = useState<string[]>(() => area.operarioIds.filter((id) => validIds.has(id)));
   const [saving, startSaving] = useTransition();
 
   // Re-sync si cambian los datos del server (post-refresh).
   const [prevIds, setPrevIds] = useState(area.operarioIds);
   if (area.operarioIds !== prevIds) {
     setPrevIds(area.operarioIds);
-    setSel(area.operarioIds);
+    setSel(area.operarioIds.filter((id) => validIds.has(id)));
   }
 
   const nombrePorId = useMemo(() => new Map(operarios.map((o) => [o.id, o.nombre])), [operarios]);
