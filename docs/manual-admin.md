@@ -167,14 +167,14 @@ El **email de facturación** es la dirección a la que se envía el comprobante.
 
 > **Importante:** todos los socios activos aparecen en los flujos de facturación (individual, ventanilla y lote). Este checkbox ya **no** controla si el socio aparece o no en el módulo: solo elige el conjunto de datos con el que se emite.
 
-> **Campos requeridos para poder emitir factura AFIP al socio:**
+> **Campos requeridos para poder emitir factura ARCA al socio:**
 >
 > Según el modo elegido, el receptor del comprobante necesita: **razón social / nombre**, **documento** (CUIT para Responsable Inscripto o Monotributo —11 dígitos sin guiones—; DNI válido para Consumidor Final), **condición frente al IVA** (determina si es comprobante A, B o C) y **dirección**.
 >
 > - Con el checkbox **desactivado** estos datos salen de la pestaña Datos Impositivos.
 > - Con el checkbox **activado** salen de la pestaña Generales (incluida la nueva **Condición frente al IVA** de datos personales).
 >
-> Si alguno de estos datos falta en el modo elegido, la emisión puede fallar o generar un rechazo de AFIP. Completalos antes de intentar facturar al socio.
+> Si alguno de estos datos falta en el modo elegido, la emisión puede fallar o generar un rechazo de ARCA. Completalos antes de intentar facturar al socio.
 
 #### Pestaña Embarcación
 
@@ -191,8 +191,8 @@ Desde esta pestaña cargás nuevos consumos con el botón **Cargar Servicio** (a
 1. Hacé clic en **Cargar Servicio**.
 2. Elegí el servicio del tarifario, el concepto, el monto y la fecha.
 3. Elegí el **tipo de comprobante**:
-   - **Comprobante fiscal** — registra el cargo como facturable. **No se emite a AFIP en el momento**: queda pendiente y se factura después, manual o automáticamente, como cualquier otro cargo.
-   - **Comprobante interno** — genera un comprobante **no fiscal** imprimible (número RB-NNNNNN), pensado para cobros que no pasan por AFIP. El cargo **nunca se factura**: no aparece ni en la facturación automática ni en la manual.
+   - **Comprobante fiscal** — registra el cargo como facturable. **No se emite a ARCA en el momento**: queda pendiente y se factura después, manual o automáticamente, como cualquier otro cargo.
+   - **Comprobante interno** — genera un comprobante **no fiscal** imprimible (número RB-NNNNNN), pensado para cobros que no pasan por ARCA. El cargo **nunca se factura**: no aparece ni en la facturación automática ni en la manual.
 4. Confirmá. El cargo se suma a la Cuenta Corriente del socio.
 
 ### Ver cargos individuales
@@ -208,7 +208,7 @@ Cada fila de servicio tiene un **chevron (▾)** a la izquierda del nombre. Al h
    - **Fecha** — fecha en que se registró.
 4. Hacé clic en **Guardar**.
 
-> El monto del cargo no se puede modificar desde este formulario. Los cargos que ya tienen una factura AFIP emitida no muestran el botón de edición.
+> El monto del cargo no se puede modificar desde este formulario. Los cargos que ya tienen una factura ARCA emitida no muestran el botón de edición.
 
 **Cancelar un servicio:**
 
@@ -565,9 +565,9 @@ Hacé clic en el **ícono de lápiz** de la comunicación para abrirla y editarl
 
 Desde esta sección emitís y gestionás las facturas de tu club.
 
-> Para poder emitir facturas AFIP necesitás tener configurado el **Punto de Venta** y haber confirmado el **Certificado AFIP**. Podés hacerlo desde **Mi perfil → Datos Impositivos**. Si la emisión está bloqueada, el panel muestra un aviso explicando qué falta. Los **recibos internos** se pueden emitir aunque el certificado todavía no esté configurado.
+> Para poder emitir facturas ARCA necesitás tener configurado el **Punto de Venta** y haber confirmado el **Certificado ARCA**. Podés hacerlo desde **Mi perfil → Datos Impositivos**. Si la emisión está bloqueada, el panel muestra un aviso explicando qué falta. Los **recibos internos** se pueden emitir aunque el certificado todavía no esté configurado.
 
-### Datos requeridos para emitir facturas AFIP
+### Datos requeridos para emitir facturas ARCA
 
 Para que la emisión no falle, tanto el **club** como cada **socio** deben tener ciertos datos completos:
 
@@ -575,7 +575,7 @@ Para que la emisión no falle, tanto el **club** como cada **socio** deben tener
 
 - CUIT del club
 - Condición frente al IVA
-- Punto de Venta configurado y Certificado AFIP confirmado
+- Punto de Venta configurado y Certificado ARCA confirmado
 
 **Del socio** (perfil):
 
@@ -585,7 +585,7 @@ Para que la emisión no falle, tanto el **club** como cada **socio** deben tener
 - **Condición frente al IVA** — define si se emite Factura A, B o C. Está en Datos Impositivos y, para datos personales, en Generales.
 - **Dirección** — requerida para el encabezado del comprobante (fiscal o personal según el modo).
 
-Si alguno de estos datos falta en el modo elegido, el sistema puede rechazar la emisión o TusFacturas puede devolver un error de AFIP. Completalos antes de intentar facturarle.
+Si alguno de estos datos falta en el modo elegido, el sistema puede rechazar la emisión o TusFacturas puede devolver un error de ARCA. Completalos antes de intentar facturarle.
 
 ### Resumen de facturación
 
@@ -611,9 +611,9 @@ Las tarjetas superiores muestran:
    - **Estado** del comprobante: Pendiente, Pagada o Vencida.
    - **Fecha** y **Vencimiento**.
    - **Período desde / hasta**.
-5. Hacé clic en **Emitir**. La factura se envía a AFIP y queda registrada.
+5. Hacé clic en **Emitir**. La factura se envía a ARCA y queda registrada.
 
-> En el selector aparecen **todos los socios del club**. Lo que define si la emisión sale bien son los **datos fiscales/personales completos** del socio (ver "Datos requeridos para emitir facturas AFIP"); si faltan, AFIP puede rechazar la emisión.
+> En el selector aparecen **todos los socios del club**. Lo que define si la emisión sale bien son los **datos fiscales/personales completos** del socio (ver "Datos requeridos para emitir facturas ARCA"); si faltan, ARCA puede rechazar la emisión.
 
 ### Emitir comprobante por ventanilla
 
@@ -623,9 +623,9 @@ Para facturar servicios puntuales que no están cargados como movimientos del so
 2. Seleccioná el socio. El **tipo de comprobante** se asigna automáticamente (igual que en la factura individual) y aparece como campo de solo lectura.
 3. Agregá los ítems: descripción, cantidad y precio unitario de cada uno.
 4. Completá condición de venta, forma de pago, fecha y vencimiento.
-5. Hacé clic en **Emitir comprobante**. La factura se envía a AFIP de inmediato.
+5. Hacé clic en **Emitir comprobante**. La factura se envía a ARCA de inmediato.
 
-> Solo disponible si el POS y el certificado AFIP están configurados.
+> Solo disponible si el POS y el certificado ARCA están configurados.
 
 ### Facturación en lote
 
@@ -645,20 +645,20 @@ El tipo de comprobante se determina automáticamente para cada socio según la c
 
 ### Recibos internos
 
-Los recibos internos son comprobantes propios del club, sin intervención de AFIP (número RB-NNNNNN). Son útiles para registrar cobros cuando todavía no tenés el certificado AFIP configurado, o para socios que no requieren factura fiscal.
+Los recibos internos son comprobantes propios del club, sin intervención de ARCA (número RB-NNNNNN). Son útiles para registrar cobros cuando todavía no tenés el certificado ARCA configurado, o para socios que no requieren factura fiscal.
 
 Se generan de dos formas:
 
 - Al **Registrar pago** en la Cuenta Corriente del socio: al confirmar, el sistema pregunta si querés emitir un recibo interno. Hacé clic en **Emitir recibo** para generarlo.
 - Al **Cargar Servicio** (pestaña Servicios Contratados) eligiendo **Comprobante interno**: genera el comprobante interno del cargo, que además queda **excluido de toda facturación**.
 
-Todos aparecen en **Comprobantes → tab Recibos internos** y, en la cuenta corriente del socio, con la columna **Tipo de comprobante** = "Comprobante interno" y su número RB-. Quedan disponibles para imprimir o descargar. No tienen CAE ni validez fiscal ante AFIP.
+Todos aparecen en **Comprobantes → tab Recibos internos** y, en la cuenta corriente del socio, con la columna **Tipo de comprobante** = "Comprobante interno" y su número RB-. Quedan disponibles para imprimir o descargar. No tienen CAE ni validez fiscal ante ARCA.
 
 ### Emitir una nota de crédito
 
 Si necesitás anular parcial o totalmente una factura ya emitida, podés emitir una nota de crédito:
 
-1. Andá a **Comprobantes** en el menú lateral → tab **Comprobantes AFIP**.
+1. Andá a **Comprobantes** en el menú lateral → tab **Comprobantes ARCA**.
 2. Encontrá la factura original en la tabla y hacé clic en el ícono de flecha curva (↩) al final de la fila.
 3. Seleccioná el motivo:
    - **Anulación total** — anula la factura completa; el importe se toma automáticamente.
@@ -666,26 +666,26 @@ Si necesitás anular parcial o totalmente una factura ya emitida, podés emitir 
    - **Devolución de servicio** — igual que descuento parcial, con un motivo descriptivo diferente.
 4. Confirmá.
 
-> El botón solo aparece en facturas tipo A, B o C que ya tienen **CAE** asignado. El CAE es el código que AFIP emite al autorizar una factura — sin él la factura no es válida fiscalmente ni puede tener nota de crédito asociada.
+> El botón solo aparece en facturas tipo A, B o C que ya tienen **CAE** asignado. El CAE es el código que ARCA emite al autorizar una factura — sin él la factura no es válida fiscalmente ni puede tener nota de crédito asociada.
 
 ### Emitir notas de crédito en lote
 
 Si necesitás **anular varias facturas a la vez** (anulación total), podés hacerlo desde el listado sin entrar una por una:
 
-1. En el tab **Comprobantes AFIP**, tildá la **casilla** al inicio de cada factura que quieras anular. La casilla del encabezado selecciona/deselecciona de una todas las elegibles.
+1. En el tab **Comprobantes ARCA**, tildá la **casilla** al inicio de cada factura que quieras anular. La casilla del encabezado selecciona/deselecciona de una todas las elegibles.
 2. Solo se pueden seleccionar facturas **A, B o C con CAE** que **todavía no tengan una nota de crédito**. El resto (recibos, notas de crédito, facturas ya anuladas) tienen la casilla deshabilitada.
 3. Al haber al menos una seleccionada aparece una barra con la cantidad y el botón **Emitir NC en lote**.
 4. Confirmá en el modal (muestra el total a anular). El sistema emite una **nota de crédito por el total** de cada factura, **una por una**.
 5. Al terminar muestra un resumen de **emitidas** y **fallidas** (con el motivo de cada falla). Si una falla, continúa con las demás.
 
-> El lote es solo para **anulación total**. Para una nota de crédito **parcial**, usá la emisión individual (ícono ↩ en la fila). Como cada nota de crédito es una emisión real a AFIP, el proceso puede tardar unos segundos si seleccionás muchas.
+> El lote es solo para **anulación total**. Para una nota de crédito **parcial**, usá la emisión individual (ícono ↩ en la fila). Como cada nota de crédito es una emisión real a ARCA, el proceso puede tardar unos segundos si seleccionás muchas.
 
 ### Filtrar y exportar comprobantes
 
-En el tab **Comprobantes AFIP** podés acotar la tabla con los siguientes filtros:
+En el tab **Comprobantes ARCA** podés acotar la tabla con los siguientes filtros:
 
 - **Estado**: Todos / Pendiente / Pagada / Vencida
-- **Tipo**: Todos / Facturas AFIP / Notas de Crédito
+- **Tipo**: Todos / Facturas ARCA / Notas de Crédito
 - **Período**: fecha desde y fecha hasta
 
 Para exportar los comprobantes actualmente visibles (respetando los filtros activos), hacé clic en **Exportar** — se descarga un archivo CSV.
@@ -694,7 +694,7 @@ Para exportar los comprobantes actualmente visibles (respetando los filtros acti
 
 Cuando un socio te abona **una factura puntual** que le emitiste, marcala como pagada:
 
-1. En el tab **Comprobantes AFIP**, ubicá la factura en la tabla. En la última columna (acciones) hacé clic en el **ícono de lápiz (✏️)** — al pasar el mouse aparece el texto "Marcar como pagada". Si la factura ya está pagada, el ícono se ve deshabilitado.
+1. En el tab **Comprobantes ARCA**, ubicá la factura en la tabla. En la última columna (acciones) hacé clic en el **ícono de lápiz (✏️)** — al pasar el mouse aparece el texto "Marcar como pagada". Si la factura ya está pagada, el ícono se ve deshabilitado.
 2. Seleccioná el **medio de pago**.
 3. Confirmá. La factura pasa de **Pendiente** a **Pagada** y los cargos vinculados a ella quedan saldados.
 
@@ -789,7 +789,7 @@ Configurá aquí el Punto de Venta para poder emitir facturas electrónicas. Ant
 _Paso 1 — Configurar el Punto de Venta:_
 
 1. Completá los datos:
-   - **Nº de referencia** _(requerido)_ — el número de Punto de Venta, que debe existir previamente en AFIP (Servicios → Administrador de Relaciones → POS de Facturación Electrónica).
+   - **Nº de referencia** _(requerido)_ — el número de Punto de Venta, que debe existir previamente en ARCA (Servicios → Administrador de Relaciones → POS de Facturación Electrónica).
    - **Razón social** _(requerida)_
    - **CUIT** _(requerido)_
    - **Condición frente al IVA** _(requerida)_ — la de tu club.
@@ -801,12 +801,12 @@ Una vez creado, el **número de Punto de Venta no se puede cambiar**. El resto d
 
 > Si el POS ya tiene facturas emitidas, TusFacturas puede bloquear la edición del CUIT y la condición frente al IVA. En ese caso el sistema mostrará el mensaje de error devuelto por TusFacturas.
 
-_Paso 2 — Certificado de enlace con AFIP:_
+_Paso 2 — Certificado de enlace con ARCA:_
 
-El certificado permite que el sistema emita facturas directamente a AFIP en nombre de tu club.
+El certificado permite que el sistema emita facturas directamente a ARCA en nombre de tu club.
 
-1. Hacé clic en **Solicitar certificado AFIP**. TusFacturas va a enviar las instrucciones al mail del administrador de la cuenta de TusFacturas.
-2. Instalá el certificado en el portal de AFIP siguiendo las instrucciones recibidas.
+1. Hacé clic en **Solicitar certificado ARCA**. TusFacturas va a enviar las instrucciones al mail del administrador de la cuenta de TusFacturas.
+2. Instalá el certificado en el portal de ARCA siguiendo las instrucciones recibidas.
 3. Volvé al panel y hacé clic en **Confirmar instalación** para habilitar la emisión.
 
 > Hasta que no confirmes la instalación del certificado, el botón "Nuevo comprobante" aparece deshabilitado.

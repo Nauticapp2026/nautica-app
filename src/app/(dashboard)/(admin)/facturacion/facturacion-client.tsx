@@ -1441,7 +1441,7 @@ function LoteNotaCreditoModal({
                 <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
                 <span>
                   Se va a emitir una <strong>nota de crédito por el total</strong> de cada factura
-                  seleccionada (anulación total). Es una emisión real a AFIP y revierte la cuenta
+                  seleccionada (anulación total). Es una emisión real a ARCA y revierte la cuenta
                   corriente del socio. No se puede deshacer.
                 </span>
               </div>
@@ -1636,7 +1636,7 @@ function VentanillaModal({
               Ventanilla — todo en un paso
             </h2>
             <p className="mt-0.5 text-sm" style={{ color: '#669E9D' }}>
-              Cargá el consumo y emití la factura AFIP al instante
+              Cargá el consumo y emití la factura ARCA al instante
             </p>
           </div>
           <button
@@ -2157,7 +2157,7 @@ export function FacturacionClient({
             disabled={!puedeFacturar}
             title={
               !puedeFacturar
-                ? 'Configurá los datos de facturación y confirmá el certificado AFIP para poder facturar.'
+                ? 'Configurá los datos de facturación y confirmá el certificado ARCA para poder facturar.'
                 : undefined
             }
             className="flex items-center justify-center gap-2 rounded-[10px] border border-[#d1d5dc] bg-white px-4 py-2.5 text-sm font-semibold text-[#364153] transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-white"
@@ -2170,7 +2170,7 @@ export function FacturacionClient({
             disabled={!puedeFacturar}
             title={
               !puedeFacturar
-                ? 'Configurá los datos de facturación y confirmá el certificado AFIP para poder facturar.'
+                ? 'Configurá los datos de facturación y confirmá el certificado ARCA para poder facturar.'
                 : undefined
             }
             className="flex items-center justify-center gap-2 rounded-[10px] px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:opacity-40"
@@ -2192,7 +2192,7 @@ export function FacturacionClient({
             </>
           ) : (
             <>
-              El certificado de enlace con AFIP todavía no está confirmado. Andá a{' '}
+              El certificado de enlace con ARCA todavía no está confirmado. Andá a{' '}
               <strong>Mi perfil → Datos Impositivos</strong>, solicitá el certificado y confirmá la
               instalación.
             </>
@@ -2218,7 +2218,7 @@ export function FacturacionClient({
               : 'text-gray-500 hover:text-gray-700'
           }`}
         >
-          Comprobantes AFIP
+          Comprobantes ARCA
           <span className="ml-2 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
             {facturas.filter((f) => f.tipoFactura !== 'recibo').length}
           </span>
@@ -2296,7 +2296,7 @@ export function FacturacionClient({
                     className="h-9 rounded-[8px] border border-gray-200 bg-white px-3 text-sm text-gray-600 focus:border-[#175861] focus:outline-none"
                   >
                     <option value="">Todos los tipos</option>
-                    <option value="afip">Facturas AFIP</option>
+                    <option value="afip">Facturas ARCA</option>
                     <option value="nc">Notas de Crédito</option>
                   </select>
                 </>
@@ -2333,7 +2333,7 @@ export function FacturacionClient({
                 text={
                   hasFiltrosAfip
                     ? 'No se encontraron comprobantes con ese criterio.'
-                    : 'Todavía no hay comprobantes AFIP emitidos.'
+                    : 'Todavía no hay comprobantes ARCA emitidos.'
                 }
               />
             ) : (
@@ -2406,7 +2406,7 @@ export function FacturacionClient({
                                 title={
                                   eligible
                                     ? 'Seleccionar para NC en lote'
-                                    : 'No elegible (no es factura AFIP con CAE, o ya tiene NC)'
+                                    : 'No elegible (no es factura ARCA con CAE, o ya tiene NC)'
                                 }
                                 checked={selectedNc.has(f.id)}
                                 onChange={() => toggleNc(f.id)}

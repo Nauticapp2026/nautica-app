@@ -339,13 +339,13 @@
 <ul><li><strong>Desactivado</strong> (valor por defecto): se factura con los <strong>Datos Impositivos</strong> (razón social, CUIT, dirección fiscal y condición frente al IVA de esta pestaña).</li><li><strong>Activado</strong>: se factura con los <strong>datos personales</strong> del socio (nombre y apellido, tipo y número de documento, dirección y condición frente al IVA cargados en la pestaña <strong>Generales</strong>).</li></ul>
 <blockquote><strong>Importante:</strong> todos los socios activos aparecen en los flujos de facturación (individual, ventanilla y lote). Este checkbox ya <strong>no</strong> controla si el socio aparece o no en el módulo: solo elige el conjunto de datos con el que se emite.</blockquote>
 
-<blockquote><strong>Campos requeridos para poder emitir factura AFIP al socio:</strong></blockquote>
+<blockquote><strong>Campos requeridos para poder emitir factura ARCA al socio:</strong></blockquote>
 <p>></p>
 <blockquote>Según el modo elegido, el receptor del comprobante necesita: <strong>razón social / nombre</strong>, <strong>documento</strong> (CUIT para Responsable Inscripto o Monotributo —11 dígitos sin guiones—; DNI válido para Consumidor Final), <strong>condición frente al IVA</strong> (determina si es comprobante A, B o C) y <strong>dirección</strong>.</blockquote>
 <p>></p>
 <blockquote>- Con el checkbox <strong>desactivado</strong> estos datos salen de la pestaña Datos Impositivos.<br>- Con el checkbox <strong>activado</strong> salen de la pestaña Generales (incluida la nueva <strong>Condición frente al IVA</strong> de datos personales).</blockquote>
 <p>></p>
-<blockquote>Si alguno de estos datos falta en el modo elegido, la emisión puede fallar o generar un rechazo de AFIP. Completalos antes de intentar facturar al socio.</blockquote>
+<blockquote>Si alguno de estos datos falta en el modo elegido, la emisión puede fallar o generar un rechazo de ARCA. Completalos antes de intentar facturar al socio.</blockquote>
 
 <h4>Pestaña Embarcación</h4>
 
@@ -359,8 +359,8 @@
 
 <p>Desde esta pestaña cargás nuevos consumos con el botón <strong>Cargar Servicio</strong> (antes se llamaba "Cargar consumo" y estaba en la Cuenta Corriente). Se alimenta del <strong>Tarifario</strong>:</p>
 
-<ol><li>Hacé clic en <strong>Cargar Servicio</strong>.</li><li>Elegí el servicio del tarifario, el concepto, el monto y la fecha.</li><li>Elegí el <strong>tipo de comprobante</strong>:</li></ol>   - <strong>Comprobante fiscal</strong> — registra el cargo como facturable. <strong>No se emite a AFIP en el momento</strong>: queda pendiente y se factura después, manual o automáticamente, como cualquier otro cargo.
-<p>- <strong>Comprobante interno</strong> — genera un comprobante <strong>no fiscal</strong> imprimible (número RB-NNNNNN), pensado para cobros que no pasan por AFIP. El cargo <strong>nunca se factura</strong>: no aparece ni en la facturación automática ni en la manual.</p>
+<ol><li>Hacé clic en <strong>Cargar Servicio</strong>.</li><li>Elegí el servicio del tarifario, el concepto, el monto y la fecha.</li><li>Elegí el <strong>tipo de comprobante</strong>:</li></ol>   - <strong>Comprobante fiscal</strong> — registra el cargo como facturable. <strong>No se emite a ARCA en el momento</strong>: queda pendiente y se factura después, manual o automáticamente, como cualquier otro cargo.
+<p>- <strong>Comprobante interno</strong> — genera un comprobante <strong>no fiscal</strong> imprimible (número RB-NNNNNN), pensado para cobros que no pasan por ARCA. El cargo <strong>nunca se factura</strong>: no aparece ni en la facturación automática ni en la manual.</p>
 <ol><li>Confirmá. El cargo se suma a la Cuenta Corriente del socio.</li></ol>
 <h3>Ver cargos individuales</h3>
 
@@ -371,7 +371,7 @@
 <ol><li>Expandí la fila del servicio con el chevron.</li><li>Hacé clic en el ícono de <strong>lápiz</strong> junto al cargo que querés corregir.</li><li>En el modal podés modificar:</li></ol>   - <strong>Concepto</strong> — descripción del cargo.
 <p>- <strong>Fecha</strong> — fecha en que se registró.</p>
 <ol><li>Hacé clic en <strong>Guardar</strong>.</li></ol>
-<blockquote>El monto del cargo no se puede modificar desde este formulario. Los cargos que ya tienen una factura AFIP emitida no muestran el botón de edición.</blockquote>
+<blockquote>El monto del cargo no se puede modificar desde este formulario. Los cargos que ya tienen una factura ARCA emitida no muestran el botón de edición.</blockquote>
 
 <p><strong>Cancelar un servicio:</strong></p>
 
@@ -635,19 +635,19 @@
 
 <p>Desde esta sección emitís y gestionás las facturas de tu club.</p>
 
-<blockquote>Para poder emitir facturas AFIP necesitás tener configurado el <strong>Punto de Venta</strong> y haber confirmado el <strong>Certificado AFIP</strong>. Podés hacerlo desde <strong>Mi perfil → Datos Impositivos</strong>. Si la emisión está bloqueada, el panel muestra un aviso explicando qué falta. Los <strong>recibos internos</strong> se pueden emitir aunque el certificado todavía no esté configurado.</blockquote>
+<blockquote>Para poder emitir facturas ARCA necesitás tener configurado el <strong>Punto de Venta</strong> y haber confirmado el <strong>Certificado ARCA</strong>. Podés hacerlo desde <strong>Mi perfil → Datos Impositivos</strong>. Si la emisión está bloqueada, el panel muestra un aviso explicando qué falta. Los <strong>recibos internos</strong> se pueden emitir aunque el certificado todavía no esté configurado.</blockquote>
 
-<h3>Datos requeridos para emitir facturas AFIP</h3>
+<h3>Datos requeridos para emitir facturas ARCA</h3>
 
 <p>Para que la emisión no falle, tanto el <strong>club</strong> como cada <strong>socio</strong> deben tener ciertos datos completos:</p>
 
 <p><strong>Del club</strong> (Mi perfil → Información general):</p>
 
-<ul><li>CUIT del club</li><li>Condición frente al IVA</li><li>Punto de Venta configurado y Certificado AFIP confirmado</li></ul>
+<ul><li>CUIT del club</li><li>Condición frente al IVA</li><li>Punto de Venta configurado y Certificado ARCA confirmado</li></ul>
 <p><strong>Del socio</strong> (perfil):</p>
 
 <ul><li><strong>Usar datos personales para facturación</strong> — elige con qué datos se emite: desactivado usa los <strong>Datos Impositivos</strong>; activado usa los datos de <strong>Generales</strong>.</li><li><strong>Razón social / nombre</strong> — nombre que figura en el comprobante (razón social si es por Datos Impositivos; nombre y apellido si es por datos personales).</li><li><strong>CUIT / documento</strong> — CUIT obligatorio para Responsable Inscripto y Monotributo (11 dígitos). Para Consumidor Final se acepta DNI.</li><li><strong>Condición frente al IVA</strong> — define si se emite Factura A, B o C. Está en Datos Impositivos y, para datos personales, en Generales.</li><li><strong>Dirección</strong> — requerida para el encabezado del comprobante (fiscal o personal según el modo).</li></ul>
-<p>Si alguno de estos datos falta en el modo elegido, el sistema puede rechazar la emisión o TusFacturas puede devolver un error de AFIP. Completalos antes de intentar facturarle.</p>
+<p>Si alguno de estos datos falta en el modo elegido, el sistema puede rechazar la emisión o TusFacturas puede devolver un error de ARCA. Completalos antes de intentar facturarle.</p>
 
 <h3>Resumen de facturación</h3>
 
@@ -665,15 +665,15 @@
 <p>- <strong>Estado</strong> del comprobante: Pendiente, Pagada o Vencida.</p>
 <p>- <strong>Fecha</strong> y <strong>Vencimiento</strong>.</p>
 <p>- <strong>Período desde / hasta</strong>.</p>
-<ol><li>Hacé clic en <strong>Emitir</strong>. La factura se envía a AFIP y queda registrada.</li></ol>
-<blockquote>En el selector aparecen <strong>todos los socios del club</strong>. Lo que define si la emisión sale bien son los <strong>datos fiscales/personales completos</strong> del socio (ver "Datos requeridos para emitir facturas AFIP"); si faltan, AFIP puede rechazar la emisión.</blockquote>
+<ol><li>Hacé clic en <strong>Emitir</strong>. La factura se envía a ARCA y queda registrada.</li></ol>
+<blockquote>En el selector aparecen <strong>todos los socios del club</strong>. Lo que define si la emisión sale bien son los <strong>datos fiscales/personales completos</strong> del socio (ver "Datos requeridos para emitir facturas ARCA"); si faltan, ARCA puede rechazar la emisión.</blockquote>
 
 <h3>Emitir comprobante por ventanilla</h3>
 
 <p>Para facturar servicios puntuales que no están cargados como movimientos del socio:</p>
 
-<ol><li>Hacé clic en <strong>Ventanilla</strong>.</li><li>Seleccioná el socio. El <strong>tipo de comprobante</strong> se asigna automáticamente (igual que en la factura individual) y aparece como campo de solo lectura.</li><li>Agregá los ítems: descripción, cantidad y precio unitario de cada uno.</li><li>Completá condición de venta, forma de pago, fecha y vencimiento.</li><li>Hacé clic en <strong>Emitir comprobante</strong>. La factura se envía a AFIP de inmediato.</li></ol>
-<blockquote>Solo disponible si el POS y el certificado AFIP están configurados.</blockquote>
+<ol><li>Hacé clic en <strong>Ventanilla</strong>.</li><li>Seleccioná el socio. El <strong>tipo de comprobante</strong> se asigna automáticamente (igual que en la factura individual) y aparece como campo de solo lectura.</li><li>Agregá los ítems: descripción, cantidad y precio unitario de cada uno.</li><li>Completá condición de venta, forma de pago, fecha y vencimiento.</li><li>Hacé clic en <strong>Emitir comprobante</strong>. La factura se envía a ARCA de inmediato.</li></ol>
+<blockquote>Solo disponible si el POS y el certificado ARCA están configurados.</blockquote>
 
 <h3>Facturación en lote</h3>
 
@@ -690,42 +690,42 @@
 
 <h3>Recibos internos</h3>
 
-<p>Los recibos internos son comprobantes propios del club, sin intervención de AFIP (número RB-NNNNNN). Son útiles para registrar cobros cuando todavía no tenés el certificado AFIP configurado, o para socios que no requieren factura fiscal.</p>
+<p>Los recibos internos son comprobantes propios del club, sin intervención de ARCA (número RB-NNNNNN). Son útiles para registrar cobros cuando todavía no tenés el certificado ARCA configurado, o para socios que no requieren factura fiscal.</p>
 
 <p>Se generan de dos formas:</p>
 
 <ul><li>Al <strong>Registrar pago</strong> en la Cuenta Corriente del socio: al confirmar, el sistema pregunta si querés emitir un recibo interno. Hacé clic en <strong>Emitir recibo</strong> para generarlo.</li><li>Al <strong>Cargar Servicio</strong> (pestaña Servicios Contratados) eligiendo <strong>Comprobante interno</strong>: genera el comprobante interno del cargo, que además queda <strong>excluido de toda facturación</strong>.</li></ul>
-<p>Todos aparecen en <strong>Comprobantes → tab Recibos internos</strong> y, en la cuenta corriente del socio, con la columna <strong>Tipo de comprobante</strong> = "Comprobante interno" y su número RB-. Quedan disponibles para imprimir o descargar. No tienen CAE ni validez fiscal ante AFIP.</p>
+<p>Todos aparecen en <strong>Comprobantes → tab Recibos internos</strong> y, en la cuenta corriente del socio, con la columna <strong>Tipo de comprobante</strong> = "Comprobante interno" y su número RB-. Quedan disponibles para imprimir o descargar. No tienen CAE ni validez fiscal ante ARCA.</p>
 
 <h3>Emitir una nota de crédito</h3>
 
 <p>Si necesitás anular parcial o totalmente una factura ya emitida, podés emitir una nota de crédito:</p>
 
-<ol><li>Andá a <strong>Comprobantes</strong> en el menú lateral → tab <strong>Comprobantes AFIP</strong>.</li><li>Encontrá la factura original en la tabla y hacé clic en el ícono de flecha curva (↩) al final de la fila.</li><li>Seleccioná el motivo:</li></ol>   - <strong>Anulación total</strong> — anula la factura completa; el importe se toma automáticamente.
+<ol><li>Andá a <strong>Comprobantes</strong> en el menú lateral → tab <strong>Comprobantes ARCA</strong>.</li><li>Encontrá la factura original en la tabla y hacé clic en el ícono de flecha curva (↩) al final de la fila.</li><li>Seleccioná el motivo:</li></ol>   - <strong>Anulación total</strong> — anula la factura completa; el importe se toma automáticamente.
 <p>- <strong>Descuento parcial</strong> — acreditá un monto parcial; ingresás el importe manualmente.</p>
 <p>- <strong>Devolución de servicio</strong> — igual que descuento parcial, con un motivo descriptivo diferente.</p>
 <ol><li>Confirmá.</li></ol>
-<blockquote>El botón solo aparece en facturas tipo A, B o C que ya tienen <strong>CAE</strong> asignado. El CAE es el código que AFIP emite al autorizar una factura — sin él la factura no es válida fiscalmente ni puede tener nota de crédito asociada.</blockquote>
+<blockquote>El botón solo aparece en facturas tipo A, B o C que ya tienen <strong>CAE</strong> asignado. El CAE es el código que ARCA emite al autorizar una factura — sin él la factura no es válida fiscalmente ni puede tener nota de crédito asociada.</blockquote>
 
 <h3>Emitir notas de crédito en lote</h3>
 
 <p>Si necesitás <strong>anular varias facturas a la vez</strong> (anulación total), podés hacerlo desde el listado sin entrar una por una:</p>
 
-<ol><li>En el tab <strong>Comprobantes AFIP</strong>, tildá la <strong>casilla</strong> al inicio de cada factura que quieras anular. La casilla del encabezado selecciona/deselecciona de una todas las elegibles.</li><li>Solo se pueden seleccionar facturas <strong>A, B o C con CAE</strong> que <strong>todavía no tengan una nota de crédito</strong>. El resto (recibos, notas de crédito, facturas ya anuladas) tienen la casilla deshabilitada.</li><li>Al haber al menos una seleccionada aparece una barra con la cantidad y el botón <strong>Emitir NC en lote</strong>.</li><li>Confirmá en el modal (muestra el total a anular). El sistema emite una <strong>nota de crédito por el total</strong> de cada factura, <strong>una por una</strong>.</li><li>Al terminar muestra un resumen de <strong>emitidas</strong> y <strong>fallidas</strong> (con el motivo de cada falla). Si una falla, continúa con las demás.</li></ol>
-<blockquote>El lote es solo para <strong>anulación total</strong>. Para una nota de crédito <strong>parcial</strong>, usá la emisión individual (ícono ↩ en la fila). Como cada nota de crédito es una emisión real a AFIP, el proceso puede tardar unos segundos si seleccionás muchas.</blockquote>
+<ol><li>En el tab <strong>Comprobantes ARCA</strong>, tildá la <strong>casilla</strong> al inicio de cada factura que quieras anular. La casilla del encabezado selecciona/deselecciona de una todas las elegibles.</li><li>Solo se pueden seleccionar facturas <strong>A, B o C con CAE</strong> que <strong>todavía no tengan una nota de crédito</strong>. El resto (recibos, notas de crédito, facturas ya anuladas) tienen la casilla deshabilitada.</li><li>Al haber al menos una seleccionada aparece una barra con la cantidad y el botón <strong>Emitir NC en lote</strong>.</li><li>Confirmá en el modal (muestra el total a anular). El sistema emite una <strong>nota de crédito por el total</strong> de cada factura, <strong>una por una</strong>.</li><li>Al terminar muestra un resumen de <strong>emitidas</strong> y <strong>fallidas</strong> (con el motivo de cada falla). Si una falla, continúa con las demás.</li></ol>
+<blockquote>El lote es solo para <strong>anulación total</strong>. Para una nota de crédito <strong>parcial</strong>, usá la emisión individual (ícono ↩ en la fila). Como cada nota de crédito es una emisión real a ARCA, el proceso puede tardar unos segundos si seleccionás muchas.</blockquote>
 
 <h3>Filtrar y exportar comprobantes</h3>
 
-<p>En el tab <strong>Comprobantes AFIP</strong> podés acotar la tabla con los siguientes filtros:</p>
+<p>En el tab <strong>Comprobantes ARCA</strong> podés acotar la tabla con los siguientes filtros:</p>
 
-<ul><li><strong>Estado</strong>: Todos / Pendiente / Pagada / Vencida</li><li><strong>Tipo</strong>: Todos / Facturas AFIP / Notas de Crédito</li><li><strong>Período</strong>: fecha desde y fecha hasta</li></ul>
+<ul><li><strong>Estado</strong>: Todos / Pendiente / Pagada / Vencida</li><li><strong>Tipo</strong>: Todos / Facturas ARCA / Notas de Crédito</li><li><strong>Período</strong>: fecha desde y fecha hasta</li></ul>
 <p>Para exportar los comprobantes actualmente visibles (respetando los filtros activos), hacé clic en <strong>Exportar</strong> — se descarga un archivo CSV.</p>
 
 <h3>Marcar una factura como pagada</h3>
 
 <p>Cuando un socio te abona <strong>una factura puntual</strong> que le emitiste, marcala como pagada:</p>
 
-<ol><li>En el tab <strong>Comprobantes AFIP</strong>, ubicá la factura en la tabla. En la última columna (acciones) hacé clic en el <strong>ícono de lápiz (✏️)</strong> — al pasar el mouse aparece el texto "Marcar como pagada". Si la factura ya está pagada, el ícono se ve deshabilitado.</li><li>Seleccioná el <strong>medio de pago</strong>.</li><li>Confirmá. La factura pasa de <strong>Pendiente</strong> a <strong>Pagada</strong> y los cargos vinculados a ella quedan saldados.</li></ol>
+<ol><li>En el tab <strong>Comprobantes ARCA</strong>, ubicá la factura en la tabla. En la última columna (acciones) hacé clic en el <strong>ícono de lápiz (✏️)</strong> — al pasar el mouse aparece el texto "Marcar como pagada". Si la factura ya está pagada, el ícono se ve deshabilitado.</li><li>Seleccioná el <strong>medio de pago</strong>.</li><li>Confirmá. La factura pasa de <strong>Pendiente</strong> a <strong>Pagada</strong> y los cargos vinculados a ella quedan saldados.</li></ol>
 <blockquote><strong>No la confundas con "Registrar pago"</strong> (pestaña Cuenta Corriente del socio): esa registra un <strong>cobro</strong> que descuenta del <strong>saldo</strong> del socio. Esta acción solo cambia el estado de <strong>una factura</strong> y <strong>no modifica el saldo</strong> de la cuenta corriente. Si necesitás que baje la deuda del socio, registrá el cobro con <strong>Registrar pago</strong> o por débito automático.</blockquote>
 
 <hr>
@@ -795,7 +795,7 @@
 
 <p><em>Paso 1 — Configurar el Punto de Venta:</em></p>
 
-<ol><li>Completá los datos:</li></ol>   - <strong>Nº de referencia</strong> <em>(requerido)</em> — el número de Punto de Venta, que debe existir previamente en AFIP (Servicios → Administrador de Relaciones → POS de Facturación Electrónica).
+<ol><li>Completá los datos:</li></ol>   - <strong>Nº de referencia</strong> <em>(requerido)</em> — el número de Punto de Venta, que debe existir previamente en ARCA (Servicios → Administrador de Relaciones → POS de Facturación Electrónica).
 <p>- <strong>Razón social</strong> <em>(requerida)</em></p>
 <p>- <strong>CUIT</strong> <em>(requerido)</em></p>
 <p>- <strong>Condición frente al IVA</strong> <em>(requerida)</em> — la de tu club.</p>
@@ -806,11 +806,11 @@
 
 <blockquote>Si el POS ya tiene facturas emitidas, TusFacturas puede bloquear la edición del CUIT y la condición frente al IVA. En ese caso el sistema mostrará el mensaje de error devuelto por TusFacturas.</blockquote>
 
-<p><em>Paso 2 — Certificado de enlace con AFIP:</em></p>
+<p><em>Paso 2 — Certificado de enlace con ARCA:</em></p>
 
-<p>El certificado permite que el sistema emita facturas directamente a AFIP en nombre de tu club.</p>
+<p>El certificado permite que el sistema emita facturas directamente a ARCA en nombre de tu club.</p>
 
-<ol><li>Hacé clic en <strong>Solicitar certificado AFIP</strong>. TusFacturas va a enviar las instrucciones al mail del administrador de la cuenta de TusFacturas.</li><li>Instalá el certificado en el portal de AFIP siguiendo las instrucciones recibidas.</li><li>Volvé al panel y hacé clic en <strong>Confirmar instalación</strong> para habilitar la emisión.</li></ol>
+<ol><li>Hacé clic en <strong>Solicitar certificado ARCA</strong>. TusFacturas va a enviar las instrucciones al mail del administrador de la cuenta de TusFacturas.</li><li>Instalá el certificado en el portal de ARCA siguiendo las instrucciones recibidas.</li><li>Volvé al panel y hacé clic en <strong>Confirmar instalación</strong> para habilitar la emisión.</li></ol>
 <blockquote>Hasta que no confirmes la instalación del certificado, el botón "Nuevo comprobante" aparece deshabilitado.</blockquote>
 
 <h3>Pestaña: Equipo</h3>

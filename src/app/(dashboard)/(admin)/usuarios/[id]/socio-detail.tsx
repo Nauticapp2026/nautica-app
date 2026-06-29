@@ -709,7 +709,7 @@ function AgregarServicioModal({
                   </p>
                 ) : (
                   <p className="text-sm text-teal-700">
-                    Se facturará por AFIP (manual o automático), como el resto.
+                    Se facturará por ARCA (manual o automático), como el resto.
                   </p>
                 )}
               </div>
@@ -818,13 +818,13 @@ function AgregarServicioModal({
                         : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
                     }`}
                   >
-                    Fiscal (AFIP)
+                    Fiscal (ARCA)
                   </button>
                 </div>
                 <p className="mt-1.5 text-xs text-gray-400">
                   {comprobante === 'interno'
-                    ? 'Genera un comprobante interno (no fiscal). El cargo NO se factura por AFIP.'
-                    : 'El cargo se factura por AFIP después (manual o automático), como el resto.'}
+                    ? 'Genera un comprobante interno (no fiscal). El cargo NO se factura por ARCA.'
+                    : 'El cargo se factura por ARCA después (manual o automático), como el resto.'}
                 </p>
               </div>
 
@@ -969,7 +969,7 @@ function InformarPagoModal({
               }}
               className="w-full rounded-[10px] border border-[#175861] bg-white px-4 py-3 text-left text-sm font-medium text-[#175861] transition hover:bg-teal-50"
             >
-              <span className="font-semibold">Factura AFIP</span>
+              <span className="font-semibold">Factura ARCA</span>
               <span className="ml-2 text-xs text-gray-400">Se emite con CAE</span>
             </button>
             <button

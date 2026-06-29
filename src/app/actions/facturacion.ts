@@ -364,7 +364,7 @@ export async function crearFacturaCore(
   if (!guarderia.certificadoAfipOk) {
     return {
       error:
-        'El certificado de enlace con AFIP todavía no está confirmado. Andá a Mi perfil → Datos Impositivos, solicitá el certificado y confirmá la instalación antes de emitir facturas.',
+        'El certificado de enlace con ARCA todavía no está confirmado. Andá a Mi perfil → Datos Impositivos, solicitá el certificado y confirmá la instalación antes de emitir facturas.',
     };
   }
 
@@ -529,7 +529,7 @@ export async function crearFacturaCore(
     });
     return {
       error:
-        'La factura se emitió en AFIP pero no se pudo guardar. Contactá al administrador con el número ' +
+        'La factura se emitió en ARCA pero no se pudo guardar. Contactá al administrador con el número ' +
         (apiResponse.comprobante_nro ?? facturaId),
     };
   }
@@ -1053,7 +1053,7 @@ export async function emitirNotaCreditoAction(data: EmitirNcData): Promise<Emiti
     tipoOriginal !== 'factura_b' &&
     tipoOriginal !== 'factura_c'
   ) {
-    return { error: 'Solo se puede emitir NC sobre facturas AFIP (A, B o C).' };
+    return { error: 'Solo se puede emitir NC sobre facturas ARCA (A, B o C).' };
   }
 
   if (!original.cae) {
@@ -1251,7 +1251,7 @@ export async function emitirNotaCreditoAction(data: EmitirNcData): Promise<Emiti
     });
     return {
       error:
-        'La NC se emitió en AFIP pero no se pudo guardar. Contactá al administrador con el número ' +
+        'La NC se emitió en ARCA pero no se pudo guardar. Contactá al administrador con el número ' +
         (apiResponse.comprobante_nro ?? ncId),
     };
   }

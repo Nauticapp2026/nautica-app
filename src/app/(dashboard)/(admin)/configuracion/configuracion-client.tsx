@@ -1542,8 +1542,8 @@ function PuntoVentaTab({ initial }: { initial: PuntoVentaData }) {
       {!yaConfigurado && (
         <div className="mb-6 rounded-[10px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           <strong>Antes de continuar:</strong> el número de referencia tiene que estar dado de alta
-          previamente en AFIP (Servicios → Administrador de Relaciones → POS de Facturación
-          Electrónica). Si no existe en AFIP, las facturas van a ser rechazadas al emitirlas.
+          previamente en ARCA (Servicios → Administrador de Relaciones → POS de Facturación
+          Electrónica). Si no existe en ARCA, las facturas van a ser rechazadas al emitirlas.
         </div>
       )}
 
@@ -1653,7 +1653,7 @@ function PuntoVentaTab({ initial }: { initial: PuntoVentaData }) {
         {yaConfigurado && (
           <div className="mt-2 border-t border-gray-200 pt-6">
             <h3 className="mb-1 text-sm font-bold" style={{ color: '#101828' }}>
-              Certificado de enlace con AFIP
+              Certificado de enlace con ARCA
             </h3>
             <CertificadoAfipSection
               ok={data.certificadoAfipOk}
@@ -1682,7 +1682,7 @@ function CertificadoAfipSection({
   function handleSolicitar() {
     if (
       !window.confirm(
-        '¿Solicitar el certificado de enlace con AFIP? TusFacturas va a enviar las instrucciones al mail del administrador de la cuenta.',
+        '¿Solicitar el certificado de enlace con ARCA? TusFacturas va a enviar las instrucciones al mail del administrador de la cuenta.',
       )
     ) {
       return;
@@ -1735,7 +1735,7 @@ function CertificadoAfipSection({
 
       <p className="mb-3 text-xs text-gray-500">
         Pedile a TusFacturas que genere el certificado de enlace y, una vez que sigas las
-        instrucciones del mail e instales el certificado en TusFacturas/AFIP, confirmá la
+        instrucciones del mail e instales el certificado en TusFacturas/ARCA, confirmá la
         instalación con el botón de la derecha.
       </p>
 
@@ -1746,7 +1746,7 @@ function CertificadoAfipSection({
           disabled={pendingSolicitar}
           className="rounded-[10px] border border-[#175861] bg-white px-5 py-3 text-sm font-semibold text-[#175861] transition-colors hover:bg-[#175861] hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {pendingSolicitar ? 'Solicitando…' : 'Solicitar certificado AFIP'}
+          {pendingSolicitar ? 'Solicitando…' : 'Solicitar certificado ARCA'}
         </button>
 
         {ok ? (
