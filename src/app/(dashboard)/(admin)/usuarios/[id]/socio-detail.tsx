@@ -255,8 +255,13 @@ const ESTADO_LABEL: Record<string, string> = {
 // Agrega a cada movimiento (orden desc: más nuevo primero) el saldo acumulado y
 // el estado MOSTRADO. Un cargo figura "Pagado" cuando los pagos (haber) alcanzan
 // a cubrirlo, asignando del más viejo al más nuevo (FIFO). Es cálculo de display:
-// no cambia el estado guardado (la facturación sigue mirando el real). Los cargos
-// ya 'pagado'/'vencido' no se reescriben ni consumen pool.
+// no cambia el estado guardado (la facturación sigue mirando el real).
+//
+// Un cargo ya `pagado` (cobranza/Payway/factura marcada pagada) CONSUME su parte
+// del pool de haberes: su pago ya está comprometido con ese cargo. Si no se
+// descontara, ese haber quedaría como "crédito fantasma" cubriendo otros cargos
+// más nuevos y mostrándolos pagados de más (doble conteo). Así el total de cargos
+// que figuran impagos queda consistente con el saldo neto (Σdebe − Σhaber).
 function calcularSaldoYEstado<
   T extends { debe: string | null; haber: string | null; estado: string | null },
 >(movimientos: T[]): (T & { saldo: number; estadoDisplay: string | null })[] {
@@ -268,14 +273,15 @@ function calcularSaldoYEstado<
     const cobranza = parseFloat(m.haber ?? '0');
     acum = acum + venta - cobranza;
     let estadoDisplay = m.estado;
-    if (
-      venta > 0 &&
-      m.estado !== 'pagado' &&
-      m.estado !== 'vencido' &&
-      poolHaber >= venta - 0.001
-    ) {
-      estadoDisplay = 'pagado';
-      poolHaber -= venta;
+    if (venta > 0) {
+      if (m.estado === 'pagado') {
+        // Ya pagado: consume el pool (su haber está comprometido), no se reescribe.
+        poolHaber -= venta;
+      } else if (poolHaber >= venta - 0.001) {
+        // Cubierto por cobertura FIFO.
+        estadoDisplay = 'pagado';
+        poolHaber -= venta;
+      }
     }
     return { ...m, saldo: acum, estadoDisplay };
   });
