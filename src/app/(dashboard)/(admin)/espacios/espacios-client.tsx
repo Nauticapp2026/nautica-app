@@ -212,6 +212,14 @@ function countEspacios(a: AreaView): {
   return acc;
 }
 
+// El rol siempre es "operario" (misma funcionalidad); solo cambia la etiqueta
+// visible según el tipo de área: en una Marina se muestran como "Marineros",
+// en una Nave como "Operarios".
+function rolAreaLabel(tipo: 'marina' | 'nave', plural = true): string {
+  if (tipo === 'marina') return plural ? 'Marineros' : 'Marinero';
+  return plural ? 'Operarios' : 'Operario';
+}
+
 const inputCls =
   'h-11 w-full rounded-[10px] border border-gray-200 bg-white px-4 text-sm text-[#101828] focus:border-[#175861] focus:outline-none focus:ring-1 focus:ring-[#175861]';
 
@@ -1220,7 +1228,7 @@ function AreaCard({
         toast.error(res.error);
         return;
       }
-      toast.success('Operarios actualizados');
+      toast.success(`${rolAreaLabel(area.tipo)} actualizados`);
       setOpen(false);
       router.refresh();
     });
@@ -1255,7 +1263,7 @@ function AreaCard({
         <div className="flex items-center justify-between">
           <span className="flex items-center gap-1.5 text-xs font-semibold text-gray-500">
             <Users className="h-3.5 w-3.5" />
-            Operarios
+            {rolAreaLabel(area.tipo)}
           </span>
           <button
             type="button"
@@ -1267,7 +1275,9 @@ function AreaCard({
         </div>
         <div className="mt-2 flex flex-wrap gap-1.5">
           {asignados.length === 0 ? (
-            <span className="text-xs text-gray-400">Sin operarios asignados</span>
+            <span className="text-xs text-gray-400">
+              Sin {rolAreaLabel(area.tipo).toLowerCase()} asignados
+            </span>
           ) : (
             asignados.map((n) => (
               <span
@@ -1283,7 +1293,9 @@ function AreaCard({
         {open && (
           <div className="absolute top-full right-0 left-0 z-20 mt-1 rounded-[10px] border border-gray-200 bg-white p-2 shadow-lg">
             {operarios.length === 0 ? (
-              <p className="px-2 py-3 text-xs text-gray-400">No hay operarios en esta guardería.</p>
+              <p className="px-2 py-3 text-xs text-gray-400">
+                No hay {rolAreaLabel(area.tipo).toLowerCase()} en esta guardería.
+              </p>
             ) : (
               <div className="max-h-48 overflow-y-auto">
                 {operarios.map((o) => (
@@ -1876,10 +1888,12 @@ function NuevaAreaModal({
 
           <div>
             <label className="mb-1 block text-sm font-semibold text-gray-700">
-              Operarios <span className="font-normal text-gray-400">(opcional)</span>
+              {rolAreaLabel(tipo)} <span className="font-normal text-gray-400">(opcional)</span>
             </label>
             {operarios.length === 0 ? (
-              <p className="text-xs text-gray-400">No hay operarios en esta guardería.</p>
+              <p className="text-xs text-gray-400">
+                No hay {rolAreaLabel(tipo).toLowerCase()} en esta guardería.
+              </p>
             ) : (
               <div className="max-h-32 space-y-1 overflow-y-auto rounded-[10px] border border-gray-200 p-2">
                 {operarios.map((o) => (
@@ -1903,8 +1917,8 @@ function NuevaAreaModal({
               </div>
             )}
             <p className="mt-1 text-xs text-gray-400">
-              Los operarios verán y podrán tomar las tareas de esta área. Después podés cambiarlos
-              desde la tarjeta del área.
+              Los {rolAreaLabel(tipo).toLowerCase()} verán y podrán tomar las tareas de esta área.
+              Después podés cambiarlos desde la tarjeta del área.
             </p>
           </div>
 
