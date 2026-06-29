@@ -116,10 +116,14 @@ type Movimiento = {
   servicioNombre: string | null;
   servicioId: string | null;
   servicioTipoCobro: 'fijo' | 'variable' | null;
+  plazoPagoDias: number | null;
   facturaCodigo: string | null;
   facturaArchivo: string | null;
   facturaTipo: string | null;
   comprobanteInterno: boolean;
+  // Fecha de vencimiento (YYYY-MM-DD) = emisión de factura + plazo de pago de la
+  // tarifa. Null si el cargo no está facturado (o es comprobante interno).
+  fechaVencimiento: string | null;
 };
 
 type Servicio = {
@@ -221,6 +225,13 @@ const fmtDate = formatArgentinaDate;
 function todayISODate() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// Formatea una fecha-calendario "YYYY-MM-DD" como "DD/MM/YYYY" sin pasar por
+// new Date() (que la interpretaría como medianoche UTC y restaría un día en AR).
+function fmtYmd(ymd: string): string {
+  const [y, m, d] = ymd.split('-');
+  return `${d}/${m}/${y}`;
 }
 
 const ESTADO_BADGE: Record<string, string> = {
@@ -2797,7 +2808,7 @@ export function SocioDetail({
           ) : (
             <>
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[640px] text-sm">
+                <table className="w-full min-w-[820px] text-sm">
                   <thead>
                     <tr className="bg-gray-50 text-left text-xs font-semibold text-gray-500">
                       <th className="px-4 py-3">
@@ -2819,9 +2830,11 @@ export function SocioDetail({
                           )}
                         </button>
                       </th>
-                      <th className="px-4 py-3">Detalle</th>
                       <th className="px-4 py-3">Tipo de comprobante</th>
                       <th className="px-4 py-3">Nº Comprobante</th>
+                      <th className="px-4 py-3">Detalle</th>
+                      <th className="px-4 py-3">Vencimiento</th>
+                      <th className="px-4 py-3">Situación</th>
                       <th className="px-4 py-3 text-right">Ventas</th>
                       <th className="px-4 py-3 text-right">Cobranzas</th>
                       <th className="px-4 py-3 text-right">Saldo</th>
@@ -2841,7 +2854,10 @@ export function SocioDetail({
                       if (visibles.length === 0) {
                         return (
                           <tr>
-                            <td colSpan={8} className="px-4 py-8 text-center text-sm text-gray-400">
+                            <td
+                              colSpan={10}
+                              className="px-4 py-8 text-center text-sm text-gray-400"
+                            >
                               No hay movimientos que coincidan con los filtros.
                             </td>
                           </tr>
@@ -2869,9 +2885,6 @@ export function SocioDetail({
                             className="border-t border-gray-100 transition hover:bg-gray-50/50"
                           >
                             <td className="px-4 py-3 text-gray-500">{fmtDate(m.fecha)}</td>
-                            <td className="px-4 py-3 font-medium" style={{ color: '#175861' }}>
-                              {detalle}
-                            </td>
                             <td className="px-4 py-3 text-gray-500">
                               {m.comprobanteInterno
                                 ? 'Comprobante interno'
@@ -2894,6 +2907,27 @@ export function SocioDetail({
                                   </a>
                                 )}
                               </div>
+                            </td>
+                            <td className="px-4 py-3 font-medium" style={{ color: '#175861' }}>
+                              {detalle}
+                            </td>
+                            <td className="px-4 py-3 text-gray-500">
+                              {m.fechaVencimiento ? fmtYmd(m.fechaVencimiento) : '—'}
+                            </td>
+                            <td className="px-4 py-3">
+                              {m.fechaVencimiento ? (
+                                <span
+                                  className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${
+                                    m.fechaVencimiento < todayISODate()
+                                      ? 'bg-red-100 text-red-700'
+                                      : 'bg-green-100 text-green-700'
+                                  }`}
+                                >
+                                  {m.fechaVencimiento < todayISODate() ? 'Vencida' : 'En término'}
+                                </span>
+                              ) : (
+                                <span className="text-gray-400">—</span>
+                              )}
                             </td>
                             <td className="px-4 py-3 text-right font-medium text-[#101828]">
                               {venta > 0 ? fmt(venta) : '—'}

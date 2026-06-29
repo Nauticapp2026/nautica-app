@@ -35,6 +35,27 @@ export function todayArg(now: Date = new Date()): string {
   }).format(now);
 }
 
+// "YYYY-MM-DD" en hora Argentina de un timestamp dado (null si no hay valor).
+export function argYmd(value: string | Date | null | undefined): string | null {
+  const d = toDate(value);
+  if (!d) return null;
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: TZ_AR,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(d);
+}
+
+// Suma `dias` a una fecha-calendario "YYYY-MM-DD" y devuelve otra "YYYY-MM-DD".
+// Se ancla al mediodía UTC para que el corrimiento de días nunca cruce el
+// límite por el offset.
+export function addDiasYmd(ymd: string, dias: number): string {
+  const d = new Date(`${ymd}T12:00:00.000Z`);
+  d.setUTCDate(d.getUTCDate() + dias);
+  return d.toISOString().slice(0, 10);
+}
+
 function toDate(value: string | Date | null | undefined): Date | null {
   if (!value) return null;
   const d = typeof value === 'string' ? new Date(value) : value;

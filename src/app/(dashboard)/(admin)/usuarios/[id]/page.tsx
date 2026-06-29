@@ -25,6 +25,7 @@ import {
 } from '@/lib/db/schema';
 import { eq, and, desc, inArray, isNull, asc } from 'drizzle-orm';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { addDiasYmd, argYmd } from '@/lib/dates';
 import { SocioDetail } from './socio-detail';
 
 export default async function SocioPage({ params }: { params: Promise<{ id: string }> }) {
@@ -119,6 +120,7 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
         servicioNombre: serviciosTable.nombre,
         servicioId: movimientosCuentaCorriente.servicioId,
         servicioTipoCobro: serviciosTable.tipoCobro,
+        plazoPagoDias: serviciosTable.plazoPagoDias,
         comprobanteInterno: movimientosCuentaCorriente.comprobanteInterno,
       })
       .from(movimientosCuentaCorriente)
@@ -315,7 +317,7 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
   const movimientoIds = movimientosList.map((m) => m.id);
   const facturasPorMovimiento = new Map<
     string,
-    { codigo: string | null; archivo: string | null; tipo: string | null }
+    { codigo: string | null; archivo: string | null; tipo: string | null; emision: Date | null }
   >();
   if (movimientoIds.length > 0) {
     const rows = await db
@@ -324,6 +326,7 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
         codigo: facturacion.codigo,
         archivo: facturacion.archivo,
         tipoFactura: facturacion.tipoFactura,
+        emision: facturacion.emision,
       })
       .from(facturacionItemMovimientos)
       .innerJoin(
@@ -337,6 +340,7 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
         codigo: r.codigo,
         archivo: r.archivo,
         tipo: r.tipoFactura,
+        emision: r.emision,
       });
     }
 
@@ -351,6 +355,7 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
         codigo: facturacion.codigo,
         archivo: facturacion.archivo,
         tipoFactura: facturacion.tipoFactura,
+        emision: facturacion.emision,
       })
       .from(facturacion)
       .where(inArray(facturacion.movimientoId, movimientoIds));
@@ -361,6 +366,7 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
         // Sin PDF: el recibo interno se ve/imprime en su página dedicada.
         archivo: r.archivo ?? `/facturacion/recibo/${r.id}`,
         tipo: r.tipoFactura,
+        emision: r.emision,
       });
     }
   }
@@ -472,13 +478,25 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
         espacioLabel: e.espacioId ? (espacioLabelMap.get(e.espacioId) ?? null) : null,
       }))}
       espaciosDisponibles={espaciosDisponiblesView}
-      movimientos={movimientosList.map((m) => ({
-        ...m,
-        fecha: m.fecha?.toISOString() ?? null,
-        facturaCodigo: facturasPorMovimiento.get(m.id)?.codigo ?? null,
-        facturaArchivo: facturasPorMovimiento.get(m.id)?.archivo ?? null,
-        facturaTipo: facturasPorMovimiento.get(m.id)?.tipo ?? null,
-      }))}
+      movimientos={movimientosList.map((m) => {
+        const fac = facturasPorMovimiento.get(m.id);
+        // Fecha de vencimiento = emisión de la factura + plazo de pago de la
+        // tarifa. Solo para cargos facturados con comprobante fiscal (no para
+        // recibos internos ni cargos todavía sin facturar → "—").
+        const emisionYmd = m.comprobanteInterno ? null : argYmd(fac?.emision);
+        const fechaVencimiento =
+          emisionYmd != null && m.plazoPagoDias != null
+            ? addDiasYmd(emisionYmd, m.plazoPagoDias)
+            : null;
+        return {
+          ...m,
+          fecha: m.fecha?.toISOString() ?? null,
+          facturaCodigo: fac?.codigo ?? null,
+          facturaArchivo: fac?.archivo ?? null,
+          facturaTipo: fac?.tipo ?? null,
+          fechaVencimiento,
+        };
+      })}
       servicios={serviciosList}
       cancelaciones={cancelacionesList.map((c) => ({
         servicioId: c.servicioId,
