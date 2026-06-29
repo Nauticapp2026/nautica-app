@@ -23,6 +23,18 @@ export function fechaCalendariaArg(ymd: string): Date {
   return new Date(`${ymd}T12:00:00.000Z`);
 }
 
+// "YYYY-MM-DD" del día de hoy en hora Argentina. Útil para comparar contra
+// fechas-calendario elegidas por el usuario (ej. ¿la vigencia es futura?).
+export function todayArg(now: Date = new Date()): string {
+  // en-CA produce el formato ISO YYYY-MM-DD.
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: TZ_AR,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(now);
+}
+
 function toDate(value: string | Date | null | undefined): Date | null {
   if (!value) return null;
   const d = typeof value === 'string' ? new Date(value) : value;

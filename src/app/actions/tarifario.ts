@@ -9,10 +9,12 @@ import {
   movimientosCuentaCorriente,
   profiles,
   servicios,
+  serviciosAjustesProgramados,
   serviciosHistorial,
   socioServiciosCancelados,
 } from '@/lib/db/schema';
 import { getActiveMarina } from '@/lib/auth/session';
+import { todayArg } from '@/lib/dates';
 
 type Origen = 'manual' | 'masivo_porcentaje' | 'masivo_monto';
 
@@ -323,7 +325,7 @@ export async function updateTarifaAction(data: UpdateTarifaData): Promise<{ erro
 
 export async function ajusteMasivoTarifasAction(
   data: AjusteMasivoData,
-): Promise<{ error?: string; afectadas?: number }> {
+): Promise<{ error?: string; afectadas?: number; programado?: boolean }> {
   const ctx = await getActiveMarina();
   if (!ctx) return { error: 'No autenticado' };
   if (!isAdmin(ctx)) return { error: 'Solo administradores pueden ajustar tarifas.' };
@@ -333,7 +335,7 @@ export async function ajusteMasivoTarifasAction(
   }
   if (data.tipo === 'porcentaje') {
     if (data.direccion !== 'aumento' && data.direccion !== 'descuento') {
-      return { error: 'Dirección inválida.' };
+      return { error: 'Acción inválida.' };
     }
     if (data.direccion === 'descuento' && data.valor > 100) {
       return { error: 'El descuento no puede ser mayor a 100%.' };
@@ -348,10 +350,20 @@ export async function ajusteMasivoTarifasAction(
 
   const guarderiaId = ctx.activeMembership.guarderiaId;
   const origen: Origen = data.tipo === 'porcentaje' ? 'masivo_porcentaje' : 'masivo_monto';
+  // Si la vigencia es a futuro, no tocamos el precio ahora: agendamos el cambio
+  // y el cron diario lo aplica el día indicado.
+  const esFuturo = data.vigenciaDesde > todayArg();
+
+  // Precio nuevo "congelado" para cada servicio según su precio actual.
+  const calcularNuevo = (actual: number): number => {
+    if (data.tipo === 'porcentaje') {
+      const factor = data.direccion === 'aumento' ? 1 + data.valor / 100 : 1 - data.valor / 100;
+      return Math.max(0, actual * factor);
+    }
+    return data.valor;
+  };
 
   const afectadas = await db.transaction(async (tx) => {
-    await setOrigenGUC(tx, origen, ctx.profile.id);
-
     const rows = await tx
       .select({ id: servicios.id, precio: servicios.precio })
       .from(servicios)
@@ -362,33 +374,52 @@ export async function ajusteMasivoTarifasAction(
         ),
       );
 
+    if (esFuturo) {
+      let count = 0;
+      for (const row of rows) {
+        const actual = row.precio != null ? Number(row.precio) : 0;
+        const nuevo = calcularNuevo(actual);
+        // Último gana: borramos el pendiente previo de este servicio antes de
+        // insertar el nuevo (índice único parcial sobre servicio_id sin aplicar).
+        await tx
+          .delete(serviciosAjustesProgramados)
+          .where(
+            and(
+              eq(serviciosAjustesProgramados.servicioId, row.id),
+              eq(serviciosAjustesProgramados.aplicado, false),
+            ),
+          );
+        await tx.insert(serviciosAjustesProgramados).values({
+          servicioId: row.id,
+          guarderiaId,
+          precioNuevo: nuevo.toFixed(2),
+          origen,
+          fechaAplicacion: data.vigenciaDesde,
+          createdBy: ctx.profile.id,
+        });
+        count++;
+      }
+      return count;
+    }
+
+    // Vigencia hoy o pasada: aplicar el cambio de precio en el acto.
+    await setOrigenGUC(tx, origen, ctx.profile.id);
     let count = 0;
     const now = new Date();
-
     for (const row of rows) {
       const actual = row.precio != null ? Number(row.precio) : 0;
-      // porcentaje: aplica X% como aumento (+) o descuento (-) sobre el actual.
-      // monto: reemplaza el precio por el valor indicado.
-      let nuevo: number;
-      if (data.tipo === 'porcentaje') {
-        const factor = data.direccion === 'aumento' ? 1 + data.valor / 100 : 1 - data.valor / 100;
-        nuevo = Math.max(0, actual * factor);
-      } else {
-        nuevo = data.valor;
-      }
-
+      const nuevo = calcularNuevo(actual);
       await tx
         .update(servicios)
         .set({ precio: nuevo.toFixed(2), vigenciaDesde: data.vigenciaDesde, updatedAt: now })
         .where(eq(servicios.id, row.id));
       count++;
     }
-
     return count;
   });
 
   revalidatePath('/tarifario');
-  return { afectadas };
+  return { afectadas, programado: esFuturo };
 }
 
 export type HistorialEntry = {

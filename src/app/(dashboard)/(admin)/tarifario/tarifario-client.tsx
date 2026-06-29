@@ -2,7 +2,18 @@
 
 import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronDown, ChevronUp, Edit3, History, Pause, Play, Plus, Tag, X } from 'lucide-react';
+import {
+  ChevronDown,
+  ChevronUp,
+  Clock,
+  Edit3,
+  History,
+  Pause,
+  Play,
+  Plus,
+  Tag,
+  X,
+} from 'lucide-react';
 import { toast } from 'sonner';
 
 import {
@@ -69,6 +80,9 @@ export type Tarifa = {
   vigenciaHasta: string;
   alicuotaIva: number;
   plazoPagoDias: number;
+  // Ajuste de precio programado a futuro (Ajuste masivo con vigencia futura),
+  // todavía sin aplicar. El cron lo aplica en `fechaAplicacion`.
+  ajusteProgramado: { precioNuevo: number; fechaAplicacion: string } | null;
 };
 
 const MEDIDAS: MedidaTarifa[] = [
@@ -373,6 +387,13 @@ function TablaTarifas({
                   )}
                   {t.alicuotaIva === 0 && (
                     <span className="block text-xs text-gray-400">Exento / No gravado</span>
+                  )}
+                  {t.ajusteProgramado && (
+                    <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+                      <Clock className="h-3 w-3" />
+                      {formatARS(t.ajusteProgramado.precioNuevo)} desde{' '}
+                      {formatDate(t.ajusteProgramado.fechaAplicacion)}
+                    </span>
                   )}
                 </td>
                 <td className="px-5 py-3">
@@ -1007,6 +1028,8 @@ function AjusteMasivoModal({
     Boolean(vigenciaDesde);
 
   const categoriaLabel = CATEGORIAS_AJUSTE.find((c) => c.value === categoria)?.label ?? 'Todos';
+  // Vigencia a futuro: el cambio no se aplica ahora, se programa para esa fecha.
+  const esFuturo = Boolean(vigenciaDesde) && vigenciaDesde > today;
 
   const previewTexto =
     tipo === 'porcentaje'
@@ -1050,6 +1073,11 @@ function AjusteMasivoModal({
         setError(res.error);
         setConfirmOpen(false);
       } else {
+        toast.success(
+          res.programado
+            ? `Ajuste programado para el ${formatDate(vigenciaDesde)}.`
+            : 'Ajuste aplicado.',
+        );
         onApplied();
       }
     });
@@ -1073,7 +1101,7 @@ function AjusteMasivoModal({
 
         <div className="flex flex-col gap-4 p-6">
           <div>
-            <label className="mb-1 block text-sm font-semibold text-gray-700">Concepto</label>
+            <label className="mb-1 block text-sm font-semibold text-gray-700">Categoría</label>
             <select
               className={inputCls}
               value={categoria}
@@ -1110,7 +1138,7 @@ function AjusteMasivoModal({
 
             {tipo === 'porcentaje' && (
               <div>
-                <label className="mb-1 block text-sm font-semibold text-gray-700">Dirección</label>
+                <label className="mb-1 block text-sm font-semibold text-gray-700">Acción</label>
                 <select
                   className={inputCls}
                   value={direccion}
@@ -1186,9 +1214,20 @@ function AjusteMasivoModal({
                 Se va a aplicar <strong>{previewTexto}</strong> a{' '}
                 <strong>
                   {categoriaLabel === 'Todos' ? 'todas las categorías' : categoriaLabel}
-                </strong>{' '}
-                con vigencia desde <strong>{vigenciaDesde}</strong>. Esta acción no se puede
-                deshacer.
+                </strong>
+                {esFuturo ? (
+                  <>
+                    . El cambio queda <strong>programado</strong> y el precio se actualiza recién el{' '}
+                    <strong>{formatDate(vigenciaDesde)}</strong>. Hasta entonces se sigue cobrando
+                    el precio actual.
+                  </>
+                ) : (
+                  <>
+                    {' '}
+                    con vigencia desde <strong>{formatDate(vigenciaDesde)}</strong>. El precio se
+                    actualiza ahora. Esta acción no se puede deshacer.
+                  </>
+                )}
               </p>
             </div>
             <div className="flex justify-end gap-3 border-t border-gray-200 p-6">

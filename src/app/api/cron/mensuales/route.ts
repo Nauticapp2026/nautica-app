@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 
+import { runAjustesProgramados } from '@/lib/ajustes-programados';
 import { runAutoEmision } from '@/lib/auto-facturacion';
 import { limpiarTareasGuardadas } from '@/lib/limpiar-tareas';
 import { guarderiasQueFacturanHoy, runMonthlyGeneration } from '@/lib/movimientos-mensuales';
@@ -27,6 +28,9 @@ export async function GET(req: Request): Promise<Response> {
 
   try {
     const now = new Date();
+    // 0. Aplicar ajustes de tarifa programados cuya fecha llegó (antes de
+    //    generar movimientos y facturar, para que el precio nuevo ya rija).
+    const ajustesProgramados = await runAjustesProgramados(now);
     // 1. Generar movimientos mensuales de espacios ocupados.
     const movs = await runMonthlyGeneration(now);
     // 2 y 3. Emisión y cobro sobre TODAS las guarderías que facturan hoy
@@ -38,6 +42,7 @@ export async function GET(req: Request): Promise<Response> {
     const tareasBorradas = await limpiarTareasGuardadas(now);
     return NextResponse.json({
       ok: true,
+      ajustesProgramados,
       movimientos: movs,
       guarderiaIds,
       facturas,

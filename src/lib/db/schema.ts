@@ -673,6 +673,33 @@ export const serviciosHistorial = pgTable(
   ],
 );
 
+// Ajustes de precio del tarifario agendados a futuro (Ajuste masivo con
+// vigencia desde futura). El cron diario los aplica en `fechaAplicacion`.
+// Ver 0110_servicios_ajustes_programados.sql.
+export const serviciosAjustesProgramados = pgTable(
+  'servicios_ajustes_programados',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    servicioId: uuid('servicio_id')
+      .notNull()
+      .references(() => servicios.id, { onDelete: 'cascade' }),
+    guarderiaId: uuid('guarderia_id')
+      .notNull()
+      .references(() => guarderias.id, { onDelete: 'cascade' }),
+    precioNuevo: numeric('precio_nuevo', { precision: 12, scale: 2 }).notNull(),
+    origen: text('origen').notNull().default('masivo_porcentaje'),
+    fechaAplicacion: date('fecha_aplicacion').notNull(),
+    aplicado: boolean('aplicado').notNull().default(false),
+    aplicadoAt: timestamp('aplicado_at', { withTimezone: true }),
+    createdBy: uuid('created_by').references(() => profiles.id, { onDelete: 'set null' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index('servicios_ajustes_prog_servicio_idx').on(t.servicioId),
+    index('servicios_ajustes_prog_guarderia_idx').on(t.guarderiaId),
+  ],
+);
+
 // Tarifas = bandas de precio por medida de eslora
 export const tarifas = pgTable(
   'tarifas',

@@ -1,9 +1,9 @@
 import { redirect } from 'next/navigation';
-import { asc, eq } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 
 import { getActiveMarina } from '@/lib/auth/session';
 import { db } from '@/lib/db';
-import { servicios } from '@/lib/db/schema';
+import { servicios, serviciosAjustesProgramados } from '@/lib/db/schema';
 
 import { TarifarioClient, type Tarifa } from './tarifario-client';
 
@@ -42,26 +42,50 @@ export default async function TarifarioPage() {
     .where(eq(servicios.guarderiaId, guarderiaId))
     .orderBy(asc(servicios.tipo), asc(servicios.nombre));
 
+  // Ajustes de precio programados a futuro y todavía sin aplicar (uno por
+  // servicio: índice único parcial). Se muestran como cambio pendiente.
+  const ajustesRows = await db
+    .select({
+      servicioId: serviciosAjustesProgramados.servicioId,
+      precioNuevo: serviciosAjustesProgramados.precioNuevo,
+      fechaAplicacion: serviciosAjustesProgramados.fechaAplicacion,
+    })
+    .from(serviciosAjustesProgramados)
+    .where(
+      and(
+        eq(serviciosAjustesProgramados.guarderiaId, guarderiaId),
+        eq(serviciosAjustesProgramados.aplicado, false),
+      ),
+    );
+
+  const ajustePorServicio = new Map(ajustesRows.map((a) => [a.servicioId, a]));
+
   const toNum = (v: string | null) => (v != null ? Number(v) : null);
 
-  const tarifas: Tarifa[] = rows.map((r) => ({
-    id: r.id,
-    nombre: r.nombre,
-    tipo: r.tipo,
-    tipoCobro: r.tipoCobro ?? 'fijo',
-    precio: r.precio != null ? Number(r.precio) : 0,
-    estado: r.estado ?? 'activo',
-    medida: r.medida,
-    locacion: r.locacion,
-    unidadMetraje: r.unidadMetraje,
-    eslora: toNum(r.eslora),
-    manga: toNum(r.manga),
-    puntual: toNum(r.puntual),
-    vigenciaDesde: r.vigenciaDesde,
-    vigenciaHasta: r.vigenciaHasta,
-    alicuotaIva: r.alicuotaIva != null ? Number(r.alicuotaIva) : 21,
-    plazoPagoDias: r.plazoPagoDias ?? 0,
-  }));
+  const tarifas: Tarifa[] = rows.map((r) => {
+    const aj = ajustePorServicio.get(r.id);
+    return {
+      id: r.id,
+      nombre: r.nombre,
+      tipo: r.tipo,
+      tipoCobro: r.tipoCobro ?? 'fijo',
+      precio: r.precio != null ? Number(r.precio) : 0,
+      estado: r.estado ?? 'activo',
+      medida: r.medida,
+      locacion: r.locacion,
+      unidadMetraje: r.unidadMetraje,
+      eslora: toNum(r.eslora),
+      manga: toNum(r.manga),
+      puntual: toNum(r.puntual),
+      vigenciaDesde: r.vigenciaDesde,
+      vigenciaHasta: r.vigenciaHasta,
+      alicuotaIva: r.alicuotaIva != null ? Number(r.alicuotaIva) : 21,
+      plazoPagoDias: r.plazoPagoDias ?? 0,
+      ajusteProgramado: aj
+        ? { precioNuevo: Number(aj.precioNuevo), fechaAplicacion: aj.fechaAplicacion }
+        : null,
+    };
+  });
 
   return <TarifarioClient tarifas={tarifas} />;
 }
