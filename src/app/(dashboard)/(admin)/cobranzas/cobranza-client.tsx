@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { CheckCircle2, Plus, Search, X } from 'lucide-react';
+import { Plus, Search, X } from 'lucide-react';
 
 import { FORMAS_PAGO, Field, FormaPagoFields, inputCls } from '@/components/shared/forma-pago';
 import { formatArgentinaDate } from '@/lib/dates';
@@ -12,7 +12,6 @@ import {
   registrarCobranzaAction,
   type ComprobantePendiente,
 } from '@/app/actions/cobranzas';
-import { crearReciboInternoAction } from '@/app/actions/facturacion';
 
 export type SocioOption = {
   id: string;
@@ -56,7 +55,7 @@ export function CobranzaClient({ socios }: { socios: SocioOption[] }) {
   );
 }
 
-type Step = 'socio' | 'comprobantes' | 'pago' | 'post-pago' | 'recibo-creado';
+type Step = 'socio' | 'comprobantes' | 'pago';
 
 function NuevaCobranzaModal({ socios, onClose }: { socios: SocioOption[]; onClose: () => void }) {
   const router = useRouter();
@@ -75,14 +74,6 @@ function NuevaCobranzaModal({ socios, onClose }: { socios: SocioOption[]; onClos
   const [formaDePago, setFormaDePago] = useState('');
   const [datosPago, setDatosPago] = useState<Record<string, string>>({});
   const [fecha, setFecha] = useState(todayISODate);
-
-  // Resultado
-  const [pagoResult, setPagoResult] = useState<{
-    movimientoId: string;
-    concepto: string;
-    importe: string;
-  } | null>(null);
-  const [reciboId, setReciboId] = useState<string | null>(null);
 
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -156,133 +147,13 @@ function NuevaCobranzaModal({ socios, onClose }: { socios: SocioOption[]; onClos
         setError(res.error);
         return;
       }
-      setPagoResult({
-        movimientoId: res.movimientoId!,
-        concepto: res.concepto!,
-        importe: res.importe!,
-      });
-      setStep('post-pago');
+      toast.success('Cobranza registrada');
+      onClose();
+      router.refresh();
     });
-  }
-
-  function handleCrearRecibo() {
-    if (!pagoResult || !socio) return;
-    startTransition(async () => {
-      const res = await crearReciboInternoAction({
-        socioId: socio.id,
-        movimientoId: pagoResult.movimientoId,
-        importe: pagoResult.importe,
-        descripcion: pagoResult.concepto,
-        medioPago: formaDePago,
-        fecha,
-      });
-      if (res.error) {
-        setError(res.error);
-      } else {
-        setReciboId(res.id!);
-        setStep('recibo-creado');
-      }
-    });
-  }
-
-  function handleFinalClose() {
-    onClose();
-    router.refresh();
   }
 
   const formaValida = Boolean(formaDePago);
-
-  // ─── Paso post-pago ──────────────────────────────────────────────────────────
-  if (step === 'post-pago') {
-    return (
-      <Overlay>
-        <div className="w-full max-w-sm rounded-2xl bg-white shadow-2xl">
-          <div className="p-6 pb-4">
-            <h2 className="text-[18px] font-bold" style={{ color: '#101828' }}>
-              Cobranza registrada
-            </h2>
-            <p className="mt-0.5 text-sm" style={{ color: '#669E9D' }}>
-              ¿Desea emitir un comprobante para {socio?.nombre}?
-            </p>
-          </div>
-          <div className="border-t border-gray-200" />
-          <div className="space-y-3 p-6">
-            <button
-              onClick={() => {
-                toast.success('Cobranza registrada');
-                onClose();
-                router.push('/facturacion');
-                router.refresh();
-              }}
-              className="w-full rounded-[10px] border border-[#175861] bg-white px-4 py-3 text-left text-sm font-medium text-[#175861] transition hover:bg-teal-50"
-            >
-              <span className="font-semibold">Factura ARCA</span>
-              <span className="ml-2 text-xs text-gray-400">Se emite con CAE</span>
-            </button>
-            <button
-              onClick={handleCrearRecibo}
-              disabled={isPending}
-              className="w-full rounded-[10px] border border-gray-200 bg-white px-4 py-3 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
-            >
-              <span className="font-semibold">Comprobante interno</span>
-              <span className="ml-2 text-xs text-gray-400">Sin valor fiscal</span>
-            </button>
-            <button
-              onClick={() => {
-                toast.success('Cobranza registrada');
-                handleFinalClose();
-              }}
-              className="w-full rounded-[10px] px-4 py-3 text-left text-sm font-medium text-gray-500 transition hover:bg-gray-50"
-            >
-              Sin comprobante
-              <span className="ml-2 text-xs text-gray-400">Solo movimiento</span>
-            </button>
-            {error && <p className="text-sm text-red-600">{error}</p>}
-          </div>
-        </div>
-      </Overlay>
-    );
-  }
-
-  // ─── Paso recibo-creado ──────────────────────────────────────────────────────
-  if (step === 'recibo-creado') {
-    return (
-      <Overlay>
-        <div className="w-full max-w-sm rounded-2xl bg-white shadow-2xl">
-          <div className="flex flex-col items-center p-6 text-center">
-            <CheckCircle2 className="mb-3 h-12 w-12 text-teal-600" />
-            <h2 className="text-[18px] font-bold" style={{ color: '#101828' }}>
-              Comprobante creado
-            </h2>
-            <p className="mt-1 text-sm" style={{ color: '#669E9D' }}>
-              La cobranza y el recibo interno fueron registrados.
-            </p>
-          </div>
-          <div className="border-t border-gray-200" />
-          <div className="flex gap-3 p-6">
-            <button
-              onClick={() => {
-                toast.success('Cobranza registrada');
-                handleFinalClose();
-              }}
-              className="flex-1 rounded-[10px] border border-[#d1d5dc] bg-white py-2.5 text-sm font-medium text-[#364153] transition hover:bg-gray-50"
-            >
-              Cerrar
-            </button>
-            <a
-              href={`/facturacion/recibo/${reciboId}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex flex-1 items-center justify-center gap-2 rounded-[10px] py-2.5 text-sm font-semibold text-white transition hover:opacity-90"
-              style={{ background: '#175861' }}
-            >
-              Ver comprobante
-            </a>
-          </div>
-        </div>
-      </Overlay>
-    );
-  }
 
   // ─── Pasos socio / comprobantes / pago ───────────────────────────────────────
   return (
