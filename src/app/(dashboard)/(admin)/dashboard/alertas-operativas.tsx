@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { AlertTriangle, Check, Phone, Ship, X } from 'lucide-react';
+import { AlertTriangle, Check, MessageCircle, Ship, X } from 'lucide-react';
 
 import { cerrarPorteriaAction, marcarAlertaResueltaAction } from '@/app/actions/alertas';
 
@@ -19,6 +19,16 @@ export type AlertaOperativa = {
   arribadaEn: string | null;
   embarcacion: string | null;
 };
+
+function buildWhatsappUrl(telefono: string | null): string | null {
+  if (!telefono) return null;
+  const digits = telefono.replace(/\D/g, '');
+  if (!digits) return null;
+  // wa.me requiere número con código de país y sin '+'. Si no empieza con
+  // 54 (Argentina), asumimos número local y prepend.
+  const normalized = digits.startsWith('54') ? digits : `54${digits}`;
+  return `https://wa.me/${normalized}`;
+}
 
 /**
  * Lista de alertas operativas sin wrapper propio — se renderiza dentro de un
@@ -167,13 +177,15 @@ function AlertaCard({
         </div>
 
         <div className="flex shrink-0 flex-row flex-wrap gap-2 sm:flex-col">
-          {isCritica && alerta.socioTelefono && (
+          {isCritica && buildWhatsappUrl(alerta.socioTelefono) && (
             <a
-              href={`tel:${alerta.socioTelefono}`}
-              className="inline-flex items-center gap-1.5 rounded-[10px] border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50"
+              href={buildWhatsappUrl(alerta.socioTelefono)!}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-[10px] border border-green-200 bg-white px-3 py-1.5 text-xs font-medium text-green-700 hover:bg-green-50"
             >
-              <Phone className="h-3.5 w-3.5" />
-              Llamar
+              <MessageCircle className="h-3.5 w-3.5" />
+              WhatsApp
             </a>
           )}
           {isCritica && (
