@@ -26,6 +26,7 @@ import {
   profiles,
 } from '@/lib/db/schema';
 import { crearFacturaCore } from '@/app/actions/facturacion';
+import { getCargosSaldadosFifo } from '@/lib/reconciliar-cuenta';
 
 type AutoEmisionResult = {
   emitted: number;
@@ -172,7 +173,15 @@ export async function runAutoEmision(
           ),
         );
 
-      if (pendientes.length === 0) {
+      // Red de seguridad: no facturar cargos que el pool de haberes ya cubre
+      // (FIFO), aunque sigan en estado 'no_pagado'. Si un pago neto no marcó el
+      // cargo (flujos viejos, o una reconciliación que falló), sin esto la
+      // auto-emisión re-facturaría plata ya cobrada → deuda fantasma. Decide
+      // solo qué NO facturar; no muta estados. Ver project_facturacion_refactura_pagos.
+      const saldados = await getCargosSaldadosFifo(socioId);
+      const aFacturar = pendientes.filter((p) => !saldados.has(p.id));
+
+      if (aFacturar.length === 0) {
         result.skippedSinPendientes++;
         continue;
       }
@@ -215,7 +224,7 @@ export async function runAutoEmision(
         vencimiento: venc,
         desde,
         hasta,
-        movimientoIds: pendientes.map((p) => p.id),
+        movimientoIds: aFacturar.map((p) => p.id),
       });
 
       if (r.error) {

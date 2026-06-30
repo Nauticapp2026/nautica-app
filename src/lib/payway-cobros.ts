@@ -22,7 +22,7 @@ import {
   profiles,
 } from '@/lib/db/schema';
 import { formatPaywayError } from '@/lib/payway/format-error';
-import { reconciliarCuentaSocio } from '@/lib/reconciliar-cuenta';
+import { marcarComprobantesSaldados, reconciliarCuentaSocio } from '@/lib/reconciliar-cuenta';
 
 const sdkModulo = require('sdk-node-payway');
 
@@ -231,6 +231,10 @@ export async function runPaywayCharges(guarderiaIds: string[]): Promise<PaywayCh
         // deuda fantasma). Si falla, no abortar el cobro (ya está aprobado).
         try {
           await reconciliarCuentaSocio(token.socioId);
+          // Además, marcar 'pagada' toda factura fiscal que el pago dejó 100%
+          // cubierta. Sin esto, una factura cobrada por débito automático sigue
+          // figurando 'pendiente' en el listado de comprobantes.
+          await marcarComprobantesSaldados(token.socioId, g.id);
         } catch (err) {
           console.error(`[payway-cobros] reconciliación falló socio=${token.socioId}`, err);
         }
