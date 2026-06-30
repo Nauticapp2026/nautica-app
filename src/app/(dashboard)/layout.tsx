@@ -10,7 +10,12 @@ import { alertas, solicitudesMembership } from '@/lib/db/schema';
 
 // Roles con acceso al dashboard web. El resto (socio, invitado, etc.)
 // se gestiona desde la app mobile.
-const WEB_DASHBOARD_ROLES = ['administrador_general', 'administrativo', 'operario'] as const;
+const WEB_DASHBOARD_ROLES = [
+  'administrador_general',
+  'administrativo',
+  'operario',
+  'marinero',
+] as const;
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const ctx = await getActiveMarina();

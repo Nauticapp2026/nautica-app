@@ -35,6 +35,7 @@ const ROL_LABELS: Record<string, string> = {
   administrador_general: 'Admin',
   administrativo: 'Administrativo',
   operario: 'Operario',
+  marinero: 'Marinero',
   contable: 'Contable',
   mantenimiento: 'Mantenimiento',
   comunicaciones: 'Comunicaciones',
@@ -82,8 +83,9 @@ const NAV_BY_VARIANT: Record<SidebarVariant, SidebarItem[]> = {
   ],
 };
 
-// El operario solo accede a Tareas desde el admin UI.
-const OPERARIO_ALLOWED = new Set(['/tareas']);
+// El operario y el marinero solo acceden a Tareas desde el admin UI.
+const STAFF_TAREAS_ALLOWED = new Set(['/tareas']);
+const STAFF_TAREAS_ROLES = new Set(['operario', 'marinero']);
 
 type Props = {
   subtitle: string;
@@ -110,7 +112,9 @@ export function Sidebar({
   const baseItems = NAV_BY_VARIANT[variant];
   const items =
     variant === 'dashboard'
-      ? baseItems.filter(({ href }) => (rol === 'operario' ? OPERARIO_ALLOWED.has(href) : true))
+      ? baseItems.filter(({ href }) =>
+          STAFF_TAREAS_ROLES.has(rol) ? STAFF_TAREAS_ALLOWED.has(href) : true,
+        )
       : baseItems;
 
   return (

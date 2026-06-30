@@ -1,7 +1,13 @@
-import { and, eq, inArray, notExists, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNull, like, notExists, sql } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
-import { deviceTokens, guarderias, memberships, platformNotificaciones } from '@/lib/db/schema';
+import {
+  deviceTokens,
+  guarderias,
+  memberships,
+  notificaciones,
+  platformNotificaciones,
+} from '@/lib/db/schema';
 
 type Audiencia =
   | 'todos'
@@ -347,6 +353,59 @@ export async function sendPushToUser({
     // disparó. Logueamos y seguimos.
     console.error('[sendPushToUser] error enviando push', { userId, err });
   }
+}
+
+// =============================================================================
+// Push de MARINA (transaccional, disparado desde el mobile).
+//
+// Drena las notificaciones in-app `marina_*` de una portería que todavía no se
+// despacharon por Expo (push_sent_at NULL) y las manda al device de cada
+// marinero. Lo llama el mobile (vía /api/marineros/notify) justo después de
+// programar/cancelar una salida o de escanear el primer QR. La campanita ya la
+// escribió el trigger Postgres (mig mobile 0026); acá solo sale el push.
+// =============================================================================
+
+export async function notifyMarinerosPushForPorteria(
+  porteriaId: string,
+): Promise<{ sent: number }> {
+  const rows = await db
+    .select({
+      id: notificaciones.id,
+      userId: notificaciones.userId,
+      tipo: notificaciones.tipo,
+      payload: notificaciones.payload,
+    })
+    .from(notificaciones)
+    .where(
+      and(
+        like(notificaciones.tipo, 'marina_%'),
+        isNull(notificaciones.pushSentAt),
+        sql`${notificaciones.payload}->>'porteria_id' = ${porteriaId}`,
+      ),
+    )
+    .limit(200);
+
+  if (rows.length === 0) return { sent: 0 };
+
+  for (const r of rows) {
+    const p = (r.payload ?? {}) as Record<string, unknown>;
+    const title = typeof p.titulo === 'string' ? p.titulo : 'NauticApp';
+    const body = typeof p.cuerpo === 'string' ? p.cuerpo : '';
+    await sendPushToUser({ userId: r.userId, title, body, data: { tipo: r.tipo, porteriaId } });
+  }
+
+  // Marcar como despachadas (idempotencia: no se vuelven a pushear).
+  await db
+    .update(notificaciones)
+    .set({ pushSentAt: new Date() })
+    .where(
+      inArray(
+        notificaciones.id,
+        rows.map((r) => r.id),
+      ),
+    );
+
+  return { sent: rows.length };
 }
 
 export async function registerDeviceToken({

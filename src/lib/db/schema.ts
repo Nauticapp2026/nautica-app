@@ -27,6 +27,7 @@ export const rolEnum = pgEnum('rol', [
   'administrador_general',
   'administrativo',
   'operario',
+  'marinero',
   'contable',
   'mantenimiento',
   'comunicaciones',
@@ -952,6 +953,8 @@ export const tareas = pgTable(
     }),
     porteriaId: uuid('porteria_id').references(() => porteria.id, { onDelete: 'set null' }),
     servicioId: uuid('servicio_id').references(() => servicios.id, { onDelete: 'set null' }),
+    // true = el barco está en una marina → tarea de marinero; false = nave → operario.
+    esMarina: boolean('es_marina').notNull().default(false),
     descripcion: text('descripcion').notNull(),
     nota: text('nota'),
     estado: estadoTareaEnum('estado').default('preparar'),
@@ -989,6 +992,46 @@ export const areaOperarios = pgTable(
     index('area_operarios_guarderia_idx').on(t.guarderiaId),
   ],
 );
+
+// Marineros asignados a cada área (M:N), espejo de areaOperarios pero para
+// marinas. Una tarea de marina (es_marina=true) de un área la ven los marineros
+// asignados a esa área.
+export const areaMarineros = pgTable(
+  'area_marineros',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    guarderiaId: uuid('guarderia_id')
+      .notNull()
+      .references(() => guarderias.id, { onDelete: 'cascade' }),
+    areaId: uuid('area_id')
+      .notNull()
+      .references(() => areas.id, { onDelete: 'cascade' }),
+    marineroId: uuid('marinero_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex('area_marineros_area_marinero_idx').on(t.areaId, t.marineroId),
+    index('area_marineros_marinero_idx').on(t.marineroId),
+    index('area_marineros_guarderia_idx').on(t.guarderiaId),
+  ],
+);
+
+// Notificaciones in-app (campanita). Tabla MOBILE-OWNED (mig mobile 0017): el
+// INSERT es solo vía triggers SECURITY DEFINER, no desde el cliente. Acá se
+// refleja en Drizzle solo para LECTURA/UPDATE desde el web (ej. drenar el push
+// de las notificaciones de marina). `push_sent_at` (mig mobile 0026) marca las
+// que el web ya despachó por Expo.
+export const notificaciones = pgTable('notificaciones', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull(),
+  tipo: text('tipo').notNull(),
+  payload: jsonb('payload').notNull(),
+  readAt: timestamp('read_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  pushSentAt: timestamp('push_sent_at', { withTimezone: true }),
+});
 
 // =============================================================================
 // FACTURACIÓN & CUENTA CORRIENTE

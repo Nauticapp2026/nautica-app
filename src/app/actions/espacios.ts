@@ -5,6 +5,7 @@ import { and, asc, desc, eq, inArray } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import {
+  areaMarineros,
   areaOperarios,
   areas,
   embarcaciones,
@@ -59,6 +60,31 @@ async function asignarOperariosNuevaArea(
   await db
     .insert(areaOperarios)
     .values(validos.map((v) => ({ guarderiaId, areaId, operarioId: v.userId })));
+}
+
+// Espejo de asignarOperariosNuevaArea, pero para marineros (áreas marina).
+async function asignarMarinerosNuevaArea(
+  guarderiaId: string,
+  areaId: string,
+  marineroIds: string[] | undefined,
+): Promise<void> {
+  const ids = [...new Set(marineroIds ?? [])];
+  if (ids.length === 0) return;
+  const validos = await db
+    .select({ userId: memberships.userId })
+    .from(memberships)
+    .where(
+      and(
+        eq(memberships.guarderiaId, guarderiaId),
+        eq(memberships.rol, 'marinero'),
+        eq(memberships.status, 'active'),
+        inArray(memberships.userId, ids),
+      ),
+    );
+  if (validos.length === 0) return;
+  await db
+    .insert(areaMarineros)
+    .values(validos.map((v) => ({ guarderiaId, areaId, marineroId: v.userId })));
 }
 
 function isAdmin(ctx: NonNullable<Awaited<ReturnType<typeof getActiveMarina>>>): boolean {
@@ -132,7 +158,8 @@ export async function createAreaAction(
       await db.insert(espacios).values(rows);
     }
 
-    await asignarOperariosNuevaArea(guarderiaId, area.id, input.operarioIds);
+    // Área marina → se asignan marineros (no operarios).
+    await asignarMarinerosNuevaArea(guarderiaId, area.id, input.operarioIds);
 
     revalidatePath('/espacios');
     return { id: area.id };
@@ -727,6 +754,60 @@ export async function setAreaOperariosAction(
     await db
       .insert(areaOperarios)
       .values(ids.map((operarioId) => ({ guarderiaId, areaId, operarioId })));
+  }
+
+  revalidatePath('/espacios');
+  revalidatePath('/tareas');
+  return {};
+}
+
+/**
+ * Reemplaza la lista de marineros asignados a un área (marina). Espejo de
+ * setAreaOperariosAction. Los marineros de un área ven (y toman) las tareas de
+ * marina de esa área.
+ */
+export async function setAreaMarinerosAction(
+  areaId: string,
+  marineroIds: string[],
+): Promise<{ error?: string }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+  if (!isAdmin(ctx)) return { error: 'Solo administradores pueden asignar marineros.' };
+
+  const guarderiaId = ctx.activeMembership.guarderiaId;
+
+  const [area] = await db
+    .select({ id: areas.id })
+    .from(areas)
+    .where(and(eq(areas.id, areaId), eq(areas.guarderiaId, guarderiaId)))
+    .limit(1);
+  if (!area) return { error: 'Área no encontrada.' };
+
+  // Validar que todos sean marineros activos de esta guardería.
+  const ids = [...new Set(marineroIds)];
+  if (ids.length > 0) {
+    const validos = await db
+      .select({ userId: memberships.userId })
+      .from(memberships)
+      .where(
+        and(
+          eq(memberships.guarderiaId, guarderiaId),
+          eq(memberships.rol, 'marinero'),
+          eq(memberships.status, 'active'),
+          inArray(memberships.userId, ids),
+        ),
+      );
+    if (validos.length !== ids.length) {
+      return { error: 'Alguno de los marineros no pertenece a esta guardería.' };
+    }
+  }
+
+  // Reemplazo completo.
+  await db.delete(areaMarineros).where(eq(areaMarineros.areaId, areaId));
+  if (ids.length > 0) {
+    await db
+      .insert(areaMarineros)
+      .values(ids.map((marineroId) => ({ guarderiaId, areaId, marineroId })));
   }
 
   revalidatePath('/espacios');

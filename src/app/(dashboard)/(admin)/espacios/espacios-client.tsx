@@ -47,6 +47,7 @@ import {
   moveEspacioToPisoAction,
   moveOcupanteAction,
   reorderEspaciosAction,
+  setAreaMarinerosAction,
   setAreaOperariosAction,
   updateEspacioAction,
   type CreateAreaInput,
@@ -80,6 +81,7 @@ export type AreaView = {
     pisos: { pisoId: string; nombre: string; espacios: EspacioCell[] }[];
   }[];
   operarioIds: string[];
+  marineroIds: string[];
 };
 
 export type SocioOpt = { id: string; nombre: string };
@@ -227,6 +229,7 @@ export function EspaciosClient({
   areas,
   socios,
   operarios,
+  marineros,
   serviciosEspacios,
   esloraMaxPorSocio,
   embarcaciones,
@@ -234,6 +237,7 @@ export function EspaciosClient({
   areas: AreaView[];
   socios: SocioOpt[];
   operarios: SocioOpt[];
+  marineros: SocioOpt[];
   serviciosEspacios: ServicioEspacio[];
   esloraMaxPorSocio: Record<string, number>;
   embarcaciones: EmbarcacionOpt[];
@@ -909,6 +913,7 @@ export function EspaciosClient({
                 area={a}
                 counts={countEspacios(a)}
                 operarios={operarios}
+                marineros={marineros}
                 onDelete={() => {
                   setDeleteError(null);
                   setConfirmDelete(a);
@@ -1058,6 +1063,7 @@ export function EspaciosClient({
       {modalOpen && (
         <NuevaAreaModal
           operarios={operarios}
+          marineros={marineros}
           onClose={() => setModalOpen(false)}
           onSaved={() => {
             setModalOpen(false);
@@ -1193,32 +1199,41 @@ function AreaCard({
   area,
   counts,
   operarios,
+  marineros,
   onDelete,
 }: {
   area: AreaView;
   counts: { total: number; ocupado: number; reservado: number; disponible: number };
   operarios: SocioOpt[];
+  marineros: SocioOpt[];
   onDelete: () => void;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  // Solo conservamos los ids que siguen siendo operarios activos de la guardería.
-  // Un operario asignado que dejó de serlo (cambió de rol, se desactivó o salió
-  // del club) queda huérfano en areaOperarios: no tiene checkbox para destildarlo
-  // pero viajaba en el payload y el server lo rechazaba. Lo descartamos acá.
-  const validIds = useMemo(() => new Set(operarios.map((o) => o.id)), [operarios]);
-  const [sel, setSel] = useState<string[]>(() => area.operarioIds.filter((id) => validIds.has(id)));
+
+  // El personal de un área depende de su tipo: marina → marineros; nave →
+  // operarios. La lista, los ids asignados y la acción de guardado cambian con eso.
+  const esMarina = area.tipo === 'marina';
+  const personal = esMarina ? marineros : operarios;
+  const personalIds = esMarina ? area.marineroIds : area.operarioIds;
+
+  // Solo conservamos los ids que siguen siendo personal activo de la guardería.
+  // Un asignado que dejó de serlo (cambió de rol, se desactivó o salió del club)
+  // queda huérfano: no tiene checkbox para destildarlo pero viajaba en el payload
+  // y el server lo rechazaba. Lo descartamos acá.
+  const validIds = useMemo(() => new Set(personal.map((o) => o.id)), [personal]);
+  const [sel, setSel] = useState<string[]>(() => personalIds.filter((id) => validIds.has(id)));
   const [saving, startSaving] = useTransition();
 
   // Re-sync si cambian los datos del server (post-refresh).
-  const [prevIds, setPrevIds] = useState(area.operarioIds);
-  if (area.operarioIds !== prevIds) {
-    setPrevIds(area.operarioIds);
-    setSel(area.operarioIds.filter((id) => validIds.has(id)));
+  const [prevIds, setPrevIds] = useState(personalIds);
+  if (personalIds !== prevIds) {
+    setPrevIds(personalIds);
+    setSel(personalIds.filter((id) => validIds.has(id)));
   }
 
-  const nombrePorId = useMemo(() => new Map(operarios.map((o) => [o.id, o.nombre])), [operarios]);
-  const asignados = area.operarioIds
+  const nombrePorId = useMemo(() => new Map(personal.map((o) => [o.id, o.nombre])), [personal]);
+  const asignados = personalIds
     .map((id) => nombrePorId.get(id))
     .filter((n): n is string => Boolean(n));
 
@@ -1228,7 +1243,9 @@ function AreaCard({
 
   function guardar() {
     startSaving(async () => {
-      const res = await setAreaOperariosAction(area.id, sel);
+      const res = esMarina
+        ? await setAreaMarinerosAction(area.id, sel)
+        : await setAreaOperariosAction(area.id, sel);
       if (res.error) {
         toast.error(res.error);
         return;
@@ -1297,13 +1314,13 @@ function AreaCard({
 
         {open && (
           <div className="absolute top-full right-0 left-0 z-20 mt-1 rounded-[10px] border border-gray-200 bg-white p-2 shadow-lg">
-            {operarios.length === 0 ? (
+            {personal.length === 0 ? (
               <p className="px-2 py-3 text-xs text-gray-400">
                 No hay {rolAreaLabel(area.tipo).toLowerCase()} en esta guardería.
               </p>
             ) : (
               <div className="max-h-48 overflow-y-auto">
-                {operarios.map((o) => (
+                {personal.map((o) => (
                   <label
                     key={o.id}
                     className="flex cursor-pointer items-center gap-2 rounded-[8px] px-2 py-1.5 text-sm hover:bg-gray-50"
@@ -1323,7 +1340,7 @@ function AreaCard({
               <button
                 type="button"
                 onClick={() => {
-                  setSel(area.operarioIds);
+                  setSel(personalIds);
                   setOpen(false);
                 }}
                 className="rounded-[8px] px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50"
@@ -1752,16 +1769,27 @@ type LadoInput = {
 
 function NuevaAreaModal({
   operarios,
+  marineros,
   onClose,
   onSaved,
 }: {
   operarios: SocioOpt[];
+  marineros: SocioOpt[];
   onClose: () => void;
   onSaved: () => void;
 }) {
   const [tipo, setTipo] = useState<'marina' | 'nave'>('marina');
   const [nombre, setNombre] = useState('');
+  // Personal a asignar al crear: marina → marineros; nave → operarios. Se guarda
+  // en operarioIds (createAreaAction lo rutea a la tabla correcta según el tipo).
   const [operarioIds, setOperarioIds] = useState<string[]>([]);
+  const personalModal = tipo === 'marina' ? marineros : operarios;
+
+  // Al cambiar el tipo, la lista de personal cambia: reseteamos la selección.
+  function cambiarTipo(t: 'marina' | 'nave') {
+    setTipo(t);
+    setOperarioIds([]);
+  }
 
   // Marina fields
   const [cantidadPeines, setCantidadPeines] = useState<string>('');
@@ -1870,11 +1898,15 @@ function NuevaAreaModal({
         <div className="space-y-4 p-6">
           <div className="flex gap-5">
             <label className="flex items-center gap-2 text-sm">
-              <input type="radio" checked={tipo === 'marina'} onChange={() => setTipo('marina')} />
+              <input
+                type="radio"
+                checked={tipo === 'marina'}
+                onChange={() => cambiarTipo('marina')}
+              />
               Marina
             </label>
             <label className="flex items-center gap-2 text-sm">
-              <input type="radio" checked={tipo === 'nave'} onChange={() => setTipo('nave')} />
+              <input type="radio" checked={tipo === 'nave'} onChange={() => cambiarTipo('nave')} />
               Nave
             </label>
           </div>
@@ -1895,13 +1927,13 @@ function NuevaAreaModal({
             <label className="mb-1 block text-sm font-semibold text-gray-700">
               {rolAreaLabel(tipo)} <span className="font-normal text-gray-400">(opcional)</span>
             </label>
-            {operarios.length === 0 ? (
+            {personalModal.length === 0 ? (
               <p className="text-xs text-gray-400">
                 No hay {rolAreaLabel(tipo).toLowerCase()} en esta guardería.
               </p>
             ) : (
               <div className="max-h-32 space-y-1 overflow-y-auto rounded-[10px] border border-gray-200 p-2">
-                {operarios.map((o) => (
+                {personalModal.map((o) => (
                   <label
                     key={o.id}
                     className="flex cursor-pointer items-center gap-2 rounded-[8px] px-2 py-1 text-sm hover:bg-gray-50"

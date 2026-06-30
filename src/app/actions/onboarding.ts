@@ -269,6 +269,7 @@ const TEAM_ROLES = [
   'administrador_general',
   'administrativo',
   'operario',
+  'marinero',
   'contable',
   'mantenimiento',
   'comunicaciones',

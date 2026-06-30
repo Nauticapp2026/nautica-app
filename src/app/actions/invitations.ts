@@ -15,6 +15,7 @@ const inviteSchema = z.object({
   rol: z.enum([
     ROLES.ADMINISTRADOR_GENERAL,
     ROLES.OPERARIO,
+    ROLES.MARINERO,
     ROLES.CONTABLE,
     ROLES.MANTENIMIENTO,
     ROLES.COMUNICACIONES,

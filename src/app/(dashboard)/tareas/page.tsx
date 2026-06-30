@@ -4,6 +4,7 @@ import { alias } from 'drizzle-orm/pg-core';
 import { getActiveMarina } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import {
+  areaMarineros,
   areaOperarios,
   embarcaciones,
   espacios,
@@ -37,10 +38,10 @@ export default async function TareasPage() {
     ctx.activeMembership.rol === 'administrador_general' ||
     ctx.activeMembership.rol === 'administrativo';
   const isOperario = ctx.activeMembership.rol === 'operario';
-  // En /tareas, admin y operario operan al mismo nivel (decisión de
-  // producto). El flag fino `isOperario` queda solo por si alguna sección
-  // futura del módulo requiere distinguirlos.
-  const canManage = isAdmin || isOperario;
+  const isMarinero = ctx.activeMembership.rol === 'marinero';
+  // En /tareas, admin, operario y marinero operan al mismo nivel (decisión de
+  // producto). El flag fino queda por si alguna sección futura los distingue.
+  const canManage = isAdmin || isOperario || isMarinero;
 
   // Alias para traer al socio dueño de la embarcación (profiles se usa dos veces:
   // una para el operario y otra para el socio).
@@ -52,21 +53,33 @@ export default async function TareasPage() {
   // (p.ej. solicitudes de lavado creadas desde mobile sin vincular embarcación).
   const lavadoEmb = alias(embarcaciones, 'lavado_emb');
 
-  // El operario solo ve tareas de SUS áreas + las que no tienen área (visibles a
-  // todos). El admin/super admin ven todas.
-  const soloMisAreas = isOperario && !isAdmin;
-  let operarioAreaIds: string[] = [];
+  // Staff (operario/marinero, no admin) ve solo tareas de SUS áreas (+ las sin
+  // área), y SOLO del tipo que le corresponde: operario → tareas de nave
+  // (es_marina=false); marinero → tareas de marina (es_marina=true). El admin/
+  // super admin ven todas.
+  const soloMisAreas = (isOperario || isMarinero) && !isAdmin;
+  let staffAreaIds: string[] = [];
   if (soloMisAreas) {
-    const rows = await db
-      .select({ areaId: areaOperarios.areaId })
-      .from(areaOperarios)
-      .where(and(eq(areaOperarios.operarioId, ctx.user.id), eq(areaOperarios.guarderiaId, gId)));
-    operarioAreaIds = rows.map((r) => r.areaId);
+    const rows = isMarinero
+      ? await db
+          .select({ areaId: areaMarineros.areaId })
+          .from(areaMarineros)
+          .where(and(eq(areaMarineros.marineroId, ctx.user.id), eq(areaMarineros.guarderiaId, gId)))
+      : await db
+          .select({ areaId: areaOperarios.areaId })
+          .from(areaOperarios)
+          .where(
+            and(eq(areaOperarios.operarioId, ctx.user.id), eq(areaOperarios.guarderiaId, gId)),
+          );
+    staffAreaIds = rows.map((r) => r.areaId);
   }
   const areaCond = soloMisAreas
-    ? operarioAreaIds.length > 0
-      ? or(isNull(tareas.areaId), inArray(tareas.areaId, operarioAreaIds))
-      : isNull(tareas.areaId)
+    ? and(
+        eq(tareas.esMarina, isMarinero),
+        staffAreaIds.length > 0
+          ? or(isNull(tareas.areaId), inArray(tareas.areaId, staffAreaIds))
+          : isNull(tareas.areaId),
+      )
     : undefined;
 
   const [listado, operariosList, embarcacionesList] = await Promise.all([
@@ -138,7 +151,8 @@ export default async function TareasPage() {
       .where(
         and(
           eq(memberships.guarderiaId, gId),
-          eq(memberships.rol, 'operario'),
+          // Operarios y marineros son asignables a tareas (nave y marina resp.).
+          inArray(memberships.rol, ['operario', 'marinero']),
           eq(memberships.status, 'active'),
         ),
       )

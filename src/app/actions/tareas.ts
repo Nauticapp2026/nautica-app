@@ -42,11 +42,15 @@ function isAdmin(ctx: NonNullable<Awaited<ReturnType<typeof getActiveMarina>>>):
   );
 }
 
-// Quién puede gestionar el módulo /tareas (CRUD + asignar + mover): admin y
-// operario. Decisión de producto: el operario opera de igual a igual con el
-// admin en este módulo (no así en el resto del back-office).
+// Quién puede gestionar el módulo /tareas (CRUD + asignar + mover): admin,
+// operario y marinero. Decisión de producto: operario y marinero operan de
+// igual a igual con el admin en este módulo (no así en el resto del back-office).
 function canManageTareas(ctx: NonNullable<Awaited<ReturnType<typeof getActiveMarina>>>): boolean {
-  return isAdmin(ctx) || ctx.activeMembership.rol === 'operario';
+  return (
+    isAdmin(ctx) ||
+    ctx.activeMembership.rol === 'operario' ||
+    ctx.activeMembership.rol === 'marinero'
+  );
 }
 
 async function validateOperarioBelongsToGuarderia(

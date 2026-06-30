@@ -150,6 +150,7 @@ const ROL_LABELS: Record<Rol, string> = {
   administrador_general: 'Admin',
   administrativo: 'Administrativo',
   operario: 'Operario',
+  marinero: 'Marinero',
   contable: 'Contable',
   mantenimiento: 'Mantenimiento',
   comunicaciones: 'Comunicaciones',
@@ -170,6 +171,7 @@ const ROL_OPTS_ALTA: { value: Rol; label: string }[] = [
   { value: 'administrador_general', label: ROL_LABELS.administrador_general },
   { value: 'administrativo', label: ROL_LABELS.administrativo },
   { value: 'operario', label: ROL_LABELS.operario },
+  { value: 'marinero', label: ROL_LABELS.marinero },
   { value: 'seguridad', label: ROL_LABELS.seguridad },
 ];
 

@@ -3,6 +3,7 @@ export const ROLES = {
   ADMINISTRADOR_GENERAL: 'administrador_general',
   ADMINISTRATIVO: 'administrativo',
   OPERARIO: 'operario',
+  MARINERO: 'marinero',
   CONTABLE: 'contable',
   MANTENIMIENTO: 'mantenimiento',
   COMUNICACIONES: 'comunicaciones',
@@ -29,6 +30,7 @@ export const ADMIN_ROLES: Rol[] = [
 // Roles de staff operativo
 export const STAFF_ROLES: Rol[] = [
   ROLES.OPERARIO,
+  ROLES.MARINERO,
   ROLES.MANTENIMIENTO,
   ROLES.COMUNICACIONES,
   ROLES.RESTAURANTES,
@@ -45,6 +47,7 @@ export const MEMBERSHIP_ROLES = [
   ROLES.INVITADO, // Invitado
   ROLES.MANTENIMIENTO, // Mantenimiento
   ROLES.OPERARIO, // Operario
+  ROLES.MARINERO, // Marinero
   ROLES.SEGURIDAD, // Portería / Seguridad
   ROLES.PROVEEDOR, // Proveedor
   ROLES.RESTAURANTES, // Restaurantes
@@ -56,6 +59,7 @@ export const ROL_LABELS: Record<Rol, string> = {
   administrador_general: 'Admin',
   administrativo: 'Administrativo',
   operario: 'Operario',
+  marinero: 'Marinero',
   contable: 'Contable',
   mantenimiento: 'Mantenimiento',
   comunicaciones: 'Comunicaciones',

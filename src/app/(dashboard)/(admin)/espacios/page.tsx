@@ -8,6 +8,7 @@ import { and, asc, eq } from 'drizzle-orm';
 import { getActiveMarina } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import {
+  areaMarineros,
   areaOperarios,
   areas,
   embarcaciones,
@@ -54,6 +55,8 @@ export default async function EspaciosPage() {
     embarcacionesRows,
     operariosRows,
     areaOperariosRows,
+    marinerosRows,
+    areaMarinerosRows,
   ] = await Promise.all([
     db
       .select({ id: areas.id, nombre: areas.nombre })
@@ -192,6 +195,31 @@ export default async function EspaciosPage() {
       .select({ areaId: areaOperarios.areaId, operarioId: areaOperarios.operarioId })
       .from(areaOperarios)
       .where(eq(areaOperarios.guarderiaId, guarderiaId)),
+
+    // Marineros de la guardería (para asignarlos a áreas marina).
+    db
+      .select({
+        id: profiles.id,
+        nombre: profiles.nombre,
+        apellido: profiles.apellido,
+        email: profiles.email,
+      })
+      .from(memberships)
+      .innerJoin(profiles, eq(profiles.id, memberships.userId))
+      .where(
+        and(
+          eq(memberships.guarderiaId, guarderiaId),
+          eq(memberships.rol, 'marinero'),
+          eq(memberships.status, 'active'),
+        ),
+      )
+      .orderBy(asc(profiles.apellido), asc(profiles.nombre)),
+
+    // Asignaciones marinero ↔ área de la guardería.
+    db
+      .select({ areaId: areaMarineros.areaId, marineroId: areaMarineros.marineroId })
+      .from(areaMarineros)
+      .where(eq(areaMarineros.guarderiaId, guarderiaId)),
   ]);
 
   // Mapa área → operarioIds asignados.
@@ -200,6 +228,14 @@ export default async function EspaciosPage() {
     const arr = operariosPorArea.get(r.areaId) ?? [];
     arr.push(r.operarioId);
     operariosPorArea.set(r.areaId, arr);
+  }
+
+  // Mapa área → marineroIds asignados.
+  const marinerosPorArea = new Map<string, string[]>();
+  for (const r of areaMarinerosRows) {
+    const arr = marinerosPorArea.get(r.areaId) ?? [];
+    arr.push(r.marineroId);
+    marinerosPorArea.set(r.areaId, arr);
   }
 
   const toNum = (v: string | null) => (v != null ? Number(v) : null);
@@ -258,6 +294,7 @@ export default async function EspaciosPage() {
     const marinasDelArea = marinasRows.filter((m) => m.areaId === a.id);
     const navesDelArea = navesRows.filter((n) => n.areaId === a.id);
     const operarioIds = operariosPorArea.get(a.id) ?? [];
+    const marineroIds = marinerosPorArea.get(a.id) ?? [];
 
     if (marinasDelArea.length > 0) {
       const peines = marinasDelArea.map((m) => ({
@@ -272,6 +309,7 @@ export default async function EspaciosPage() {
         peines,
         lados: [],
         operarioIds,
+        marineroIds,
       };
     }
 
@@ -301,6 +339,7 @@ export default async function EspaciosPage() {
         peines: [],
         lados: ladosArea,
         operarioIds,
+        marineroIds,
       };
     }
 
@@ -312,10 +351,16 @@ export default async function EspaciosPage() {
       peines: [],
       lados: [],
       operarioIds,
+      marineroIds,
     };
   });
 
   const operarios: SocioOpt[] = operariosRows.map((o) => ({
+    id: o.id,
+    nombre: [o.nombre, o.apellido].filter(Boolean).join(' ').trim() || o.email,
+  }));
+
+  const marineros: SocioOpt[] = marinerosRows.map((o) => ({
     id: o.id,
     nombre: [o.nombre, o.apellido].filter(Boolean).join(' ').trim() || o.email,
   }));
@@ -355,6 +400,7 @@ export default async function EspaciosPage() {
       areas={areasView}
       socios={socios}
       operarios={operarios}
+      marineros={marineros}
       serviciosEspacios={serviciosEspacios}
       esloraMaxPorSocio={esloraMaxPorSocio}
       embarcaciones={embarcacionesList}

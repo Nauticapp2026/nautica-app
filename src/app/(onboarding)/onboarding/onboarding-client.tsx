@@ -725,6 +725,7 @@ function Step4({
                 <option value="administrador_general">Admin</option>
                 <option value="administrativo">Administrativo</option>
                 <option value="operario">Operario</option>
+                <option value="marinero">Marinero</option>
                 <option value="seguridad">Portería / Seguridad</option>
               </select>
               <Input

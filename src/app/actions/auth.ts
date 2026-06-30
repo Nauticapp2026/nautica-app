@@ -165,7 +165,7 @@ export async function getPostSignupAccess(): Promise<
   ) {
     return { kind: 'web', redirectTo: '/dashboard' };
   }
-  if (active.activeMembership.rol === 'operario') {
+  if (active.activeMembership.rol === 'operario' || active.activeMembership.rol === 'marinero') {
     return { kind: 'web', redirectTo: '/tareas' };
   }
   return { kind: 'mobile' };
