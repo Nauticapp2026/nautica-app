@@ -28,21 +28,50 @@ export function RealtimeRefresher({ guarderiaId }: { guarderiaId: string }) {
 
   useEffect(() => {
     const supabase = createClient();
-    let channel = supabase.channel(`dashboard-${guarderiaId}`);
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let cancelled = false;
 
-    for (const table of REALTIME_TABLES) {
-      channel = channel.on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table, filter: `guarderia_id=eq.${guarderiaId}` },
-        scheduleRefresh,
-      );
+    async function setup() {
+      // CRÍTICO: Realtime respeta RLS, y todas las policies de estas tablas
+      // dependen de auth.uid(). El canal DEBE autenticarse con el JWT del
+      // usuario ANTES de suscribir; si se suscribe primero (como anon), RLS
+      // bloquea TODOS los eventos postgres_changes y nada refresca al instante.
+      // (Verificado: setAuth después de subscribe no entrega eventos.)
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (cancelled) return;
+      if (session?.access_token) {
+        await supabase.realtime.setAuth(session.access_token);
+      }
+      if (cancelled) return;
+
+      let ch = supabase.channel(`dashboard-${guarderiaId}`);
+      for (const table of REALTIME_TABLES) {
+        ch = ch.on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table, filter: `guarderia_id=eq.${guarderiaId}` },
+          scheduleRefresh,
+        );
+      }
+      ch.subscribe();
+      channel = ch;
     }
 
-    channel.subscribe();
+    void setup();
+
+    // Mantener el token fresco tras cada refresh (~1h) para no perder eventos.
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.access_token) void supabase.realtime.setAuth(session.access_token);
+    });
 
     return () => {
+      cancelled = true;
+      subscription.unsubscribe();
       if (timerRef.current) clearTimeout(timerRef.current);
-      supabase.removeChannel(channel);
+      if (channel) supabase.removeChannel(channel);
     };
   }, [guarderiaId, scheduleRefresh]);
 
