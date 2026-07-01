@@ -2030,7 +2030,6 @@ export function SocioDetail({
       {activeTab === 'servicios-contratados' && (
         <ServiciosContratadosTab
           movimientos={movimientos}
-          servicios={servicios}
           cancelaciones={cancelaciones}
           socioId={socio.id}
           onCargarServicio={() => setModalServicioOpen(true)}
@@ -2869,13 +2868,11 @@ function ImpositivosTab({
 
 function ServiciosContratadosTab({
   movimientos,
-  servicios,
   cancelaciones,
   socioId,
   onCargarServicio,
 }: {
   movimientos: Movimiento[];
-  servicios: Servicio[];
   cancelaciones: { servicioId: string; fechaCancelacion: string }[];
   socioId: string;
   onCargarServicio: () => void;
@@ -2884,6 +2881,7 @@ function ServiciosContratadosTab({
   const [cancelandoId, setCancelandoId] = useState<string | null>(null);
   const [editingMov, setEditingMov] = useState<Movimiento | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [montoOverride, setMontoOverride] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   function toggleExpand(id: string) {
@@ -2903,6 +2901,7 @@ function ServiciosContratadosTab({
     cantidad: number;
     total: number;
     ultimaFecha: string | null;
+    ultimoMonto: number;
   };
   const mapaServicios = new Map<string, Resumen>();
   for (const m of movimientos) {
@@ -2915,6 +2914,7 @@ function ServiciosContratadosTab({
       if (m.servicioTipoCobro && !prev.tipoCobro) prev.tipoCobro = m.servicioTipoCobro;
       if (m.fecha && (!prev.ultimaFecha || m.fecha > prev.ultimaFecha)) {
         prev.ultimaFecha = m.fecha;
+        prev.ultimoMonto = importe;
       }
     } else {
       mapaServicios.set(m.servicioId, {
@@ -2924,6 +2924,7 @@ function ServiciosContratadosTab({
         cantidad: 1,
         total: importe,
         ultimaFecha: m.fecha,
+        ultimoMonto: importe,
       });
     }
   }
@@ -2933,16 +2934,32 @@ function ServiciosContratadosTab({
 
   const cancelacionMap = new Map(cancelaciones.map((c) => [c.servicioId, c.fechaCancelacion]));
 
-  // Calcula el proporcional para el mes actual basado en el día de hoy.
-  function calcularProporcional(precio: string): {
+  // Calcula el proporcional en base al último monto REAL cobrado a este socio
+  // por este servicio (no el precio vigente del tarifario, que puede haber
+  // cambiado desde la última vez que se le cobró) y a los días transcurridos
+  // desde ese último cobro (no "qué día del mes es hoy": si cancelás el día 1
+  // de un mes nuevo eso daría un proporcional casi nulo aunque el último cobro
+  // haya sido hace semanas). Se limita a como máximo un mes completo, para no
+  // arrastrar meses atrasados que no se cobraron por otro motivo.
+  function calcularProporcional(
+    ultimoMonto: number,
+    ultimaFecha: string | null,
+  ): {
     monto: number;
     diasUsados: number;
     diasMes: number;
   } {
     const hoy = new Date();
     const diasMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0).getDate();
-    const diasUsados = hoy.getDate();
-    const monto = Math.round((diasUsados / diasMes) * parseFloat(precio) * 100) / 100;
+    let diasUsados = diasMes;
+    if (ultimaFecha) {
+      const msPorDia = 1000 * 60 * 60 * 24;
+      const diasDesdeUltimoCobro = Math.round(
+        (hoy.getTime() - new Date(ultimaFecha).getTime()) / msPorDia,
+      );
+      diasUsados = Math.min(diasMes, Math.max(0, diasDesdeUltimoCobro));
+    }
+    const monto = Math.round((diasUsados / diasMes) * ultimoMonto * 100) / 100;
     return { monto, diasUsados, diasMes };
   }
 
@@ -2950,10 +2967,21 @@ function ServiciosContratadosTab({
   const servicioSeleccionado = cancelandoId
     ? (filas.find((f) => f.servicioId === cancelandoId) ?? null)
     : null;
-  const precioServicio = cancelandoId
-    ? (servicios.find((s) => s.id === cancelandoId)?.precio ?? null)
+  const proporcional = servicioSeleccionado
+    ? calcularProporcional(servicioSeleccionado.ultimoMonto, servicioSeleccionado.ultimaFecha)
     : null;
-  const proporcional = precioServicio ? calcularProporcional(precioServicio) : null;
+  const montoFinal =
+    montoOverride !== null ? parseFloat(montoOverride) || 0 : (proporcional?.monto ?? 0);
+
+  function abrirCancelacion(servicioId: string) {
+    setMontoOverride(null);
+    setCancelandoId(servicioId);
+  }
+
+  function cerrarCancelacion() {
+    setMontoOverride(null);
+    setCancelandoId(null);
+  }
 
   function handleCancelar(cobrarProporcional: boolean) {
     if (!cancelandoId) return;
@@ -2963,11 +2991,11 @@ function ServiciosContratadosTab({
         socioId,
         servicioId: cancelandoId,
         cobrarProporcional,
-        ...(cobrarProporcional && proporcional
+        ...(cobrarProporcional
           ? {
-              monto: String(proporcional.monto),
+              monto: String(montoFinal),
               fecha: hoy.toISOString().split('T')[0],
-              concepto: `Proporcional ${servicioSeleccionado?.servicioNombre ?? 'servicio'} — ${proporcional.diasUsados} días`,
+              concepto: `Proporcional ${servicioSeleccionado?.servicioNombre ?? 'servicio'} — ${proporcional?.diasUsados ?? 0} días`,
             }
           : {}),
       });
@@ -2975,7 +3003,7 @@ function ServiciosContratadosTab({
         toast.error(res.error);
       } else {
         toast.success('Servicio cancelado');
-        setCancelandoId(null);
+        cerrarCancelacion();
         router.refresh();
       }
     });
@@ -3090,7 +3118,7 @@ function ServiciosContratadosTab({
                       <td className="py-3 text-right">
                         {!cancelado && (
                           <button
-                            onClick={() => setCancelandoId(s.servicioId)}
+                            onClick={() => abrirCancelacion(s.servicioId)}
                             className="rounded-[8px] border border-red-200 px-3 py-1 text-xs font-medium text-red-600 transition hover:bg-red-50"
                           >
                             Cancelar
@@ -3159,19 +3187,27 @@ function ServiciosContratadosTab({
             {proporcional ? (
               <>
                 <p className="mb-4 text-sm text-gray-700">
-                  El servicio estuvo activo <strong>{proporcional.diasUsados}</strong> de{' '}
-                  <strong>{proporcional.diasMes}</strong> días del mes. ¿Querés cargar el
+                  Pasaron <strong>{proporcional.diasUsados}</strong> días desde el último cobro
+                  (sobre un mes de <strong>{proporcional.diasMes}</strong> días). ¿Querés cargar el
                   proporcional a la cuenta corriente?
                 </p>
-                <div className="mb-5 rounded-xl border border-gray-100 bg-gray-50 p-3 text-center">
-                  <p className="text-xs text-gray-500">Importe proporcional</p>
-                  <p className="text-xl font-bold" style={{ color: '#101828' }}>
-                    {fmt(proporcional.monto)}
-                  </p>
+                <div className="mb-5 rounded-xl border border-gray-100 bg-gray-50 p-3">
+                  <label className="mb-1 block text-xs text-gray-500">
+                    Importe proporcional (sugerido en base al último cobro real)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={montoOverride ?? proporcional.monto.toFixed(2)}
+                    onChange={(e) => setMontoOverride(e.target.value)}
+                    className="border-input focus-visible:border-ring focus-visible:ring-ring/50 h-10 w-full rounded-[8px] border bg-white px-3 text-center text-xl font-bold focus-visible:ring-[3px] focus-visible:outline-none"
+                    style={{ color: '#101828' }}
+                  />
                 </div>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => setCancelandoId(null)}
+                    onClick={cerrarCancelacion}
                     disabled={isPending}
                     className="flex-1 rounded-[10px] border border-gray-200 py-2.5 text-sm font-medium text-gray-600 transition hover:bg-gray-50 disabled:opacity-40"
                   >
@@ -3201,7 +3237,7 @@ function ServiciosContratadosTab({
                 </p>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => setCancelandoId(null)}
+                    onClick={cerrarCancelacion}
                     disabled={isPending}
                     className="flex-1 rounded-[10px] border border-gray-200 py-2.5 text-sm font-medium text-gray-600 transition hover:bg-gray-50 disabled:opacity-40"
                   >
