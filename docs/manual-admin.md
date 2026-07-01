@@ -476,11 +476,21 @@ En la sección **Áreas** (arriba de Espacios), cada tarjeta de área tiene un b
 
 > Si el espacio tiene una tarifa con eslora/manga, el sistema valida que la embarcación sea compatible antes de confirmar un cambio de espacio. En el alta inicial no bloquea.
 
+También podés asignar un socio a un espacio **sin elegir todavía una embarcación** (para reservarle el lugar antes de que llegue el barco). Ojo: el espacio empieza a facturarse **desde el momento en que le asignás el socio**, no desde que aparece una embarcación ahí — ver la nota al final de esta sección.
+
 ### Mover un socio a otro espacio (mudanza)
 
 1. Hacé clic en el espacio ocupado y seleccioná **Cambiar ubicación**.
 2. Elegí el espacio destino (puede estar en otra marina o nave).
-3. Confirmá. El socio conserva su fecha de asignación original y sus embarcaciones se mueven con él.
+3. Confirmá. El socio conserva su fecha de asignación original y sus embarcaciones se mueven con él, y el espacio de origen queda libre y disponible para otro socio.
+
+### Liberar un espacio
+
+Sacá al cliente desde la ficha del espacio. Esto detiene la facturación mensual desde el próximo ciclo (no toca los cargos ya generados) y desvincula cualquier embarcación que estuviera ahí. Si el espacio queda con **Estado: Ocupado** sin nadie asignado, el sistema lo baja solo a **Disponible**; si preferís reservarlo para alguien, podés dejarlo en **Reservado** a propósito.
+
+Al **borrar una embarcación** que tenía un espacio asignado, el espacio se libera automáticamente en el mismo paso.
+
+> **Un espacio asignado a un socio se factura todos los meses, tenga o no una embarcación real ahí.** No lo dejes "reservado sin uso" por mucho tiempo si no vas a completarlo pronto — mientras tenga un socio asignado, sigue generando el cargo mensual.
 
 ### Reordenar espacios
 
