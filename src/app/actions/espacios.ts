@@ -335,13 +335,20 @@ export async function updateEspacioAction(input: UpdateEspacioInput): Promise<{ 
     nuevaFechaAsignacion = current.fechaAsignacion;
   }
 
+  // "Ocupado" sin ocupante no tiene sentido (y deja el espacio invisible
+  // para reasignar, aunque ya dejó de facturarse). Si se saca el cliente y
+  // queda en ese estado, bajarlo a "disponible". "Reservado" sí se respeta:
+  // puede usarse para guardarle el lugar a alguien antes de asignarlo.
+  const nuevoEstado =
+    input.ocupanteId === null && input.estado === 'ocupado' ? 'disponible' : input.estado;
+
   await db
     .update(espacios)
     .set({
       ocupanteId: input.ocupanteId,
       servicioId: input.servicioId,
       nomenclatura: input.nomenclatura.trim(),
-      estado: input.estado,
+      estado: nuevoEstado,
       eslora: input.eslora != null ? input.eslora.toFixed(2) : null,
       manga: input.manga != null ? input.manga.toFixed(2) : null,
       puntual: input.puntual != null ? input.puntual.toFixed(2) : null,
