@@ -214,9 +214,9 @@ Cada fila de servicio tiene un **chevron (▾)** a la izquierda del nombre. Al h
 **Cancelar un servicio:**
 
 1. Hacé clic en **Cancelar** en el servicio que querés dar de baja.
-2. Si el servicio tiene precio fijo, el sistema pregunta si querés cobrar el **proporcional de los días usados** del mes (días utilizados ÷ días del mes × precio; ej. si cancelás el día 10 de un mes de 30, cobra 10/30 del precio):
-   - **Solo cancelar** — registra la cancelación sin generar cargo adicional.
-   - **Cobrar y cancelar** — genera el cargo proporcional en la Cuenta Corriente y registra la cancelación. Ese cargo entra en la próxima factura.
+2. El sistema pregunta si querés cobrar un **proporcional** — el importe se sugiere en base al **último cargo real** que se le hizo a ese socio por ese servicio y a los **días pasados desde ese cobro** (con tope de un mes), y se puede **editar** antes de confirmar:
+   - **Solo cancelar** — da de baja el servicio sin generar ningún cargo adicional.
+   - **Cobrar y cancelar** — genera el cargo proporcional en la Cuenta Corriente (con el importe que hayas dejado en el campo) y da de baja el servicio. Ese cargo entra en la próxima factura.
 3. El servicio queda marcado como **Cancelado** con la fecha de baja. El historial de movimientos anteriores se conserva.
 
 **Servicio de guarda (espacio):** además del proporcional, al cancelar el sistema **deja de generar el cargo mensual** automáticamente de ahí en más. El espacio **sigue asignado** (la embarcación queda en su lugar); si querés **liberar el lugar** para otro socio, hacelo desde la sección **Espacios**. Si más adelante le volvés a asignar ese espacio al socio, la cancelación se limpia sola y vuelve a facturarse.
