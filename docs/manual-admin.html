@@ -475,7 +475,7 @@
 
 <h2>6. Tareas</h2>
 
-<p>El tablero de Tareas organiza el trabajo operativo del equipo en columnas por estado.</p>
+<p>La sección Tareas tiene dos vistas: <strong>Tablero</strong> (kanban operativo del día a día) e <strong>Historial</strong> (todos los registros, sin filtrar por fecha).</p>
 
 <h3>Estados del tablero<table></h3>
 
@@ -485,6 +485,8 @@
 <tr><td>Navegando</td><td>Embarcación actualmente en el agua</td></tr>
 <tr><td>Guardada</td><td>Embarcación de regreso y guardada</td></tr>
 <tr><td>Lavado</td><td>Solicitudes de lavado</td></tr></tbody></table></tbody></table>
+<p>Arriba del tablero hay una card por columna con la cantidad de tareas activas. Las tareas <strong>canceladas</strong> (ver más abajo) siguen visibles en el tablero con su badge, pero <strong>no suman</strong> en el número de la card.</p>
+
 <h3>Qué muestra cada tarjeta</h3>
 
 <p>Cada tarjeta muestra:</p>
@@ -492,7 +494,14 @@
 <ul><li><strong>Nombre del socio</strong> (arriba, en gris).</li><li><strong>Nombre de la embarcación</strong> (en negrita).</li><li><strong>Ubicación</strong> — nave y/o número de espacio donde está guardada la embarcación (ej. "Nave A — A-12"). Aparece si el espacio está asignado en el sistema.</li><li><strong>Para el DD/MM</strong> — solo en tarjetas de lavado: la fecha en que el socio pidió que el lavado esté listo.</li><li><strong>Descripción / nota</strong> — si la tarea tiene texto.</li></ul>
 <h3>Visibilidad según estado</h3>
 
-<ul><li><strong>Salida programada</strong> — solo se muestran las salidas del día en curso. Las del futuro se ocultarán hasta que llegue su fecha.</li><li><strong>Guardada</strong> — las embarcaciones guardadas aparecen en esa columna. Solo se ven las del <strong>día en curso</strong>: a las <strong>00:00 (medianoche)</strong> la tarea desaparece del tablero y se <strong>borra automáticamente</strong> (no queda en el historial). Esto aplica tanto en el panel web como en la app.</li><li><strong>Lavado lista</strong> — cuando marcás un lavado como <strong>Lista</strong>, la tarjeta se mantiene visible el resto del día y desaparece sola al día siguiente.</li></ul>
+<p>Nada se borra físicamente: una tarea que desaparece del tablero por los criterios de abajo sigue disponible en el <strong>Historial</strong>.</p>
+
+<ul><li><strong>Salida programada</strong> — se muestran de hoy en adelante. Las sin fecha o de fecha ya pasada no aparecen en el tablero.</li><li><strong>Preparar</strong> — se oculta del tablero si la fecha de salida ya pasó y la tarea nunca avanzó a Navegando (queda solo en el Historial).</li><li><strong>Navegando cancelada</strong> — si el socio revocó la salida desde la app mobile con el barco ya afuera, la tarjeta se marca <strong>Cancelada</strong> y se sigue viendo el resto del día; se oculta del tablero recién al día siguiente.</li><li><strong>Guardada</strong> — solo se ven las del <strong>día en curso</strong>: a las <strong>00:00 (medianoche)</strong> la tarjeta desaparece del tablero (pasa a verse solo en el Historial).</li><li><strong>Lavado lista</strong> — cuando marcás un lavado como <strong>Lista</strong>, la tarjeta se mantiene visible el resto del día y desaparece del tablero al día siguiente.</li><li><strong>Lavado cancelado</strong> — nunca se muestra en el tablero; solo aparece en el Historial.</li></ul>
+<h3>Historial</h3>
+
+<p>Muestra <strong>todas</strong> las tareas y solicitudes de lavado, mezcladas en una sola tabla ordenada por fecha (más reciente primero), sin el recorte de "solo hoy/vencidas" del tablero.</p>
+
+<ul><li><strong>Filtros</strong>: Operario, Embarcación, y rango de fechas (Desde / Hasta).</li><li><strong>Columnas</strong>: Embarcación, Titular, Tipo (Salida o Lavado), Horario, Operario/Marinero, Estado (con tag rojo <strong>Cancelado</strong> cuando corresponde).</li><li>Tabla paginada.</li></ul>
 <h3>Crear una tarea</h3>
 
 <ol><li>Hacé clic en el botón <strong>Nueva tarea</strong> (arriba a la derecha de la pantalla).</li><li>Completá el formulario:</li></ol>   - <strong>Descripción</strong> <em>(requerida)</em> — qué hay que hacer.

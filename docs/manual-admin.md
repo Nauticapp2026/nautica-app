@@ -348,7 +348,7 @@ La pestaña **Resueltas** muestra el historial de solicitudes aprobadas y rechaz
 
 ## 6. Tareas
 
-El tablero de Tareas organiza el trabajo operativo del equipo en columnas por estado.
+La sección Tareas tiene dos vistas: **Tablero** (kanban operativo del día a día) e **Historial** (todos los registros, sin filtrar por fecha).
 
 ### Estados del tablero
 
@@ -359,6 +359,8 @@ El tablero de Tareas organiza el trabajo operativo del equipo en columnas por es
 | Navegando         | Embarcación actualmente en el agua   |
 | Guardada          | Embarcación de regreso y guardada    |
 | Lavado            | Solicitudes de lavado                |
+
+Arriba del tablero hay una card por columna con la cantidad de tareas activas. Las tareas **canceladas** (ver más abajo) siguen visibles en el tablero con su badge, pero **no suman** en el número de la card.
 
 ### Qué muestra cada tarjeta
 
@@ -372,9 +374,22 @@ Cada tarjeta muestra:
 
 ### Visibilidad según estado
 
-- **Salida programada** — solo se muestran las salidas del día en curso. Las del futuro se ocultarán hasta que llegue su fecha.
-- **Guardada** — las embarcaciones guardadas aparecen en esa columna. Solo se ven las del **día en curso**: a las **00:00 (medianoche)** la tarea desaparece del tablero y se **borra automáticamente** (no queda en el historial). Esto aplica tanto en el panel web como en la app.
-- **Lavado lista** — cuando marcás un lavado como **Lista**, la tarjeta se mantiene visible el resto del día y desaparece sola al día siguiente.
+Nada se borra físicamente: una tarea que desaparece del tablero por los criterios de abajo sigue disponible en el **Historial**.
+
+- **Salida programada** — se muestran de hoy en adelante. Las sin fecha o de fecha ya pasada no aparecen en el tablero.
+- **Preparar** — se oculta del tablero si la fecha de salida ya pasó y la tarea nunca avanzó a Navegando (queda solo en el Historial).
+- **Navegando cancelada** — si el socio revocó la salida desde la app mobile con el barco ya afuera, la tarjeta se marca **Cancelada** y se sigue viendo el resto del día; se oculta del tablero recién al día siguiente.
+- **Guardada** — solo se ven las del **día en curso**: a las **00:00 (medianoche)** la tarjeta desaparece del tablero (pasa a verse solo en el Historial).
+- **Lavado lista** — cuando marcás un lavado como **Lista**, la tarjeta se mantiene visible el resto del día y desaparece del tablero al día siguiente.
+- **Lavado cancelado** — nunca se muestra en el tablero; solo aparece en el Historial.
+
+### Historial
+
+Muestra **todas** las tareas y solicitudes de lavado, mezcladas en una sola tabla ordenada por fecha (más reciente primero), sin el recorte de "solo hoy/vencidas" del tablero.
+
+- **Filtros**: Operario, Embarcación, y rango de fechas (Desde / Hasta).
+- **Columnas**: Embarcación, Titular, Tipo (Salida o Lavado), Horario, Operario/Marinero, Estado (con tag rojo **Cancelado** cuando corresponde).
+- Tabla paginada.
 
 ### Crear una tarea
 
