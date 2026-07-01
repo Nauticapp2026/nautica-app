@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, isNull, notInArray, or } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, or } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 
 import { getActiveMarina } from '@/lib/auth/session';
@@ -129,15 +129,16 @@ export default async function TareasPage() {
       .where(
         and(
           eq(tareas.guarderiaId, gId),
-          // 'cancelada' se excluye siempre. 'lista' se incluye y el cliente
-          // la oculta al día siguiente (mismo patrón que 'guardada').
-          or(isNull(solicitudesLavado.estado), notInArray(solicitudesLavado.estado, ['cancelada'])),
           // Operario: solo sus áreas + tareas sin área. Admin: sin filtro.
           areaCond,
         ),
       )
       .orderBy(desc(tareas.createdAt))
-      .limit(500),
+      // Sin filtro de estado/fecha acá: el cliente decide qué muestra en el
+      // Kanban (oculta cancelada/vencidas) y qué muestra en el Historial (todo,
+      // sin filtrar) a partir del mismo listado. Límite más alto porque nada se
+      // borra físicamente y el Historial necesita ver hacia atrás.
+      .limit(2000),
 
     db
       .select({

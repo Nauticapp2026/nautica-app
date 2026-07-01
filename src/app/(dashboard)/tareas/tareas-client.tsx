@@ -9,6 +9,7 @@ import {
   ClipboardList,
   Droplet,
   FilterX,
+  History,
   Plus,
   Settings,
   Ship,
@@ -23,6 +24,9 @@ import {
   updateTareaEstadoAction,
   updateTareaOperarioAction,
 } from '@/app/actions/tareas';
+import { EmptyState } from '@/components/shared/empty-state';
+import { Pagination } from '@/components/shared/pagination';
+import { formatArgentinaDate } from '@/lib/dates';
 import {
   ESTADOS_SOLICITUD_LAVADO,
   ESTADOS_TAREA,
@@ -136,6 +140,18 @@ const textareaCls =
   'w-full rounded-[10px] border border-gray-200 bg-white px-4 py-2.5 text-sm text-[#101828] focus:border-[#175861] focus:outline-none focus:ring-1 focus:ring-[#175861]';
 
 const TZ_AR = 'America/Argentina/Buenos_Aires';
+const HISTORIAL_PAGE_SIZE = 20;
+
+type HistorialItem = {
+  id: string;
+  tipo: 'Salida' | 'Lavado';
+  embarcacionNombre: string | null;
+  socioNombre: string | null;
+  operarioNombre: string | null;
+  horarioIso: string | null;
+  cancelado: boolean;
+  estadoLabel: string;
+};
 
 function fmtHora(iso: string | null): string {
   if (!iso) return '';
@@ -663,6 +679,10 @@ export function TareasClient({
   const [filterOperario, setFilterOperario] = useState<string>('');
   const [filterEmbarcacion, setFilterEmbarcacion] = useState<string>('');
   const [tab, setTab] = useState<'operativa' | 'lavado'>('operativa');
+  const [vista, setVista] = useState<'tablero' | 'historial'>('tablero');
+  const [historialDesde, setHistorialDesde] = useState('');
+  const [historialHasta, setHistorialHasta] = useState('');
+  const [historialPage, setHistorialPage] = useState(1);
 
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverState, setDragOverState] = useState<EstadoTarea | null>(null);
@@ -683,19 +703,39 @@ export function TareasClient({
     return tareas.filter((t) => {
       if (filterOperario && t.operarioId !== filterOperario) return false;
       if (filterEmbarcacion && t.embarcacionId !== filterEmbarcacion) return false;
-      // Salidas programadas: solo se muestran las del día (TZ AR). Las del
-      // futuro quedan ocultas hasta su fecha; las sin fecha no aparecen
-      // (no tiene sentido sin hora de salida).
+      // Lavado cancelado: nunca se muestra en el Kanban (antes lo filtraba la
+      // query; ahora la query trae todo para que el Historial pueda verlo).
+      if (t.estado === 'lavado' && t.solicitudLavadoEstado === 'cancelada') return false;
+      // Salidas programadas: se muestran de hoy en adelante (mismo criterio
+      // que el tablero mobile). Las sin fecha no aparecen (no tiene sentido
+      // sin hora de salida).
       if (t.estado === 'salida_programada') {
         const dia = fechaArYmd(t.fechaHora);
-        return dia === hoyAr;
+        if (!dia) return false;
+        return dia >= hoyAr;
+      }
+      // Preparar vencida: si la fecha de salida ya pasó y nunca avanzó a
+      // navegando, se oculta del tablero (queda solo en el Historial). Hoy y
+      // futuro se muestran igual (no se clampea a "solo hoy" como la columna
+      // anterior, porque acá sí puede seguir en curso).
+      if (t.estado === 'preparar') {
+        const dia = fechaArYmd(t.fechaHora);
+        if (!dia) return true;
+        return dia >= hoyAr;
       }
       // Guardadas: solo se ven las del día en curso (TZ AR); desaparecen a las
-      // 00:00. Un cron las borra físicamente a la mañana siguiente. Mismo patrón
-      // "solo hoy" que 'lavado lista'.
+      // 00:00 y quedan solo en el Historial (no se borran de la base).
       if (t.estado === 'guardada') {
         if (!t.updatedAt) return true;
         return fechaArYmd(t.updatedAt) === hoyAr;
+      }
+      // Navegando cancelada (el socio revocó la salida con el barco ya
+      // afuera): igual que el resto de lo vencido/cancelado, se oculta a
+      // partir del día siguiente a su fecha de salida.
+      if (t.estado === 'navegando' && t.salidaCancelada) {
+        const dia = fechaArYmd(t.fechaHora);
+        if (!dia) return true;
+        return dia >= hoyAr;
       }
       // Lavado lista: se muestra el resto del día y desaparece al siguiente.
       if (t.estado === 'lavado' && t.solicitudLavadoEstado === 'lista') {
@@ -717,9 +757,71 @@ export function TareasClient({
     return acc;
   }, [filtradas]);
 
+  // Historial: TODAS las tareas (sin el filtro "solo hoy/vencida" del tablero),
+  // salidas y lavados mezclados en una sola lista cronológica. Nada se borra
+  // físicamente, así que esta vista siempre puede reconstruirse desde `tareas`.
+  const historialItems = useMemo((): HistorialItem[] => {
+    const items: HistorialItem[] = tareas
+      .filter((t) => {
+        if (filterOperario && t.operarioId !== filterOperario) return false;
+        if (filterEmbarcacion && t.embarcacionId !== filterEmbarcacion) return false;
+        return true;
+      })
+      .map((t) => {
+        const esLavado = t.estado === 'lavado';
+        const horarioIso = esLavado
+          ? t.solicitudDiaUso
+            ? `${t.solicitudDiaUso}T00:00:00.000Z`
+            : null
+          : t.fechaHora;
+        const cancelado = esLavado ? t.solicitudLavadoEstado === 'cancelada' : t.salidaCancelada;
+        const estadoLabel = esLavado
+          ? t.solicitudLavadoEstado
+            ? ESTADO_SOLICITUD_LAVADO_LABEL[t.solicitudLavadoEstado]
+            : '—'
+          : cancelado
+            ? 'Cancelada'
+            : ESTADO_LABEL[t.estado];
+        return {
+          id: t.id,
+          tipo: esLavado ? 'Lavado' : 'Salida',
+          embarcacionNombre: t.embarcacionNombre,
+          socioNombre: t.socioNombre,
+          operarioNombre: t.operarioNombre,
+          horarioIso,
+          cancelado,
+          estadoLabel,
+        };
+      });
+    const desdeMs = historialDesde ? new Date(`${historialDesde}T00:00:00.000Z`).getTime() : null;
+    const hastaMs = historialHasta ? new Date(`${historialHasta}T23:59:59.999Z`).getTime() : null;
+    return items
+      .filter((it) => {
+        if (!desdeMs && !hastaMs) return true;
+        if (!it.horarioIso) return false;
+        const ms = new Date(it.horarioIso).getTime();
+        if (desdeMs && ms < desdeMs) return false;
+        if (hastaMs && ms > hastaMs) return false;
+        return true;
+      })
+      .sort((a, b) => {
+        const ta = a.horarioIso ? new Date(a.horarioIso).getTime() : 0;
+        const tb = b.horarioIso ? new Date(b.horarioIso).getTime() : 0;
+        return tb - ta;
+      });
+  }, [tareas, filterOperario, filterEmbarcacion, historialDesde, historialHasta]);
+
+  const historialPaginado = useMemo(() => {
+    const start = (historialPage - 1) * HISTORIAL_PAGE_SIZE;
+    return historialItems.slice(start, start + HISTORIAL_PAGE_SIZE);
+  }, [historialItems, historialPage]);
+
   const limpiarFiltros = () => {
     setFilterOperario('');
     setFilterEmbarcacion('');
+    setHistorialDesde('');
+    setHistorialHasta('');
+    setHistorialPage(1);
   };
 
   const moverTarea = (tarea: Tarea, destino: EstadoTarea) => {
@@ -787,60 +889,27 @@ export function TareasClient({
         )}
       </div>
 
-      {/* Stat cards */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
-        {COLUMNAS.map((col) => {
-          const Icon = col.icon;
-          const count = agrupadas[col.estado].length;
-          return (
-            <div key={col.estado} className="rounded-2xl border border-gray-200 bg-white p-5">
-              <div className="flex items-center justify-between">
-                <p className="text-sm" style={{ color: '#669E9D' }}>
-                  {col.label}
-                </p>
-                <Icon className="h-4 w-4" style={{ color: '#669E9D' }} />
-              </div>
-              <p className="mt-2 text-3xl font-bold" style={{ color: '#175861' }}>
-                {count}
-              </p>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Filtros */}
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_auto]">
-        <select
-          className={inputCls}
-          value={filterOperario}
-          onChange={(e) => setFilterOperario(e.target.value)}
-        >
-          <option value="">Operario</option>
-          {operarios.map((o) => (
-            <option key={o.id} value={o.id}>
-              {o.nombre}
-            </option>
-          ))}
-        </select>
-        <select
-          className={inputCls}
-          value={filterEmbarcacion}
-          onChange={(e) => setFilterEmbarcacion(e.target.value)}
-        >
-          <option value="">Embarcación</option>
-          {embarcaciones.map((e) => (
-            <option key={e.id} value={e.id}>
-              {e.nombre}
-            </option>
-          ))}
-        </select>
+      {/* Vista: Tablero (kanban operativo) vs Historial (todo, sin filtrar) */}
+      <div className="flex w-fit gap-1 rounded-[12px] border border-gray-200 bg-white p-1">
         <button
           type="button"
-          onClick={limpiarFiltros}
-          className="inline-flex h-11 items-center justify-center gap-2 rounded-[10px] border border-gray-200 px-4 text-sm font-medium text-gray-600 hover:bg-gray-50"
+          onClick={() => setVista('tablero')}
+          className={`inline-flex items-center gap-1.5 rounded-[8px] px-4 py-2 text-sm font-semibold transition-colors ${
+            vista === 'tablero' ? 'bg-[#175861] text-white' : 'text-gray-600 hover:bg-gray-50'
+          }`}
         >
-          <FilterX className="h-4 w-4" />
-          Limpiar filtros
+          <ClipboardList className="h-4 w-4" />
+          Tablero
+        </button>
+        <button
+          type="button"
+          onClick={() => setVista('historial')}
+          className={`inline-flex items-center gap-1.5 rounded-[8px] px-4 py-2 text-sm font-semibold transition-colors ${
+            vista === 'historial' ? 'bg-[#175861] text-white' : 'text-gray-600 hover:bg-gray-50'
+          }`}
+        >
+          <History className="h-4 w-4" />
+          Historial
         </button>
       </div>
 
@@ -851,110 +920,289 @@ export function TareasClient({
         </div>
       )}
 
-      {/* Tabs */}
-      <div className="flex w-fit gap-1 rounded-[12px] border border-gray-200 bg-white p-1">
-        <button
-          type="button"
-          onClick={() => setTab('operativa')}
-          className={`rounded-[8px] px-4 py-2 text-sm font-semibold transition-colors ${
-            tab === 'operativa' ? 'bg-[#175861] text-white' : 'text-gray-600 hover:bg-gray-50'
-          }`}
-        >
-          Operativa
-        </button>
-        <button
-          type="button"
-          onClick={() => setTab('lavado')}
-          className={`rounded-[8px] px-4 py-2 text-sm font-semibold transition-colors ${
-            tab === 'lavado' ? 'bg-[#175861] text-white' : 'text-gray-600 hover:bg-gray-50'
-          }`}
-        >
-          Lavado ({agrupadas.lavado.length})
-        </button>
-      </div>
-
-      {/* Kanban */}
-      {(() => {
-        const cols = COLUMNAS.filter((c) => {
-          if (tab === 'lavado') return c.estado === 'lavado';
-          // 'operativa': salida_programada / preparar / navegando / guardada
-          return c.estado !== 'lavado';
-        });
-        const dndEnabled = tab === 'operativa';
-        const gridCls =
-          tab === 'operativa' ? 'grid grid-cols-1 gap-4 md:grid-cols-4' : 'grid grid-cols-1 gap-4';
-        return (
-          <div className={gridCls}>
-            {cols.map((col) => {
-              const lista = agrupadas[col.estado];
+      {vista === 'tablero' && (
+        <>
+          {/* Stat cards */}
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+            {COLUMNAS.map((col) => {
               const Icon = col.icon;
-              const isOver = dndEnabled && dragOverState === col.estado;
+              const count = agrupadas[col.estado].length;
               return (
-                <div
-                  key={col.estado}
-                  onDragOver={(e) => {
-                    if (!canEditAll || !dndEnabled) return;
-                    e.preventDefault();
-                    if (dragOverState !== col.estado) setDragOverState(col.estado);
-                  }}
-                  onDragLeave={() => {
-                    if (dragOverState === col.estado) setDragOverState(null);
-                  }}
-                  onDrop={(e) => {
-                    if (!dndEnabled) return;
-                    e.preventDefault();
-                    onDropOnColumn(col.estado);
-                  }}
-                  className={`flex min-h-[280px] flex-col overflow-hidden rounded-2xl border ${
-                    isOver ? 'border-[#175861] ring-2 ring-[#175861]/30' : 'border-gray-200'
-                  } ${col.body}`}
-                >
-                  <div
-                    className={`flex items-center justify-between ${col.header} px-4 py-3 text-white`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <Icon className="h-4 w-4" />
-                      <span className="text-sm font-semibold">{col.label}</span>
-                    </div>
-                    <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-xs font-bold text-white">
-                      {lista.length}
-                    </span>
+                <div key={col.estado} className="rounded-2xl border border-gray-200 bg-white p-5">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm" style={{ color: '#669E9D' }}>
+                      {col.label}
+                    </p>
+                    <Icon className="h-4 w-4" style={{ color: '#669E9D' }} />
                   </div>
-
-                  <div className="flex-1 space-y-2.5 p-3">
-                    {lista.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center gap-2 py-10 text-gray-400">
-                        <ClipboardList className="h-6 w-6 opacity-40" />
-                        <p className="text-xs">Sin tareas</p>
-                      </div>
-                    ) : (
-                      lista.map((t) => (
-                        <TareaCard
-                          key={t.id}
-                          tarea={t}
-                          canEditAll={canEditAll}
-                          currentUserId={currentUserId}
-                          isOperario={isOperario}
-                          dndEnabled={dndEnabled}
-                          operarios={operarios}
-                          onEdit={(x) => setModal({ mode: 'edit', tarea: x })}
-                          onMoveEstado={moverTarea}
-                          busy={isPending && busyId === t.id}
-                          onDragStart={() => setDraggingId(t.id)}
-                          onDragEnd={() => {
-                            setDraggingId(null);
-                            setDragOverState(null);
-                          }}
-                        />
-                      ))
-                    )}
-                  </div>
+                  <p className="mt-2 text-3xl font-bold" style={{ color: '#175861' }}>
+                    {count}
+                  </p>
                 </div>
               );
             })}
           </div>
-        );
-      })()}
+
+          {/* Filtros */}
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_auto]">
+            <select
+              className={inputCls}
+              value={filterOperario}
+              onChange={(e) => setFilterOperario(e.target.value)}
+            >
+              <option value="">Operario</option>
+              {operarios.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.nombre}
+                </option>
+              ))}
+            </select>
+            <select
+              className={inputCls}
+              value={filterEmbarcacion}
+              onChange={(e) => setFilterEmbarcacion(e.target.value)}
+            >
+              <option value="">Embarcación</option>
+              {embarcaciones.map((e) => (
+                <option key={e.id} value={e.id}>
+                  {e.nombre}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={limpiarFiltros}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-[10px] border border-gray-200 px-4 text-sm font-medium text-gray-600 hover:bg-gray-50"
+            >
+              <FilterX className="h-4 w-4" />
+              Limpiar filtros
+            </button>
+          </div>
+
+          {/* Tabs */}
+          <div className="flex w-fit gap-1 rounded-[12px] border border-gray-200 bg-white p-1">
+            <button
+              type="button"
+              onClick={() => setTab('operativa')}
+              className={`rounded-[8px] px-4 py-2 text-sm font-semibold transition-colors ${
+                tab === 'operativa' ? 'bg-[#175861] text-white' : 'text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              Operativa
+            </button>
+            <button
+              type="button"
+              onClick={() => setTab('lavado')}
+              className={`rounded-[8px] px-4 py-2 text-sm font-semibold transition-colors ${
+                tab === 'lavado' ? 'bg-[#175861] text-white' : 'text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              Lavado ({agrupadas.lavado.length})
+            </button>
+          </div>
+
+          {/* Kanban */}
+          {(() => {
+            const cols = COLUMNAS.filter((c) => {
+              if (tab === 'lavado') return c.estado === 'lavado';
+              // 'operativa': salida_programada / preparar / navegando / guardada
+              return c.estado !== 'lavado';
+            });
+            const dndEnabled = tab === 'operativa';
+            const gridCls =
+              tab === 'operativa'
+                ? 'grid grid-cols-1 gap-4 md:grid-cols-4'
+                : 'grid grid-cols-1 gap-4';
+            return (
+              <div className={gridCls}>
+                {cols.map((col) => {
+                  const lista = agrupadas[col.estado];
+                  const Icon = col.icon;
+                  const isOver = dndEnabled && dragOverState === col.estado;
+                  return (
+                    <div
+                      key={col.estado}
+                      onDragOver={(e) => {
+                        if (!canEditAll || !dndEnabled) return;
+                        e.preventDefault();
+                        if (dragOverState !== col.estado) setDragOverState(col.estado);
+                      }}
+                      onDragLeave={() => {
+                        if (dragOverState === col.estado) setDragOverState(null);
+                      }}
+                      onDrop={(e) => {
+                        if (!dndEnabled) return;
+                        e.preventDefault();
+                        onDropOnColumn(col.estado);
+                      }}
+                      className={`flex min-h-[280px] flex-col overflow-hidden rounded-2xl border ${
+                        isOver ? 'border-[#175861] ring-2 ring-[#175861]/30' : 'border-gray-200'
+                      } ${col.body}`}
+                    >
+                      <div
+                        className={`flex items-center justify-between ${col.header} px-4 py-3 text-white`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <Icon className="h-4 w-4" />
+                          <span className="text-sm font-semibold">{col.label}</span>
+                        </div>
+                        <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-xs font-bold text-white">
+                          {lista.length}
+                        </span>
+                      </div>
+
+                      <div className="flex-1 space-y-2.5 p-3">
+                        {lista.length === 0 ? (
+                          <div className="flex flex-col items-center justify-center gap-2 py-10 text-gray-400">
+                            <ClipboardList className="h-6 w-6 opacity-40" />
+                            <p className="text-xs">Sin tareas</p>
+                          </div>
+                        ) : (
+                          lista.map((t) => (
+                            <TareaCard
+                              key={t.id}
+                              tarea={t}
+                              canEditAll={canEditAll}
+                              currentUserId={currentUserId}
+                              isOperario={isOperario}
+                              dndEnabled={dndEnabled}
+                              operarios={operarios}
+                              onEdit={(x) => setModal({ mode: 'edit', tarea: x })}
+                              onMoveEstado={moverTarea}
+                              busy={isPending && busyId === t.id}
+                              onDragStart={() => setDraggingId(t.id)}
+                              onDragEnd={() => {
+                                setDraggingId(null);
+                                setDragOverState(null);
+                              }}
+                            />
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
+        </>
+      )}
+
+      {vista === 'historial' && (
+        <>
+          {/* Filtros */}
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_1fr_1fr_auto]">
+            <select
+              className={inputCls}
+              value={filterOperario}
+              onChange={(e) => setFilterOperario(e.target.value)}
+            >
+              <option value="">Operario</option>
+              {operarios.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.nombre}
+                </option>
+              ))}
+            </select>
+            <select
+              className={inputCls}
+              value={filterEmbarcacion}
+              onChange={(e) => setFilterEmbarcacion(e.target.value)}
+            >
+              <option value="">Embarcación</option>
+              {embarcaciones.map((e) => (
+                <option key={e.id} value={e.id}>
+                  {e.nombre}
+                </option>
+              ))}
+            </select>
+            <input
+              type="date"
+              value={historialDesde}
+              onChange={(e) => {
+                setHistorialDesde(e.target.value);
+                setHistorialPage(1);
+              }}
+              title="Desde"
+              className={inputCls}
+            />
+            <input
+              type="date"
+              value={historialHasta}
+              onChange={(e) => {
+                setHistorialHasta(e.target.value);
+                setHistorialPage(1);
+              }}
+              title="Hasta"
+              className={inputCls}
+            />
+            <button
+              type="button"
+              onClick={limpiarFiltros}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-[10px] border border-gray-200 px-4 text-sm font-medium text-gray-600 hover:bg-gray-50"
+            >
+              <FilterX className="h-4 w-4" />
+              Limpiar filtros
+            </button>
+          </div>
+
+          {historialItems.length === 0 ? (
+            <EmptyState
+              icon={<History className="h-7 w-7 opacity-40" />}
+              text="No hay registros para este criterio."
+            />
+          ) : (
+            <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[720px] text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 text-left text-xs font-semibold text-gray-500">
+                      <th className="px-4 py-3">Embarcación</th>
+                      <th className="px-4 py-3">Titular</th>
+                      <th className="px-4 py-3">Tipo</th>
+                      <th className="px-4 py-3">Horario</th>
+                      <th className="px-4 py-3">Operario/Marinero</th>
+                      <th className="px-4 py-3 text-center">Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {historialPaginado.map((it) => (
+                      <tr key={it.id} className="border-t border-gray-100 hover:bg-gray-50/50">
+                        <td className="px-4 py-3 font-medium" style={{ color: '#101828' }}>
+                          {it.embarcacionNombre ?? 'Sin embarcación'}
+                        </td>
+                        <td className="px-4 py-3 text-gray-500">{it.socioNombre ?? '—'}</td>
+                        <td className="px-4 py-3 text-gray-500">{it.tipo}</td>
+                        <td className="px-4 py-3 text-gray-500">
+                          {it.horarioIso ? formatArgentinaDate(it.horarioIso) : '—'}
+                        </td>
+                        <td className="px-4 py-3 text-gray-500">{it.operarioNombre ?? '—'}</td>
+                        <td className="px-4 py-3 text-center">
+                          <span
+                            className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${
+                              it.cancelado
+                                ? 'bg-[#FCE8E8] text-[#C0392B]'
+                                : 'bg-gray-100 text-gray-600'
+                            }`}
+                          >
+                            {it.cancelado ? 'Cancelado' : it.estadoLabel}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <Pagination
+                page={historialPage}
+                totalItems={historialItems.length}
+                pageSize={HISTORIAL_PAGE_SIZE}
+                onPageChange={setHistorialPage}
+              />
+            </div>
+          )}
+        </>
+      )}
 
       <TareaModal
         key={modal?.mode === 'edit' ? `edit-${modal.tarea.id}` : 'create'}

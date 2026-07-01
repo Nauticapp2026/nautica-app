@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 
 import { runAjustesProgramados } from '@/lib/ajustes-programados';
 import { runAutoEmision } from '@/lib/auto-facturacion';
-import { limpiarTareasGuardadas } from '@/lib/limpiar-tareas';
 import { guarderiasQueFacturanHoy, runMonthlyGeneration } from '@/lib/movimientos-mensuales';
 import { runPaywayCharges } from '@/lib/payway-cobros';
 
@@ -38,8 +37,6 @@ export async function GET(req: Request): Promise<Response> {
     const guarderiaIds = await guarderiasQueFacturanHoy(now);
     const facturas = await runAutoEmision(guarderiaIds, now);
     const cobros = await runPaywayCharges(guarderiaIds);
-    // Limpieza: borrar tareas 'guardada' con más de 24 hs.
-    const tareasBorradas = await limpiarTareasGuardadas(now);
     return NextResponse.json({
       ok: true,
       ajustesProgramados,
@@ -47,7 +44,6 @@ export async function GET(req: Request): Promise<Response> {
       guarderiaIds,
       facturas,
       cobros,
-      tareasBorradas,
     });
   } catch (err) {
     console.error('[cron/mensuales] error', err);
