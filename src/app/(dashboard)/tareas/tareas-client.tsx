@@ -926,7 +926,9 @@ export function TareasClient({
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
             {COLUMNAS.map((col) => {
               const Icon = col.icon;
-              const count = agrupadas[col.estado].length;
+              // Las canceladas siguen visibles en el tablero (con badge) pero
+              // no deben sumar en el contador de la card.
+              const count = agrupadas[col.estado].filter((t) => !t.salidaCancelada).length;
               return (
                 <div key={col.estado} className="rounded-2xl border border-gray-200 bg-white p-5">
                   <div className="flex items-center justify-between">
