@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { and, eq, ne } from 'drizzle-orm';
 import { db } from '@/lib/db';
-import { embarcaciones, memberships } from '@/lib/db/schema';
+import { embarcaciones, espacios, memberships } from '@/lib/db/schema';
 import { getActiveMarina } from '@/lib/auth/session';
 
 export type EmbarcacionInput = {
@@ -160,7 +160,11 @@ export async function deleteEmbarcacionAction(id: string): Promise<{ error?: str
   const gId = ctx.activeMembership.guarderiaId;
 
   const [existing] = await db
-    .select({ profileId: embarcaciones.profileId, esPrincipal: embarcaciones.esPrincipal })
+    .select({
+      profileId: embarcaciones.profileId,
+      esPrincipal: embarcaciones.esPrincipal,
+      espacioId: embarcaciones.espacioId,
+    })
     .from(embarcaciones)
     .where(and(eq(embarcaciones.id, id), eq(embarcaciones.guarderiaId, gId)))
     .limit(1);
@@ -168,6 +172,16 @@ export async function deleteEmbarcacionAction(id: string): Promise<{ error?: str
 
   try {
     await db.delete(embarcaciones).where(eq(embarcaciones.id, id));
+
+    // Si la embarcación tenía un espacio asignado, liberarlo. Sin esto el
+    // espacio queda "ocupado" (ocupanteId) para siempre sin ninguna
+    // embarcación real ahí, y el cron mensual lo sigue facturando.
+    if (existing.espacioId) {
+      await db
+        .update(espacios)
+        .set({ ocupanteId: null, estado: 'disponible', fechaAsignacion: null })
+        .where(and(eq(espacios.id, existing.espacioId), eq(espacios.guarderiaId, gId)));
+    }
 
     // Si era la principal y quedan otras, promover la primera restante.
     if (existing.esPrincipal && existing.profileId) {
