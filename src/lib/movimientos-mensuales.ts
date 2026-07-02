@@ -207,6 +207,9 @@ export async function runMonthlyGeneration(now: Date = new Date()): Promise<{
         // Solo facturar tarifas vigentes en la fecha de cobro
         lte(servicios.vigenciaDesde, todayStr),
         gte(servicios.vigenciaHasta, todayStr),
+        // Una tarifa pausada o inactiva no genera cargos nuevos, aunque el
+        // espacio siga ocupado con esa tarifa asignada.
+        eq(servicios.estado, 'activo'),
       ),
     );
 

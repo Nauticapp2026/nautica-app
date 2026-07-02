@@ -287,6 +287,19 @@ export async function updateTarifaAction(data: UpdateTarifaData): Promise<{ erro
   // El estado pausado solo se cambia con Pausar/Reactivar (botones dedicados).
   const estadoFinal = current.estado === 'pausado' ? 'pausado' : data.estado;
 
+  // Misma regla que pausar: no se puede inactivar si hay socios con el
+  // servicio contratado (quedarían sin facturarse/cobrarse en silencio).
+  if (current.estado === 'activo' && estadoFinal === 'inactivo') {
+    const n = await contarSociosConServicio(data.id);
+    if (n > 0) {
+      return {
+        error: `No se puede inactivar: ${n} socio${n === 1 ? '' : 's'} ${
+          n === 1 ? 'tiene' : 'tienen'
+        } este servicio contratado. Cancelalo en esos socios antes de inactivar la tarifa.`,
+      };
+    }
+  }
+
   const overlapErr = await checkVigenciaOverlap(guarderiaId, data, data.id);
   if (overlapErr) return { error: overlapErr };
 

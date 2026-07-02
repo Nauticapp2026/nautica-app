@@ -848,11 +848,14 @@ export async function cargarServicioAction(data: CargarServicioData): Promise<{
   // 1. Crear el cargo en la cuenta corriente (igual que "Cargar consumo").
   //    Si es interno, se marca para excluirlo de la facturación automática y manual.
   const [serv] = await db
-    .select({ nombre: servicios.nombre })
+    .select({ nombre: servicios.nombre, estado: servicios.estado })
     .from(servicios)
     .where(and(eq(servicios.id, data.servicioId), eq(servicios.guarderiaId, gId)))
     .limit(1);
   if (!serv) return { error: 'Servicio no encontrado.' };
+  if (serv.estado !== 'activo') {
+    return { error: 'Esta tarifa no está activa. No se puede cargar el servicio.' };
+  }
 
   const conceptoFinal = data.concepto.trim() || serv.nombre;
 

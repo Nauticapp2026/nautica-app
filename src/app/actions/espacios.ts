@@ -269,6 +269,7 @@ export async function updateEspacioAction(input: UpdateEspacioInput): Promise<{ 
       id: espacios.id,
       ocupanteId: espacios.ocupanteId,
       fechaAsignacion: espacios.fechaAsignacion,
+      servicioId: espacios.servicioId,
     })
     .from(espacios)
     .where(and(eq(espacios.id, input.id), eq(espacios.guarderiaId, guarderiaId)))
@@ -318,11 +319,18 @@ export async function updateEspacioAction(input: UpdateEspacioInput): Promise<{ 
         nombre: servicios.nombre,
         precio: servicios.precio,
         alicuotaIva: servicios.alicuotaIva,
+        estado: servicios.estado,
       })
       .from(servicios)
       .where(and(eq(servicios.id, input.servicioId), eq(servicios.guarderiaId, guarderiaId)))
       .limit(1);
     if (!s) return { error: 'La tarifa seleccionada no existe.' };
+    // Solo exigimos que esté activa si es una tarifa NUEVA para este espacio;
+    // si ya la tenía asignada y se pausó/inactivó después, dejamos que se
+    // sigan editando otros campos del espacio sin bloquear por esto.
+    if (input.servicioId !== current.servicioId && s.estado !== 'activo') {
+      return { error: 'La tarifa seleccionada no está activa.' };
+    }
     tarifaPrecio = s.precio ?? null;
     servicioNombre = s.nombre;
     servicioPrecioNum =
@@ -507,9 +515,11 @@ export async function assignEspacioToSocioAction(input: {
     }
   }
 
-  // Si el espacio tiene tarifa, generamos el movimiento mensual proporcional
-  // de este mes. Si todavía no tiene tarifa, el movimiento se crea cuando
-  // el admin cargue la tarifa después (updateEspacioAction lo dispara).
+  // Si el espacio tiene tarifa ACTIVA, generamos el movimiento mensual
+  // proporcional de este mes. Si todavía no tiene tarifa, o la tarifa está
+  // pausada/inactiva, no se genera cargo (igual que "sin tarifa configurada"):
+  // se asigna el espacio igual y el movimiento arranca cuando la tarifa
+  // vuelva a estar activa o se cargue una nueva.
   if (espacio.servicioId) {
     try {
       const [servicio] = await db
@@ -517,11 +527,12 @@ export async function assignEspacioToSocioAction(input: {
           nombre: servicios.nombre,
           precio: servicios.precio,
           alicuotaIva: servicios.alicuotaIva,
+          estado: servicios.estado,
         })
         .from(servicios)
         .where(eq(servicios.id, espacio.servicioId))
         .limit(1);
-      if (servicio) {
+      if (servicio && servicio.estado === 'activo') {
         const servicioPrecioNum =
           servicio.precio != null
             ? precioConIva(Number(servicio.precio), Number(servicio.alicuotaIva ?? 0))
