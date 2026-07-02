@@ -2488,7 +2488,7 @@ export function SocioDetail({
                       </p>
                       {s.estado === 'revocado' && (
                         <span className="shrink-0 rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-medium text-red-600">
-                          Cancelada
+                          Finalizada
                         </span>
                       )}
                     </div>
