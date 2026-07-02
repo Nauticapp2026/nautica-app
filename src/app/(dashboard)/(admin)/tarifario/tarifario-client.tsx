@@ -26,6 +26,7 @@ import {
   type AjusteMasivoData,
   type HistorialEntry,
 } from '@/app/actions/tarifario';
+import { precioConIva } from '@/lib/iva';
 import { EmptyState } from '@/components/shared/empty-state';
 
 export type TipoTarifa =
@@ -376,12 +377,14 @@ function TablaTarifas({
                 </td>
                 <td className="px-5 py-3" style={{ color: '#101828' }}>
                   <span className="block text-sm font-medium">
-                    {formatARS(t.precio)}
-                    <span className="ml-1.5 text-xs font-normal text-gray-400">c/IVA</span>
+                    {formatARS(precioConIva(t.precio, t.alicuotaIva))}
+                    {t.alicuotaIva > 0 && (
+                      <span className="ml-1.5 text-xs font-normal text-gray-400">c/IVA</span>
+                    )}
                   </span>
                   {t.alicuotaIva > 0 && (
                     <span className="block text-xs text-gray-500">
-                      {formatARS(+(t.precio / (1 + t.alicuotaIva / 100)).toFixed(2))}
+                      {formatARS(t.precio)}
                       <span className="ml-1 text-gray-400">s/IVA · {t.alicuotaIva}%</span>
                     </span>
                   )}
@@ -391,8 +394,9 @@ function TablaTarifas({
                   {t.ajusteProgramado && (
                     <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
                       <Clock className="h-3 w-3" />
-                      {formatARS(t.ajusteProgramado.precioNuevo)} desde{' '}
-                      {formatDate(t.ajusteProgramado.fechaAplicacion)}
+                      {formatARS(
+                        precioConIva(t.ajusteProgramado.precioNuevo, t.alicuotaIva),
+                      )} desde {formatDate(t.ajusteProgramado.fechaAplicacion)}
                     </span>
                   )}
                 </td>
@@ -770,7 +774,9 @@ function TarifaModal({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-sm font-semibold text-gray-700">Precio</label>
+              <label className="mb-1 block text-sm font-semibold text-gray-700">
+                Precio <span className="font-normal text-gray-400">(sin IVA)</span>
+              </label>
               <input
                 className={inputCls}
                 type="number"
@@ -780,6 +786,11 @@ function TarifaModal({
                 value={precio}
                 onChange={(e) => setPrecio(e.target.value)}
               />
+              {alicuotaIva > 0 && Number(precio) > 0 && (
+                <p className="mt-1 text-xs text-gray-500">
+                  Total c/IVA: {formatARS(precioConIva(Number(precio), alicuotaIva))}
+                </p>
+              )}
             </div>
             <div>
               <label className="mb-1 block text-sm font-semibold text-gray-700">IVA</label>

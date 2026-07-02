@@ -104,6 +104,9 @@ function derivarTipoFactura(
   return 'factura_b';
 }
 
+// Alícuota de fallback para ítems que no vienen de un servicio del tarifario
+// (ventanilla, notas de crédito, items libres) — no hay de dónde leer la
+// alícuota real, así que se asume el default histórico.
 function alicuotaPara(tipo: TipoFactura): string {
   // Factura C (Monotributo) → sin IVA discriminado
   return tipo === 'factura_c' ? '0' : '21';
@@ -201,29 +204,40 @@ function buildCliente(
 }
 
 function buildDetalle(
-  items: { descripcion: string; cantidad: number; importeUnitario: number }[],
+  items: {
+    descripcion: string;
+    cantidad: number;
+    importeUnitario: number;
+    alicuotaIva?: number | null;
+  }[],
   tipo: TipoFactura,
 ): TusFacturasDetalleItem[] {
-  const alicuota = alicuotaPara(tipo);
-  return items.map((it) => ({
-    cantidad: it.cantidad,
-    afecta_stock: 'N' as const,
-    producto: {
-      descripcion: it.descripcion,
-      codigo: 'NAUT-001',
-      lista_precios: 'standard',
+  const alicuotaDefault = alicuotaPara(tipo);
+  return items.map((it) => {
+    // Factura C nunca discrimina IVA (requisito AFIP), sea cual sea la
+    // alícuota real del servicio. Para A/B usamos la alícuota real del
+    // servicio si la conocemos; si no (ítem libre / ventanilla), el default.
+    const alicuota = tipo === 'factura_c' ? '0' : (it.alicuotaIva?.toFixed(2) ?? alicuotaDefault);
+    return {
+      cantidad: it.cantidad,
+      afecta_stock: 'N' as const,
+      producto: {
+        descripcion: it.descripcion,
+        codigo: 'NAUT-001',
+        lista_precios: 'standard',
+        leyenda: '',
+        unidad_bulto: 1,
+        unidad_medida: 7,
+        alicuota,
+        precio_unitario_sin_iva: precioSinIva(it.importeUnitario, alicuota),
+        actualiza_precio: 'N' as const,
+        rg5329: 'N' as const,
+      },
       leyenda: '',
-      unidad_bulto: 1,
-      unidad_medida: 7,
-      alicuota,
-      precio_unitario_sin_iva: precioSinIva(it.importeUnitario, alicuota),
-      actualiza_precio: 'N' as const,
-      rg5329: 'N' as const,
-    },
-    leyenda: '',
-    tratamiento_descuento: 'A',
-    bonificacion_porcentaje: 0,
-  }));
+      tratamiento_descuento: 'A',
+      bonificacion_porcentaje: 0,
+    };
+  });
 }
 
 function totalItems(items: { cantidad: number; importeUnitario: number }[]): number {
@@ -377,7 +391,12 @@ export async function crearFacturaCore(
   };
 
   // 2. Construir items desde movimientos (si llegaron) o desde items libres
-  let items: { descripcion: string; cantidad: number; importeUnitario: number }[] = [];
+  let items: {
+    descripcion: string;
+    cantidad: number;
+    importeUnitario: number;
+    alicuotaIva?: number | null;
+  }[] = [];
   let movimientoIds = data.movimientoIds ?? [];
 
   if (movimientoIds.length > 0) {
@@ -387,8 +406,13 @@ export async function crearFacturaCore(
         concepto: movimientosCuentaCorriente.concepto,
         debe: movimientosCuentaCorriente.debe,
         comprobanteInterno: movimientosCuentaCorriente.comprobanteInterno,
+        // Alícuota real del servicio del cargo (si lo tiene) para no asumir
+        // 21% en servicios Exentos o al 10,5%. Null si el cargo es libre
+        // (ventanilla / "Cargar consumo" sin servicio) — se usa el default.
+        servicioAlicuotaIva: servicios.alicuotaIva,
       })
       .from(movimientosCuentaCorriente)
+      .leftJoin(servicios, eq(servicios.id, movimientosCuentaCorriente.servicioId))
       .where(
         and(
           inArray(movimientosCuentaCorriente.id, movimientoIds),
@@ -407,6 +431,7 @@ export async function crearFacturaCore(
       descripcion: m.concepto ?? 'Servicio',
       cantidad: 1,
       importeUnitario: parseFloat(m.debe ?? '0'),
+      alicuotaIva: m.servicioAlicuotaIva != null ? Number(m.servicioAlicuotaIva) : null,
     }));
     movimientoIds = movs.map((m) => m.id);
   } else if (data.items && data.items.length > 0) {

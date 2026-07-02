@@ -137,6 +137,7 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
         id: serviciosTable.id,
         nombre: serviciosTable.nombre,
         precio: serviciosTable.precio,
+        alicuotaIva: serviciosTable.alicuotaIva,
       })
       .from(serviciosTable)
       .where(and(eq(serviciosTable.guarderiaId, gId), eq(serviciosTable.estado, 'activo'))),
@@ -265,6 +266,7 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
         eslora: espacios.eslora,
         unidadMetraje: serviciosTable.unidadMetraje,
         precio: serviciosTable.precio,
+        alicuotaIva: serviciosTable.alicuotaIva,
       })
       .from(espacios)
       .leftJoin(areas, eq(areas.id, espacios.areaId))
@@ -447,6 +449,7 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
     eslora: e.eslora ?? null,
     unidadMetraje: e.unidadMetraje ?? null,
     precio: e.precio ?? null,
+    alicuotaIva: e.alicuotaIva ?? null,
   }));
 
   return (

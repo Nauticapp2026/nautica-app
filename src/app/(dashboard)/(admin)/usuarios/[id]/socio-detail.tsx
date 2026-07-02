@@ -57,6 +57,7 @@ import {
   type GuardarTarjetaData,
 } from '@/app/actions/payway';
 import { formatArgentinaDate, formatArgentinaDateTime, formatNaiveDateTime } from '@/lib/dates';
+import { precioConIva } from '@/lib/iva';
 import { ASTILLEROS } from '../astilleros';
 import { EmptyState } from '@/components/shared/empty-state';
 import { Pagination } from '@/components/shared/pagination';
@@ -135,6 +136,7 @@ type Servicio = {
   id: string;
   nombre: string;
   precio: string | null;
+  alicuotaIva: string | null;
 };
 
 type Navegante = {
@@ -332,7 +334,10 @@ function AgregarServicioModal({
     const id = e.target.value;
     setServicioId(id);
     const s = servicios.find((s) => s.id === id);
-    if (s?.precio) setMonto(s.precio);
+    if (s?.precio) {
+      const conIva = precioConIva(parseFloat(s.precio), parseFloat(s.alicuotaIva ?? '0'));
+      setMonto(conIva.toFixed(2));
+    }
   }
 
   function handleClose() {
@@ -439,7 +444,9 @@ function AgregarServicioModal({
                   {servicios.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.nombre}
-                      {s.precio ? ` — ${fmt(parseFloat(s.precio))}` : ''}
+                      {s.precio
+                        ? ` — ${fmt(precioConIva(parseFloat(s.precio), parseFloat(s.alicuotaIva ?? '0')))}`
+                        : ''}
                     </option>
                   ))}
                 </select>
@@ -647,7 +654,9 @@ function EspacioEmbarcacionRow({
         {espaciosFiltrados.map((e) => (
           <option key={e.id} value={e.id}>
             {e.label}
-            {e.precio ? ` — $${Number(e.precio).toLocaleString('es-AR')}` : ''}
+            {e.precio
+              ? ` — $${precioConIva(Number(e.precio), Number(e.alicuotaIva ?? 0)).toLocaleString('es-AR')}`
+              : ''}
           </option>
         ))}
       </select>
@@ -1430,6 +1439,7 @@ export type EspacioOption = {
   eslora: string | null;
   unidadMetraje: 'metros' | 'pies' | null;
   precio: string | null;
+  alicuotaIva: string | null;
 };
 
 type PaywayTokenInfo = {

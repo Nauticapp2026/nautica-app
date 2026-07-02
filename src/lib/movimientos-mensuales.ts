@@ -31,6 +31,7 @@ import {
   servicios,
   socioServiciosCancelados,
 } from '@/lib/db/schema';
+import { precioConIva } from '@/lib/iva';
 
 function nextMonthStart(d: Date = new Date()): Date {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1, 0, 0, 0, 0));
@@ -56,6 +57,10 @@ function hace27Dias(now: Date): Date {
  * Para asignaciones a mitad de mes, cobramos solo los días que quedan
  * (incluye el día de asignación). Si la fecha es el día 1, devuelve el
  * mes completo. El cron mensual usa siempre el precio completo.
+ *
+ * `precio` tiene que venir YA con IVA sumado (lo que se le cobra al socio) —
+ * `servicios.precio` se guarda neto, así que el caller debe pasarlo por
+ * `precioConIva()` antes de llamar a esta función.
  */
 export function calcularProporcionalMes(
   precio: number,
@@ -188,6 +193,7 @@ export async function runMonthlyGeneration(now: Date = new Date()): Promise<{
       servicioId: espacios.servicioId,
       servicioNombre: servicios.nombre,
       servicioPrecio: servicios.precio,
+      servicioAlicuotaIva: servicios.alicuotaIva,
       diaFacturacion: guarderias.diaFacturacion,
       facturacionPrimerHabil: guarderias.facturacionPrimerHabil,
     })
@@ -249,7 +255,9 @@ export async function runMonthlyGeneration(now: Date = new Date()): Promise<{
 
     guarderiasProcesadas.add(r.guarderiaId);
 
-    const precio = r.servicioPrecio != null ? Number(r.servicioPrecio) : 0;
+    const precioNeto = r.servicioPrecio != null ? Number(r.servicioPrecio) : 0;
+    const alicuotaIva = r.servicioAlicuotaIva != null ? Number(r.servicioAlicuotaIva) : 0;
+    const precio = precioConIva(precioNeto, alicuotaIva);
     const res = await ensureMonthlyMovimiento({
       socioId: r.ocupanteId,
       espacioId: r.espacioId,

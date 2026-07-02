@@ -21,6 +21,7 @@ import {
 import { getActiveMarina } from '@/lib/auth/session';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { calcularProporcionalMes, ensureMonthlyMovimiento } from '@/lib/movimientos-mensuales';
+import { precioConIva } from '@/lib/iva';
 
 export type CreateAreaInput = { operarioIds?: string[] } & (
   | {
@@ -312,14 +313,20 @@ export async function updateEspacioAction(input: UpdateEspacioInput): Promise<{ 
   let servicioPrecioNum = 0;
   if (input.servicioId) {
     const [s] = await db
-      .select({ id: servicios.id, nombre: servicios.nombre, precio: servicios.precio })
+      .select({
+        id: servicios.id,
+        nombre: servicios.nombre,
+        precio: servicios.precio,
+        alicuotaIva: servicios.alicuotaIva,
+      })
       .from(servicios)
       .where(and(eq(servicios.id, input.servicioId), eq(servicios.guarderiaId, guarderiaId)))
       .limit(1);
     if (!s) return { error: 'La tarifa seleccionada no existe.' };
     tarifaPrecio = s.precio ?? null;
     servicioNombre = s.nombre;
-    servicioPrecioNum = s.precio != null ? Number(s.precio) : 0;
+    servicioPrecioNum =
+      s.precio != null ? precioConIva(Number(s.precio), Number(s.alicuotaIva ?? 0)) : 0;
   }
 
   // Día de cobro mensual: arranca cuando se asigna o se cambia el ocupante.
@@ -506,12 +513,19 @@ export async function assignEspacioToSocioAction(input: {
   if (espacio.servicioId) {
     try {
       const [servicio] = await db
-        .select({ nombre: servicios.nombre, precio: servicios.precio })
+        .select({
+          nombre: servicios.nombre,
+          precio: servicios.precio,
+          alicuotaIva: servicios.alicuotaIva,
+        })
         .from(servicios)
         .where(eq(servicios.id, espacio.servicioId))
         .limit(1);
       if (servicio) {
-        const servicioPrecioNum = servicio.precio != null ? Number(servicio.precio) : 0;
+        const servicioPrecioNum =
+          servicio.precio != null
+            ? precioConIva(Number(servicio.precio), Number(servicio.alicuotaIva ?? 0))
+            : 0;
         const { importe, diasRestantes, diasMes, esProporcional } =
           calcularProporcionalMes(servicioPrecioNum);
         const concepto = esProporcional
