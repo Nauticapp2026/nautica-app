@@ -52,7 +52,7 @@ export default async function UsuariosPage({
       and(
         eq(memberships.guarderiaId, gId),
         eq(memberships.rol, 'socio'),
-        inArray(memberships.status, ['active', 'suspended', 'inactivo']),
+        inArray(memberships.status, ['active', 'inactivo']),
       ),
     )
     .orderBy(desc(memberships.createdAt));
@@ -308,7 +308,7 @@ export default async function UsuariosPage({
       estadoSocio: (morososSet.has(s.profileId) && deuda > 0.001 ? 'moroso' : 'activo') as
         | 'moroso'
         | 'activo',
-      membershipStatus: s.membershipStatus as 'active' | 'suspended' | 'inactivo',
+      membershipStatus: s.membershipStatus as 'active' | 'inactivo',
       numeroSocio: s.numeroSocio,
       embarcacion: s.profileId ? (embByProfile[s.profileId] ?? null) : null,
       ubicacion: s.profileId ? (ubicacionByProfile[s.profileId] ?? null) : null,

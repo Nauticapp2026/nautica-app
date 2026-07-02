@@ -58,7 +58,7 @@ type Socio = {
   // Saldo neto: positivo = nos debe, negativo = saldo a favor.
   saldoNeto: string | null;
   estadoSocio: 'activo' | 'moroso' | null;
-  membershipStatus: 'active' | 'suspended' | 'inactivo';
+  membershipStatus: 'active' | 'inactivo';
   numeroSocio: number | null;
   embarcacion: string | null;
   ubicacion: string | null;
@@ -1145,11 +1145,7 @@ export function UsuariosClient({
                               <td className="px-4 py-3 text-gray-500">{s.embarcacion ?? '—'}</td>
                               <td className="px-4 py-3 text-gray-500">{s.ubicacion ?? '—'}</td>
                               <td className="px-4 py-3 text-center">
-                                {s.membershipStatus === 'suspended' ? (
-                                  <span className="inline-block rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-700">
-                                    Pausado
-                                  </span>
-                                ) : s.membershipStatus === 'inactivo' ? (
+                                {s.membershipStatus === 'inactivo' ? (
                                   <span className="inline-block rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-500">
                                     Inactivo
                                   </span>

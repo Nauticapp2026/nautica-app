@@ -104,9 +104,8 @@ La tabla muestra: número de socio (#), nombre, email, embarcación asignada, ub
 - La columna **Saldo** muestra el saldo de la cuenta del socio. Si **debe**, aparece el monto adeudado. Si tiene **saldo a favor** (pagó de más), aparece el monto en verde con la etiqueta **"a favor"**. Podés ordenar por esta columna haciendo clic en su encabezado (de mayor deuda a saldo a favor).
 - El **número de socio** (#NNN) aparece como un chip junto al nombre. Podés editarlo en el perfil del socio → pestaña **Generales**.
 - El **estado** de la membresía se indica con un badge de color:
-  - **Verde (Activo)** — socio con membresía vigente.
-  - **Ámbar (Pausado)** — membresía temporalmente suspendida.
-  - **Gris (Inactivo)** — socio inactivo.
+  - **Verde (Activo)** — socio con membresía vigente, puede acceder a la app.
+  - **Gris (Inactivo)** — socio sin acceso a la app (la app mobile lo bloquea al iniciar sesión).
   - **Rojo (Moroso)** — socio con deuda pendiente.
 - Si un socio tiene un **ícono de alerta amarillo** junto a su nombre, significa que tiene datos de perfil o documentación incompletos. Hacé clic en su nombre para ver qué falta completar.
 - Cada fila tiene un **botón chevron (▾)** a la derecha. Al hacerle clic se despliega un panel con:
@@ -153,7 +152,7 @@ Hacé clic en el nombre del socio en la tabla para abrir su perfil. El perfil ti
 Mostrá y editá los datos personales: nombre, apellido, email, teléfono, documento y dirección.
 
 - **Número de socio** — campo editable para asignar o modificar el número interno del socio. El número aparece como chip (#NNN) en la cabecera del perfil y en la lista de socios.
-- **Estado de membresía** — selector en la cabecera del perfil para cambiar el estado: **Activo**, **Pausado**, **Inactivo**. También está disponible la opción **Eliminar** para desvincular al socio del club.
+- **Estado de membresía** — selector en la cabecera del perfil para cambiar el estado: **Activo** o **Inactivo**. Un socio Inactivo no puede acceder a la app (bloqueo al iniciar sesión). Para desvincular al socio del club existe por separado el botón **Eliminar socio** (más abajo, en la pestaña Generales), que lo oculta del listado conservando su historial.
 
 #### Pestaña Datos Impositivos
 

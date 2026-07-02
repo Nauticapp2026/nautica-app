@@ -518,12 +518,12 @@ export async function updateNumeroSocioAction(
 
 const updateStatusSchema = z.object({
   socioId: z.string().uuid(),
-  status: z.enum(['active', 'suspended', 'inactivo']),
+  status: z.enum(['active', 'inactivo']),
 });
 
 export async function updateSocioStatusAction(
   socioId: string,
-  newStatus: 'active' | 'suspended' | 'inactivo',
+  newStatus: 'active' | 'inactivo',
 ): Promise<{ error?: string }> {
   const parsed = updateStatusSchema.safeParse({ socioId, status: newStatus });
   if (!parsed.success) return { error: 'Datos inválidos.' };

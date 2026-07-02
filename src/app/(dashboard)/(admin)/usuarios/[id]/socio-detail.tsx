@@ -233,15 +233,13 @@ const ESTADO_BADGE: Record<string, string> = {
   vencido: 'bg-red-100 text-red-700',
 };
 
-const MEMBERSHIP_STATUS_CLASSES: Record<'active' | 'suspended' | 'inactivo', string> = {
+const MEMBERSHIP_STATUS_CLASSES: Record<'active' | 'inactivo', string> = {
   active: 'border-green-200 bg-green-50 text-green-700',
-  suspended: 'border-amber-200 bg-amber-50 text-amber-700',
   inactivo: 'border-gray-200 bg-gray-100 text-gray-500',
 };
 
-const MEMBERSHIP_STATUS_LABEL: Record<'active' | 'suspended' | 'inactivo', string> = {
+const MEMBERSHIP_STATUS_LABEL: Record<'active' | 'inactivo', string> = {
   active: 'Activo',
-  suspended: 'Pausado',
   inactivo: 'Inactivo',
 };
 
@@ -1522,13 +1520,8 @@ export function SocioDetail({
   const [confirmEliminar, setConfirmEliminar] = useState(false);
   const [eliminarError, setEliminarError] = useState<string | null>(null);
   const [isEliminando, startEliminando] = useTransition();
-  const initialStatus =
-    socio.membershipStatus === 'suspended' || socio.membershipStatus === 'inactivo'
-      ? socio.membershipStatus
-      : 'active';
-  const [currentStatus, setCurrentStatus] = useState<'active' | 'suspended' | 'inactivo'>(
-    initialStatus,
-  );
+  const initialStatus = socio.membershipStatus === 'active' ? 'active' : 'inactivo';
+  const [currentStatus, setCurrentStatus] = useState<'active' | 'inactivo'>(initialStatus);
   const [isUpdatingStatus, startUpdatingStatus] = useTransition();
   const router = useRouter();
 
@@ -1596,7 +1589,7 @@ export function SocioDetail({
     });
   }
 
-  function handleStatusChange(newStatus: 'active' | 'suspended' | 'inactivo') {
+  function handleStatusChange(newStatus: 'active' | 'inactivo') {
     startUpdatingStatus(async () => {
       const res = await updateSocioStatusAction(socio.id, newStatus);
       if (res.error) {
@@ -1609,12 +1602,7 @@ export function SocioDetail({
   }
 
   function handleSelectChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    const val = e.target.value;
-    if (val === '_eliminar') {
-      setConfirmEliminar(true);
-      return;
-    }
-    handleStatusChange(val as 'active' | 'suspended' | 'inactivo');
+    handleStatusChange(e.target.value as 'active' | 'inactivo');
   }
 
   const nombre = [socio.nombre, socio.apellido].filter(Boolean).join(' ') || socio.email;
@@ -1706,9 +1694,7 @@ export function SocioDetail({
           className={`focus:border-ring focus:ring-ring/50 h-9 cursor-pointer rounded-full border px-3 text-xs font-semibold transition focus:ring-[3px] focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 ${MEMBERSHIP_STATUS_CLASSES[currentStatus]}`}
         >
           <option value="active">{MEMBERSHIP_STATUS_LABEL.active}</option>
-          <option value="suspended">{MEMBERSHIP_STATUS_LABEL.suspended}</option>
           <option value="inactivo">{MEMBERSHIP_STATUS_LABEL.inactivo}</option>
-          <option value="_eliminar">Eliminar...</option>
         </select>
       </div>
 
