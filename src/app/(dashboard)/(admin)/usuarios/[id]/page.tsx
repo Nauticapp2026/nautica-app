@@ -325,6 +325,7 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
     const rows = await db
       .selectDistinct({
         movimientoId: facturacionItemMovimientos.movimientoId,
+        facturacionId: facturacion.id,
         codigo: facturacion.codigo,
         archivo: facturacion.archivo,
         tipoFactura: facturacion.tipoFactura,
@@ -340,7 +341,10 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
     for (const r of rows) {
       facturasPorMovimiento.set(r.movimientoId, {
         codigo: r.codigo,
-        archivo: r.archivo,
+        // Comprobantes internos (CM-/CL-) no tienen PDF externo: se ven/imprimen
+        // en su página dedicada, igual que los recibos con vínculo directo.
+        archivo:
+          r.archivo ?? (r.tipoFactura === 'recibo' ? `/ventas/recibo/${r.facturacionId}` : null),
         tipo: r.tipoFactura,
         emision: r.emision,
       });

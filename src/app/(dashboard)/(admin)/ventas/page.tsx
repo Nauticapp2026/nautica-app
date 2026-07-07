@@ -3,6 +3,7 @@ import { and, count, desc, eq, gte, lte, sql, sum } from 'drizzle-orm';
 import { getActiveMarina } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import {
+  embarcaciones,
   facturacion,
   guarderias,
   memberships,
@@ -34,6 +35,7 @@ export default async function VentasPage() {
     cobrosLista,
     movsPendientesList,
     movsPendientesInternoList,
+    embarcacionesList,
   ] = await Promise.all([
     db
       .select({ pendientesCount: count() })
@@ -102,6 +104,7 @@ export default async function VentasPage() {
         condicionIvaPersonal: profiles.condicionIvaPersonal,
         // true = factura con datos personales (Generales); false = Datos Impositivos.
         facturaFiscal: memberships.facturaFiscal,
+        numeroSocio: memberships.numeroSocio,
         pendientes: sql<number>`count(${movimientosCuentaCorriente.id})::int`,
         pendienteTotal: sql<string>`coalesce(sum(${movimientosCuentaCorriente.debe}), '0')::text`,
       })
@@ -123,7 +126,7 @@ export default async function VentasPage() {
           eq(memberships.status, 'active'),
         ),
       )
-      .groupBy(profiles.id, memberships.facturaFiscal)
+      .groupBy(profiles.id, memberships.facturaFiscal, memberships.numeroSocio)
       .orderBy(profiles.apellido, profiles.nombre),
 
     db
@@ -211,6 +214,13 @@ export default async function VentasPage() {
         ),
       )
       .orderBy(movimientosCuentaCorriente.fecha),
+
+    // Embarcaciones por socio, para buscar por embarcación en Facturación
+    // manual / Comprobante interno manual.
+    db
+      .select({ profileId: embarcaciones.profileId, nombre: embarcaciones.nombre })
+      .from(embarcaciones)
+      .where(eq(embarcaciones.guarderiaId, gId)),
   ]);
 
   const facturas = lista.map((f) => ({
@@ -253,6 +263,13 @@ export default async function VentasPage() {
     });
   }
 
+  const embsBySocio = new Map<string, string[]>();
+  for (const e of embarcacionesList) {
+    if (!e.profileId) continue;
+    if (!embsBySocio.has(e.profileId)) embsBySocio.set(e.profileId, []);
+    if (e.nombre) embsBySocio.get(e.profileId)!.push(e.nombre);
+  }
+
   const socios = sociosList.map((s) => ({
     id: s.profileId,
     nombre: [s.nombre, s.apellido].filter(Boolean).join(' ') || s.razonSocial || s.email,
@@ -261,6 +278,8 @@ export default async function VentasPage() {
     condicionIva: s.condicionIva ?? null,
     condicionIvaPersonal: s.condicionIvaPersonal ?? null,
     facturaFiscal: s.facturaFiscal,
+    numeroSocio: s.numeroSocio,
+    embarcaciones: embsBySocio.get(s.profileId) ?? [],
     pendientes: s.pendientes,
     pendienteTotal: s.pendienteTotal,
     movimientos: movsBySocio.get(s.profileId) ?? [],

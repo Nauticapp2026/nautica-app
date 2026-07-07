@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useTransition } from 'react';
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   AlertCircle,
@@ -92,6 +92,8 @@ type Socio = {
   condicionIvaPersonal: string | null;
   // true = factura con datos personales (Generales); false = Datos Impositivos.
   facturaFiscal: boolean;
+  numeroSocio: number | null;
+  embarcaciones: string[];
   pendientes: number;
   pendienteTotal: string;
   movimientos: LoteMovimiento[];
@@ -234,6 +236,96 @@ function KpiCard({ value, label }: { value: string; label: string }) {
   );
 }
 
+// ─── Combobox: buscar socio ─────────────────────────────────────────────────
+
+function SocioCombobox({
+  socios,
+  value,
+  onChange,
+}: {
+  socios: Socio[];
+  value: string;
+  onChange: (socioId: string) => void;
+}) {
+  const [query, setQuery] = useState('');
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const seleccionado = socios.find((s) => s.id === value);
+
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
+  }, []);
+
+  const filtrados = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return socios;
+    return socios.filter((s) => {
+      if (s.nombre.toLowerCase().includes(q)) return true;
+      if (s.numeroSocio != null && String(s.numeroSocio).includes(q)) return true;
+      if (s.embarcaciones.some((e) => e.toLowerCase().includes(q))) return true;
+      return false;
+    });
+  }, [socios, query]);
+
+  function select(socioId: string) {
+    onChange(socioId);
+    setQuery('');
+    setOpen(false);
+  }
+
+  return (
+    <div className="relative" ref={containerRef}>
+      <input
+        className={inputCls}
+        placeholder="Buscar por nombre, Nº de socio o embarcación..."
+        value={open ? query : (seleccionado?.nombre ?? '')}
+        onFocus={() => {
+          setOpen(true);
+          setQuery('');
+        }}
+        onChange={(e) => setQuery(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') setOpen(false);
+        }}
+      />
+      {open && (
+        <div className="absolute z-20 mt-1 max-h-60 w-full overflow-y-auto rounded-[10px] border border-gray-200 bg-white shadow-lg">
+          {filtrados.length === 0 ? (
+            <p className="px-3 py-2 text-sm text-gray-400">Sin resultados</p>
+          ) : (
+            filtrados.map((s) => (
+              <button
+                type="button"
+                key={s.id}
+                onClick={() => select(s.id)}
+                className="flex w-full flex-col items-start px-3 py-2 text-left text-sm hover:bg-gray-50"
+              >
+                <span className="font-medium" style={{ color: '#101828' }}>
+                  {s.nombre}
+                </span>
+                {(s.numeroSocio != null || s.embarcaciones.length > 0) && (
+                  <span className="text-xs text-gray-400">
+                    {s.numeroSocio != null ? `Nº ${s.numeroSocio}` : ''}
+                    {s.numeroSocio != null && s.embarcaciones.length > 0 ? ' · ' : ''}
+                    {s.embarcaciones.join(', ')}
+                  </span>
+                )}
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Modal: Nuevo comprobante ───────────────────────────────────────────────
 
 function NuevaFacturaModal({
@@ -267,8 +359,7 @@ function NuevaFacturaModal({
   const [success, setSuccess] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  function handleSocioChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    const socioId = e.target.value;
+  function handleSocioChange(socioId: string) {
     const socio = socios.find((s) => s.id === socioId);
     const tipoFactura = derivarTipoFactura(
       guarderiaCondicionIva,
@@ -406,16 +497,9 @@ function NuevaFacturaModal({
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
-                Cliente*
+                Socio*
               </label>
-              <select className={inputCls} value={form.socioId} onChange={handleSocioChange}>
-                <option value="">Seleccioná un socio...</option>
-                {socios.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.nombre}
-                  </option>
-                ))}
-              </select>
+              <SocioCombobox socios={socios} value={form.socioId} onChange={handleSocioChange} />
             </div>
             <div>
               <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
@@ -667,8 +751,7 @@ function ComprobanteInternoManualModal({
   const [success, setSuccess] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  function handleSocioChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    const id = e.target.value;
+  function handleSocioChange(id: string) {
     setSocioId(id);
     setMovimientos([]);
     setSelectedMovs(new Set());
@@ -773,16 +856,9 @@ function ComprobanteInternoManualModal({
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
-                Cliente*
+                Socio*
               </label>
-              <select className={inputCls} value={socioId} onChange={handleSocioChange}>
-                <option value="">Seleccioná un socio...</option>
-                {socios.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.nombre}
-                  </option>
-                ))}
-              </select>
+              <SocioCombobox socios={socios} value={socioId} onChange={handleSocioChange} />
             </div>
             <div>
               <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
