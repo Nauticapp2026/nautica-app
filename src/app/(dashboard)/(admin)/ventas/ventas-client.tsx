@@ -532,7 +532,7 @@ function NuevaFacturaModal({
               <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
                 <div>
                   <p className="text-sm font-semibold" style={{ color: '#101828' }}>
-                    Conceptos a facturar
+                    Servicios a facturar
                   </p>
                   <p className="text-xs text-gray-400">
                     {loadingMovs
