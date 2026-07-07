@@ -100,7 +100,7 @@ export function CobranzaTabla({ cobranzas }: { cobranzas: CobranzaRow[] }) {
               <td className="px-4 py-3">
                 <div className="flex items-center justify-end gap-2">
                   <a
-                    href={`/facturacion/recibo/${c.id}`}
+                    href={`/ventas/recibo/${c.id}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1 rounded-[8px] border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50"

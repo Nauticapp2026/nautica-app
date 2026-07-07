@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 test.beforeEach(async ({ page }) => {
-  await page.goto('/facturacion');
+  await page.goto('/ventas');
 });
 
 test('carga la página con las métricas', async ({ page }) => {

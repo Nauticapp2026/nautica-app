@@ -15,7 +15,7 @@ Guía paso a paso para gestionar tu club o guardería náutica desde el panel we
 7. [Espacios](#7-espacios)
 8. [Publicaciones](#8-publicaciones)
 9. [Comunicaciones](#9-comunicaciones)
-10. [Comprobantes](#10-comprobantes)
+10. [Ventas](#10-ventas)
 11. [Tarifario](#11-tarifario)
 12. [Mi perfil](#12-mi-perfil)
 13. [Débito automático (Payway)](#13-débito-automático-payway)
@@ -43,7 +43,7 @@ El menú lateral izquierdo es la navegación principal. Desde ahí accedés a to
 - **Espacios** — amarras, camas y ubicaciones
 - **Publicaciones** — avisos de amarras y camas en NautiShop
 - **Comunicaciones** — anuncios y novedades para socios
-- **Comprobantes** — emisión y seguimiento de facturas
+- **Ventas** — emisión y seguimiento de facturas
 - **Tarifario** — precios y servicios
 - **Mi perfil** — datos del club, equipo, plan y datos impositivos
 
@@ -189,7 +189,7 @@ Lista los servicios que el socio tiene contratados o consume. Los servicios se a
 Desde esta pestaña cargás nuevos consumos con el botón **Cargar Servicio** (antes se llamaba "Cargar consumo" y estaba en la Cuenta Corriente). Se alimenta del **Tarifario**:
 
 1. Hacé clic en **Cargar Servicio**.
-2. Elegí el servicio del tarifario, el concepto, el monto y la fecha.
+2. Elegí el servicio del tarifario (solo aparecen tarifas **Activas**), el concepto, el monto (se precarga con el precio c/IVA de la tarifa; podés editarlo) y la fecha.
 3. Elegí el **tipo de comprobante**:
    - **Comprobante fiscal** — registra el cargo como facturable. **No se emite a ARCA en el momento**: queda pendiente y se factura después, manual o automáticamente, como cualquier otro cargo.
    - **Comprobante interno** — genera un comprobante **no fiscal** imprimible (número RB-NNNNNN), pensado para cobros que no pasan por ARCA. El cargo **nunca se factura**: no aparece ni en la facturación automática ni en la manual.
@@ -268,7 +268,7 @@ Lista los invitados autorizados por el socio (los mismos que aparecen al despleg
 
 #### Pestaña Salidas
 
-Historial de salidas y entradas de la embarcación. Las salidas que el socio canceló desde la app mobile aparecen con el badge **Cancelada** en rojo.
+Historial de salidas y entradas de la embarcación. Las salidas que el socio finalizó desde la app mobile antes de zarpar aparecen con el badge **Finalizada** en rojo.
 
 #### Pestaña Documentación
 
@@ -591,7 +591,7 @@ Hacé clic en el **ícono de lápiz** de la comunicación para abrirla y editarl
 
 ---
 
-## 10. Comprobantes
+## 10. Ventas
 
 Desde esta sección emitís y gestionás las facturas de tu club.
 
@@ -682,13 +682,13 @@ Se generan de dos formas:
 - Al **Registrar pago** en la Cuenta Corriente del socio: al confirmar, el sistema pregunta si querés emitir un recibo interno. Hacé clic en **Emitir recibo** para generarlo.
 - Al **Cargar Servicio** (pestaña Servicios Contratados) eligiendo **Comprobante interno**: genera el comprobante interno del cargo, que además queda **excluido de toda facturación**.
 
-Todos aparecen en **Comprobantes → tab Recibos internos** y, en la cuenta corriente del socio, con la columna **Tipo de comprobante** = "Comprobante interno" y su número RB-. Quedan disponibles para imprimir o descargar. No tienen CAE ni validez fiscal ante ARCA.
+Todos aparecen en **Ventas → tab Recibos internos** y, en la cuenta corriente del socio, con la columna **Tipo de comprobante** = "Comprobante interno" y su número RB-. Quedan disponibles para imprimir o descargar. No tienen CAE ni validez fiscal ante ARCA.
 
 ### Emitir una nota de crédito
 
 Si necesitás anular parcial o totalmente una factura ya emitida, podés emitir una nota de crédito:
 
-1. Andá a **Comprobantes** en el menú lateral → tab **Comprobantes ARCA**.
+1. Andá a **Ventas** en el menú lateral → tab **Comprobantes ARCA**.
 2. Encontrá la factura original en la tabla y hacé clic en el ícono de flecha curva (↩) al final de la fila.
 3. Seleccioná el motivo:
    - **Anulación total** — anula la factura completa; el importe se toma automáticamente.
@@ -742,17 +742,17 @@ Las tarifas están agrupadas por categoría. Podés filtrar usando los botones: 
 
 Cada tarifa muestra su concepto, un badge **Fijo** o **Variable** (fijo = precio único; variable = se cobra según el metraje de la embarcación), el período de vigencia, el precio y el estado. En la columna de precio se muestran dos valores:
 
-- **Precio c/IVA** — el precio de lista (incluye IVA).
-- **Precio s/IVA** — calculado automáticamente según la alícuota configurada (precio ÷ (1 + alícuota)). La línea "s/IVA" solo aparece cuando la alícuota es mayor a 0; si la tarifa es **Exento / No gravado** (0 %), no se muestra.
+- **Precio c/IVA** — el total que se le cobra al socio, calculado automáticamente sumando la alícuota al precio de lista (precio × (1 + alícuota)).
+- **Precio s/IVA** — el precio de lista que cargaste (sin impuesto). La línea "s/IVA" solo aparece cuando la alícuota es mayor a 0; si la tarifa es **Exento / No gravado** (0 %), no se muestra.
 
-**Estados de una tarifa:** **Activa**; **Vencida** (en ámbar, si pasó su fecha de vencimiento); o **Pausada**. Con el botón **Pausar** dejás de aplicar una tarifa sin borrarla (no se puede pausar una que tenga socios con ese servicio contratado), y con **Reactivar** la volvés a habilitar.
+**Estados de una tarifa:** **Activa**; **Vencida** (en ámbar, si pasó su fecha de vencimiento); **Pausada**; o **Inactiva**. Con el botón **Pausar** dejás de aplicar una tarifa sin borrarla (no se puede pausar una que tenga socios con ese servicio contratado), y con **Reactivar** la volvés a habilitar. Cambiar el **Estado** a "Inactivo" desde Editar tiene la misma restricción: no se puede si hay socios con el servicio contratado. Una tarifa Pausada o Inactiva deja de generar cargos nuevos (el cron mensual la salta, no se puede cargar manualmente por "Cargar Servicio", y no aparece en los selectores para asignarla a un espacio o socio nuevo).
 
 ### Crear una tarifa
 
 1. Hacé clic en **Nueva tarifa**.
 2. Seleccioná la **Categoría**: Espacio de guarda, Cuota social, Membresía, Expensas ordinarias, Expensas extraordinarias o Servicio extra.
 3. Indicá si el servicio es **Fijo** (precio único) o **Variable** (se cobra según el metraje de la embarcación).
-4. Ingresá el **Precio** y la **Alícuota de IVA**: **Exento / No gravado**, **10,5 %** o **21 %**.
+4. Ingresá el **Precio (sin IVA)** y la **Alícuota de IVA**: **Exento / No gravado**, **10,5 %** o **21 %**. El sistema suma el IVA automáticamente para calcular lo que se le cobra al socio.
 5. Configurá el **Plazo de pago** (días) y la **Vigencia**:
    - El **Plazo de pago** (Contado, 5, 10, 15, 20 o 30 días) define la **fecha de vencimiento** de los cargos de esa tarifa en la Cuenta Corriente del socio: vencimiento = fecha de la factura + el plazo elegido.
    - **Vigencia desde** — fecha a partir de la cual la tarifa está activa.
@@ -762,7 +762,7 @@ Cada tarifa muestra su concepto, un badge **Fijo** o **Variable** (fijo = precio
 
 ### Editar una tarifa
 
-Hacé clic en el ícono de edición (lápiz) en la fila de la tarifa. Podés cambiar el precio, el concepto, la alícuota de IVA, las fechas de vigencia o desactivarla cambiando el **Estado** a "Inactivo".
+Hacé clic en el ícono de edición (lápiz) en la fila de la tarifa. Podés cambiar el precio (sin IVA), el concepto, la alícuota de IVA, las fechas de vigencia o desactivarla cambiando el **Estado** a "Inactivo" (bloqueado si hay socios con el servicio contratado — cancelalo en esos socios primero).
 
 ### Ajuste masivo de precios
 
@@ -940,7 +940,7 @@ Cuando el cobro se aprueba, se registra un pago **Pago — Débito automático**
 
 ### Ver el historial de cobros
 
-1. Andá a **Comprobantes** en el menú lateral.
+1. Andá a **Ventas** en el menú lateral.
 2. Hacé clic en la pestaña **Débito automático**.
 
 Vas a ver:

@@ -169,8 +169,8 @@ export default async function ReciboPage({ params }: { params: Promise<{ id: str
       <div className="min-h-screen bg-gray-50 p-6 print:bg-white print:p-0">
         {/* Botones de acción — ocultos en impresión */}
         <div className="no-print mb-6 flex items-center justify-between">
-          <a href="/facturacion" className="text-sm text-gray-500 hover:text-gray-700">
-            ← Volver a Comprobantes
+          <a href="/ventas" className="text-sm text-gray-500 hover:text-gray-700">
+            ← Volver a Ventas
           </a>
           <div className="flex items-center gap-2">
             <EnviarReciboMailButton reciboId={row.id} socioEmail={row.socioEmail} />

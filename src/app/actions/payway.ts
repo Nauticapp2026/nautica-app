@@ -345,7 +345,7 @@ export async function reintentarCobroPaywayAction(cobroId: string): Promise<{ er
     return { error: `Cobro rechazado: ${msg}` };
   }
 
-  revalidatePath('/facturacion');
+  revalidatePath('/ventas');
   return {};
 }
 

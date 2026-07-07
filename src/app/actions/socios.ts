@@ -647,7 +647,7 @@ export async function toggleFacturaFiscalAction(socioId: string, value: boolean)
         ),
       );
     revalidatePath(`/usuarios/${socioId}`);
-    revalidatePath('/facturacion');
+    revalidatePath('/ventas');
     return {};
   } catch {
     return { error: 'Error al actualizar.' };

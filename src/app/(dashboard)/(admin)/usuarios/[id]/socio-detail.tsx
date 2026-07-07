@@ -417,7 +417,7 @@ function AgregarServicioModal({
             </div>
             {result.comprobante === 'interno' && result.reciboId && (
               <Link
-                href={`/facturacion/recibo/${result.reciboId}`}
+                href={`/ventas/recibo/${result.reciboId}`}
                 target="_blank"
                 className="flex w-full items-center justify-center gap-2 rounded-[10px] border border-gray-200 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
               >

@@ -366,7 +366,7 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
       facturasPorMovimiento.set(r.movimientoId, {
         codigo: r.codigo,
         // Sin PDF: el recibo interno se ve/imprime en su página dedicada.
-        archivo: r.archivo ?? `/facturacion/recibo/${r.id}`,
+        archivo: r.archivo ?? `/ventas/recibo/${r.id}`,
         tipo: r.tipoFactura,
         emision: r.emision,
       });

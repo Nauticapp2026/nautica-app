@@ -538,7 +538,7 @@ export async function crearFacturaCore(
         .where(inArray(movimientosCuentaCorriente.id, movimientoIds));
     }
 
-    revalidatePath('/facturacion');
+    revalidatePath('/ventas');
     revalidatePath(`/usuarios/${data.socioId}`);
 
     return {
@@ -652,7 +652,7 @@ export async function createBatchInvoicesAction(
     }
   }
 
-  revalidatePath('/facturacion');
+  revalidatePath('/ventas');
   return { result };
 }
 
@@ -756,7 +756,7 @@ export async function markInvoicePaidAction(
       }
     }
 
-    revalidatePath('/facturacion');
+    revalidatePath('/ventas');
     if (updated.socioId) revalidatePath(`/usuarios/${updated.socioId}`);
     return {};
   } catch {
@@ -813,7 +813,7 @@ export async function crearReciboInternoAction(
       codigo,
     });
 
-    revalidatePath('/facturacion');
+    revalidatePath('/ventas');
     revalidatePath(`/usuarios/${data.socioId}`);
     return { id };
   } catch {
@@ -902,7 +902,7 @@ export async function cargarServicioAction(data: CargarServicioData): Promise<{
       movimientoId,
       codigo,
     });
-    revalidatePath('/facturacion');
+    revalidatePath('/ventas');
     revalidatePath(`/usuarios/${data.socioId}`);
     return { comprobante: 'interno', reciboId: id, comprobanteNro: codigo };
   }
@@ -910,7 +910,7 @@ export async function cargarServicioAction(data: CargarServicioData): Promise<{
   // 2b. Comprobante fiscal → NO se emite a AFIP ahora. El cargo queda como un
   // consumo facturable normal (comprobante_interno = false), y la factura AFIP se
   // emite después por la facturación manual o automática (como cualquier otro cargo).
-  revalidatePath('/facturacion');
+  revalidatePath('/ventas');
   revalidatePath(`/usuarios/${data.socioId}`);
   return { comprobante: 'fiscal' };
 }
@@ -1264,7 +1264,7 @@ export async function emitirNotaCreditoAction(data: EmitirNcData): Promise<Emiti
       });
     }
 
-    revalidatePath('/facturacion');
+    revalidatePath('/ventas');
     if (original.socioId) revalidatePath(`/usuarios/${original.socioId}`);
 
     return {

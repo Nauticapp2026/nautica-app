@@ -415,7 +415,7 @@ export async function registrarCobranzaAction(data: RegistrarCobranzaData): Prom
     });
 
     revalidatePath(`/usuarios/${data.socioId}`);
-    revalidatePath('/facturacion');
+    revalidatePath('/ventas');
     revalidatePath('/cobranzas');
     return { movimientoId, importe };
   } catch {
@@ -548,7 +548,7 @@ export async function anularCobranzaAction(reciboId: string): Promise<{ error?: 
     });
 
     if (recibo.socioId) revalidatePath(`/usuarios/${recibo.socioId}`);
-    revalidatePath('/facturacion');
+    revalidatePath('/ventas');
     revalidatePath('/cobranzas');
     return {};
   } catch {

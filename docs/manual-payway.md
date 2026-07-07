@@ -69,7 +69,7 @@ Los movimientos cobrados quedan marcados como **Pagados**.
 
 ## Si un cobro falla
 
-1. Andá a **Comprobantes** → **Débito automático**.
+1. Andá a **Ventas** → **Débito automático**.
 2. Buscá el cobro con estado **Rechazado** o **Error**.
 3. Hacé clic en **Reintentar**.
 

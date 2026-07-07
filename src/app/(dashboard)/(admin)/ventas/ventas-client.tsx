@@ -1891,7 +1891,7 @@ function VentanillaModal({
 
 // ─── Componente principal ──────────────────────────────────────────────────
 
-export function FacturacionClient({
+export function VentasClient({
   facturas,
   socios,
   kpis,
@@ -2139,7 +2139,7 @@ export function FacturacionClient({
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="page-title">Comprobantes</h1>
+          <h1 className="page-title">Ventas</h1>
           <p className="page-subtitle mt-1">Gestión de comprobantes y cobros</p>
         </div>
         <div className="flex shrink-0 flex-wrap gap-2">
@@ -2571,7 +2571,7 @@ export function FacturacionClient({
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-end">
                             <a
-                              href={`/facturacion/recibo/${f.id}`}
+                              href={`/ventas/recibo/${f.id}`}
                               target="_blank"
                               rel="noopener noreferrer"
                               title="Ver / Imprimir recibo"
