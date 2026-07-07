@@ -119,6 +119,7 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
         haber: movimientosCuentaCorriente.haber,
         servicioNombre: serviciosTable.nombre,
         servicioId: movimientosCuentaCorriente.servicioId,
+        servicioTipo: serviciosTable.tipo,
         servicioTipoCobro: serviciosTable.tipoCobro,
         plazoPagoDias: serviciosTable.plazoPagoDias,
         comprobanteInterno: movimientosCuentaCorriente.comprobanteInterno,

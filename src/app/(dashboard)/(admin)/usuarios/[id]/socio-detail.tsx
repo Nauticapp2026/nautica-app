@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useState, useTransition, useRef, useEffect } from 'react';
+import { useState, useTransition, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Script from 'next/script';
@@ -11,7 +11,6 @@ import {
   User,
   Anchor,
   CheckCircle2,
-  ChevronDown,
   CreditCard,
   DollarSign,
   Users,
@@ -121,6 +120,7 @@ type Movimiento = {
   haber: string | null;
   servicioNombre: string | null;
   servicioId: string | null;
+  servicioTipo: string | null;
   servicioTipoCobro: 'fijo' | 'variable' | null;
   plazoPagoDias: number | null;
   facturaCodigo: string | null;
@@ -297,6 +297,16 @@ const TIPO_COMPROBANTE_LABEL: Record<string, string> = {
   nota_credito_a: 'Nota de crédito A',
   nota_credito_b: 'Nota de crédito B',
   nota_credito_c: 'Nota de crédito C',
+};
+
+// Categorías del Tarifario (tipoServicioEnum) — mismos labels que tarifario-client.tsx.
+const CATEGORIA_SERVICIO_LABEL: Record<string, string> = {
+  espacio_guarda: 'Espacio de guarda',
+  cuota_social: 'Cuota social',
+  membresia: 'Membresía',
+  expensas_ordinarias: 'Expensas ordinarias',
+  expensas_extraordinarias: 'Expensas extraordinarias',
+  servicio_extra: 'Servicio extra',
 };
 
 // ─── Agregar Servicio Modal ───────────────────────────────────────────────────
@@ -2860,23 +2870,17 @@ function ServiciosContratadosTab({
   const router = useRouter();
   const [cancelandoId, setCancelandoId] = useState<string | null>(null);
   const [editingMov, setEditingMov] = useState<Movimiento | null>(null);
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [montoOverride, setMontoOverride] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  function toggleExpand(id: string) {
-    setExpandedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
-  // Agrupa movimientos por servicio.
+  // Resumen por servicio (no se muestra agrupado — se usa para el modal de
+  // cancelación, que necesita el último monto/fecha cobrados a este socio
+  // por ese servicio, y para los badges Fijo/Variable + Vigente/Cancelado
+  // de cada fila individual).
   type Resumen = {
     servicioId: string;
     servicioNombre: string;
+    categoria: string | null;
     tipoCobro: 'fijo' | 'variable' | null;
     cantidad: number;
     total: number;
@@ -2892,6 +2896,7 @@ function ServiciosContratadosTab({
       prev.cantidad += 1;
       prev.total += importe;
       if (m.servicioTipoCobro && !prev.tipoCobro) prev.tipoCobro = m.servicioTipoCobro;
+      if (m.servicioTipo && !prev.categoria) prev.categoria = m.servicioTipo;
       if (m.fecha && (!prev.ultimaFecha || m.fecha > prev.ultimaFecha)) {
         prev.ultimaFecha = m.fecha;
         prev.ultimoMonto = importe;
@@ -2900,6 +2905,7 @@ function ServiciosContratadosTab({
       mapaServicios.set(m.servicioId, {
         servicioId: m.servicioId,
         servicioNombre: m.servicioNombre,
+        categoria: m.servicioTipo,
         tipoCobro: m.servicioTipoCobro,
         cantidad: 1,
         total: importe,
@@ -2911,6 +2917,15 @@ function ServiciosContratadosTab({
   const filas = [...mapaServicios.values()].sort((a, b) =>
     a.servicioNombre.localeCompare(b.servicioNombre),
   );
+
+  // Cada Servicio Contratado es un registro independiente — sin agrupar.
+  const filasIndividuales = movimientos
+    .filter((m) => m.servicioId && m.servicioNombre)
+    .sort((a, b) => {
+      if (!a.fecha) return 1;
+      if (!b.fecha) return -1;
+      return b.fecha.localeCompare(a.fecha);
+    });
 
   const cancelacionMap = new Map(cancelaciones.map((c) => [c.servicioId, c.fechaCancelacion]));
 
@@ -3032,111 +3047,77 @@ function ServiciosContratadosTab({
             <thead>
               <tr className="border-b border-gray-100 text-left text-xs font-semibold text-gray-400 uppercase">
                 <th className="pr-4 pb-2">Servicio</th>
-                <th className="pr-4 pb-2 text-center">Cargos</th>
-                <th className="pr-4 pb-2">Último cargo</th>
+                <th className="pr-4 pb-2">Categoría</th>
+                <th className="pr-4 pb-2">Fecha</th>
                 <th className="pr-4 pb-2 text-right">Total</th>
                 <th className="pb-2" />
               </tr>
             </thead>
             <tbody>
-              {filas.map((s) => {
-                const cancelado = cancelacionMap.get(s.servicioId);
-                const isExpanded = expandedIds.has(s.servicioId);
-                const movsForServicio = movimientos
-                  .filter((m) => m.servicioId === s.servicioId)
-                  .sort((a, b) => {
-                    if (!a.fecha) return 1;
-                    if (!b.fecha) return -1;
-                    return b.fecha.localeCompare(a.fecha);
-                  });
+              {filasIndividuales.map((m) => {
+                const resumen = m.servicioId ? mapaServicios.get(m.servicioId) : undefined;
+                const cancelado = m.servicioId ? cancelacionMap.get(m.servicioId) : undefined;
                 return (
-                  <Fragment key={s.servicioId}>
-                    <tr className="border-b border-gray-50 last:border-0">
-                      <td className="py-3 pr-4">
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            onClick={() => toggleExpand(s.servicioId)}
-                            className="rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-                            title={isExpanded ? 'Ocultar cargos' : 'Ver cargos'}
+                  <tr key={m.id} className="border-b border-gray-50 last:border-0">
+                    <td className="py-3 pr-4">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="font-medium" style={{ color: '#101828' }}>
+                          {m.servicioNombre}
+                        </span>
+                        {resumen?.tipoCobro && (
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                              resumen.tipoCobro === 'fijo'
+                                ? 'bg-[#EFF8F7] text-[#175861]'
+                                : 'bg-[#FFF4E6] text-[#B45309]'
+                            }`}
                           >
-                            <ChevronDown
-                              className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                            />
-                          </button>
-                          <span className="font-medium" style={{ color: '#101828' }}>
-                            {s.servicioNombre}
+                            {resumen.tipoCobro === 'fijo' ? 'Fijo' : 'Variable'}
                           </span>
-                          {s.tipoCobro && (
-                            <span
-                              className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                                s.tipoCobro === 'fijo'
-                                  ? 'bg-[#EFF8F7] text-[#175861]'
-                                  : 'bg-[#FFF4E6] text-[#B45309]'
-                              }`}
-                            >
-                              {s.tipoCobro === 'fijo' ? 'Fijo' : 'Variable'}
-                            </span>
-                          )}
-                          {cancelado ? (
-                            <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-600">
-                              Cancelado {fmtDate(cancelado)}
-                            </span>
-                          ) : (
-                            <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
-                              Vigente
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="py-3 pr-4 text-center text-gray-600">{s.cantidad}</td>
-                      <td className="py-3 pr-4 text-gray-600">
-                        {s.ultimaFecha ? fmtDate(s.ultimaFecha) : '—'}
-                      </td>
-                      <td className="py-3 pr-4 text-right font-medium" style={{ color: '#101828' }}>
-                        {fmt(s.total)}
-                      </td>
-                      <td className="py-3 text-right">
-                        {!cancelado && (
+                        )}
+                        {cancelado ? (
+                          <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-600">
+                            Cancelado {fmtDate(cancelado)}
+                          </span>
+                        ) : (
+                          <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
+                            Vigente
+                          </span>
+                        )}
+                      </div>
+                      {m.concepto && <p className="mt-0.5 text-xs text-gray-400">{m.concepto}</p>}
+                    </td>
+                    <td className="py-3 pr-4 text-gray-600">
+                      {m.servicioTipo
+                        ? (CATEGORIA_SERVICIO_LABEL[m.servicioTipo] ?? m.servicioTipo)
+                        : '—'}
+                    </td>
+                    <td className="py-3 pr-4 text-gray-600">{m.fecha ? fmtDate(m.fecha) : '—'}</td>
+                    <td className="py-3 pr-4 text-right font-medium" style={{ color: '#101828' }}>
+                      {fmt(parseFloat(m.debe ?? '0'))}
+                    </td>
+                    <td className="py-3 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        {!cancelado && m.servicioId && (
                           <button
-                            onClick={() => abrirCancelacion(s.servicioId)}
+                            onClick={() => abrirCancelacion(m.servicioId!)}
                             className="rounded-[8px] border border-red-200 px-3 py-1 text-xs font-medium text-red-600 transition hover:bg-red-50"
                           >
                             Cancelar
                           </button>
                         )}
-                      </td>
-                    </tr>
-                    {isExpanded &&
-                      movsForServicio.map((m) => (
-                        <tr key={m.id} className="bg-gray-50">
-                          <td className="py-2 pr-4 pl-9 text-sm text-gray-500">
-                            {m.fecha ? fmtDate(m.fecha) : '—'}
-                          </td>
-                          <td colSpan={2} className="py-2 pr-4 text-sm text-gray-500">
-                            {m.concepto ?? (
-                              <span className="text-gray-300 italic">Sin detalle</span>
-                            )}
-                          </td>
-                          <td
-                            className="py-2 pr-4 text-right text-sm font-medium"
-                            style={{ color: '#101828' }}
+                        {!m.facturaCodigo && (
+                          <button
+                            onClick={() => setEditingMov(m)}
+                            className="rounded-[8px] border border-gray-200 p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+                            title="Editar cargo"
                           >
-                            {fmt(parseFloat(m.debe ?? '0'))}
-                          </td>
-                          <td className="py-2 text-right">
-                            {!m.facturaCodigo && (
-                              <button
-                                onClick={() => setEditingMov(m)}
-                                className="rounded-[8px] border border-gray-200 p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
-                                title="Editar cargo"
-                              >
-                                <Pencil className="h-3.5 w-3.5" />
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                  </Fragment>
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
                 );
               })}
             </tbody>
