@@ -825,13 +825,22 @@ export async function cargarServicioAction(data: CargarServicioData): Promise<{
   // emite después por la facturación manual o automática (como cualquier
   // otro cargo).
   const [serv] = await db
-    .select({ nombre: servicios.nombre, estado: servicios.estado })
+    .select({
+      nombre: servicios.nombre,
+      estado: servicios.estado,
+      vigenciaDesde: servicios.vigenciaDesde,
+      vigenciaHasta: servicios.vigenciaHasta,
+    })
     .from(servicios)
     .where(and(eq(servicios.id, data.servicioId), eq(servicios.guarderiaId, gId)))
     .limit(1);
   if (!serv) return { error: 'Servicio no encontrado.' };
   if (serv.estado !== 'activo') {
     return { error: 'Esta tarifa no está activa. No se puede cargar el servicio.' };
+  }
+  const hoyStr = new Date().toISOString().slice(0, 10);
+  if (serv.vigenciaDesde > hoyStr || serv.vigenciaHasta < hoyStr) {
+    return { error: 'Esta tarifa no está vigente. No se puede cargar el servicio.' };
   }
 
   const conceptoFinal = data.concepto.trim() || serv.nombre;

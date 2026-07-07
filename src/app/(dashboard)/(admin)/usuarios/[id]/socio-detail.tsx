@@ -56,7 +56,7 @@ import {
   type GuardarTarjetaData,
 } from '@/app/actions/payway';
 import { formatArgentinaDate, formatArgentinaDateTime, formatNaiveDateTime } from '@/lib/dates';
-import { precioConIva } from '@/lib/iva';
+import { precioConIva, precioSinIva } from '@/lib/iva';
 import { ASTILLEROS } from '../astilleros';
 import { EmptyState } from '@/components/shared/empty-state';
 import { Pagination } from '@/components/shared/pagination';
@@ -122,6 +122,7 @@ type Movimiento = {
   servicioId: string | null;
   servicioTipo: string | null;
   servicioTipoCobro: 'fijo' | 'variable' | null;
+  servicioAlicuotaIva: string | null;
   plazoPagoDias: number | null;
   facturaCodigo: string | null;
   facturaArchivo: string | null;
@@ -3049,7 +3050,7 @@ function ServiciosContratadosTab({
                 <th className="pr-4 pb-2">Servicio</th>
                 <th className="pr-4 pb-2">Categoría</th>
                 <th className="pr-4 pb-2">Fecha</th>
-                <th className="pr-4 pb-2 text-right">Total</th>
+                <th className="pr-4 pb-2 text-right">Precio</th>
                 <th className="pb-2" />
               </tr>
             </thead>
@@ -3093,8 +3094,34 @@ function ServiciosContratadosTab({
                         : '—'}
                     </td>
                     <td className="py-3 pr-4 text-gray-600">{m.fecha ? fmtDate(m.fecha) : '—'}</td>
-                    <td className="py-3 pr-4 text-right font-medium" style={{ color: '#101828' }}>
-                      {fmt(parseFloat(m.debe ?? '0'))}
+                    <td className="py-3 pr-4 text-right" style={{ color: '#101828' }}>
+                      {(() => {
+                        const montoConIva = parseFloat(m.debe ?? '0');
+                        const alicuota =
+                          m.servicioAlicuotaIva != null ? Number(m.servicioAlicuotaIva) : 0;
+                        return (
+                          <>
+                            <span className="block text-sm font-medium">
+                              {fmt(montoConIva)}
+                              {alicuota > 0 && (
+                                <span className="ml-1.5 text-xs font-normal text-gray-400">
+                                  c/IVA
+                                </span>
+                              )}
+                            </span>
+                            {alicuota > 0 ? (
+                              <span className="block text-xs text-gray-500">
+                                {fmt(precioSinIva(montoConIva, alicuota))}
+                                <span className="ml-1 text-gray-400">s/IVA · {alicuota}%</span>
+                              </span>
+                            ) : (
+                              <span className="block text-xs text-gray-400">
+                                Exento / No gravado
+                              </span>
+                            )}
+                          </>
+                        );
+                      })()}
                     </td>
                     <td className="py-3 text-right">
                       <div className="flex items-center justify-end gap-2">

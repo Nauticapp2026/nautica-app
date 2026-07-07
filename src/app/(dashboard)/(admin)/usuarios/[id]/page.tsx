@@ -23,7 +23,7 @@ import {
   servicios as serviciosTable,
   socioServiciosCancelados,
 } from '@/lib/db/schema';
-import { eq, and, desc, inArray, isNull, asc } from 'drizzle-orm';
+import { eq, and, desc, gte, inArray, isNull, asc, lte } from 'drizzle-orm';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { addDiasYmd, argYmd } from '@/lib/dates';
 import { SocioDetail } from './socio-detail';
@@ -34,6 +34,7 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
   if (!ctx) return null;
 
   const gId = ctx.activeMembership.guarderiaId;
+  const todayStr = new Date().toISOString().slice(0, 10);
 
   const rows = await db
     .select({
@@ -121,6 +122,7 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
         servicioId: movimientosCuentaCorriente.servicioId,
         servicioTipo: serviciosTable.tipo,
         servicioTipoCobro: serviciosTable.tipoCobro,
+        servicioAlicuotaIva: serviciosTable.alicuotaIva,
         plazoPagoDias: serviciosTable.plazoPagoDias,
         comprobanteInterno: movimientosCuentaCorriente.comprobanteInterno,
       })
@@ -141,7 +143,14 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
         alicuotaIva: serviciosTable.alicuotaIva,
       })
       .from(serviciosTable)
-      .where(and(eq(serviciosTable.guarderiaId, gId), eq(serviciosTable.estado, 'activo'))),
+      .where(
+        and(
+          eq(serviciosTable.guarderiaId, gId),
+          eq(serviciosTable.estado, 'activo'),
+          lte(serviciosTable.vigenciaDesde, todayStr),
+          gte(serviciosTable.vigenciaHasta, todayStr),
+        ),
+      ),
 
     db
       .select({

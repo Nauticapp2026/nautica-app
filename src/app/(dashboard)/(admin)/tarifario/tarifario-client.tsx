@@ -492,11 +492,11 @@ function TarifaModal({
   const [precio, setPrecio] = useState<string>(initial ? String(initial.precio) : '');
   const [alicuotaIva, setAlicuotaIva] = useState<number>(initial?.alicuotaIva ?? 21);
   const [plazoPagoDias, setPlazoPagoDias] = useState<number>(initial?.plazoPagoDias ?? 0);
-  // El selector del modal solo maneja activo/inactivo. El estado 'pausado' se
-  // cambia con los botones Pausar/Reactivar y el server lo preserva al editar.
-  const [estado, setEstado] = useState<'activo' | 'inactivo'>(
-    initial?.estado === 'inactivo' ? 'inactivo' : 'activo',
-  );
+  // El modal ya no deja elegir Activo/Inactivo — Inactivar se sacó de la
+  // edición (solo quedan Activo y Pausado, este último vía los botones
+  // Pausar/Reactivar). Se preserva el estado actual de la tarifa tal cual
+  // al guardar, para no reactivar sin querer una tarifa ya inactiva.
+  const estado: 'activo' | 'inactivo' = initial?.estado === 'inactivo' ? 'inactivo' : 'activo';
   const [vigenciaDesde, setVigenciaDesde] = useState<string>(initial?.vigenciaDesde ?? '');
   const [vigenciaHasta, setVigenciaHasta] = useState<string>(initial?.vigenciaHasta ?? '');
 
@@ -847,20 +847,6 @@ function TarifaModal({
               />
             </div>
           </div>
-
-          {isEdit && (
-            <div>
-              <label className="mb-1 block text-sm font-semibold text-gray-700">Estado</label>
-              <select
-                className={inputCls}
-                value={estado}
-                onChange={(e) => setEstado(e.target.value as 'activo' | 'inactivo')}
-              >
-                <option value="activo">Activo</option>
-                <option value="inactivo">Inactivo</option>
-              </select>
-            </div>
-          )}
 
           {error && <p className="text-sm text-red-600">{error}</p>}
 

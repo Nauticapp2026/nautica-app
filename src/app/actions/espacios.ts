@@ -320,16 +320,25 @@ export async function updateEspacioAction(input: UpdateEspacioInput): Promise<{ 
         precio: servicios.precio,
         alicuotaIva: servicios.alicuotaIva,
         estado: servicios.estado,
+        vigenciaDesde: servicios.vigenciaDesde,
+        vigenciaHasta: servicios.vigenciaHasta,
       })
       .from(servicios)
       .where(and(eq(servicios.id, input.servicioId), eq(servicios.guarderiaId, guarderiaId)))
       .limit(1);
     if (!s) return { error: 'La tarifa seleccionada no existe.' };
-    // Solo exigimos que esté activa si es una tarifa NUEVA para este espacio;
-    // si ya la tenía asignada y se pausó/inactivó después, dejamos que se
-    // sigan editando otros campos del espacio sin bloquear por esto.
-    if (input.servicioId !== current.servicioId && s.estado !== 'activo') {
-      return { error: 'La tarifa seleccionada no está activa.' };
+    // Solo exigimos que esté activa y vigente si es una tarifa NUEVA para
+    // este espacio; si ya la tenía asignada y se pausó/inactivó/venció
+    // después, dejamos que se sigan editando otros campos del espacio sin
+    // bloquear por esto (la deuda ya generada se sigue pudiendo facturar).
+    if (input.servicioId !== current.servicioId) {
+      if (s.estado !== 'activo') {
+        return { error: 'La tarifa seleccionada no está activa.' };
+      }
+      const hoyStr = new Date().toISOString().slice(0, 10);
+      if (s.vigenciaDesde > hoyStr || s.vigenciaHasta < hoyStr) {
+        return { error: 'La tarifa seleccionada no está vigente.' };
+      }
     }
     tarifaPrecio = s.precio ?? null;
     servicioNombre = s.nombre;
@@ -528,11 +537,16 @@ export async function assignEspacioToSocioAction(input: {
           precio: servicios.precio,
           alicuotaIva: servicios.alicuotaIva,
           estado: servicios.estado,
+          vigenciaDesde: servicios.vigenciaDesde,
+          vigenciaHasta: servicios.vigenciaHasta,
         })
         .from(servicios)
         .where(eq(servicios.id, espacio.servicioId))
         .limit(1);
-      if (servicio && servicio.estado === 'activo') {
+      const hoyStr = new Date().toISOString().slice(0, 10);
+      const vigente =
+        !!servicio && servicio.vigenciaDesde <= hoyStr && servicio.vigenciaHasta >= hoyStr;
+      if (servicio && servicio.estado === 'activo' && vigente) {
         const servicioPrecioNum =
           servicio.precio != null
             ? precioConIva(Number(servicio.precio), Number(servicio.alicuotaIva ?? 0))
