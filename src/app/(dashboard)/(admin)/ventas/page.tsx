@@ -100,6 +100,8 @@ export default async function VentasPage() {
         email: profiles.email,
         razonSocial: profiles.razonSocial,
         numeroDocumento: profiles.numeroDocumento,
+        tipoDocumento: profiles.tipoDocumento,
+        cuit: profiles.cuit,
         condicionIva: profiles.condicionIva,
         condicionIvaPersonal: profiles.condicionIvaPersonal,
         // true = factura con datos personales (Generales); false = Datos Impositivos.
@@ -275,6 +277,8 @@ export default async function VentasPage() {
     nombre: [s.nombre, s.apellido].filter(Boolean).join(' ') || s.razonSocial || s.email,
     email: s.email,
     numeroDocumento: s.numeroDocumento ?? '',
+    tipoDocumento: s.tipoDocumento ?? null,
+    cuit: s.cuit ?? null,
     condicionIva: s.condicionIva ?? null,
     condicionIvaPersonal: s.condicionIvaPersonal ?? null,
     facturaFiscal: s.facturaFiscal,

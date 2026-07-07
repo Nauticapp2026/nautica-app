@@ -88,6 +88,8 @@ type Socio = {
   nombre: string;
   email: string;
   numeroDocumento: string;
+  tipoDocumento: string | null;
+  cuit: string | null;
   condicionIva: string | null;
   condicionIvaPersonal: string | null;
   // true = factura con datos personales (Generales); false = Datos Impositivos.
@@ -105,6 +107,16 @@ function condicionIvaEfectiva(
   socio: Pick<Socio, 'facturaFiscal' | 'condicionIva' | 'condicionIvaPersonal'>,
 ): string | null {
   return socio.facturaFiscal ? socio.condicionIvaPersonal : socio.condicionIva;
+}
+
+// Documento que realmente se manda a facturar (ver identidadFacturacion en
+// actions/facturacion.ts): con datos personales es el DNI; con datos
+// impositivos es el CUIT si está cargado, si no cae al DNI.
+function numeroDocumentoEfectivo(
+  socio: Pick<Socio, 'facturaFiscal' | 'numeroDocumento' | 'cuit'>,
+): string {
+  if (socio.facturaFiscal) return socio.numeroDocumento;
+  return socio.cuit?.trim() || socio.numeroDocumento;
 }
 
 type CobroPayway = {
@@ -503,11 +515,11 @@ function NuevaFacturaModal({
             </div>
             <div>
               <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
-                Número documento
+                Número documento (DNI / CUIT / CUIL)
               </label>
               <input
                 className={`${inputCls} cursor-not-allowed bg-gray-50 text-gray-500`}
-                value={socioSeleccionado?.numeroDocumento ?? ''}
+                value={socioSeleccionado ? numeroDocumentoEfectivo(socioSeleccionado) : ''}
                 placeholder="Se completa al elegir socio"
                 readOnly
               />
