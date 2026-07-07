@@ -21,12 +21,16 @@ import {
 } from 'lucide-react';
 
 import {
+  crearComprobanteInternoAction,
+  crearComprobanteInternoLoteAction,
   createBatchInvoicesAction,
   createInvoiceAction,
   emitirNotaCreditoAction,
   getSocioPendientesAction,
+  getSocioPendientesInternoAction,
   markInvoicePaidAction,
   type BatchResult,
+  type ComprobanteInternoLoteResult,
   type EmitirNcMotivo,
   type MovimientoPendiente,
 } from '@/app/actions/facturacion';
@@ -70,6 +74,13 @@ type LoteMovimiento = {
   debe: string | null;
   servicioNombre: string | null;
   tipoServicio: string | null;
+};
+
+type SocioInterno = {
+  id: string;
+  nombre: string;
+  email: string;
+  movimientos: LoteMovimiento[];
 };
 
 type Socio = {
@@ -635,6 +646,265 @@ function NuevaFacturaModal({
   );
 }
 
+// ─── Modal: Comprobante interno manual ─────────────────────────────────────
+
+function ComprobanteInternoManualModal({
+  open,
+  onClose,
+  socios,
+}: {
+  open: boolean;
+  onClose: () => void;
+  socios: Socio[];
+}) {
+  const router = useRouter();
+  const [socioId, setSocioId] = useState('');
+  const [fecha, setFecha] = useState(todayIso);
+  const [movimientos, setMovimientos] = useState<MovimientoPendiente[]>([]);
+  const [selectedMovs, setSelectedMovs] = useState<Set<string>>(() => new Set());
+  const [loadingMovs, setLoadingMovs] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  function handleSocioChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const id = e.target.value;
+    setSocioId(id);
+    setMovimientos([]);
+    setSelectedMovs(new Set());
+    setError(null);
+    if (!id) return;
+    setLoadingMovs(true);
+    getSocioPendientesInternoAction(id)
+      .then((res) => {
+        if (res.error) {
+          setError(res.error);
+        } else {
+          const movs = res.movimientos ?? [];
+          setMovimientos(movs);
+          setSelectedMovs(new Set(movs.map((m) => m.id)));
+        }
+      })
+      .finally(() => setLoadingMovs(false));
+  }
+
+  const totalSeleccionado = useMemo(
+    () =>
+      movimientos
+        .filter((m) => selectedMovs.has(m.id))
+        .reduce((s, m) => s + parseFloat(m.debe || '0'), 0),
+    [movimientos, selectedMovs],
+  );
+
+  const isValid = Boolean(socioId && fecha && selectedMovs.size > 0 && totalSeleccionado > 0);
+
+  function toggleMov(id: string) {
+    setSelectedMovs((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAllMovs() {
+    if (selectedMovs.size === movimientos.length) {
+      setSelectedMovs(new Set());
+    } else {
+      setSelectedMovs(new Set(movimientos.map((m) => m.id)));
+    }
+  }
+
+  function handleClose() {
+    setSocioId('');
+    setFecha(todayIso());
+    setMovimientos([]);
+    setSelectedMovs(new Set());
+    setError(null);
+    setSuccess(null);
+    onClose();
+  }
+
+  function handleSubmit() {
+    setError(null);
+    setSuccess(null);
+    startTransition(async () => {
+      const res = await crearComprobanteInternoAction({
+        socioId,
+        fecha,
+        movimientoIds: Array.from(selectedMovs),
+      });
+      if (res.error) {
+        setError(res.error);
+      } else {
+        setSuccess(`Comprobante emitido ${res.codigo ?? ''}`);
+        setTimeout(() => {
+          handleClose();
+          router.refresh();
+        }, 1200);
+      }
+    });
+  }
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="flex max-h-[90vh] w-full max-w-xl flex-col rounded-2xl bg-white shadow-2xl">
+        <div className="flex items-start justify-between p-6 pb-4">
+          <div>
+            <h2 className="text-lg font-bold" style={{ color: '#101828' }}>
+              Comprobante interno manual
+            </h2>
+            <p className="mt-0.5 text-sm" style={{ color: '#669E9D' }}>
+              Consolidá los cargos Interno pendientes del socio en un solo comprobante
+            </p>
+          </div>
+          <button
+            onClick={handleClose}
+            className="rounded-[8px] p-1 text-gray-400 hover:bg-gray-100"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="border-t border-gray-200" />
+
+        <div className="flex-1 space-y-4 overflow-y-auto p-6">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
+                Cliente*
+              </label>
+              <select className={inputCls} value={socioId} onChange={handleSocioChange}>
+                <option value="">Seleccioná un socio...</option>
+                {socios.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
+                Fecha*
+              </label>
+              <input
+                type="date"
+                className={inputCls}
+                value={fecha}
+                onChange={(e) => setFecha(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {socioId && (
+            <div className="rounded-[10px] border border-gray-100 bg-white">
+              <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
+                <div>
+                  <p className="text-sm font-semibold" style={{ color: '#101828' }}>
+                    Cargos internos pendientes
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    {loadingMovs
+                      ? 'Cargando...'
+                      : `${selectedMovs.size} de ${movimientos.length} seleccionados — Total ${fmtMoney(totalSeleccionado)}`}
+                  </p>
+                </div>
+                {movimientos.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={toggleAllMovs}
+                    className="text-xs font-medium underline underline-offset-2"
+                    style={{ color: '#175861' }}
+                  >
+                    {selectedMovs.size === movimientos.length ? 'Ninguno' : 'Todos'}
+                  </button>
+                )}
+              </div>
+              {loadingMovs ? (
+                <p className="px-4 py-6 text-center text-sm text-gray-400">
+                  Cargando movimientos...
+                </p>
+              ) : movimientos.length === 0 ? (
+                <p className="px-4 py-6 text-center text-sm text-gray-400">
+                  Este socio no tiene cargos internos pendientes.
+                </p>
+              ) : (
+                <div className="max-h-60 overflow-y-auto">
+                  {movimientos.map((m) => (
+                    <label
+                      key={m.id}
+                      className="flex cursor-pointer items-center gap-3 border-b border-gray-50 px-4 py-2.5 text-sm last:border-0 hover:bg-gray-50"
+                    >
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 cursor-pointer rounded accent-[#175861]"
+                        checked={selectedMovs.has(m.id)}
+                        onChange={() => toggleMov(m.id)}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-medium" style={{ color: '#101828' }}>
+                          {m.concepto ?? 'Servicio'}
+                        </p>
+                        <p className="text-xs text-gray-400">{fmtDate(m.fecha)}</p>
+                      </div>
+                      <p className="text-sm font-medium" style={{ color: '#175861' }}>
+                        {fmtMoney(m.debe)}
+                      </p>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {error && (
+            <div className="flex items-start gap-2 rounded-[10px] bg-red-50 p-3 text-sm text-red-700">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
+          {success && (
+            <div className="flex items-start gap-2 rounded-[10px] bg-green-50 p-3 text-sm text-green-700">
+              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>{success}</span>
+            </div>
+          )}
+        </div>
+
+        <div className="border-t border-gray-200 p-6">
+          {socioId && selectedMovs.size > 0 && (
+            <div className="mb-4 flex items-center justify-between rounded-[10px] bg-gray-50 px-4 py-3">
+              <p className="text-sm font-semibold" style={{ color: '#101828' }}>
+                Total a emitir
+              </p>
+              <p className="text-lg font-bold" style={{ color: '#175861' }}>
+                {fmtMoney(totalSeleccionado)}
+              </p>
+            </div>
+          )}
+          <div className="flex gap-3">
+            <button
+              onClick={handleClose}
+              className="flex-1 rounded-[10px] border border-[#d1d5dc] bg-white py-2.5 text-sm font-medium text-[#364153] transition hover:bg-gray-50"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={isPending || !isValid}
+              className="flex-1 rounded-[10px] py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+              style={{ background: '#175861' }}
+            >
+              {isPending ? 'Emitiendo...' : 'Emitir comprobante'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Modal: Factura en lote ─────────────────────────────────────────────────
 
 const CONCEPTO_OPTS: { value: string; label: string }[] = [
@@ -1071,6 +1341,332 @@ function LoteModal({
   );
 }
 
+// ─── Modal: Comprobante interno por lote ────────────────────────────────────
+
+function ComprobanteInternoLoteModal({
+  open,
+  onClose,
+  sociosInterno,
+}: {
+  open: boolean;
+  onClose: () => void;
+  sociosInterno: SocioInterno[];
+}) {
+  const router = useRouter();
+  const [fecha, setFecha] = useState(todayIso);
+  // deselected: movimientos que el usuario desmarcó explícitamente (por defecto todo está seleccionado)
+  const [deselected, setDeselected] = useState<Map<string, Set<string>>>(() => new Map());
+  const [expandedSocios, setExpandedSocios] = useState<Set<string>>(() => new Set());
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<ComprobanteInternoLoteResult | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  function isMovSel(socioId: string, movId: string) {
+    return !deselected.get(socioId)?.has(movId);
+  }
+
+  function toggleExpandSocio(id: string) {
+    setExpandedSocios((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSocio(socioId: string, movimientos: LoteMovimiento[]) {
+    const allSel = movimientos.every((m) => isMovSel(socioId, m.id));
+    setDeselected((prev) => {
+      const next = new Map(prev);
+      if (allSel) {
+        next.set(socioId, new Set(movimientos.map((m) => m.id)));
+      } else {
+        next.delete(socioId);
+      }
+      return next;
+    });
+  }
+
+  function toggleMov(socioId: string, movId: string) {
+    setDeselected((prev) => {
+      const next = new Map(prev);
+      const socioSet = new Set(next.get(socioId) ?? []);
+      if (socioSet.has(movId)) socioSet.delete(movId);
+      else socioSet.add(movId);
+      next.set(socioId, socioSet);
+      return next;
+    });
+  }
+
+  const totalSeleccionado = useMemo(() => {
+    return sociosInterno.reduce((sum, s) => {
+      return (
+        sum +
+        s.movimientos
+          .filter((m) => isMovSel(s.id, m.id))
+          .reduce((s2, m) => s2 + parseFloat(m.debe ?? '0'), 0)
+      );
+    }, 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deselected, sociosInterno]);
+
+  const sociosConSel = useMemo(
+    () => sociosInterno.filter((s) => s.movimientos.some((m) => isMovSel(s.id, m.id))).length,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [deselected, sociosInterno],
+  );
+
+  const allSelected = sociosInterno.every((s) => s.movimientos.every((m) => isMovSel(s.id, m.id)));
+
+  function toggleAll() {
+    if (allSelected) {
+      const next = new Map<string, Set<string>>();
+      for (const s of sociosInterno) {
+        next.set(s.id, new Set(s.movimientos.map((m) => m.id)));
+      }
+      setDeselected(next);
+    } else {
+      setDeselected(new Map());
+    }
+  }
+
+  function handleClose() {
+    setError(null);
+    setResult(null);
+    setDeselected(new Map());
+    setExpandedSocios(new Set());
+    onClose();
+  }
+
+  function handleSubmit() {
+    if (sociosConSel === 0) {
+      setError('Seleccioná al menos un cargo para emitir.');
+      return;
+    }
+    setError(null);
+    setResult(null);
+    startTransition(async () => {
+      const socioMovimientos = sociosInterno
+        .map((s) => ({
+          socioId: s.id,
+          movimientoIds: s.movimientos.filter((m) => isMovSel(s.id, m.id)).map((m) => m.id),
+        }))
+        .filter((s) => s.movimientoIds.length > 0);
+
+      const res = await crearComprobanteInternoLoteAction({ fecha, socioMovimientos });
+      if (res.error) setError(res.error);
+      else if (res.result) {
+        setResult(res.result);
+        router.refresh();
+      }
+    });
+  }
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-2xl bg-white shadow-2xl">
+        <div className="flex items-start justify-between p-6 pb-4">
+          <div>
+            <h2 className="text-lg font-bold" style={{ color: '#101828' }}>
+              Comprobante interno por lote
+            </h2>
+            <p className="mt-0.5 text-sm" style={{ color: '#669E9D' }}>
+              Emití un comprobante interno por cada socio con cargos Interno pendientes
+            </p>
+          </div>
+          <button
+            onClick={handleClose}
+            className="rounded-[8px] p-1 text-gray-400 hover:bg-gray-100"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="border-t border-gray-200" />
+
+        <div className="flex-1 space-y-4 overflow-y-auto p-6">
+          {!result ? (
+            <>
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
+                  Fecha
+                </label>
+                <input
+                  type="date"
+                  className={inputCls}
+                  value={fecha}
+                  onChange={(e) => setFecha(e.target.value)}
+                />
+              </div>
+
+              <div className="rounded-[10px] border border-gray-100 bg-white">
+                <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
+                  <div>
+                    <p className="text-sm font-semibold" style={{ color: '#101828' }}>
+                      Socios con cargos internos ({sociosInterno.length})
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Seleccionados: {sociosConSel} — Total: {fmtMoney(totalSeleccionado)}
+                    </p>
+                  </div>
+                  {sociosInterno.length > 0 && (
+                    <button
+                      onClick={toggleAll}
+                      className="text-xs font-medium underline underline-offset-2"
+                      style={{ color: '#175861' }}
+                    >
+                      {allSelected ? 'Ninguno' : 'Todos'}
+                    </button>
+                  )}
+                </div>
+                {sociosInterno.length === 0 ? (
+                  <p className="px-4 py-6 text-center text-sm text-gray-400">
+                    No hay socios con cargos internos pendientes.
+                  </p>
+                ) : (
+                  <div className="max-h-72 overflow-y-auto">
+                    {sociosInterno.map((s) => {
+                      const expanded = expandedSocios.has(s.id);
+                      const totalSocio = s.movimientos
+                        .filter((m) => isMovSel(s.id, m.id))
+                        .reduce((sum, m) => sum + parseFloat(m.debe ?? '0'), 0);
+                      const allMovSel = s.movimientos.every((m) => isMovSel(s.id, m.id));
+                      const selCount = s.movimientos.filter((m) => isMovSel(s.id, m.id)).length;
+                      const someMovSel = selCount > 0 && !allMovSel;
+
+                      return (
+                        <div key={s.id} className="border-b border-gray-50 last:border-0">
+                          <div className="flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-gray-50">
+                            <input
+                              ref={(el) => {
+                                if (el) el.indeterminate = someMovSel;
+                              }}
+                              type="checkbox"
+                              className="h-4 w-4 cursor-pointer rounded accent-[#175861]"
+                              checked={allMovSel}
+                              onChange={() => toggleSocio(s.id, s.movimientos)}
+                            />
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate font-medium" style={{ color: '#101828' }}>
+                                {s.nombre}
+                              </p>
+                              <p className="truncate text-xs text-gray-400">{s.email}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-sm font-medium" style={{ color: '#175861' }}>
+                                {fmtMoney(totalSocio)}
+                              </p>
+                              <p className="text-xs text-gray-400">
+                                {selCount}/{s.movimientos.length} mov.
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => toggleExpandSocio(s.id)}
+                              className="shrink-0 rounded-[6px] p-1 text-gray-400 hover:bg-gray-100"
+                              title={expanded ? 'Ocultar cargos' : 'Ver cargos'}
+                            >
+                              {expanded ? (
+                                <ChevronDown className="h-4 w-4" />
+                              ) : (
+                                <ChevronRight className="h-4 w-4" />
+                              )}
+                            </button>
+                          </div>
+                          {expanded && (
+                            <div className="bg-gray-50 pb-1">
+                              {s.movimientos.map((m) => (
+                                <label
+                                  key={m.id}
+                                  className="flex cursor-pointer items-center gap-3 border-b border-gray-100 py-2 pr-4 pl-11 text-sm last:border-0 hover:bg-gray-100"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    className="h-3.5 w-3.5 cursor-pointer rounded accent-[#175861]"
+                                    checked={isMovSel(s.id, m.id)}
+                                    onChange={() => toggleMov(s.id, m.id)}
+                                  />
+                                  <span className="min-w-0 flex-1 truncate text-xs text-gray-700">
+                                    {m.concepto ?? m.servicioNombre ?? 'Servicio'}
+                                  </span>
+                                  <span className="shrink-0 text-xs font-medium text-gray-600">
+                                    {fmtMoney(m.debe)}
+                                  </span>
+                                </label>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {error && (
+                <div className="flex items-start gap-2 rounded-[10px] bg-red-50 p-3 text-sm text-red-700">
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span>{error}</span>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="space-y-3">
+              <div className="rounded-[10px] bg-green-50 p-4 text-sm text-green-800">
+                <p className="font-semibold">{result.succeeded.length} comprobantes emitidos</p>
+                {result.skipped.length > 0 && (
+                  <p className="mt-0.5 text-green-700">
+                    {result.skipped.length} socios omitidos (sin cargos seleccionados)
+                  </p>
+                )}
+              </div>
+              {result.failed.length > 0 && (
+                <div className="rounded-[10px] bg-red-50 p-4 text-sm text-red-800">
+                  <p className="mb-1 font-semibold">{result.failed.length} fallaron:</p>
+                  <ul className="space-y-1 text-xs">
+                    {result.failed.map((f) => {
+                      const socio = sociosInterno.find((s) => s.id === f.socioId);
+                      return (
+                        <li key={f.socioId}>
+                          • {socio?.nombre ?? f.socioId}: {f.error}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="border-t border-gray-200 p-6">
+          <div className="flex gap-3">
+            <button
+              onClick={handleClose}
+              className="flex-1 rounded-[10px] border border-[#d1d5dc] bg-white py-2.5 text-sm font-medium text-[#364153] transition hover:bg-gray-50"
+            >
+              {result ? 'Cerrar' : 'Cancelar'}
+            </button>
+            {!result && (
+              <button
+                onClick={handleSubmit}
+                disabled={isPending || sociosConSel === 0}
+                className="flex-1 rounded-[10px] py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+                style={{ background: '#175861' }}
+              >
+                {isPending
+                  ? 'Emitiendo...'
+                  : `Emitir ${sociosConSel} comprobante${sociosConSel === 1 ? '' : 's'}`}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Modal: marcar pagada ───────────────────────────────────────────────────
 
 function MarcarPagadaModal({
@@ -1404,6 +2000,7 @@ function LoteNotaCreditoModal({
       const r = await emitirNotaCreditoAction({
         facturaOriginalId: f.id,
         motivo: 'anulacion_total',
+        origen: 'lote',
       });
       res.push({
         codigo: f.codigo ?? f.id.slice(0, 8),
@@ -1561,6 +2158,7 @@ function LoteNotaCreditoModal({
 export function VentasClient({
   facturas,
   socios,
+  sociosInterno,
   kpis,
   posConfigurado,
   certificadoOk,
@@ -1569,6 +2167,7 @@ export function VentasClient({
 }: {
   facturas: Factura[];
   socios: Socio[];
+  sociosInterno: SocioInterno[];
   kpis: Kpis;
   posConfigurado: boolean;
   certificadoOk: boolean;
@@ -1583,6 +2182,8 @@ export function VentasClient({
   const [filterHasta, setFilterHasta] = useState('');
   const [nuevaOpen, setNuevaOpen] = useState(false);
   const [loteOpen, setLoteOpen] = useState(false);
+  const [comprobanteInternoOpen, setComprobanteInternoOpen] = useState(false);
+  const [comprobanteInternoLoteOpen, setComprobanteInternoLoteOpen] = useState(false);
   const [pagarFactura, setPagarFactura] = useState<Factura | null>(null);
   const [ncFactura, setNcFactura] = useState<Factura | null>(null);
   // Selección para NC en lote (anulación total) sobre la tabla AFIP.
@@ -1784,6 +2385,16 @@ export function VentasClient({
         guarderiaCondicionIva={guarderiaCondicionIva}
       />
       <LoteModal open={loteOpen} onClose={() => setLoteOpen(false)} socios={socios} />
+      <ComprobanteInternoManualModal
+        open={comprobanteInternoOpen}
+        onClose={() => setComprobanteInternoOpen(false)}
+        socios={socios}
+      />
+      <ComprobanteInternoLoteModal
+        open={comprobanteInternoLoteOpen}
+        onClose={() => setComprobanteInternoLoteOpen(false)}
+        sociosInterno={sociosInterno}
+      />
       <MarcarPagadaModal
         open={!!pagarFactura}
         onClose={() => setPagarFactura(null)}
@@ -1840,10 +2451,10 @@ export function VentasClient({
                 Facturación por lote
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem disabled title="Próximamente">
+              <DropdownMenuItem onSelect={() => setComprobanteInternoOpen(true)}>
                 Comprobante interno manual
               </DropdownMenuItem>
-              <DropdownMenuItem disabled title="Próximamente">
+              <DropdownMenuItem onSelect={() => setComprobanteInternoLoteOpen(true)}>
                 Comprobante interno por lote
               </DropdownMenuItem>
             </DropdownMenuContent>

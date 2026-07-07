@@ -192,7 +192,7 @@ Desde esta pestaña cargás nuevos consumos con el botón **Cargar Servicio** (a
 2. Elegí el servicio del tarifario (solo aparecen tarifas **Activas**), el concepto, el monto (se precarga con el precio c/IVA de la tarifa; podés editarlo) y la fecha.
 3. Elegí el **tipo de comprobante**:
    - **Comprobante fiscal** — registra el cargo como facturable. **No se emite a ARCA en el momento**: queda pendiente y se factura después, manual o automáticamente, como cualquier otro cargo.
-   - **Comprobante interno** — genera un comprobante **no fiscal** imprimible (número RB-NNNNNN), pensado para cobros que no pasan por ARCA. El cargo **nunca se factura**: no aparece ni en la facturación automática ni en la manual.
+   - **Comprobante interno** — marca el cargo como **no fiscal**: no aparece ni en la facturación automática ni en la manual. Queda pendiente hasta que lo consolidés en un comprobante desde **Ventas → Nuevo comprobante → Comprobante interno manual/lote** (ver sección Comprobantes internos).
 4. Confirmá. El cargo se suma a la Cuenta Corriente del socio.
 
 ### Ver cargos individuales
@@ -230,7 +230,7 @@ Muestra los movimientos del socio: facturas, cobros y saldo.
 
 Arriba de la tabla hay tres tarjetas: **Ingresos por venta**, **Cobranzas** y **Saldo** del socio.
 
-- **Registrar pago** — registrá un pago recibido del socio (te pide el medio de pago). Se crea una cobranza que descuenta del saldo; los cargos cubiertos pasan a figurar **Pagado**, asignando del más viejo al más nuevo. Si el pago supera la deuda, el excedente queda como **saldo a favor**. Al confirmar, podés además emitir un recibo interno (ver sección Recibos internos).
+- **Registrar pago** — registrá un pago recibido del socio (te pide el medio de pago). Se crea una cobranza que descuenta del saldo; los cargos cubiertos pasan a figurar **Pagado**, asignando del más viejo al más nuevo. Si el pago supera la deuda, el excedente queda como **saldo a favor**.
 
 > Los consumos ya no se cargan desde esta pestaña: usá **Cargar Servicio** en la pestaña **Servicios Contratados**.
 
@@ -645,7 +645,7 @@ Las tarjetas superiores muestran:
 
 > En el selector aparecen **todos los socios del club**. Lo que define si la emisión sale bien son los **datos fiscales/personales completos** del socio (ver "Datos requeridos para emitir facturas ARCA"); si faltan, ARCA puede rechazar la emisión.
 
-> Además del número que devuelve ARCA, cada comprobante emitido por Facturación manual, por lote o como nota de crédito lleva un identificador interno correlativo **FL Nº** (ej. FL-000001), visible debajo del número ARCA en la tabla de **Comprobantes ARCA**.
+> Además del número que devuelve ARCA, cada comprobante lleva un identificador interno correlativo, visible debajo del número ARCA en la tabla de **Comprobantes ARCA**: **FM-NNNNNN** para lo emitido por Facturación manual (y sus NC), **FL-NNNNNN** para lo emitido por Facturación por lote (y sus NC). La factura automática mensual y los recibos internos (RB-) no llevan este identificador.
 
 ### Facturación en lote
 
@@ -663,16 +663,24 @@ El tipo de comprobante se determina automáticamente para cada socio según la c
 
 **¿Qué conceptos entran en la factura automática?** La factura incluye **todos los cargos pendientes** del socio: la mensualidad del espacio que el sistema genera ese día **más cualquier consumo cargado durante el mes que siga pendiente**. No entran los pagos ni saldos a favor, ni los cargos que ya estaban facturados (no se duplican), **ni los cargos con comprobante interno** (esos nunca se facturan). Importante: como todo consumo fiscal cargado desde **Cargar Servicio** queda pendiente, cada consumo no cobrado antes del día de facturación se va a incluir en la factura mensual del socio.
 
-### Recibos internos
+### Comprobantes internos
 
-Los recibos internos son comprobantes propios del club, sin intervención de ARCA (número RB-NNNNNN). Son útiles para registrar cobros cuando todavía no tenés el certificado ARCA configurado, o para socios que no requieren factura fiscal.
+Los comprobantes internos son documentos propios del club, sin intervención de ARCA. No tienen CAE ni validez fiscal — sirven para dejar constancia de un cobro o cargo que no se factura por AFIP.
 
-Se generan de dos formas:
+**Paso 1 — marcar un cargo como Interno:**
 
-- Al **Registrar pago** en la Cuenta Corriente del socio: al confirmar, el sistema pregunta si querés emitir un recibo interno. Hacé clic en **Emitir recibo** para generarlo.
-- Al **Cargar Servicio** (pestaña Servicios Contratados) eligiendo **Comprobante interno**: genera el comprobante interno del cargo, que además queda **excluido de toda facturación**.
+Al **Cargar Servicio** (pestaña Servicios Contratados de un socio) eligiendo **Interno** en vez de Fiscal, el cargo queda excluido de toda facturación por ARCA (automática y manual) y pendiente de comprobante.
 
-Todos aparecen en **Ventas → tab Recibos internos** y, en la cuenta corriente del socio, con la columna **Tipo de comprobante** = "Comprobante interno" y su número RB-. Quedan disponibles para imprimir o descargar. No tienen CAE ni validez fiscal ante ARCA.
+**Paso 2 — emitir el comprobante:**
+
+Los cargos Interno pendientes no generan nada por sí solos: hay que consolidarlos en un comprobante desde **Ventas → Nuevo comprobante**:
+
+- **Comprobante interno manual** — elegís un socio, el sistema te muestra sus cargos Interno pendientes en una lista para tildar (igual que Facturación manual), y emitís un solo comprobante con todos los que selecciones. Numeración **CM-NNNNNN**.
+- **Comprobante interno por lote** — igual, pero para todos los socios con cargos Interno pendientes a la vez; genera un comprobante por socio. Numeración **CL-NNNNNN**.
+
+El comprobante generado muestra fecha de emisión, descripción del o los servicios incluidos, precio y datos del cliente — como una factura, pero sin validez fiscal.
+
+Todos aparecen en **Ventas → tab Recibos internos** y quedan disponibles para imprimir o enviar por mail.
 
 ### Emitir una nota de crédito
 

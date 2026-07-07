@@ -118,15 +118,16 @@ function precioSinIva(total: number, alicuota: string): number {
   return +(total / (1 + a / 100)).toFixed(2);
 }
 
-// Identificación interna "FL-NNNNNN", correlativa por guardería. Se suma al
-// número que devuelve ARCA — solo para Facturación manual/lote y sus NC (no
-// para recibos internos "RB-" ni para la auto-facturación del cron).
-async function nextFolioLocal(gId: string): Promise<string> {
+// Identificación interna correlativa por guardería, que se suma al número
+// que devuelve ARCA: "FM-NNNNNN" para Facturación manual (y su NC), "FL-NNNNNN"
+// para Facturación por lote (y su NC). No aplica a recibos internos "RB-" ni
+// a la auto-facturación del cron.
+async function nextFolioLocal(gId: string, prefix: 'FM' | 'FL'): Promise<string> {
   const [{ n }] = await db
     .select({ n: count() })
     .from(facturacion)
-    .where(and(eq(facturacion.guarderiaId, gId), like(facturacion.folioLocal, 'FL-%')));
-  return `FL-${String(Number(n) + 1).padStart(6, '0')}`;
+    .where(and(eq(facturacion.guarderiaId, gId), like(facturacion.folioLocal, `${prefix}-%`)));
+  return `${prefix}-${String(Number(n) + 1).padStart(6, '0')}`;
 }
 
 /**
@@ -306,23 +307,27 @@ export type FacturaResult = {
   pdfUrl?: string;
 };
 
-export async function createInvoiceAction(data: CreateInvoiceData): Promise<FacturaResult> {
+export async function createInvoiceAction(
+  data: CreateInvoiceData,
+  opts?: { folioPrefix?: 'FM' | 'FL' },
+): Promise<FacturaResult> {
   const ctx = await getActiveMarina();
   if (!ctx) return { error: 'No autenticado' };
   return crearFacturaCore(
     { ...data, guarderiaId: ctx.activeMembership.guarderiaId },
-    { folioLocal: true },
+    { folioPrefix: opts?.folioPrefix ?? 'FM' },
   );
 }
 
 /**
  * Core de emisión de factura, sin chequeo de sesión. Llamable desde:
- * - createInvoiceAction (manual, con auth) → asigna folio local "FL-NNNNNN"
+ * - createInvoiceAction (manual, con auth) → folio local "FM-NNNNNN"
+ * - createInvoiceAction desde el lote → folio local "FL-NNNNNN"
  * - cron de auto-facturación (sin auth, recibe guarderiaId) → sin folio local
  */
 export async function crearFacturaCore(
   data: CreateInvoiceData & { guarderiaId: string },
-  opts?: { folioLocal?: boolean },
+  opts?: { folioPrefix?: 'FM' | 'FL' },
 ): Promise<FacturaResult> {
   const gId = data.guarderiaId;
 
@@ -503,7 +508,7 @@ export async function crearFacturaCore(
       `Factura ${TIPO_FACTURA_API[data.tipoFactura]} — ${items[0].descripcion}${
         items.length > 1 ? ` (+${items.length - 1})` : ''
       }`;
-    const folioLocal = opts?.folioLocal ? await nextFolioLocal(gId) : null;
+    const folioLocal = opts?.folioPrefix ? await nextFolioLocal(gId, opts.folioPrefix) : null;
 
     await db.insert(facturacion).values({
       id: facturaId,
@@ -648,17 +653,20 @@ export async function createBatchInvoicesAction(
 
     const tipoFactura = derivarTipoFactura(guarderiaCondicion, validSocioMap.get(socioId) ?? null);
 
-    const res = await createInvoiceAction({
-      socioId,
-      tipoFactura,
-      condicionVenta: 'contado',
-      medioPago: data.medioPago,
-      fecha: data.fecha,
-      vencimiento,
-      desde,
-      hasta,
-      movimientoIds,
-    });
+    const res = await createInvoiceAction(
+      {
+        socioId,
+        tipoFactura,
+        condicionVenta: 'contado',
+        medioPago: data.medioPago,
+        fecha: data.fecha,
+        vencimiento,
+        desde,
+        hasta,
+        movimientoIds,
+      },
+      { folioPrefix: 'FL' },
+    );
 
     if (res.error) {
       result.failed.push({ socioId, error: res.error });
@@ -784,63 +792,6 @@ export async function markInvoicePaidAction(
   }
 }
 
-// ─── Action: crear recibo interno ─────────────────────────────────────────────
-
-export type CreateReciboInternoData = {
-  socioId: string;
-  movimientoId: string;
-  importe: string;
-  descripcion: string;
-  medioPago: string;
-  fecha?: string;
-};
-
-export async function crearReciboInternoAction(
-  data: CreateReciboInternoData,
-): Promise<{ id?: string; error?: string }> {
-  const ctx = await getActiveMarina();
-  if (!ctx) return { error: 'No autenticado' };
-
-  const gId = ctx.activeMembership.guarderiaId;
-
-  try {
-    const id = randomUUID();
-    // Número de recibo secuencial por guardería: RB-000001, RB-000002, ...
-    const [{ n }] = await db
-      .select({ n: count() })
-      .from(facturacion)
-      .where(
-        and(
-          eq(facturacion.guarderiaId, gId),
-          eq(facturacion.tipoFactura, 'recibo'),
-          like(facturacion.codigo, 'RB-%'),
-        ),
-      );
-    const codigo = `RB-${String(Number(n) + 1).padStart(6, '0')}`;
-    const emision = data.fecha ? fechaCalendariaArg(data.fecha) : new Date();
-
-    await db.insert(facturacion).values({
-      id,
-      guarderiaId: gId,
-      socioId: data.socioId,
-      tipoFactura: 'recibo',
-      estado: 'pagada',
-      importe: data.importe,
-      descripcion: data.descripcion,
-      medioPago: data.medioPago as MedioPago,
-      emision,
-      movimientoId: data.movimientoId,
-      codigo,
-    });
-
-    revalidatePath('/ventas');
-    revalidatePath(`/usuarios/${data.socioId}`);
-    return { id };
-  } catch {
-    return { error: 'Error al crear el comprobante interno.' };
-  }
-}
-
 // ─── Action: cargar servicio (con comprobante interno o fiscal) ───────────────
 
 export type CargarServicioData = {
@@ -855,8 +806,6 @@ export type CargarServicioData = {
 export async function cargarServicioAction(data: CargarServicioData): Promise<{
   error?: string;
   comprobante?: 'interno' | 'fiscal';
-  reciboId?: string;
-  comprobanteNro?: string;
 }> {
   const ctx = await getActiveMarina();
   if (!ctx) return { error: 'No autenticado' };
@@ -865,8 +814,16 @@ export async function cargarServicioAction(data: CargarServicioData): Promise<{
   if (!data.servicioId || !data.monto) return { error: 'Faltan datos del servicio.' };
   const esInterno = data.comprobante === 'interno';
 
-  // 1. Crear el cargo en la cuenta corriente (igual que "Cargar consumo").
-  //    Si es interno, se marca para excluirlo de la facturación automática y manual.
+  // Crear el cargo en la cuenta corriente (igual que "Cargar consumo").
+  //
+  // Interno: se marca comprobante_interno = true y queda pendiente, para
+  // consolidarlo después en un comprobante CM-/CL- desde Ventas → Nuevo
+  // comprobante → Comprobante interno manual/lote. No se emite nada acá.
+  //
+  // Fiscal: NO se emite a AFIP ahora. El cargo queda como un consumo
+  // facturable normal (comprobante_interno = false), y la factura AFIP se
+  // emite después por la facturación manual o automática (como cualquier
+  // otro cargo).
   const [serv] = await db
     .select({ nombre: servicios.nombre, estado: servicios.estado })
     .from(servicios)
@@ -879,60 +836,221 @@ export async function cargarServicioAction(data: CargarServicioData): Promise<{
 
   const conceptoFinal = data.concepto.trim() || serv.nombre;
 
-  const [mov] = await db
-    .insert(movimientosCuentaCorriente)
-    .values({
-      socioId: data.socioId,
-      servicioId: data.servicioId,
-      concepto: conceptoFinal,
-      tipo: 'otro',
-      estado: 'no_pagado',
-      debe: data.monto,
-      fecha: data.fecha ? fechaCalendariaArg(data.fecha) : new Date(),
-      createdBy: ctx.profile.id,
-      comprobanteInterno: esInterno,
-    })
-    .returning({ id: movimientosCuentaCorriente.id });
-  const movimientoId = mov.id;
+  await db.insert(movimientosCuentaCorriente).values({
+    socioId: data.socioId,
+    servicioId: data.servicioId,
+    concepto: conceptoFinal,
+    tipo: 'otro',
+    estado: 'no_pagado',
+    debe: data.monto,
+    fecha: data.fecha ? fechaCalendariaArg(data.fecha) : new Date(),
+    createdBy: ctx.profile.id,
+    comprobanteInterno: esInterno,
+  });
 
-  // 2a. Comprobante interno → documento no fiscal (estilo recibo), número RB-.
-  if (esInterno) {
-    const id = randomUUID();
-    const [{ n }] = await db
-      .select({ n: count() })
-      .from(facturacion)
-      .where(
-        and(
-          eq(facturacion.guarderiaId, gId),
-          eq(facturacion.tipoFactura, 'recibo'),
-          like(facturacion.codigo, 'RB-%'),
-        ),
-      );
-    const codigo = `RB-${String(Number(n) + 1).padStart(6, '0')}`;
-    const emision = data.fecha ? fechaCalendariaArg(data.fecha) : new Date();
-    await db.insert(facturacion).values({
-      id,
-      guarderiaId: gId,
-      socioId: data.socioId,
-      tipoFactura: 'recibo',
-      estado: 'pendiente',
-      importe: data.monto,
-      descripcion: conceptoFinal,
-      emision,
-      movimientoId,
-      codigo,
-    });
-    revalidatePath('/ventas');
-    revalidatePath(`/usuarios/${data.socioId}`);
-    return { comprobante: 'interno', reciboId: id, comprobanteNro: codigo };
-  }
-
-  // 2b. Comprobante fiscal → NO se emite a AFIP ahora. El cargo queda como un
-  // consumo facturable normal (comprobante_interno = false), y la factura AFIP se
-  // emite después por la facturación manual o automática (como cualquier otro cargo).
   revalidatePath('/ventas');
   revalidatePath(`/usuarios/${data.socioId}`);
-  return { comprobante: 'fiscal' };
+  return { comprobante: esInterno ? 'interno' : 'fiscal' };
+}
+
+// ─── Action: comprobante interno manual/lote ──────────────────────────────────
+//
+// Consolida cargos "Interno" pendientes (comprobante_interno = true, sin
+// comprobante emitido todavía) en un solo documento no fiscal. No interactúa
+// con ARCA ni con las facturas: es solo un recibo para imprimir/mandar.
+
+async function nextComprobanteInternoCodigo(gId: string, prefix: 'CM' | 'CL'): Promise<string> {
+  const [{ n }] = await db
+    .select({ n: count() })
+    .from(facturacion)
+    .where(
+      and(
+        eq(facturacion.guarderiaId, gId),
+        eq(facturacion.tipoFactura, 'recibo'),
+        like(facturacion.codigo, `${prefix}-%`),
+      ),
+    );
+  return `${prefix}-${String(Number(n) + 1).padStart(6, '0')}`;
+}
+
+export async function getSocioPendientesInternoAction(
+  socioId: string,
+): Promise<{ error?: string; movimientos?: MovimientoPendiente[] }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+
+  const gId = ctx.activeMembership.guarderiaId;
+
+  const [m] = await db
+    .select({ id: memberships.id })
+    .from(memberships)
+    .where(
+      and(
+        eq(memberships.userId, socioId),
+        eq(memberships.guarderiaId, gId),
+        eq(memberships.status, 'active'),
+      ),
+    );
+  if (!m) return { error: 'Socio no pertenece a esta guardería.' };
+
+  const rows = await db
+    .select({
+      id: movimientosCuentaCorriente.id,
+      fecha: movimientosCuentaCorriente.fecha,
+      concepto: movimientosCuentaCorriente.concepto,
+      debe: movimientosCuentaCorriente.debe,
+    })
+    .from(movimientosCuentaCorriente)
+    .where(
+      and(
+        eq(movimientosCuentaCorriente.socioId, socioId),
+        eq(movimientosCuentaCorriente.estado, 'no_pagado'),
+        eq(movimientosCuentaCorriente.comprobanteInterno, true),
+      ),
+    )
+    .orderBy(movimientosCuentaCorriente.fecha);
+
+  return {
+    movimientos: rows.map((r) => ({
+      id: r.id,
+      fecha: r.fecha ? r.fecha.toISOString() : null,
+      concepto: r.concepto,
+      debe: r.debe ?? '0',
+    })),
+  };
+}
+
+async function crearComprobanteInternoCore(
+  data: { socioId: string; movimientoIds: string[]; fecha: string; guarderiaId: string },
+  prefix: 'CM' | 'CL',
+): Promise<{ error?: string; id?: string; codigo?: string }> {
+  const gId = data.guarderiaId;
+
+  if (!data.movimientoIds.length) return { error: 'Seleccioná al menos un ítem.' };
+
+  const movs = await db
+    .select({
+      id: movimientosCuentaCorriente.id,
+      concepto: movimientosCuentaCorriente.concepto,
+      debe: movimientosCuentaCorriente.debe,
+      comprobanteInterno: movimientosCuentaCorriente.comprobanteInterno,
+    })
+    .from(movimientosCuentaCorriente)
+    .where(
+      and(
+        inArray(movimientosCuentaCorriente.id, data.movimientoIds),
+        eq(movimientosCuentaCorriente.socioId, data.socioId),
+        eq(movimientosCuentaCorriente.estado, 'no_pagado'),
+      ),
+    );
+
+  if (movs.length === 0) return { error: 'No hay ítems para emitir.' };
+  if (movs.some((m) => !m.comprobanteInterno)) {
+    return { error: 'Solo se pueden incluir cargos marcados como Interno.' };
+  }
+
+  const total = movs.reduce((s, m) => s + parseFloat(m.debe ?? '0'), 0);
+  if (total <= 0) return { error: 'El total del comprobante debe ser mayor a 0.' };
+
+  const descripcion = `${movs[0].concepto ?? 'Servicio'}${movs.length > 1 ? ` (+${movs.length - 1})` : ''}`;
+
+  const facturaId = randomUUID();
+  const codigo = await nextComprobanteInternoCodigo(gId, prefix);
+  const emision = fechaCalendariaArg(data.fecha);
+
+  await db.insert(facturacion).values({
+    id: facturaId,
+    guarderiaId: gId,
+    socioId: data.socioId,
+    tipoFactura: 'recibo',
+    estado: 'pendiente',
+    codigo,
+    importe: total.toFixed(2),
+    descripcion,
+    emision,
+  });
+
+  const movimientoIds = movs.map((m) => m.id);
+  for (const m of movs) {
+    const [inserted] = await db
+      .insert(facturacionItems)
+      .values({
+        facturacionId: facturaId,
+        socioId: data.socioId,
+        importe: parseFloat(m.debe ?? '0').toFixed(2),
+        confirmado: true,
+      })
+      .returning({ id: facturacionItems.id });
+
+    await db.insert(facturacionItemMovimientos).values({
+      facturacionItemId: inserted.id,
+      movimientoId: m.id,
+    });
+  }
+
+  await db
+    .update(movimientosCuentaCorriente)
+    .set({ estado: 'facturado' })
+    .where(inArray(movimientosCuentaCorriente.id, movimientoIds));
+
+  revalidatePath('/ventas');
+  revalidatePath(`/usuarios/${data.socioId}`);
+
+  return { id: facturaId, codigo };
+}
+
+export type CrearComprobanteInternoData = {
+  socioId: string;
+  movimientoIds: string[];
+  fecha: string;
+};
+
+export async function crearComprobanteInternoAction(
+  data: CrearComprobanteInternoData,
+): Promise<{ error?: string; id?: string; codigo?: string }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+  return crearComprobanteInternoCore(
+    { ...data, guarderiaId: ctx.activeMembership.guarderiaId },
+    'CM',
+  );
+}
+
+export type ComprobanteInternoLoteResult = {
+  succeeded: { socioId: string; id: string; codigo: string }[];
+  skipped: { socioId: string; reason: string }[];
+  failed: { socioId: string; error: string }[];
+};
+
+export async function crearComprobanteInternoLoteAction(data: {
+  fecha: string;
+  socioMovimientos: { socioId: string; movimientoIds: string[] }[];
+}): Promise<{ error?: string; result?: ComprobanteInternoLoteResult }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+  if (!data.socioMovimientos.length) return { error: 'Seleccioná al menos un socio.' };
+
+  const gId = ctx.activeMembership.guarderiaId;
+  const result: ComprobanteInternoLoteResult = { succeeded: [], skipped: [], failed: [] };
+
+  for (const { socioId, movimientoIds } of data.socioMovimientos) {
+    if (!movimientoIds.length) {
+      result.skipped.push({ socioId, reason: 'Sin ítems seleccionados' });
+      continue;
+    }
+    const res = await crearComprobanteInternoCore(
+      { socioId, movimientoIds, fecha: data.fecha, guarderiaId: gId },
+      'CL',
+    );
+    if (res.error) {
+      result.failed.push({ socioId, error: res.error });
+    } else if (res.id && res.codigo) {
+      result.succeeded.push({ socioId, id: res.id, codigo: res.codigo });
+    }
+  }
+
+  revalidatePath('/ventas');
+  return { result };
 }
 
 // ─── Action: enviar recibo por mail al socio ──────────────────────────────────
@@ -986,9 +1104,12 @@ export async function enviarReciboPorMailAction(
   const destino = row.socioEmailFacturacion?.trim() || row.socioEmail;
   if (!destino) return { error: 'El socio no tiene email cargado.' };
 
-  // Comprobantes cancelados (FIFO), igual que la vista del recibo.
+  // Comprobantes cancelados (FIFO), igual que la vista del recibo. Solo
+  // aplica a recibos de cobranza (RC-): son los únicos que efectivamente
+  // cobran comprobantes existentes. RB-/CM-/CL- documentan un cargo propio,
+  // no un pago — para esos se usa row.descripcion más abajo.
   const comprobantes: string[] = [];
-  if (row.socioId) {
+  if (row.socioId && row.codigo?.startsWith('RC-')) {
     const facturasSocio = await db
       .select({
         codigo: facturacion.codigo,
@@ -1015,6 +1136,7 @@ export async function enviarReciboPorMailAction(
       acumulado += parseFloat(f.importe ?? '0');
     }
   }
+  if (comprobantes.length === 0 && row.descripcion) comprobantes.push(row.descripcion);
 
   const socioNombre =
     [row.socioNombre, row.socioApellido].filter(Boolean).join(' ').trim() || 'Socio';
@@ -1062,6 +1184,8 @@ export type EmitirNcData = {
   /** Requerido si motivo !== 'anulacion_total'. */
   importe?: number;
   descripcion?: string;
+  /** Define el prefijo del folio local: FM (individual) o FL (en lote). Default 'manual'. */
+  origen?: 'manual' | 'lote';
 };
 
 export type EmitirNcResult = {
@@ -1253,7 +1377,7 @@ export async function emitirNotaCreditoAction(data: EmitirNcData): Promise<Emiti
       | 'nota_credito_a'
       | 'nota_credito_b'
       | 'nota_credito_c';
-    const folioLocal = await nextFolioLocal(gId);
+    const folioLocal = await nextFolioLocal(gId, data.origen === 'lote' ? 'FL' : 'FM');
 
     await db.insert(facturacion).values({
       id: ncId,

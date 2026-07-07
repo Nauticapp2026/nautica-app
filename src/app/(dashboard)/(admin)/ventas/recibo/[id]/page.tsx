@@ -102,8 +102,10 @@ export default async function ReciboPage({ params }: { params: Promise<{ id: str
   const clubNombre = row.guarderiaRazonSocial ?? row.guarderiaName;
 
   // Comprobantes que cobró el recibo. Para recibos de cobranza (RC-) están
-  // guardados exactos en cobranza_comprobante_ids. Para el resto, heurística FIFO:
-  // facturas AFIP del socio, de la más antigua a la más nueva, hasta cubrir el importe.
+  // guardados exactos en cobranza_comprobante_ids, o si no se buscan por
+  // heurística FIFO (facturas AFIP del socio, de la más antigua a la más
+  // nueva, hasta cubrir el importe). RB-/CM-/CL- documentan un cargo propio,
+  // no un pago — para esos se muestra row.descripcion directamente más abajo.
   const comprobantes: { codigo: string | null; tipoFactura: string | null }[] = [];
   if (row.cobranzaComprobanteIds && row.cobranzaComprobanteIds.length > 0) {
     const cobrados = await db
@@ -114,7 +116,7 @@ export default async function ReciboPage({ params }: { params: Promise<{ id: str
       )
       .orderBy(asc(facturacion.emision));
     comprobantes.push(...cobrados);
-  } else if (row.socioId) {
+  } else if (row.socioId && row.codigo?.startsWith('RC-')) {
     const facturasSocio = await db
       .select({
         codigo: facturacion.codigo,

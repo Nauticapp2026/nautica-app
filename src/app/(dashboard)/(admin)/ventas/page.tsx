@@ -33,6 +33,7 @@ export default async function VentasPage() {
     [guarderiaInfo],
     cobrosLista,
     movsPendientesList,
+    movsPendientesInternoList,
   ] = await Promise.all([
     db
       .select({ pendientesCount: count() })
@@ -181,6 +182,35 @@ export default async function VentasPage() {
         ),
       )
       .orderBy(movimientosCuentaCorriente.fecha),
+
+    // Cargos "Interno" pendientes de consolidar en un Comprobante interno.
+    db
+      .select({
+        id: movimientosCuentaCorriente.id,
+        socioId: movimientosCuentaCorriente.socioId,
+        concepto: movimientosCuentaCorriente.concepto,
+        debe: movimientosCuentaCorriente.debe,
+        servicioNombre: servicios.nombre,
+        tipoServicio: servicios.tipo,
+      })
+      .from(movimientosCuentaCorriente)
+      .innerJoin(
+        memberships,
+        and(
+          eq(memberships.userId, movimientosCuentaCorriente.socioId),
+          eq(memberships.guarderiaId, gId),
+          eq(memberships.rol, 'socio'),
+          eq(memberships.status, 'active'),
+        ),
+      )
+      .leftJoin(servicios, eq(servicios.id, movimientosCuentaCorriente.servicioId))
+      .where(
+        and(
+          eq(movimientosCuentaCorriente.estado, 'no_pagado'),
+          eq(movimientosCuentaCorriente.comprobanteInterno, true),
+        ),
+      )
+      .orderBy(movimientosCuentaCorriente.fecha),
   ]);
 
   const facturas = lista.map((f) => ({
@@ -236,6 +266,36 @@ export default async function VentasPage() {
     movimientos: movsBySocio.get(s.profileId) ?? [],
   }));
 
+  // Cargos "Interno" pendientes, agrupados por socio (para Comprobante interno por lote).
+  const movsInternoBySocio = new Map<
+    string,
+    {
+      id: string;
+      concepto: string | null;
+      debe: string | null;
+      servicioNombre: string | null;
+      tipoServicio: string | null;
+    }[]
+  >();
+  for (const m of movsPendientesInternoList) {
+    if (!movsInternoBySocio.has(m.socioId)) movsInternoBySocio.set(m.socioId, []);
+    movsInternoBySocio.get(m.socioId)!.push({
+      id: m.id,
+      concepto: m.concepto,
+      debe: m.debe,
+      servicioNombre: m.servicioNombre,
+      tipoServicio: m.tipoServicio,
+    });
+  }
+  const sociosInterno = socios
+    .map((s) => ({
+      id: s.id,
+      nombre: s.nombre,
+      email: s.email,
+      movimientos: movsInternoBySocio.get(s.id) ?? [],
+    }))
+    .filter((s) => s.movimientos.length > 0);
+
   const posConfigurado = guarderiaInfo?.puntoDeVenta != null;
   const certificadoOk = guarderiaInfo?.certificadoAfipOk ?? false;
   const guarderiaCondicionIva = guarderiaInfo?.condicionIva ?? null;
@@ -255,6 +315,7 @@ export default async function VentasPage() {
     <VentasClient
       facturas={facturas}
       socios={socios}
+      sociosInterno={sociosInterno}
       kpis={{
         pendientes: pendientesCount,
         pagadasMes,

@@ -321,11 +321,7 @@ function AgregarServicioModal({
   const [fecha, setFecha] = useState(todayISODate);
   const [comprobante, setComprobante] = useState<'interno' | 'fiscal'>('interno');
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<{
-    comprobante: 'interno' | 'fiscal';
-    nro?: string;
-    reciboId?: string;
-  } | null>(null);
+  const [result, setResult] = useState<{ comprobante: 'interno' | 'fiscal' } | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const isValid = Boolean(servicioId && monto);
@@ -365,11 +361,7 @@ function AgregarServicioModal({
       if (res.error) {
         setError(res.error);
       } else {
-        setResult({
-          comprobante: res.comprobante!,
-          nro: res.comprobanteNro,
-          reciboId: res.reciboId,
-        });
+        setResult({ comprobante: res.comprobante! });
         router.refresh();
       }
     });
@@ -406,7 +398,8 @@ function AgregarServicioModal({
                 <p className="font-semibold text-teal-900">Servicio cargado</p>
                 {result.comprobante === 'interno' ? (
                   <p className="text-sm text-teal-700">
-                    Comprobante interno{result.nro ? ` · Nro: ${result.nro}` : ''}
+                    Marcado como no fiscal. Vas a poder emitirle un Comprobante interno desde
+                    Ventas.
                   </p>
                 ) : (
                   <p className="text-sm text-teal-700">
@@ -415,15 +408,6 @@ function AgregarServicioModal({
                 )}
               </div>
             </div>
-            {result.comprobante === 'interno' && result.reciboId && (
-              <Link
-                href={`/ventas/recibo/${result.reciboId}`}
-                target="_blank"
-                className="flex w-full items-center justify-center gap-2 rounded-[10px] border border-gray-200 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
-              >
-                Ver / imprimir comprobante
-              </Link>
-            )}
             <button
               onClick={handleClose}
               className="w-full rounded-[10px] py-2.5 text-sm font-semibold text-white transition hover:opacity-90"
@@ -526,7 +510,7 @@ function AgregarServicioModal({
                 </div>
                 <p className="mt-1.5 text-xs text-gray-400">
                   {comprobante === 'interno'
-                    ? 'Genera un comprobante interno (no fiscal). El cargo NO se factura por ARCA.'
+                    ? 'Marca el cargo como no fiscal (NO se factura por ARCA). Podés emitirle un Comprobante interno desde Ventas cuando quieras.'
                     : 'El cargo se factura por ARCA después (manual o automático), como el resto.'}
                 </p>
               </div>
