@@ -661,7 +661,9 @@ El tipo de comprobante se determina automáticamente para cada socio según la c
 
 > La facturación mensual automática corre el día del mes que configuraste en **Mi perfil → Información general** (campo "Día de facturación"). Solo aplica a socios que ya tuvieron al menos una factura emitida.
 
-**¿Qué conceptos entran en la factura automática?** La factura incluye **todos los cargos pendientes** del socio: la mensualidad del espacio que el sistema genera ese día **más cualquier consumo cargado durante el mes que siga pendiente**. No entran los pagos ni saldos a favor, ni los cargos que ya estaban facturados (no se duplican), **ni los cargos con comprobante interno** (esos nunca se facturan). Importante: como todo consumo fiscal cargado desde **Cargar Servicio** queda pendiente, cada consumo no cobrado antes del día de facturación se va a incluir en la factura mensual del socio.
+**¿Qué conceptos entran en la factura automática?** La factura incluye **todos los cargos pendientes** del socio: la mensualidad que el sistema genera ese día **más cualquier consumo cargado durante el mes que siga pendiente**. No entran los pagos ni saldos a favor, ni los cargos que ya estaban facturados (no se duplican), **ni los cargos con comprobante interno** (esos nunca se facturan). Importante: como todo consumo fiscal cargado desde **Cargar Servicio** queda pendiente, cada consumo no cobrado antes del día de facturación se va a incluir en la factura mensual del socio.
+
+> **Qué se genera solo cada mes.** Toda tarifa marcada **Fija** se cobra mensual automático — no solo Espacio de guarda: también Cuota social, Membresía, Expensas ordinarias/extraordinarias y Servicio extra. Para Espacio de guarda alcanza con tener el espacio asignado. Para el resto, la recurrencia arranca sola apenas le cargás el primer cargo fiscal con **Cargar Servicio**; de ahí en más se repite todos los meses hasta que lo canceles desde **Servicios Contratados**. Las tarifas **Variables** (se cobran según el metraje) nunca se repiten solas — se cobran una vez y listo; para volver a cobrarlas hay que cargarlas a mano de nuevo.
 
 ### Comprobantes internos
 
@@ -738,7 +740,7 @@ Desde aquí definís los precios de los servicios que ofrece tu club.
 
 Las tarifas están agrupadas por categoría. Podés filtrar usando los botones: **Todas**, **Espacio de guarda**, **Cuota social**, **Membresía**, **Expensas ordinarias**, **Expensas extraordinarias** y **Servicio extra**.
 
-Cada tarifa muestra su concepto, un badge **Fijo** o **Variable** (fijo = precio único; variable = se cobra según el metraje de la embarcación), el período de vigencia, el precio y el estado. En la columna de precio se muestran dos valores:
+Cada tarifa muestra su concepto, un badge **Fijo** o **Variable** (fijo = precio único; variable = se cobra según el metraje de la embarcación), el período de vigencia, el precio y el estado. **Fijo/Variable también define si se repite sola todos los meses**: las Fijas sí, las Variables se cobran una sola vez (ver "¿Qué conceptos entran en la factura automática?" más abajo). En la columna de precio se muestran dos valores:
 
 - **Precio c/IVA** — el total que se le cobra al socio, calculado automáticamente sumando la alícuota al precio de lista (precio × (1 + alícuota)).
 - **Precio s/IVA** — el precio de lista que cargaste (sin impuesto). La línea "s/IVA" solo aparece cuando la alícuota es mayor a 0; si la tarifa es **Exento / No gravado** (0 %), no se muestra.

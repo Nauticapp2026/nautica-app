@@ -2,12 +2,20 @@ import { NextResponse } from 'next/server';
 
 import { runAjustesProgramados } from '@/lib/ajustes-programados';
 import { runAutoEmision } from '@/lib/auto-facturacion';
-import { guarderiasQueFacturanHoy, runMonthlyGeneration } from '@/lib/movimientos-mensuales';
+import {
+  guarderiasQueFacturanHoy,
+  runMonthlyGeneracionServiciosRecurrentes,
+  runMonthlyGeneration,
+} from '@/lib/movimientos-mensuales';
 import { runPaywayCharges } from '@/lib/payway-cobros';
 
 // Invocado diariamente por Vercel Cron (ver vercel.json: 0 5 * * *).
 // Para cada guardería cuyo `diaFacturacion === hoy`:
-//   1. Genera el movimiento mensual de cada espacio asignado.
+//   1. Genera el movimiento mensual de cada cargo con tarifa Fija que el
+//      socio ya tenga contratado — vía "Asignar espacio" o vía "Cargar
+//      Servicio" (Cuota social, Membresía, Expensas, Servicio extra, o
+//      incluso Espacio de guarda cargado a mano). Las tarifas Variables no
+//      se repiten solas.
 //   2. Auto-emite factura para cada socio con pendientes que ya tenga
 //      al menos una factura emitida (regla: primera factura es manual).
 //   3. Cobra por Payway (débito automático) a los socios con token activo.
@@ -30,8 +38,10 @@ export async function GET(req: Request): Promise<Response> {
     // 0. Aplicar ajustes de tarifa programados cuya fecha llegó (antes de
     //    generar movimientos y facturar, para que el precio nuevo ya rija).
     const ajustesProgramados = await runAjustesProgramados(now);
-    // 1. Generar movimientos mensuales de espacios ocupados.
+    // 1. Generar movimientos mensuales: espacios ocupados con tarifa Fija, y
+    //    servicios recurrentes (no-espacio) con tarifa Fija ya contratados.
     const movs = await runMonthlyGeneration(now);
+    const movsServicios = await runMonthlyGeneracionServiciosRecurrentes(now);
     // 2 y 3. Emisión y cobro sobre TODAS las guarderías que facturan hoy
     //        (no solo las que tienen espacios ocupados).
     const guarderiaIds = await guarderiasQueFacturanHoy(now);
@@ -41,6 +51,7 @@ export async function GET(req: Request): Promise<Response> {
       ok: true,
       ajustesProgramados,
       movimientos: movs,
+      movimientosServicios: movsServicios,
       guarderiaIds,
       facturas,
       cobros,

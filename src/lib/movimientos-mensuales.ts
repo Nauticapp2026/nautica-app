@@ -10,6 +10,21 @@
  *    con pendientes (ver `auto-facturacion.ts`). La primera factura de
  *    cada socio sigue siendo manual.
  *
+ * Regla Fijo/Variable (post deploy — Comprobante interno / servicios
+ * recurrentes): solo las tarifas **Fijas** se cobran mensual automático.
+ * Las **Variables** se cobran una sola vez y no vuelven a generarse solas.
+ * Hay dos caminos, y lo que decide cuál corresponde es si el cargo está
+ * atado a un espacio asignado, no la categoría de la tarifa:
+ *  - `runMonthlyGeneration` — cargos con `espacio_id` (vienen de "Asignar
+ *    espacio").
+ *  - `runMonthlyGeneracionServiciosRecurrentes` — cargos sin `espacio_id`
+ *    (vienen de "Cargar Servicio", sea cual sea la categoría de la
+ *    tarifa). No hay una asignación explícita como en Espacios — la
+ *    recurrencia arranca sola apenas el socio tiene un primer cargo fiscal
+ *    con esa tarifa, y se frena cancelando el servicio desde la pestaña
+ *    Servicios Contratados (tabla `socio_servicios_cancelados`, ya usada
+ *    por Espacios).
+ *
  * Uso:
  *  - updateEspacioAction: al asociar un socio a un espacio con tarifa,
  *    creamos el movimiento del mes corriente prorrateado por los días
@@ -21,12 +36,13 @@
  * deprecado). Sigue siendo útil como historial del alta.
  */
 
-import { and, eq, gte, inArray, isNotNull, lte } from 'drizzle-orm';
+import { and, eq, gte, inArray, isNotNull, isNull, lte } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import {
   espacios,
   guarderias,
+  memberships,
   movimientosCuentaCorriente,
   servicios,
   socioServiciosCancelados,
@@ -210,6 +226,10 @@ export async function runMonthlyGeneration(now: Date = new Date()): Promise<{
         // Una tarifa pausada o inactiva no genera cargos nuevos, aunque el
         // espacio siga ocupado con esa tarifa asignada.
         eq(servicios.estado, 'activo'),
+        // Solo tarifas Fijas se cobran mensual automático. Las Variables se
+        // cobran una sola vez (al asignar el espacio) y no vuelven a
+        // generarse solas — hay que cargarlas a mano cada vez.
+        eq(servicios.tipoCobro, 'fijo'),
       ),
     );
 
@@ -278,6 +298,174 @@ export async function runMonthlyGeneration(now: Date = new Date()): Promise<{
     skipped,
     guarderiaIds: Array.from(guarderiasProcesadas),
   };
+}
+
+/**
+ * Se asegura de que exista un movimiento mensual para (socio, servicio) en
+ * los últimos 27 días. Análogo a `ensureMonthlyMovimiento` pero sin espacio
+ * — para las categorías que no son Espacio de guarda.
+ */
+async function ensureMonthlyMovimientoServicio(params: {
+  socioId: string;
+  servicioId: string;
+  precio: number;
+  concepto: string;
+  now?: Date;
+}): Promise<string | null> {
+  const now = params.now ?? new Date();
+
+  const [existing] = await db
+    .select({ id: movimientosCuentaCorriente.id })
+    .from(movimientosCuentaCorriente)
+    .where(
+      and(
+        eq(movimientosCuentaCorriente.socioId, params.socioId),
+        eq(movimientosCuentaCorriente.servicioId, params.servicioId),
+        isNull(movimientosCuentaCorriente.espacioId),
+        eq(movimientosCuentaCorriente.tipo, 'mensual'),
+        gte(movimientosCuentaCorriente.fecha, hace27Dias(now)),
+      ),
+    )
+    .limit(1);
+
+  if (existing) return null;
+
+  const importe = params.precio.toFixed(2);
+
+  const [row] = await db
+    .insert(movimientosCuentaCorriente)
+    .values({
+      socioId: params.socioId,
+      servicioId: params.servicioId,
+      concepto: params.concepto,
+      tipo: 'mensual',
+      estado: 'no_pagado',
+      debe: importe,
+      importeSigned: importe,
+      fecha: now,
+      proximoPago: nextMonthStart(now),
+    })
+    .returning({ id: movimientosCuentaCorriente.id });
+
+  return row?.id ?? null;
+}
+
+/**
+ * Recorre pares (socio, servicio) con al menos un cargo fiscal previo
+ * (comprobante_interno = false, sin espacio asociado) para una tarifa Fija,
+ * y genera el cargo mensual el día de facturación de la guardería, salvo
+ * que el socio lo haya cancelado (Servicios Contratados).
+ *
+ * La categoría de la tarifa no importa acá — lo que decide si un cargo lo
+ * cobra esta función o `runMonthlyGeneration` es si está atado a un espacio
+ * (`espacio_id`) o no. Un cargo de una tarifa "Espacio de guarda" cargado a
+ * mano con "Cargar Servicio" (sin pasar por "Asignar espacio") también
+ * recurre por acá.
+ *
+ * No hay una "asignación" explícita como en Espacios: la recurrencia
+ * arranca sola con el primer cargo que se cargue a mano vía "Cargar
+ * Servicio" (Fiscal). Se ejecuta diariamente desde el cron, junto con
+ * `runMonthlyGeneration`.
+ */
+export async function runMonthlyGeneracionServiciosRecurrentes(
+  now: Date = new Date(),
+): Promise<{ created: number; scanned: number; skipped: number }> {
+  const diaHoy = now.getUTCDate();
+  const todayStr = now.toISOString().slice(0, 10);
+  const primerHabilDelMes = primerDiaHabilDelMes(now);
+
+  const pares = await db
+    .selectDistinct({
+      socioId: movimientosCuentaCorriente.socioId,
+      servicioId: movimientosCuentaCorriente.servicioId,
+      servicioNombre: servicios.nombre,
+      servicioPrecio: servicios.precio,
+      servicioAlicuotaIva: servicios.alicuotaIva,
+      diaFacturacion: guarderias.diaFacturacion,
+      facturacionPrimerHabil: guarderias.facturacionPrimerHabil,
+    })
+    .from(movimientosCuentaCorriente)
+    .innerJoin(servicios, eq(servicios.id, movimientosCuentaCorriente.servicioId))
+    .innerJoin(guarderias, eq(guarderias.id, servicios.guarderiaId))
+    .innerJoin(
+      memberships,
+      and(
+        eq(memberships.userId, movimientosCuentaCorriente.socioId),
+        eq(memberships.guarderiaId, servicios.guarderiaId),
+        eq(memberships.rol, 'socio'),
+        eq(memberships.status, 'active'),
+      ),
+    )
+    .where(
+      and(
+        eq(movimientosCuentaCorriente.comprobanteInterno, false),
+        isNotNull(movimientosCuentaCorriente.servicioId),
+        // La categoría (tipo) NO decide quién cobra esto — lo decide si el
+        // cargo está atado a un espacio o no. Un cargo cargado a mano con
+        // "Cargar Servicio" para una tarifa de categoría Espacio de guarda
+        // (sin pasar por "Asignar espacio") también tiene que recurrir acá;
+        // lo que SÍ hay que excluir siempre son los cargos que sí vienen de
+        // un espacio asignado — esos los cobra runMonthlyGeneration.
+        isNull(movimientosCuentaCorriente.espacioId),
+        eq(servicios.tipoCobro, 'fijo'),
+        eq(servicios.estado, 'activo'),
+        lte(servicios.vigenciaDesde, todayStr),
+        gte(servicios.vigenciaHasta, todayStr),
+      ),
+    );
+
+  const socioIds = [...new Set(pares.map((p) => p.socioId))];
+  const servicioIdsSet = [...new Set(pares.map((p) => p.servicioId).filter(Boolean) as string[])];
+  const canceladosSet = new Set<string>();
+  if (socioIds.length > 0 && servicioIdsSet.length > 0) {
+    const cancelados = await db
+      .select({
+        socioId: socioServiciosCancelados.socioId,
+        servicioId: socioServiciosCancelados.servicioId,
+      })
+      .from(socioServiciosCancelados)
+      .where(
+        and(
+          inArray(socioServiciosCancelados.socioId, socioIds),
+          inArray(socioServiciosCancelados.servicioId, servicioIdsSet),
+        ),
+      );
+    for (const c of cancelados) canceladosSet.add(`${c.socioId}:${c.servicioId}`);
+  }
+
+  let created = 0;
+  let skipped = 0;
+
+  for (const p of pares) {
+    if (!p.servicioId) continue;
+
+    if (canceladosSet.has(`${p.socioId}:${p.servicioId}`)) {
+      skipped++;
+      continue;
+    }
+
+    const usaPrimerHabil = p.facturacionPrimerHabil ?? false;
+    const diaObjetivo = usaPrimerHabil ? primerHabilDelMes : (p.diaFacturacion ?? 1);
+    if (diaObjetivo !== diaHoy) {
+      skipped++;
+      continue;
+    }
+
+    const precioNeto = p.servicioPrecio != null ? Number(p.servicioPrecio) : 0;
+    const alicuotaIva = p.servicioAlicuotaIva != null ? Number(p.servicioAlicuotaIva) : 0;
+    const precio = precioConIva(precioNeto, alicuotaIva);
+
+    const res = await ensureMonthlyMovimientoServicio({
+      socioId: p.socioId,
+      servicioId: p.servicioId,
+      precio,
+      concepto: p.servicioNombre,
+      now,
+    });
+    if (res) created++;
+  }
+
+  return { created, scanned: pares.length, skipped };
 }
 
 /**
