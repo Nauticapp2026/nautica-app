@@ -118,6 +118,17 @@ function precioSinIva(total: number, alicuota: string): number {
   return +(total / (1 + a / 100)).toFixed(2);
 }
 
+// Identificación interna "FL-NNNNNN", correlativa por guardería. Se suma al
+// número que devuelve ARCA — solo para Facturación manual/lote y sus NC (no
+// para recibos internos "RB-" ni para la auto-facturación del cron).
+async function nextFolioLocal(gId: string): Promise<string> {
+  const [{ n }] = await db
+    .select({ n: count() })
+    .from(facturacion)
+    .where(and(eq(facturacion.guarderiaId, gId), like(facturacion.folioLocal, 'FL-%')));
+  return `FL-${String(Number(n) + 1).padStart(6, '0')}`;
+}
+
 /**
  * Datos del socio relevantes para construir la identidad de facturación.
  * facturaFiscal = true  → facturar con datos PERSONALES (pestaña Generales).
@@ -291,22 +302,27 @@ export type FacturaResult = {
   error?: string;
   facturaId?: string;
   comprobanteNro?: string;
+  folioLocal?: string;
   pdfUrl?: string;
 };
 
 export async function createInvoiceAction(data: CreateInvoiceData): Promise<FacturaResult> {
   const ctx = await getActiveMarina();
   if (!ctx) return { error: 'No autenticado' };
-  return crearFacturaCore({ ...data, guarderiaId: ctx.activeMembership.guarderiaId });
+  return crearFacturaCore(
+    { ...data, guarderiaId: ctx.activeMembership.guarderiaId },
+    { folioLocal: true },
+  );
 }
 
 /**
  * Core de emisión de factura, sin chequeo de sesión. Llamable desde:
- * - createInvoiceAction (manual, con auth)
- * - cron de auto-facturación (sin auth, recibe guarderiaId)
+ * - createInvoiceAction (manual, con auth) → asigna folio local "FL-NNNNNN"
+ * - cron de auto-facturación (sin auth, recibe guarderiaId) → sin folio local
  */
 export async function crearFacturaCore(
   data: CreateInvoiceData & { guarderiaId: string },
+  opts?: { folioLocal?: boolean },
 ): Promise<FacturaResult> {
   const gId = data.guarderiaId;
 
@@ -487,12 +503,14 @@ export async function crearFacturaCore(
       `Factura ${TIPO_FACTURA_API[data.tipoFactura]} — ${items[0].descripcion}${
         items.length > 1 ? ` (+${items.length - 1})` : ''
       }`;
+    const folioLocal = opts?.folioLocal ? await nextFolioLocal(gId) : null;
 
     await db.insert(facturacion).values({
       id: facturaId,
       guarderiaId: gId,
       socioId: data.socioId,
       codigo: apiResponse.comprobante_nro ?? null,
+      folioLocal,
       archivo: apiResponse.comprobante_pdf_url ?? null,
       cae: apiResponse.cae ?? null,
       descripcion: descripcionFactura,
@@ -544,6 +562,7 @@ export async function crearFacturaCore(
     return {
       facturaId,
       comprobanteNro: apiResponse.comprobante_nro,
+      folioLocal: folioLocal ?? undefined,
       pdfUrl: apiResponse.comprobante_pdf_url,
     };
   } catch (err) {
@@ -563,7 +582,7 @@ export async function crearFacturaCore(
 // ─── Action: factura en lote ────────────────────────────────────────────────
 
 export type BatchResult = {
-  succeeded: { socioId: string; facturaId: string; comprobanteNro?: string }[];
+  succeeded: { socioId: string; facturaId: string; comprobanteNro?: string; folioLocal?: string }[];
   skipped: { socioId: string; reason: string }[];
   failed: { socioId: string; error: string }[];
 };
@@ -648,6 +667,7 @@ export async function createBatchInvoicesAction(
         socioId,
         facturaId: res.facturaId,
         comprobanteNro: res.comprobanteNro,
+        folioLocal: res.folioLocal,
       });
     }
   }
@@ -1048,6 +1068,7 @@ export type EmitirNcResult = {
   error?: string;
   ncId?: string;
   comprobanteNro?: string;
+  folioLocal?: string;
   pdfUrl?: string;
 };
 
@@ -1232,6 +1253,7 @@ export async function emitirNotaCreditoAction(data: EmitirNcData): Promise<Emiti
       | 'nota_credito_a'
       | 'nota_credito_b'
       | 'nota_credito_c';
+    const folioLocal = await nextFolioLocal(gId);
 
     await db.insert(facturacion).values({
       id: ncId,
@@ -1240,6 +1262,7 @@ export async function emitirNotaCreditoAction(data: EmitirNcData): Promise<Emiti
       tipoFactura: ncTipoFactura,
       estado: 'pagada',
       codigo: apiResponse.comprobante_nro ?? null,
+      folioLocal,
       archivo: apiResponse.comprobante_pdf_url ?? null,
       cae: apiResponse.cae ?? null,
       descripcion: descripcionNc,
@@ -1270,6 +1293,7 @@ export async function emitirNotaCreditoAction(data: EmitirNcData): Promise<Emiti
     return {
       ncId,
       comprobanteNro: apiResponse.comprobante_nro,
+      folioLocal,
       pdfUrl: apiResponse.comprobante_pdf_url,
     };
   } catch (err) {

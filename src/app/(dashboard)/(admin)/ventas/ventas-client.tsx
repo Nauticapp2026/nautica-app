@@ -48,6 +48,7 @@ import {
 type Factura = {
   id: string;
   codigo: string | null;
+  folioLocal: string | null;
   tipoFactura: string | null;
   importe: string | null;
   estado: string | null;
@@ -356,7 +357,9 @@ function NuevaFacturaModal({
       if (res.error) {
         setError(res.error);
       } else {
-        setSuccess(`Comprobante emitido ${res.comprobanteNro ?? ''}`);
+        setSuccess(
+          `Comprobante emitido ${res.comprobanteNro ?? ''}${res.folioLocal ? ` · ${res.folioLocal}` : ''}`,
+        );
         setTimeout(() => {
           handleClose();
           router.refresh();
@@ -1182,7 +1185,11 @@ function NotaCreditoModal({
   const [importe, setImporte] = useState('');
   const [descripcion, setDescripcion] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<{ comprobanteNro?: string; pdfUrl?: string } | null>(null);
+  const [result, setResult] = useState<{
+    comprobanteNro?: string;
+    folioLocal?: string;
+    pdfUrl?: string;
+  } | null>(null);
   const [isPending, startTransition] = useTransition();
 
   if (!open || !factura) return null;
@@ -1204,7 +1211,11 @@ function NotaCreditoModal({
       if (res.error) {
         setError(res.error);
       } else {
-        setResult({ comprobanteNro: res.comprobanteNro, pdfUrl: res.pdfUrl });
+        setResult({
+          comprobanteNro: res.comprobanteNro,
+          folioLocal: res.folioLocal,
+          pdfUrl: res.pdfUrl,
+        });
         router.refresh();
       }
     });
@@ -1249,6 +1260,7 @@ function NotaCreditoModal({
                 {result.comprobanteNro && (
                   <p className="text-sm text-teal-700">Nro: {result.comprobanteNro}</p>
                 )}
+                {result.folioLocal && <p className="text-sm text-teal-700">{result.folioLocal}</p>}
               </div>
             </div>
             {result.pdfUrl && (
@@ -1396,7 +1408,9 @@ function LoteNotaCreditoModal({
       res.push({
         codigo: f.codigo ?? f.id.slice(0, 8),
         ok: !r.error,
-        mensaje: r.error ?? `NC ${r.comprobanteNro ?? 'emitida'}`,
+        mensaje:
+          r.error ??
+          `NC ${r.comprobanteNro ?? 'emitida'}${r.folioLocal ? ` · ${r.folioLocal}` : ''}`,
       });
     }
     setProgreso(facturas.length);
@@ -1591,6 +1605,7 @@ export function VentasClient({
           const tipo = TIPO_FACTURA_LABEL[f.tipoFactura ?? ''] ?? f.tipoFactura ?? '';
           const ok =
             (f.codigo ?? '').toLowerCase().includes(q) ||
+            (f.folioLocal ?? '').toLowerCase().includes(q) ||
             tipo.toLowerCase().includes(q) ||
             f.socioNombre.toLowerCase().includes(q) ||
             (f.descripcion ?? '').toLowerCase().includes(q);
@@ -1704,6 +1719,7 @@ export function VentasClient({
     if (activeTab === 'afip') {
       const cols = [
         'Número',
+        'FL Nº',
         'Tipo',
         'Cliente',
         'Fecha',
@@ -1715,6 +1731,7 @@ export function VentasClient({
       const rows = filtradosAfip.map((f) =>
         [
           f.codigo ?? '',
+          f.folioLocal ?? '',
           TIPO_FACTURA_LABEL[f.tipoFactura ?? ''] ?? f.tipoFactura ?? '',
           f.socioNombre,
           f.emision ? fmtDate(f.emision) : '',
@@ -2066,6 +2083,11 @@ export function VentasClient({
                             </td>
                             <td className="px-4 py-3 font-medium" style={{ color: '#101828' }}>
                               {f.codigo ?? '—'}
+                              {f.folioLocal && (
+                                <div className="text-xs font-normal text-gray-400">
+                                  {f.folioLocal}
+                                </div>
+                              )}
                             </td>
                             <td className="px-4 py-3 text-gray-500">
                               {TIPO_FACTURA_LABEL[f.tipoFactura ?? ''] ?? '—'}

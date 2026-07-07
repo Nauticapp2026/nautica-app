@@ -645,6 +645,8 @@ Las tarjetas superiores muestran:
 
 > En el selector aparecen **todos los socios del club**. Lo que define si la emisión sale bien son los **datos fiscales/personales completos** del socio (ver "Datos requeridos para emitir facturas ARCA"); si faltan, ARCA puede rechazar la emisión.
 
+> Además del número que devuelve ARCA, cada comprobante emitido por Facturación manual, por lote o como nota de crédito lleva un identificador interno correlativo **FL Nº** (ej. FL-000001), visible debajo del número ARCA en la tabla de **Comprobantes ARCA**.
+
 ### Facturación en lote
 
 Emití facturas para múltiples socios al mismo tiempo.

@@ -65,6 +65,7 @@ export default async function VentasPage() {
       .select({
         id: facturacion.id,
         codigo: facturacion.codigo,
+        folioLocal: facturacion.folioLocal,
         tipoFactura: facturacion.tipoFactura,
         importe: facturacion.importe,
         estado: facturacion.estado,
@@ -185,6 +186,7 @@ export default async function VentasPage() {
   const facturas = lista.map((f) => ({
     id: f.id,
     codigo: f.codigo,
+    folioLocal: f.folioLocal,
     tipoFactura: f.tipoFactura,
     importe: f.importe,
     estado: f.estado,

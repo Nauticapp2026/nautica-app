@@ -1127,6 +1127,9 @@ export const facturacion = pgTable(
       .references(() => guarderias.id, { onDelete: 'cascade' }),
     socioId: uuid('socio_id').references(() => profiles.id, { onDelete: 'set null' }),
     codigo: text('codigo'),
+    // Identificación interna "FL-NNNNNN", correlativa por guardería. Se suma
+    // al codigo que devuelve ARCA — solo para Facturación manual/lote y sus NC.
+    folioLocal: text('folio_local'),
     archivo: text('archivo'),
     descripcion: text('descripcion'),
     tipoFactura: tipoFacturaEnum('tipo_factura'),
