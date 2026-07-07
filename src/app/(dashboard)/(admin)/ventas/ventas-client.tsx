@@ -38,6 +38,13 @@ import { toast } from 'sonner';
 import { formatArgentinaDate } from '@/lib/dates';
 import { EmptyState } from '@/components/shared/empty-state';
 import { Pagination } from '@/components/shared/pagination';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 // ─── Tipos ──────────────────────────────────────────────────────────────────
 
@@ -2152,33 +2159,49 @@ export function VentasClient({
               Ventanilla
             </button>
           )}
-          <button
-            onClick={() => setLoteOpen(true)}
-            disabled={!puedeFacturar}
-            title={
-              !puedeFacturar
-                ? 'Configurá los datos de facturación y confirmá el certificado ARCA para poder facturar.'
-                : undefined
-            }
-            className="flex items-center justify-center gap-2 rounded-[10px] border border-[#d1d5dc] bg-white px-4 py-2.5 text-sm font-semibold text-[#364153] transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-white"
-          >
-            <Plus className="h-4 w-4" />
-            Factura en lote
-          </button>
-          <button
-            onClick={() => setNuevaOpen(true)}
-            disabled={!puedeFacturar}
-            title={
-              !puedeFacturar
-                ? 'Configurá los datos de facturación y confirmá el certificado ARCA para poder facturar.'
-                : undefined
-            }
-            className="flex items-center justify-center gap-2 rounded-[10px] px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:opacity-40"
-            style={{ background: '#175861' }}
-          >
-            <Plus className="h-4 w-4" />
-            Nuevo comprobante
-          </button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                className="flex items-center justify-center gap-2 rounded-[10px] px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90"
+                style={{ background: '#175861' }}
+              >
+                <Plus className="h-4 w-4" />
+                Nuevo comprobante
+                <ChevronDown className="h-4 w-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem
+                disabled={!puedeFacturar}
+                title={
+                  !puedeFacturar
+                    ? 'Configurá los datos de facturación y confirmá el certificado ARCA para poder facturar.'
+                    : undefined
+                }
+                onSelect={() => setNuevaOpen(true)}
+              >
+                Facturación manual
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={!puedeFacturar}
+                title={
+                  !puedeFacturar
+                    ? 'Configurá los datos de facturación y confirmá el certificado ARCA para poder facturar.'
+                    : undefined
+                }
+                onSelect={() => setLoteOpen(true)}
+              >
+                Facturación por lote
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem disabled title="Próximamente">
+                Comprobante interno manual
+              </DropdownMenuItem>
+              <DropdownMenuItem disabled title="Próximamente">
+                Comprobante interno por lote
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
