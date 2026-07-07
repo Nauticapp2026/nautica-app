@@ -337,7 +337,7 @@
 <p><strong>Usar datos personales para facturación</strong> — checkbox en la parte superior de esta pestaña. Define <strong>con qué datos se emiten los comprobantes</strong> del socio:</p>
 
 <ul><li><strong>Desactivado</strong> (valor por defecto): se factura con los <strong>Datos Impositivos</strong> (razón social, CUIT, dirección fiscal y condición frente al IVA de esta pestaña).</li><li><strong>Activado</strong>: se factura con los <strong>datos personales</strong> del socio (nombre y apellido, tipo y número de documento, dirección y condición frente al IVA cargados en la pestaña <strong>Generales</strong>).</li></ul>
-<blockquote><strong>Importante:</strong> todos los socios activos aparecen en los flujos de facturación (individual, ventanilla y lote). Este checkbox ya <strong>no</strong> controla si el socio aparece o no en el módulo: solo elige el conjunto de datos con el que se emite.</blockquote>
+<blockquote><strong>Importante:</strong> todos los socios activos aparecen en los flujos de facturación (individual y lote). Este checkbox ya <strong>no</strong> controla si el socio aparece o no en el módulo: solo elige el conjunto de datos con el que se emite.</blockquote>
 
 <blockquote><strong>Campos requeridos para poder emitir factura ARCA al socio:</strong></blockquote>
 <p>></p>
@@ -678,7 +678,7 @@
 <ul><li><strong>Pendientes de cobro</strong> — <strong>cantidad</strong> de facturas sin cobrar.</li><li><strong>Pagadas este mes</strong> — <strong>cantidad</strong> de facturas cobradas en el mes.</li><li><strong>Vencidas</strong> — cantidad de facturas que superaron su fecha de vencimiento sin cobro.</li><li><strong>Total facturado</strong> — monto acumulado histórico.</li></ul>
 <h3>Emitir una factura individual</h3>
 
-<ol><li>Hacé clic en <strong>Nuevo comprobante</strong>.</li><li>Seleccioná el <strong>socio</strong> en el campo Cliente.</li><li>El sistema muestra automáticamente los <strong>conceptos pendientes</strong> del socio (movimientos sin facturar). Marcá los que querés incluir. Podés usar <strong>Todos</strong> o <strong>Ninguno</strong> para seleccionar rápido.</li><li>Completá los campos:</li></ol>   - <strong>Tipo de comprobante</strong> — se determina automáticamente según la condición IVA del club y del socio (campo de solo lectura):
+<ol><li>Hacé clic en <strong>Nuevo comprobante</strong> → <strong>Facturación manual</strong>.</li><li>Seleccioná el <strong>socio</strong> en el campo Cliente.</li><li>El sistema muestra automáticamente los <strong>conceptos pendientes</strong> del socio (movimientos sin facturar). Marcá los que querés incluir. Podés usar <strong>Todos</strong> o <strong>Ninguno</strong> para seleccionar rápido.</li><li>Completá los campos:</li></ol>   - <strong>Tipo de comprobante</strong> — se determina automáticamente según la condición IVA del club y del socio (campo de solo lectura):
 <p>- Club Monotributo → siempre <strong>Factura C</strong>.</p>
 <p>- Club Responsable Inscripto + Socio Responsable Inscripto → <strong>Factura A</strong>.</p>
 <p>- Club Responsable Inscripto + cualquier otra condición → <strong>Factura B</strong>.</p>
@@ -690,18 +690,11 @@
 <ol><li>Hacé clic en <strong>Emitir</strong>. La factura se envía a ARCA y queda registrada.</li></ol>
 <blockquote>En el selector aparecen <strong>todos los socios del club</strong>. Lo que define si la emisión sale bien son los <strong>datos fiscales/personales completos</strong> del socio (ver "Datos requeridos para emitir facturas ARCA"); si faltan, ARCA puede rechazar la emisión.</blockquote>
 
-<h3>Emitir comprobante por ventanilla</h3>
-
-<p>Para facturar servicios puntuales que no están cargados como movimientos del socio:</p>
-
-<ol><li>Hacé clic en <strong>Ventanilla</strong>.</li><li>Seleccioná el socio. El <strong>tipo de comprobante</strong> se asigna automáticamente (igual que en la factura individual) y aparece como campo de solo lectura.</li><li>Agregá los ítems: descripción, cantidad y precio unitario de cada uno.</li><li>Completá condición de venta, forma de pago, fecha y vencimiento.</li><li>Hacé clic en <strong>Emitir comprobante</strong>. La factura se envía a ARCA de inmediato.</li></ol>
-<blockquote>Solo disponible si el POS y el certificado ARCA están configurados.</blockquote>
-
 <h3>Facturación en lote</h3>
 
 <p>Emití facturas para múltiples socios al mismo tiempo.</p>
 
-<ol><li>Hacé clic en <strong>Factura en lote</strong>.</li><li>El sistema lista los socios con conceptos pendientes. Cada socio puede tener uno o más conceptos expandibles.</li></ol>   - La <strong>casilla del socio</strong> selecciona o deselecciona todos sus conceptos de una vez.
+<ol><li>Hacé clic en <strong>Nuevo comprobante</strong> → <strong>Facturación por lote</strong>.</li><li>El sistema lista los socios con conceptos pendientes. Cada socio puede tener uno o más conceptos expandibles.</li></ol>   - La <strong>casilla del socio</strong> selecciona o deselecciona todos sus conceptos de una vez.
 <p>- Podés marcar o desmarcar conceptos individuales dentro del socio. Si solo algunos están marcados, la casilla del socio muestra el estado <strong>intermedio</strong> (guión) indicando selección parcial.</p>
 <ol><li>Revisá el resumen y confirmá.</li></ol>
 <p>El tipo de comprobante se determina automáticamente para cada socio según la condición IVA del club y de cada socio individualmente (igual que en la factura individual). La condición de venta es siempre <strong>Contado</strong>.</p>

@@ -105,7 +105,7 @@ function derivarTipoFactura(
 }
 
 // Alícuota de fallback para ítems que no vienen de un servicio del tarifario
-// (ventanilla, notas de crédito, items libres) — no hay de dónde leer la
+// (notas de crédito, items libres) — no hay de dónde leer la
 // alícuota real, así que se asume el default histórico.
 function alicuotaPara(tipo: TipoFactura): string {
   // Factura C (Monotributo) → sin IVA discriminado
@@ -216,7 +216,7 @@ function buildDetalle(
   return items.map((it) => {
     // Factura C nunca discrimina IVA (requisito AFIP), sea cual sea la
     // alícuota real del servicio. Para A/B usamos la alícuota real del
-    // servicio si la conocemos; si no (ítem libre / ventanilla), el default.
+    // servicio si la conocemos; si no (ítem libre), el default.
     const alicuota = tipo === 'factura_c' ? '0' : (it.alicuotaIva?.toFixed(2) ?? alicuotaDefault);
     return {
       cantidad: it.cantidad,
@@ -408,7 +408,7 @@ export async function crearFacturaCore(
         comprobanteInterno: movimientosCuentaCorriente.comprobanteInterno,
         // Alícuota real del servicio del cargo (si lo tiene) para no asumir
         // 21% en servicios Exentos o al 10,5%. Null si el cargo es libre
-        // (ventanilla / "Cargar consumo" sin servicio) — se usa el default.
+        // ("Cargar consumo" sin servicio) — se usa el default.
         servicioAlicuotaIva: servicios.alicuotaIva,
       })
       .from(movimientosCuentaCorriente)
@@ -1283,83 +1283,4 @@ export async function emitirNotaCreditoAction(data: EmitirNcData): Promise<Emiti
         (apiResponse.comprobante_nro ?? ncId),
     };
   }
-}
-
-// ─── Action: ventanilla — consumo + factura en un paso ────────────────────────
-
-export type VentanillaItem = {
-  descripcion: string;
-  cantidad: number;
-  importeUnitario: number;
-};
-
-export type VentanillaData = {
-  socioId: string;
-  tipoFactura: TipoFactura;
-  condicionVenta: CondicionVenta;
-  medioPago: MedioPago;
-  fecha: string;
-  vencimiento: string;
-  items: VentanillaItem[];
-};
-
-export async function ventanillaEmitirFacturaAction(data: VentanillaData): Promise<FacturaResult> {
-  const ctx = await getActiveMarina();
-  if (!ctx) return { error: 'No autenticado' };
-
-  const gId = ctx.activeMembership.guarderiaId;
-
-  if (!data.items || data.items.length === 0) return { error: 'Ingresá al menos un ítem.' };
-
-  // Verificar que el socio pertenece a esta guardería
-  const [membership] = await db
-    .select({ id: memberships.id })
-    .from(memberships)
-    .where(
-      and(
-        eq(memberships.userId, data.socioId),
-        eq(memberships.guarderiaId, gId),
-        eq(memberships.status, 'active'),
-      ),
-    );
-  if (!membership) return { error: 'El socio no pertenece a esta guardería.' };
-
-  // Crear los movimientos primero
-  const movimientoIds: string[] = [];
-  for (const item of data.items) {
-    const importe = (item.cantidad * item.importeUnitario).toFixed(2);
-    const [inserted] = await db
-      .insert(movimientosCuentaCorriente)
-      .values({
-        socioId: data.socioId,
-        concepto: item.descripcion,
-        tipo: 'otro',
-        estado: 'no_pagado',
-        debe: importe,
-        haber: '0',
-        importeSigned: importe,
-        fecha: fechaCalendariaArg(data.fecha),
-        createdBy: ctx.user.id,
-      })
-      .returning({ id: movimientosCuentaCorriente.id });
-    movimientoIds.push(inserted.id);
-  }
-
-  // Emitir la factura linkando los movimientos recién creados
-  const result = await crearFacturaCore({
-    ...data,
-    guarderiaId: gId,
-    desde: data.fecha,
-    hasta: data.fecha,
-    movimientoIds,
-  });
-
-  // Si la factura falló, limpiar los movimientos creados
-  if (result.error) {
-    await db
-      .delete(movimientosCuentaCorriente)
-      .where(inArray(movimientosCuentaCorriente.id, movimientoIds));
-  }
-
-  return result;
 }

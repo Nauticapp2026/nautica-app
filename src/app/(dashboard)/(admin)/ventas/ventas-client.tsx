@@ -17,7 +17,6 @@ import {
   Printer,
   RefreshCw,
   Send,
-  Trash2,
   X,
 } from 'lucide-react';
 
@@ -27,11 +26,9 @@ import {
   emitirNotaCreditoAction,
   getSocioPendientesAction,
   markInvoicePaidAction,
-  ventanillaEmitirFacturaAction,
   type BatchResult,
   type EmitirNcMotivo,
   type MovimientoPendiente,
-  type VentanillaItem,
 } from '@/app/actions/facturacion';
 import { reintentarCobroPaywayAction } from '@/app/actions/payway';
 import { toast } from 'sonner';
@@ -1545,357 +1542,6 @@ function LoteNotaCreditoModal({
   );
 }
 
-// ─── Modal: ventanilla (consumo + factura en un paso) ─────────────────────
-
-type LineaItem = { descripcion: string; cantidad: string; importe: string };
-
-function VentanillaModal({
-  open,
-  onClose,
-  socios,
-  guarderiaCondicionIva,
-}: {
-  open: boolean;
-  onClose: () => void;
-  socios: Socio[];
-  guarderiaCondicionIva: string | null;
-}) {
-  const router = useRouter();
-  const [socioId, setSocioId] = useState('');
-  const [tipoFactura, setTipoFactura] = useState(() =>
-    derivarTipoFactura(guarderiaCondicionIva, null),
-  );
-  const [condicionVenta, setCondicionVenta] = useState('contado');
-  const [medioPago, setMedioPago] = useState('efectivo');
-  const [fecha, setFecha] = useState(todayIso);
-  const [vencimiento, setVencimiento] = useState(() => addDays(todayIso(), 30));
-  const [lineas, setLineas] = useState<LineaItem[]>([
-    { descripcion: '', cantidad: '1', importe: '' },
-  ]);
-  const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<{ comprobanteNro?: string; pdfUrl?: string } | null>(null);
-  const [isPending, startTransition] = useTransition();
-
-  if (!open) return null;
-
-  const total = lineas.reduce((s, l) => {
-    const cant = parseFloat(l.cantidad) || 0;
-    const imp = parseFloat(l.importe.replace(',', '.')) || 0;
-    return s + cant * imp;
-  }, 0);
-
-  const isValid =
-    Boolean(socioId) &&
-    lineas.every((l) => l.descripcion.trim() && parseFloat(l.importe.replace(',', '.')) > 0);
-
-  function addLinea() {
-    setLineas((prev) => [...prev, { descripcion: '', cantidad: '1', importe: '' }]);
-  }
-
-  function removeLinea(i: number) {
-    setLineas((prev) => prev.filter((_, idx) => idx !== i));
-  }
-
-  function updateLinea(i: number, field: keyof LineaItem, value: string) {
-    setLineas((prev) => prev.map((l, idx) => (idx === i ? { ...l, [field]: value } : l)));
-  }
-
-  function handleClose() {
-    setSocioId('');
-    setLineas([{ descripcion: '', cantidad: '1', importe: '' }]);
-    setError(null);
-    setResult(null);
-    onClose();
-  }
-
-  function handleSubmit() {
-    setError(null);
-    const items: VentanillaItem[] = lineas.map((l) => ({
-      descripcion: l.descripcion.trim(),
-      cantidad: parseFloat(l.cantidad) || 1,
-      importeUnitario: parseFloat(l.importe.replace(',', '.')) || 0,
-    }));
-    startTransition(async () => {
-      const res = await ventanillaEmitirFacturaAction({
-        socioId,
-        tipoFactura: tipoFactura as never,
-        condicionVenta: condicionVenta as never,
-        medioPago: medioPago as never,
-        fecha,
-        vencimiento,
-        items,
-      });
-      if (res.error) {
-        setError(res.error);
-      } else {
-        setResult({ comprobanteNro: res.comprobanteNro, pdfUrl: res.pdfUrl });
-        router.refresh();
-      }
-    });
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-2xl bg-white shadow-2xl">
-        <div className="flex items-start justify-between p-6 pb-4">
-          <div>
-            <h2 className="text-[18px] font-bold" style={{ color: '#101828' }}>
-              Ventanilla — todo en un paso
-            </h2>
-            <p className="mt-0.5 text-sm" style={{ color: '#669E9D' }}>
-              Cargá el consumo y emití la factura ARCA al instante
-            </p>
-          </div>
-          <button
-            onClick={handleClose}
-            className="rounded-[8px] p-1 text-gray-400 hover:bg-gray-100"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-        <div className="border-t border-gray-200" />
-
-        {result ? (
-          <div className="space-y-4 p-6">
-            <div className="flex items-center gap-3 rounded-[10px] bg-teal-50 p-4">
-              <CheckCircle2 className="h-5 w-5 shrink-0 text-teal-600" />
-              <div>
-                <p className="font-semibold text-teal-900">Comprobante emitido</p>
-                {result.comprobanteNro && (
-                  <p className="text-sm text-teal-700">Nro: {result.comprobanteNro}</p>
-                )}
-              </div>
-            </div>
-            {result.pdfUrl && (
-              <a
-                href={result.pdfUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex w-full items-center justify-center gap-2 rounded-[10px] border border-gray-200 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
-              >
-                <Download className="h-4 w-4" />
-                Descargar PDF
-              </a>
-            )}
-            <button
-              onClick={handleClose}
-              className="w-full rounded-[10px] py-2.5 text-sm font-semibold text-white transition hover:opacity-90"
-              style={{ background: '#175861' }}
-            >
-              Cerrar
-            </button>
-          </div>
-        ) : (
-          <>
-            <div className="flex-1 space-y-5 overflow-y-auto p-6">
-              {/* Socio + parámetros */}
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="sm:col-span-2">
-                  <label
-                    className="mb-1.5 block text-xs font-semibold"
-                    style={{ color: '#101828' }}
-                  >
-                    Socio
-                  </label>
-                  <select
-                    className={inputCls}
-                    value={socioId}
-                    onChange={(e) => {
-                      const id = e.target.value;
-                      setSocioId(id);
-                      const socio = socios.find((s) => s.id === id);
-                      setTipoFactura(
-                        derivarTipoFactura(
-                          guarderiaCondicionIva,
-                          socio ? condicionIvaEfectiva(socio) : null,
-                        ),
-                      );
-                    }}
-                  >
-                    <option value="">Seleccioná un socio...</option>
-                    {socios.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.nombre}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label
-                    className="mb-1.5 block text-xs font-semibold"
-                    style={{ color: '#101828' }}
-                  >
-                    Tipo de comprobante
-                  </label>
-                  <input
-                    className={`${inputCls} cursor-not-allowed bg-gray-50 text-gray-700`}
-                    value={
-                      TIPO_FACTURA_OPTS.find((o) => o.value === tipoFactura)?.label ?? tipoFactura
-                    }
-                    readOnly
-                  />
-                </div>
-                <div>
-                  <label
-                    className="mb-1.5 block text-xs font-semibold"
-                    style={{ color: '#101828' }}
-                  >
-                    Condición de venta
-                  </label>
-                  <select
-                    className={inputCls}
-                    value={condicionVenta}
-                    onChange={(e) => setCondicionVenta(e.target.value)}
-                  >
-                    {CONDICION_VENTA_OPTS.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label
-                    className="mb-1.5 block text-xs font-semibold"
-                    style={{ color: '#101828' }}
-                  >
-                    Medio de pago
-                  </label>
-                  <select
-                    className={inputCls}
-                    value={medioPago}
-                    onChange={(e) => setMedioPago(e.target.value)}
-                  >
-                    {MEDIO_PAGO_OPTS.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label
-                    className="mb-1.5 block text-xs font-semibold"
-                    style={{ color: '#101828' }}
-                  >
-                    Fecha
-                  </label>
-                  <input
-                    type="date"
-                    className={inputCls}
-                    value={fecha}
-                    onChange={(e) => setFecha(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label
-                    className="mb-1.5 block text-xs font-semibold"
-                    style={{ color: '#101828' }}
-                  >
-                    Vencimiento
-                  </label>
-                  <input
-                    type="date"
-                    className={inputCls}
-                    value={vencimiento}
-                    onChange={(e) => setVencimiento(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              {/* Ítems */}
-              <div>
-                <label className="mb-2 block text-xs font-semibold" style={{ color: '#101828' }}>
-                  Ítems
-                </label>
-                <div className="space-y-2">
-                  {lineas.map((l, i) => (
-                    <div key={i} className="flex items-center gap-2">
-                      <input
-                        className={`${inputCls} flex-1`}
-                        placeholder="Descripción"
-                        value={l.descripcion}
-                        onChange={(e) => updateLinea(i, 'descripcion', e.target.value)}
-                      />
-                      <input
-                        className="h-11 w-16 shrink-0 rounded-[10px] border border-gray-200 bg-white px-3 text-center text-sm focus:border-[#175861] focus:ring-1 focus:ring-[#175861] focus:outline-none"
-                        placeholder="Cant"
-                        inputMode="numeric"
-                        value={l.cantidad}
-                        onChange={(e) => updateLinea(i, 'cantidad', e.target.value)}
-                      />
-                      <input
-                        className="h-11 w-28 shrink-0 rounded-[10px] border border-gray-200 bg-white px-3 text-sm focus:border-[#175861] focus:ring-1 focus:ring-[#175861] focus:outline-none"
-                        placeholder="Precio"
-                        inputMode="decimal"
-                        value={l.importe}
-                        onChange={(e) => updateLinea(i, 'importe', e.target.value)}
-                      />
-                      {lineas.length > 1 && (
-                        <button
-                          onClick={() => removeLinea(i)}
-                          className="shrink-0 rounded-[8px] p-2 text-gray-400 hover:bg-red-50 hover:text-red-500"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-                <button
-                  onClick={addLinea}
-                  className="mt-2 flex items-center gap-1 text-sm font-medium transition hover:opacity-70"
-                  style={{ color: '#175861' }}
-                >
-                  <Plus className="h-4 w-4" />
-                  Agregar ítem
-                </button>
-              </div>
-
-              {total > 0 && (
-                <div className="flex justify-end">
-                  <div className="text-right">
-                    <p className="text-xs text-gray-400">Total a facturar</p>
-                    <p className="text-lg font-bold" style={{ color: '#101828' }}>
-                      {fmtMoney(total)}
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {error && (
-                <div className="flex items-start gap-2 rounded-[10px] bg-red-50 p-3 text-sm text-red-700">
-                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                  <span>{error}</span>
-                </div>
-              )}
-            </div>
-
-            <div className="border-t border-gray-200 p-6">
-              <div className="flex gap-3">
-                <button
-                  onClick={handleClose}
-                  className="flex-1 rounded-[10px] border border-[#d1d5dc] bg-white py-2.5 text-sm font-medium text-[#364153] transition hover:bg-gray-50"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={handleSubmit}
-                  disabled={isPending || !isValid}
-                  className="flex-1 rounded-[10px] py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-                  style={{ background: '#175861' }}
-                >
-                  {isPending ? 'Emitiendo...' : 'Emitir comprobante'}
-                </button>
-              </div>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
 // ─── Componente principal ──────────────────────────────────────────────────
 
 export function VentasClient({
@@ -1923,7 +1569,6 @@ export function VentasClient({
   const [filterHasta, setFilterHasta] = useState('');
   const [nuevaOpen, setNuevaOpen] = useState(false);
   const [loteOpen, setLoteOpen] = useState(false);
-  const [ventanillaOpen, setVentanillaOpen] = useState(false);
   const [pagarFactura, setPagarFactura] = useState<Factura | null>(null);
   const [ncFactura, setNcFactura] = useState<Factura | null>(null);
   // Selección para NC en lote (anulación total) sobre la tabla AFIP.
@@ -2136,13 +1781,6 @@ export function VentasClient({
         }}
         facturas={facturasSeleccionadas}
       />
-      <VentanillaModal
-        open={ventanillaOpen}
-        onClose={() => setVentanillaOpen(false)}
-        socios={socios}
-        guarderiaCondicionIva={guarderiaCondicionIva}
-      />
-
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
@@ -2150,15 +1788,6 @@ export function VentasClient({
           <p className="page-subtitle mt-1">Gestión de comprobantes y cobros</p>
         </div>
         <div className="flex shrink-0 flex-wrap gap-2">
-          {puedeFacturar && (
-            <button
-              onClick={() => setVentanillaOpen(true)}
-              className="flex items-center justify-center gap-2 rounded-[10px] border border-[#d1d5dc] bg-white px-4 py-2.5 text-sm font-semibold text-[#364153] transition hover:bg-gray-50"
-            >
-              <Send className="h-4 w-4" />
-              Ventanilla
-            </button>
-          )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button

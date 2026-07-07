@@ -165,7 +165,7 @@ El **email de facturación** es la dirección a la que se envía el comprobante.
 - **Desactivado** (valor por defecto): se factura con los **Datos Impositivos** (razón social, CUIT, dirección fiscal y condición frente al IVA de esta pestaña).
 - **Activado**: se factura con los **datos personales** del socio (nombre y apellido, tipo y número de documento, dirección y condición frente al IVA cargados en la pestaña **Generales**).
 
-> **Importante:** todos los socios activos aparecen en los flujos de facturación (individual, ventanilla y lote). Este checkbox ya **no** controla si el socio aparece o no en el módulo: solo elige el conjunto de datos con el que se emite.
+> **Importante:** todos los socios activos aparecen en los flujos de facturación (individual y lote). Este checkbox ya **no** controla si el socio aparece o no en el módulo: solo elige el conjunto de datos con el que se emite.
 
 > **Campos requeridos para poder emitir factura ARCA al socio:**
 >
@@ -628,7 +628,7 @@ Las tarjetas superiores muestran:
 
 ### Emitir una factura individual
 
-1. Hacé clic en **Nuevo comprobante**.
+1. Hacé clic en **Nuevo comprobante** → **Facturación manual**.
 2. Seleccioná el **socio** en el campo Cliente.
 3. El sistema muestra automáticamente los **conceptos pendientes** del socio (movimientos sin facturar). Marcá los que querés incluir. Podés usar **Todos** o **Ninguno** para seleccionar rápido.
 4. Completá los campos:
@@ -645,23 +645,11 @@ Las tarjetas superiores muestran:
 
 > En el selector aparecen **todos los socios del club**. Lo que define si la emisión sale bien son los **datos fiscales/personales completos** del socio (ver "Datos requeridos para emitir facturas ARCA"); si faltan, ARCA puede rechazar la emisión.
 
-### Emitir comprobante por ventanilla
-
-Para facturar servicios puntuales que no están cargados como movimientos del socio:
-
-1. Hacé clic en **Ventanilla**.
-2. Seleccioná el socio. El **tipo de comprobante** se asigna automáticamente (igual que en la factura individual) y aparece como campo de solo lectura.
-3. Agregá los ítems: descripción, cantidad y precio unitario de cada uno.
-4. Completá condición de venta, forma de pago, fecha y vencimiento.
-5. Hacé clic en **Emitir comprobante**. La factura se envía a ARCA de inmediato.
-
-> Solo disponible si el POS y el certificado ARCA están configurados.
-
 ### Facturación en lote
 
 Emití facturas para múltiples socios al mismo tiempo.
 
-1. Hacé clic en **Factura en lote**.
+1. Hacé clic en **Nuevo comprobante** → **Facturación por lote**.
 2. El sistema lista los socios con conceptos pendientes. Cada socio puede tener uno o más conceptos expandibles.
    - La **casilla del socio** selecciona o deselecciona todos sus conceptos de una vez.
    - Podés marcar o desmarcar conceptos individuales dentro del socio. Si solo algunos están marcados, la casilla del socio muestra el estado **intermedio** (guión) indicando selección parcial.
