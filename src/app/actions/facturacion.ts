@@ -1612,6 +1612,7 @@ async function cargarCredsGuarderia(gId: string) {
  * aceptan (confirmado contra la documentación oficial de TusFacturas).
  */
 async function emitirNotaTusFacturas(params: {
+  notaId: string;
   tipoFactura: 'factura_a' | 'factura_b' | 'factura_c';
   esNc: boolean;
   importe: number;
@@ -1621,7 +1622,7 @@ async function emitirNotaTusFacturas(params: {
   creds: TusFacturasCredentials;
   asociado?: TusFacturasComprobanteAsociado;
 }) {
-  const notaId = randomUUID();
+  const notaId = params.notaId;
   const hoy = toTusFecha(new Date());
   const tipoApi = params.esNc ? TIPO_NC_API[params.tipoFactura] : TIPO_ND_API[params.tipoFactura];
 
@@ -1797,10 +1798,19 @@ export async function emitirNotaAsociadaAction(
     cuit: (guarderia.cuit ?? '').replace(/[-\s]/g, ''),
   };
 
-  let notaId: string;
+  const notaId = randomUUID();
+  const tipoNotaFactura = (data.esNc ? NC_TIPO_FACTURA : ND_TIPO_FACTURA)[tipoOriginal];
+  // Sin desglose por ítem (la nota es un monto único) — mismo fallback de
+  // alícuota que ya usa `buildDetalle` para este caso.
+  const montos = desglosarMontos(
+    [{ importeUnitario: importeNota, cantidad: 1 }],
+    alicuotaPara(tipoOriginal),
+  );
+
   let apiResponse;
   try {
-    ({ notaId, apiResponse } = await emitirNotaTusFacturas({
+    ({ apiResponse } = await emitirNotaTusFacturas({
+      notaId,
       tipoFactura: tipoOriginal,
       esNc: data.esNc,
       importe: importeNota,
@@ -1811,21 +1821,40 @@ export async function emitirNotaAsociadaAction(
       asociado,
     }));
   } catch (err) {
-    return {
-      error: err instanceof Error ? err.message : `Error al emitir la ${tipoNota} en TusFacturas.`,
-    };
+    // ARCA rechazó la nota: se guarda igual (sin folioLocal/codigo/cae) para
+    // que quede a la vista en Ventas, en vez de perder el intento. A
+    // diferencia de una factura, no hay cargos que bloquear — la nota no
+    // consume movimientos pendientes hasta que se confirma.
+    const motivoError =
+      err instanceof Error ? err.message : `Error al emitir la ${tipoNota} en TusFacturas.`;
+    try {
+      await db.insert(facturacion).values({
+        id: notaId,
+        guarderiaId: gId,
+        socioId: original.socioId,
+        tipoFactura: tipoNotaFactura as never,
+        estado: 'pendiente',
+        descripcion: descripcionNota,
+        importe: importeNota.toFixed(2),
+        montoNeto: montos.montoNeto.toFixed(2),
+        montoExento: montos.montoExento.toFixed(2),
+        montoIva: montos.montoIva.toFixed(2),
+        emision: new Date(),
+        externalReference: notaId,
+        facturaOriginalId: data.facturaOriginalId,
+        rechazada: true,
+        motivoError,
+      });
+      revalidatePath('/ventas');
+    } catch (persistErr) {
+      console.error('No se pudo guardar la nota rechazada', { notaId, persistErr });
+    }
+    return { error: motivoError, notaId };
   }
 
   // 5. Persistir nota + movimiento
   try {
-    const tipoNotaFactura = (data.esNc ? NC_TIPO_FACTURA : ND_TIPO_FACTURA)[tipoOriginal];
     const folioLocal = await nextFolioLocal(gId, data.origen === 'lote' ? 'FL' : 'FM');
-    // Sin desglose por ítem (la nota es un monto único) — mismo fallback de
-    // alícuota que ya usa `buildDetalle` para este caso.
-    const montos = desglosarMontos(
-      [{ importeUnitario: importeNota, cantidad: 1 }],
-      alicuotaPara(tipoOriginal),
-    );
 
     await db.insert(facturacion).values({
       id: notaId,
@@ -1924,10 +1953,17 @@ export async function emitirNotaLibreAction(data: EmitirNotaLibreData): Promise<
   const descripcionNota =
     data.descripcion?.trim() || `${tipoNota} — ${MOTIVO_NOTA_LABEL[data.motivo]}`;
 
-  let notaId: string;
+  const notaId = randomUUID();
+  const tipoNotaFactura = (data.esNc ? NC_TIPO_FACTURA : ND_TIPO_FACTURA)[tipoFactura];
+  const montos = desglosarMontos(
+    [{ importeUnitario: data.importe, cantidad: 1 }],
+    alicuotaPara(tipoFactura),
+  );
+
   let apiResponse;
   try {
-    ({ notaId, apiResponse } = await emitirNotaTusFacturas({
+    ({ apiResponse } = await emitirNotaTusFacturas({
+      notaId,
       tipoFactura,
       esNc: data.esNc,
       importe: data.importe,
@@ -1937,18 +1973,34 @@ export async function emitirNotaLibreAction(data: EmitirNotaLibreData): Promise<
       creds,
     }));
   } catch (err) {
-    return {
-      error: err instanceof Error ? err.message : `Error al emitir la ${tipoNota} en TusFacturas.`,
-    };
+    const motivoError =
+      err instanceof Error ? err.message : `Error al emitir la ${tipoNota} en TusFacturas.`;
+    try {
+      await db.insert(facturacion).values({
+        id: notaId,
+        guarderiaId: gId,
+        socioId: data.socioId,
+        tipoFactura: tipoNotaFactura as never,
+        estado: 'pendiente',
+        descripcion: descripcionNota,
+        importe: data.importe.toFixed(2),
+        montoNeto: montos.montoNeto.toFixed(2),
+        montoExento: montos.montoExento.toFixed(2),
+        montoIva: montos.montoIva.toFixed(2),
+        emision: new Date(),
+        externalReference: notaId,
+        rechazada: true,
+        motivoError,
+      });
+      revalidatePath('/ventas');
+    } catch (persistErr) {
+      console.error('No se pudo guardar la nota rechazada', { notaId, persistErr });
+    }
+    return { error: motivoError, notaId };
   }
 
   try {
-    const tipoNotaFactura = (data.esNc ? NC_TIPO_FACTURA : ND_TIPO_FACTURA)[tipoFactura];
     const folioLocal = await nextFolioLocal(gId, 'FM');
-    const montos = desglosarMontos(
-      [{ importeUnitario: data.importe, cantidad: 1 }],
-      alicuotaPara(tipoFactura),
-    );
 
     await db.insert(facturacion).values({
       id: notaId,

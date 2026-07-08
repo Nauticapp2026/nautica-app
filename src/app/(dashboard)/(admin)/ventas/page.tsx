@@ -256,6 +256,7 @@ export default async function VentasPage() {
         condicionIva: guarderias.condicionIva,
         nombre: guarderias.nombre,
         razonSocial: guarderias.razonSocial,
+        cuit: guarderias.cuit,
       })
       .from(guarderias)
       .where(eq(guarderias.id, gId))
@@ -353,6 +354,7 @@ export default async function VentasPage() {
   const entreEmisor = guarderiaInfo?.razonSocial?.trim() || guarderiaInfo?.nombre || '—';
   const centroEmisor =
     guarderiaInfo?.puntoDeVenta != null ? String(guarderiaInfo.puntoDeVenta) : '—';
+  const entreEmisorCuit = guarderiaInfo?.cuit?.trim() || '—';
 
   const facturas = lista.map((f) => {
     const identidad = identidadFacturacion({
@@ -402,6 +404,7 @@ export default async function VentasPage() {
       socioCuitDni: identidad.numeroDocumento || '—',
       numeroOperacionSC: numeroOperacionPorFactura.get(f.id) ?? '—',
       entreEmisor,
+      entreEmisorCuit,
       centroEmisor,
     };
   });

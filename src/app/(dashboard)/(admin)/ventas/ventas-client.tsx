@@ -82,6 +82,7 @@ type Factura = {
   socioCuitDni: string;
   numeroOperacionSC: string;
   entreEmisor: string;
+  entreEmisorCuit: string;
   centroEmisor: string;
 };
 
@@ -3261,7 +3262,7 @@ export function VentasClient({
                   </div>
                 )}
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[1900px] text-sm">
+                  <table className="w-full min-w-[2300px] text-sm">
                     <thead>
                       <tr className="bg-gray-50 text-left text-xs font-semibold text-gray-500">
                         <th className="w-10 px-4 py-3">
@@ -3286,14 +3287,17 @@ export function VentasClient({
                         <th className="px-4 py-3">Nº Op. SC</th>
                         <th className="px-4 py-3">Fecha</th>
                         <th className="px-4 py-3">Vencimiento</th>
+                        <th className="px-4 py-3">CAE</th>
                         <th className="px-4 py-3">Venc. CAE</th>
                         <th className="px-4 py-3">Período</th>
                         <th className="px-4 py-3 text-right">Neto</th>
                         <th className="px-4 py-3 text-right">Exento</th>
                         <th className="px-4 py-3 text-right">IVA</th>
                         <th className="px-4 py-3 text-right">Total</th>
+                        <th className="px-4 py-3 text-center">Estado envío</th>
                         <th className="px-4 py-3 text-center">Estado</th>
                         <th className="px-4 py-3">Ente emisor</th>
+                        <th className="px-4 py-3">CUIT emisor</th>
                         <th className="px-4 py-3">Centro emisor</th>
                         <th className="px-4 py-3 text-right">Acciones</th>
                       </tr>
@@ -3343,6 +3347,9 @@ export function VentasClient({
                             <td className="px-4 py-3 text-gray-500">{f.numeroOperacionSC}</td>
                             <td className="px-4 py-3 text-gray-500">{fmtDate(f.emision)}</td>
                             <td className="px-4 py-3 text-gray-500">{fmtDate(f.vencimiento)}</td>
+                            <td className="px-4 py-3 font-mono text-xs text-gray-500">
+                              {f.cae ?? '—'}
+                            </td>
                             <td className="px-4 py-3 text-gray-500">
                               {f.caeVencimiento ? fmtYmd(f.caeVencimiento) : '—'}
                             </td>
@@ -3377,20 +3384,26 @@ export function VentasClient({
                                   title={f.motivoError ?? undefined}
                                   className="inline-block cursor-help rounded-full bg-red-100 px-3 py-1 text-xs font-medium text-red-700"
                                 >
-                                  Rechazada
+                                  Rechazado
                                 </span>
                               ) : (
-                                <span
-                                  className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${
-                                    ESTADO_BADGE[f.estado ?? 'pendiente'] ??
-                                    'bg-gray-100 text-gray-600'
-                                  }`}
-                                >
-                                  {ESTADO_LABEL[f.estado ?? 'pendiente'] ?? f.estado}
+                                <span className="inline-block rounded-full bg-teal-50 px-3 py-1 text-xs font-medium text-[#175861]">
+                                  Aceptado
                                 </span>
                               )}
                             </td>
+                            <td className="px-4 py-3 text-center">
+                              <span
+                                className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${
+                                  ESTADO_BADGE[f.estado ?? 'pendiente'] ??
+                                  'bg-gray-100 text-gray-600'
+                                }`}
+                              >
+                                {ESTADO_LABEL[f.estado ?? 'pendiente'] ?? f.estado}
+                              </span>
+                            </td>
                             <td className="px-4 py-3 text-gray-500">{f.entreEmisor}</td>
+                            <td className="px-4 py-3 text-gray-500">{f.entreEmisorCuit}</td>
                             <td className="px-4 py-3 text-gray-500">{f.centroEmisor}</td>
                             <td className="px-4 py-3">
                               <div className="flex items-center justify-end gap-2">
@@ -3441,7 +3454,10 @@ export function VentasClient({
                                     <Download className="h-4 w-4" />
                                   </button>
                                 )}
-                                {f.rechazada ? (
+                                {f.rechazada &&
+                                (f.tipoFactura === 'factura_a' ||
+                                  f.tipoFactura === 'factura_b' ||
+                                  f.tipoFactura === 'factura_c') ? (
                                   <button
                                     onClick={() => setReenviarFactura(f)}
                                     title="Reenviar factura rechazada"
