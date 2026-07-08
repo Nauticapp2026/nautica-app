@@ -42,17 +42,25 @@ export function nuevaForma(): FormaCobranza {
 export function FormasDePago({
   formas,
   setFormas,
+  montoAPagar,
   tarjetaGuardada,
 }: {
   formas: FormaCobranza[];
   setFormas: React.Dispatch<React.SetStateAction<FormaCobranza[]>>;
+  montoAPagar: string;
   tarjetaGuardada: TarjetaGuardada;
 }) {
   function update(id: string, patch: Partial<FormaCobranza>) {
     setFormas((prev) => prev.map((f) => (f.id === id ? { ...f, ...patch } : f)));
   }
   function remove(id: string) {
-    setFormas((prev) => prev.filter((f) => f.id !== id));
+    setFormas((prev) => {
+      const next = prev.filter((f) => f.id !== id);
+      // Si queda una sola forma, la re-sincroniza con el monto a pagar — si
+      // se estaba partiendo el pago, la que sobrevive puede haber quedado
+      // con un importe parcial que ya no corresponde.
+      return next.length === 1 ? [{ ...next[0], monto: montoAPagar }] : next;
+    });
   }
 
   return (
@@ -63,6 +71,7 @@ export function FormasDePago({
           forma={forma}
           index={i}
           canRemove={formas.length > 1}
+          soloUnaForma={formas.length === 1}
           tarjetaGuardada={tarjetaGuardada}
           onChange={(patch) => update(forma.id, patch)}
           onRemove={() => remove(forma.id)}
@@ -84,6 +93,7 @@ function Linea({
   forma,
   index,
   canRemove,
+  soloUnaForma,
   tarjetaGuardada,
   onChange,
   onRemove,
@@ -91,6 +101,7 @@ function Linea({
   forma: FormaCobranza;
   index: number;
   canRemove: boolean;
+  soloUnaForma: boolean;
   tarjetaGuardada: TarjetaGuardada;
   onChange: (patch: Partial<FormaCobranza>) => void;
   onRemove: () => void;
@@ -107,10 +118,12 @@ function Linea({
   }
 
   function changeTipo(tipo: string) {
-    // Default de algunos campos al cambiar de tipo.
+    // Default de algunos campos al cambiar de tipo. Con una sola forma el
+    // monto sigue al "Monto a pagar" (no se resetea); con varias, al cambiar
+    // el tipo de una línea el importe se vuelve a completar a mano.
     const datos: Record<string, string> = {};
     if (tipo === 'transferencia') datos.fecha = todayISODate();
-    onChange({ tipo, datos, monto: '' });
+    onChange({ tipo, datos, monto: soloUnaForma ? forma.monto : '' });
   }
 
   return (
@@ -182,18 +195,32 @@ function Linea({
           />
         )}
 
-        {/* Monto en pesos (no para dólares, que es derivado) */}
-        {forma.tipo !== 'efectivo_usd' && (
-          <Field label="Importe (pesos)">
-            <input
-              className={inputCls}
-              inputMode="decimal"
-              placeholder="0,00"
-              value={forma.monto}
-              onChange={(e) => onChange({ monto: sanitizeMontoInput(e.target.value) })}
-            />
-          </Field>
-        )}
+        {/* Monto en pesos (no para dólares, que es derivado). Con una sola
+            forma de pago, sigue automáticamente al "Monto a pagar" de
+            arriba — no tiene sentido pedirle al admin que escriba el mismo
+            número dos veces (y era la causa de que un pago parcial pareciera
+            bloqueado: bastaba con que este campo no se actualizara solo). */}
+        {forma.tipo !== 'efectivo_usd' &&
+          (soloUnaForma ? (
+            <Field label="Importe (pesos)">
+              <input
+                className={`${inputCls} bg-gray-50 text-gray-500`}
+                value={forma.monto}
+                disabled
+                title="Sigue al Monto a pagar de arriba"
+              />
+            </Field>
+          ) : (
+            <Field label="Importe (pesos)">
+              <input
+                className={inputCls}
+                inputMode="decimal"
+                placeholder="0,00"
+                value={forma.monto}
+                onChange={(e) => onChange({ monto: sanitizeMontoInput(e.target.value) })}
+              />
+            </Field>
+          ))}
       </div>
     </div>
   );

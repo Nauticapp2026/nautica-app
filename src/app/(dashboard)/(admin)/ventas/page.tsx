@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gte, inArray, lte, sql, sum } from 'drizzle-orm';
+import { and, count, desc, eq, gte, inArray, lte, sum } from 'drizzle-orm';
 
 import { getActiveMarina } from '@/lib/auth/session';
 import { db } from '@/lib/db';
@@ -16,6 +16,7 @@ import {
   socioServicios,
 } from '@/lib/db/schema';
 import { identidadFacturacion } from '@/lib/facturacion/identidad';
+import { getCargosSaldadosFifo } from '@/lib/reconciliar-cuenta';
 
 import { VentasClient } from './ventas-client';
 
@@ -218,7 +219,9 @@ export default async function VentasPage() {
       .orderBy(desc(facturacion.createdAt))
       .limit(200),
 
-    // Socios activos con cantidad de movimientos pendientes — útil para lote
+    // Socios activos — la lista base para el combobox de facturación; los
+    // pendientes/pendienteTotal se recalculan más abajo desde
+    // movsPendientesFiltrados (ya filtrado por FIFO), no acá.
     db
       .select({
         profileId: profiles.id,
@@ -234,20 +237,9 @@ export default async function VentasPage() {
         // true = factura con datos personales (Generales); false = Datos Impositivos.
         facturaFiscal: memberships.facturaFiscal,
         numeroSocio: memberships.numeroSocio,
-        pendientes: sql<number>`count(${movimientosCuentaCorriente.id})::int`,
-        pendienteTotal: sql<string>`coalesce(sum(${movimientosCuentaCorriente.debe}), '0')::text`,
       })
       .from(memberships)
       .innerJoin(profiles, eq(profiles.id, memberships.userId))
-      .leftJoin(
-        movimientosCuentaCorriente,
-        and(
-          eq(movimientosCuentaCorriente.socioId, profiles.id),
-          eq(movimientosCuentaCorriente.estado, 'no_pagado'),
-          // Excluir cargos con comprobante interno (no se facturan por TusFacturas).
-          eq(movimientosCuentaCorriente.comprobanteInterno, false),
-        ),
-      )
       .where(
         and(
           eq(memberships.guarderiaId, gId),
@@ -255,7 +247,6 @@ export default async function VentasPage() {
           eq(memberships.status, 'active'),
         ),
       )
-      .groupBy(profiles.id, memberships.facturaFiscal, memberships.numeroSocio)
       .orderBy(profiles.apellido, profiles.nombre),
 
     db
@@ -415,6 +406,20 @@ export default async function VentasPage() {
     };
   });
 
+  // Excluir cargos ya cubiertos por el pool de haberes (FIFO) aunque su
+  // `estado` todavía diga 'no_pagado' — mismo criterio que ya aplica
+  // crearFacturaCore al facturar. Sin esto, "Facturación por lote" podía
+  // mostrar como pendiente algo que un cobro Payway ya saldó en neto.
+  const socioIdsConPendientes = [...new Set(movsPendientesList.map((m) => m.socioId))];
+  const saldadosPorSocio = new Map(
+    await Promise.all(
+      socioIdsConPendientes.map(async (sId) => [sId, await getCargosSaldadosFifo(sId)] as const),
+    ),
+  );
+  const movsPendientesFiltrados = movsPendientesList.filter(
+    (m) => !saldadosPorSocio.get(m.socioId)?.has(m.id),
+  );
+
   const movsBySocio = new Map<
     string,
     {
@@ -425,7 +430,7 @@ export default async function VentasPage() {
       tipoServicio: string | null;
     }[]
   >();
-  for (const m of movsPendientesList) {
+  for (const m of movsPendientesFiltrados) {
     if (!movsBySocio.has(m.socioId)) movsBySocio.set(m.socioId, []);
     movsBySocio.get(m.socioId)!.push({
       id: m.id,
@@ -443,22 +448,27 @@ export default async function VentasPage() {
     if (e.nombre) embsBySocio.get(e.profileId)!.push(e.nombre);
   }
 
-  const socios = sociosList.map((s) => ({
-    id: s.profileId,
-    nombre: [s.nombre, s.apellido].filter(Boolean).join(' ') || s.razonSocial || s.email,
-    email: s.email,
-    numeroDocumento: s.numeroDocumento ?? '',
-    tipoDocumento: s.tipoDocumento ?? null,
-    cuit: s.cuit ?? null,
-    condicionIva: s.condicionIva ?? null,
-    condicionIvaPersonal: s.condicionIvaPersonal ?? null,
-    facturaFiscal: s.facturaFiscal,
-    numeroSocio: s.numeroSocio,
-    embarcaciones: embsBySocio.get(s.profileId) ?? [],
-    pendientes: s.pendientes,
-    pendienteTotal: s.pendienteTotal,
-    movimientos: movsBySocio.get(s.profileId) ?? [],
-  }));
+  const socios = sociosList.map((s) => {
+    const movs = movsBySocio.get(s.profileId) ?? [];
+    return {
+      id: s.profileId,
+      nombre: [s.nombre, s.apellido].filter(Boolean).join(' ') || s.razonSocial || s.email,
+      email: s.email,
+      numeroDocumento: s.numeroDocumento ?? '',
+      tipoDocumento: s.tipoDocumento ?? null,
+      cuit: s.cuit ?? null,
+      condicionIva: s.condicionIva ?? null,
+      condicionIvaPersonal: s.condicionIvaPersonal ?? null,
+      facturaFiscal: s.facturaFiscal,
+      numeroSocio: s.numeroSocio,
+      embarcaciones: embsBySocio.get(s.profileId) ?? [],
+      // Recalculado sobre la lista ya filtrada por FIFO, no el agregado SQL
+      // (que no sabe de cargos saldados en neto vía Payway).
+      pendientes: movs.length,
+      pendienteTotal: movs.reduce((acc, m) => acc + parseFloat(m.debe ?? '0'), 0).toFixed(2),
+      movimientos: movs,
+    };
+  });
 
   // Cargos "Interno" pendientes, agrupados por socio (para Comprobante interno por lote).
   const movsInternoBySocio = new Map<

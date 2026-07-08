@@ -154,11 +154,24 @@ function NuevaCobranzaModal({ socios, onClose }: { socios: SocioOption[]; onClos
   }
 
   function irAPago() {
-    // Pre-llenar el monto a pagar con el total seleccionado y una forma vacía.
-    setMontoAPagar(totalSeleccionado > 0 ? totalSeleccionado.toFixed(2) : '');
-    setFormas([nuevaForma()]);
+    // Pre-llenar el monto a pagar con el total seleccionado, y la única forma
+    // de pago con el mismo importe (se mantienen sincronizados mientras haya
+    // una sola forma — ver `handleMontoAPagarChange`). Si el admin agrega más
+    // formas para partir el pago, cada una se edita por separado.
+    const inicial = totalSeleccionado > 0 ? totalSeleccionado.toFixed(2) : '';
+    setMontoAPagar(inicial);
+    setFormas([{ ...nuevaForma(), monto: inicial }]);
     setError(null);
     setStep('pago');
+  }
+
+  function handleMontoAPagarChange(value: string) {
+    const limpio = sanitizeMontoInput(value);
+    setMontoAPagar(limpio);
+    // Con una sola forma de pago no tiene sentido pedirle al admin que
+    // escriba el mismo importe dos veces — se sigue el monto a pagar
+    // (incluye el caso de pago parcial: si lo baja, la forma lo acompaña).
+    setFormas((prev) => (prev.length === 1 ? [{ ...prev[0], monto: limpio }] : prev));
   }
 
   function handleRegistrar() {
@@ -322,7 +335,7 @@ function NuevaCobranzaModal({ socios, onClose }: { socios: SocioOption[]; onClos
                     inputMode="decimal"
                     placeholder="0,00"
                     value={montoAPagar}
-                    onChange={(e) => setMontoAPagar(sanitizeMontoInput(e.target.value))}
+                    onChange={(e) => handleMontoAPagarChange(e.target.value)}
                   />
                 </Field>
                 <Field label="Fecha">
@@ -352,6 +365,7 @@ function NuevaCobranzaModal({ socios, onClose }: { socios: SocioOption[]; onClos
                 <FormasDePago
                   formas={formas}
                   setFormas={setFormas}
+                  montoAPagar={montoAPagar}
                   tarjetaGuardada={tarjetaGuardada}
                 />
               </div>
