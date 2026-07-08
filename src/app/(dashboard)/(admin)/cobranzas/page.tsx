@@ -5,10 +5,12 @@ import { db } from '@/lib/db';
 import {
   embarcaciones,
   facturacion,
+  guarderias,
   memberships,
   movimientosCuentaCorriente,
   profiles,
 } from '@/lib/db/schema';
+import { identidadFacturacion } from '@/lib/facturacion/identidad';
 
 import { CobranzaClient, type SocioOption } from './cobranza-client';
 import { CobranzaTabla, type CobranzaRow } from './cobranza-tabla';
@@ -19,7 +21,7 @@ export default async function CobranzasPage() {
 
   const gId = ctx.activeMembership.guarderiaId;
 
-  const [socios, barcos, recibos] = await Promise.all([
+  const [socios, barcos, recibos, [guarderiaInfo]] = await Promise.all([
     db
       .select({
         id: profiles.id,
@@ -56,8 +58,18 @@ export default async function CobranzasPage() {
         importe: facturacion.importe,
         anulada: facturacion.anulada,
         anuladaAt: facturacion.anuladaAt,
+        tipoRecibo: facturacion.tipoRecibo,
         socioNombre: profiles.nombre,
         socioApellido: profiles.apellido,
+        socioEmail: profiles.email,
+        socioEmailFacturacion: profiles.emailFacturacion,
+        socioRazonSocial: profiles.razonSocial,
+        socioTipoDocumento: profiles.tipoDocumento,
+        socioNumeroDocumento: profiles.numeroDocumento,
+        socioCuit: profiles.cuit,
+        socioCondicionIva: profiles.condicionIva,
+        socioCondicionIvaPersonal: profiles.condicionIvaPersonal,
+        socioFacturaFiscal: memberships.facturaFiscal,
         numeroSocio: memberships.numeroSocio,
         datosPago: movimientosCuentaCorriente.datosPago,
       })
@@ -80,6 +92,12 @@ export default async function CobranzasPage() {
       )
       .orderBy(desc(facturacion.emision))
       .limit(300),
+
+    db
+      .select({ nombre: guarderias.nombre, razonSocial: guarderias.razonSocial })
+      .from(guarderias)
+      .where(eq(guarderias.id, gId))
+      .limit(1),
   ]);
 
   // Agrupar embarcaciones (nombre/matrícula) por socio para el filtro.
@@ -99,11 +117,29 @@ export default async function CobranzasPage() {
     embarcaciones: barcosPorSocio.get(s.id) ?? [],
   }));
 
+  const entreEmisor = guarderiaInfo?.razonSocial?.trim() || guarderiaInfo?.nombre || '—';
+
   const cobranzas: CobranzaRow[] = recibos.map((r) => {
     // `datosPago.formas` = [{ tipo, monto, datos }] — solo se muestra
     // tipo+monto en la tabla, los campos de `datos` quedan en el recibo.
     const datosPago = r.datosPago as { formas?: { tipo: string; monto: string }[] } | null;
     const formas = (datosPago?.formas ?? []).map((f) => ({ tipo: f.tipo, monto: f.monto }));
+    const identidad = identidadFacturacion({
+      id: r.id,
+      email: r.socioEmail ?? '',
+      emailFacturacion: r.socioEmailFacturacion,
+      nombre: r.socioNombre,
+      apellido: r.socioApellido,
+      razonSocial: r.socioRazonSocial,
+      tipoDocumento: r.socioTipoDocumento,
+      numeroDocumento: r.socioNumeroDocumento,
+      cuit: r.socioCuit,
+      direccion: null,
+      direccionFiscal: null,
+      condicionIva: r.socioCondicionIva,
+      condicionIvaPersonal: r.socioCondicionIvaPersonal,
+      facturaFiscal: r.socioFacturaFiscal ?? false,
+    });
     return {
       id: r.id,
       codigo: r.codigo,
@@ -111,8 +147,11 @@ export default async function CobranzasPage() {
       importe: r.importe ?? '0',
       anulada: r.anulada,
       anuladaAt: r.anuladaAt ? r.anuladaAt.toISOString() : null,
+      tipoRecibo: r.tipoRecibo,
       socioNombre: [r.socioNombre, r.socioApellido].filter(Boolean).join(' ') || '—',
+      socioRazonSocial: identidad.razon,
       numeroSocio: r.numeroSocio,
+      entreEmisor,
       formas,
     };
   });

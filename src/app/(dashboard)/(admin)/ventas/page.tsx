@@ -400,6 +400,7 @@ export default async function VentasPage() {
       medioPago: f.medioPago,
       socioNombre:
         [f.socioNombre, f.socioApellido].filter(Boolean).join(' ') || f.socioEmail || '—',
+      socioRazonSocial: identidad.razon,
       socioNumeroSocio: f.socioNumeroSocio,
       socioCuitDni: identidad.numeroDocumento || '—',
       numeroOperacionSC: numeroOperacionPorFactura.get(f.id) ?? '—',

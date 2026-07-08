@@ -171,6 +171,11 @@ export const tipoFacturaEnum = pgEnum('tipo_factura', [
   'nota_debito_c',
 ]);
 
+// Solo para recibos de cobranza (RC-): si los comprobantes que cobró son
+// facturas fiscales o comprobantes internos (CM-/CL-) — un mismo recibo no
+// puede mezclar los dos tipos, se valida al registrar la cobranza.
+export const tipoReciboEnum = pgEnum('tipo_recibo', ['fiscal', 'interno']);
+
 export const tipoCuentaCorrienteEnum = pgEnum('tipo_cta_cte', ['mensual', 'espacio', 'otro']);
 
 export const tipoServicioEnum = pgEnum('tipo_servicio', [
@@ -1167,6 +1172,12 @@ export const facturacion = pgTable(
     anulada: boolean('anulada').notNull().default(false),
     anuladaAt: timestamp('anulada_at', { withTimezone: true }),
     cobranzaComprobanteIds: uuid('cobranza_comprobante_ids').array(),
+    // Solo para recibos de cobranza (RC-). Se calcula sobre TODOS los
+    // comprobantes elegidos al registrar la cobranza (no solo los que
+    // terminaron cubiertos enteros por el FIFO, que puede quedar vacío en un
+    // pago parcial chico) — por eso es un campo propio y no se deriva de
+    // `cobranzaComprobanteIds`.
+    tipoRecibo: tipoReciboEnum('tipo_recibo'),
     // Factura fiscal rechazada por ARCA vía TusFacturas: se persiste igual
     // (sin folioLocal/codigo/cae) para poder mostrar el motivo y reenviarla
     // una vez corregida, en vez de perder el intento.

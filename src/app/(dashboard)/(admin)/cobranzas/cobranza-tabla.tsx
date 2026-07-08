@@ -16,14 +16,21 @@ export type CobranzaRow = {
   importe: string;
   anulada: boolean;
   anuladaAt: string | null;
-  socioNombre: string;
+  tipoRecibo: 'fiscal' | 'interno' | null;
+  socioRazonSocial: string;
   numeroSocio: number | null;
+  entreEmisor: string;
   formas: { tipo: string; monto: string }[];
 };
 
 function fmtMoney(value: string): string {
   return `$${parseFloat(value || '0').toLocaleString('es-AR', { minimumFractionDigits: 2 })}`;
 }
+
+const TIPO_RECIBO_LABEL: Record<string, string> = {
+  fiscal: 'Fiscal',
+  interno: 'Interno',
+};
 
 const TIPO_COBRANZA_LABEL: Record<string, string> = {
   efectivo: 'Efectivo',
@@ -79,11 +86,13 @@ export function CobranzaTabla({ cobranzas }: { cobranzas: CobranzaRow[] }) {
 
   return (
     <div className="overflow-x-auto rounded-2xl border border-gray-200 bg-white">
-      <table className="w-full text-sm">
+      <table className="w-full min-w-[1500px] text-sm">
         <thead>
           <tr className="border-b border-gray-200 text-left text-xs font-medium text-gray-500">
+            <th className="px-4 py-3">Ente emisor</th>
+            <th className="px-4 py-3">Tipo de recibo</th>
             <th className="px-4 py-3">Nº cliente</th>
-            <th className="px-4 py-3">Nombre</th>
+            <th className="px-4 py-3">Razón social socio</th>
             <th className="px-4 py-3">Fecha</th>
             <th className="px-4 py-3">Nº de recibo</th>
             <th className="px-4 py-3 text-right">Monto</th>
@@ -91,14 +100,19 @@ export function CobranzaTabla({ cobranzas }: { cobranzas: CobranzaRow[] }) {
             <th className="px-4 py-3">Instrumento de cobro 2</th>
             <th className="px-4 py-3">Instrumento de cobro 3</th>
             <th className="px-4 py-3">Estado</th>
+            <th className="px-4 py-3">Fecha anulación</th>
             <th className="px-4 py-3 text-right">Acción</th>
           </tr>
         </thead>
         <tbody>
           {cobranzas.map((c) => (
             <tr key={c.id} className="border-b border-gray-100 last:border-0">
+              <td className="px-4 py-3 text-gray-700">{c.entreEmisor}</td>
+              <td className="px-4 py-3 text-gray-700">
+                {c.tipoRecibo ? TIPO_RECIBO_LABEL[c.tipoRecibo] : '—'}
+              </td>
               <td className="px-4 py-3 text-gray-700">{c.numeroSocio ?? '—'}</td>
-              <td className="px-4 py-3 font-medium text-[#101828]">{c.socioNombre}</td>
+              <td className="px-4 py-3 font-medium text-[#101828]">{c.socioRazonSocial}</td>
               <td className="px-4 py-3 text-gray-700">
                 {c.fecha ? formatArgentinaDate(c.fecha) : '—'}
               </td>
@@ -111,21 +125,17 @@ export function CobranzaTabla({ cobranzas }: { cobranzas: CobranzaRow[] }) {
               <td className="px-4 py-3 text-gray-700">{instrumentoCobro(c.formas, 2)}</td>
               <td className="px-4 py-3">
                 {c.anulada ? (
-                  <span className="inline-flex flex-col">
-                    <span className="inline-flex w-fit items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
-                      Anulado
-                    </span>
-                    {c.anuladaAt && (
-                      <span className="mt-0.5 text-xs text-gray-400">
-                        {formatArgentinaDate(c.anuladaAt)}
-                      </span>
-                    )}
+                  <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
+                    Anulado
                   </span>
                 ) : (
                   <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
                     Vigente
                   </span>
                 )}
+              </td>
+              <td className="px-4 py-3 text-gray-700">
+                {c.anuladaAt ? formatArgentinaDate(c.anuladaAt) : '—'}
               </td>
               <td className="px-4 py-3">
                 <div className="flex items-center justify-end gap-2">

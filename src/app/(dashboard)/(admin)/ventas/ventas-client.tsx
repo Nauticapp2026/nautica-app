@@ -78,6 +78,7 @@ type Factura = {
   montoExento: string | null;
   montoIva: string | null;
   caeVencimiento: string | null;
+  socioRazonSocial: string;
   socioNumeroSocio: number | null;
   socioCuitDni: string;
   numeroOperacionSC: string;
@@ -3281,7 +3282,7 @@ export function VentasClient({
                         <th className="px-4 py-3">Número</th>
                         <th className="px-4 py-3">Tipo</th>
                         <th className="px-4 py-3">Letra</th>
-                        <th className="px-4 py-3">Cliente</th>
+                        <th className="px-4 py-3">Razón social</th>
                         <th className="px-4 py-3">Nº Socio</th>
                         <th className="px-4 py-3">CUIT/CUIL</th>
                         <th className="px-4 py-3">Nº Op. SC</th>
@@ -3340,7 +3341,7 @@ export function VentasClient({
                             </td>
                             <td className="px-4 py-3 text-gray-500">{f.letra}</td>
                             <td className="px-4 py-3 font-medium" style={{ color: '#175861' }}>
-                              {f.socioNombre}
+                              {f.socioRazonSocial}
                             </td>
                             <td className="px-4 py-3 text-gray-500">{f.socioNumeroSocio ?? '—'}</td>
                             <td className="px-4 py-3 text-gray-500">{f.socioCuitDni}</td>
@@ -3507,13 +3508,22 @@ export function VentasClient({
           ) : (
             <>
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[600px] text-sm">
+                <table className="w-full min-w-[1700px] text-sm">
                   <thead>
                     <tr className="bg-gray-50 text-left text-xs font-semibold text-gray-500">
                       <th className="px-4 py-3">Número</th>
-                      <th className="px-4 py-3">Cliente</th>
+                      <th className="px-4 py-3">Nº Op. SC</th>
+                      <th className="px-4 py-3">Nº Socio</th>
+                      <th className="px-4 py-3">Razón social</th>
+                      <th className="px-4 py-3">CUIT/CUIL</th>
                       <th className="px-4 py-3">Fecha</th>
+                      <th className="px-4 py-3 text-right">Neto</th>
+                      <th className="px-4 py-3 text-right">Exento</th>
+                      <th className="px-4 py-3 text-right">IVA</th>
                       <th className="px-4 py-3 text-right">Total</th>
+                      <th className="px-4 py-3">Ente emisor</th>
+                      <th className="px-4 py-3">CUIT emisor</th>
+                      <th className="px-4 py-3">Centro emisor</th>
                       <th className="px-4 py-3 text-right">Acciones</th>
                     </tr>
                   </thead>
@@ -3526,16 +3536,31 @@ export function VentasClient({
                         <td className="px-4 py-3 font-medium" style={{ color: '#101828' }}>
                           {f.codigo ?? '—'}
                         </td>
+                        <td className="px-4 py-3 text-gray-500">{f.numeroOperacionSC}</td>
+                        <td className="px-4 py-3 text-gray-500">{f.socioNumeroSocio ?? '—'}</td>
                         <td className="px-4 py-3 font-medium" style={{ color: '#175861' }}>
-                          {f.socioNombre}
+                          {f.socioRazonSocial}
                         </td>
+                        <td className="px-4 py-3 text-gray-500">{f.socioCuitDni}</td>
                         <td className="px-4 py-3 text-gray-500">{fmtDate(f.emision)}</td>
+                        <td className="px-4 py-3 text-right text-gray-500">
+                          {f.montoNeto ? fmtMoney(f.montoNeto) : '—'}
+                        </td>
+                        <td className="px-4 py-3 text-right text-gray-500">
+                          {f.montoExento ? fmtMoney(f.montoExento) : '—'}
+                        </td>
+                        <td className="px-4 py-3 text-right text-gray-500">
+                          {f.montoIva ? fmtMoney(f.montoIva) : '—'}
+                        </td>
                         <td
                           className="px-4 py-3 text-right font-medium"
                           style={{ color: '#101828' }}
                         >
                           {fmtMoney(f.importe)}
                         </td>
+                        <td className="px-4 py-3 text-gray-500">{f.entreEmisor}</td>
+                        <td className="px-4 py-3 text-gray-500">{f.entreEmisorCuit}</td>
+                        <td className="px-4 py-3 text-gray-500">{f.centroEmisor}</td>
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-end">
                             <a

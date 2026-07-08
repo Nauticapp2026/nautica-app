@@ -1283,8 +1283,10 @@ async function crearComprobanteInternoCore(
       concepto: movimientosCuentaCorriente.concepto,
       debe: movimientosCuentaCorriente.debe,
       comprobanteInterno: movimientosCuentaCorriente.comprobanteInterno,
+      servicioAlicuotaIva: servicios.alicuotaIva,
     })
     .from(movimientosCuentaCorriente)
+    .leftJoin(servicios, eq(servicios.id, movimientosCuentaCorriente.servicioId))
     .where(
       and(
         inArray(movimientosCuentaCorriente.id, data.movimientoIds),
@@ -1302,6 +1304,16 @@ async function crearComprobanteInternoCore(
   if (total <= 0) return { error: 'El total del comprobante debe ser mayor a 0.' };
 
   const descripcion = `${movs[0].concepto ?? 'Servicio'}${movs.length > 1 ? ` (+${movs.length - 1})` : ''}`;
+  // Sin tipo fiscal (es interno): fallback '21' si el cargo no viene de un
+  // servicio del tarifario con alícuota propia. Mismo criterio que fiscal.
+  const montos = desglosarMontos(
+    movs.map((m) => ({
+      importeUnitario: parseFloat(m.debe ?? '0'),
+      cantidad: 1,
+      alicuotaIva: m.servicioAlicuotaIva != null ? Number(m.servicioAlicuotaIva) : null,
+    })),
+    '21',
+  );
 
   const facturaId = randomUUID();
   const codigo = await nextComprobanteInternoCodigo(gId, prefix);
@@ -1315,6 +1327,9 @@ async function crearComprobanteInternoCore(
     estado: 'pendiente',
     codigo,
     importe: total.toFixed(2),
+    montoNeto: montos.montoNeto.toFixed(2),
+    montoExento: montos.montoExento.toFixed(2),
+    montoIva: montos.montoIva.toFixed(2),
     descripcion,
     emision,
   });

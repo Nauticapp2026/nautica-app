@@ -283,6 +283,7 @@ export async function registrarCobranzaAction(data: RegistrarCobranzaData): Prom
       id: facturacion.id,
       importe: facturacion.importe,
       movimientoId: facturacion.movimientoId,
+      tipoFactura: facturacion.tipoFactura,
     })
     .from(facturacion)
     .where(
@@ -301,6 +302,16 @@ export async function registrarCobranzaAction(data: RegistrarCobranzaData): Prom
       error: 'Algún comprobante ya no está disponible para cobrar. Refrescá e intentá de nuevo.',
     };
   }
+
+  // Un recibo no puede mezclar comprobantes fiscales (factura_a/b/c) con
+  // internos (recibo/CM-/CL-) — son circuitos separados.
+  const tiposEnSeleccion = new Set(
+    comprobantes.map((c) => (c.tipoFactura === 'recibo' ? 'interno' : 'fiscal')),
+  );
+  if (tiposEnSeleccion.size > 1) {
+    return { error: 'No se pueden cobrar juntos comprobantes fiscales e internos.' };
+  }
+  const tipoRecibo = tiposEnSeleccion.has('interno') ? 'interno' : 'fiscal';
 
   // FIFO: el monto cubre los comprobantes del más viejo al más nuevo. Solo los que
   // se cubren ENTEROS quedan pagados; el primero que no alcanza (y el resto) sigue
@@ -409,6 +420,7 @@ export async function registrarCobranzaAction(data: RegistrarCobranzaData): Prom
         movimientoId: pago.id,
         codigo,
         cobranzaComprobanteIds: pagadosIds,
+        tipoRecibo,
       });
 
       return pago.id;

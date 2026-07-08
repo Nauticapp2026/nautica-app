@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition, useRef, useEffect } from 'react';
+import { Fragment, useState, useTransition, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Script from 'next/script';
@@ -3016,8 +3016,8 @@ function ServiciosContratadosTab({
                     (!sc.fechaBaja || m.fecha.slice(0, 10) <= sc.fechaBaja),
                 );
                 return (
-                  <>
-                    <tr key={sc.id} className="border-b border-gray-50 last:border-0">
+                  <Fragment key={sc.id}>
+                    <tr className="border-b border-gray-50 last:border-0">
                       <td className="py-3 pr-4">
                         <div className="flex flex-wrap items-center gap-1.5">
                           <span className="font-medium" style={{ color: '#101828' }}>
@@ -3139,7 +3139,7 @@ function ServiciosContratadosTab({
                         </td>
                       </tr>
                     )}
-                  </>
+                  </Fragment>
                 );
               })}
             </tbody>
