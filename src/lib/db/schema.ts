@@ -166,6 +166,9 @@ export const tipoFacturaEnum = pgEnum('tipo_factura', [
   'nota_credito_a',
   'nota_credito_b',
   'nota_credito_c',
+  'nota_debito_a',
+  'nota_debito_b',
+  'nota_debito_c',
 ]);
 
 export const tipoCuentaCorrienteEnum = pgEnum('tipo_cta_cte', ['mensual', 'espacio', 'otro']);

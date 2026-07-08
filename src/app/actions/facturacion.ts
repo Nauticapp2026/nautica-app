@@ -35,9 +35,11 @@ import {
   CONDICION_PAGO_API,
   FORMA_PAGO_LABEL,
   NC_TIPO_FACTURA,
+  ND_TIPO_FACTURA,
   TIPO_DOC_API,
   TIPO_FACTURA_API,
   TIPO_NC_API,
+  TIPO_ND_API,
 } from '@/lib/tusfacturas/mappers';
 
 // ─── Tipos ──────────────────────────────────────────────────────────────────
@@ -1217,33 +1219,211 @@ export async function enviarReciboPorMailAction(
   return { email: destino };
 }
 
-// ─── Action: emitir nota de crédito ───────────────────────────────────────────
+// ─── Notas de Crédito y Débito ─────────────────────────────────────────────
+//
+// Dos caminos para llegar a una NC/ND, con validación distinta cada uno — no
+// se mezclan en una sola función:
+//  - emitirNotaAsociadaAction: parte de un comprobante fiscal ya emitido
+//    (precompleta tipo/número/fecha, tope de importe = importe original).
+//  - emitirNotaLibreAction: decisión comercial nueva sin comprobante de
+//    origen (elige socio a mano, importe libre, sin tope).
+// Ambas comparten los helpers de más abajo (armar el payload de TusFacturas
+// y registrar el movimiento en cuenta corriente), que no dependen de cuál
+// de los dos caminos las llamó.
 
-export type EmitirNcMotivo = 'anulacion_total' | 'descuento_parcial' | 'devolucion_servicio';
+export type MotivoNota =
+  | 'anulacion_total'
+  | 'descuento_parcial'
+  | 'devolucion_servicio'
+  | 'error_facturacion'
+  | 'bonificacion'
+  | 'cargo_extra';
 
-export type EmitirNcData = {
+export const MOTIVO_NOTA_LABEL: Record<MotivoNota, string> = {
+  anulacion_total: 'Anulación total',
+  descuento_parcial: 'Descuento parcial',
+  devolucion_servicio: 'Devolución de servicio',
+  error_facturacion: 'Error de facturación',
+  bonificacion: 'Bonificación',
+  cargo_extra: 'Cargo extra',
+};
+
+export type EmitirNcMotivo = MotivoNota;
+
+export type EmitirNotaResult = {
+  error?: string;
+  notaId?: string;
+  comprobanteNro?: string;
+  folioLocal?: string;
+  pdfUrl?: string;
+};
+
+async function cargarSocioParaFacturar(gId: string, socioId: string) {
+  const [socio] = await db
+    .select({
+      id: profiles.id,
+      email: profiles.email,
+      nombre: profiles.nombre,
+      apellido: profiles.apellido,
+      razonSocial: profiles.razonSocial,
+      tipoDocumento: profiles.tipoDocumento,
+      numeroDocumento: profiles.numeroDocumento,
+      cuit: profiles.cuit,
+      direccion: profiles.direccion,
+      direccionFiscal: profiles.direccionFiscal,
+      condicionIva: profiles.condicionIva,
+      condicionIvaPersonal: profiles.condicionIvaPersonal,
+      emailFacturacion: profiles.emailFacturacion,
+      facturaFiscal: memberships.facturaFiscal,
+    })
+    .from(profiles)
+    .innerJoin(
+      memberships,
+      and(eq(memberships.userId, profiles.id), eq(memberships.guarderiaId, gId)),
+    )
+    .where(eq(profiles.id, socioId))
+    .limit(1);
+  return socio ?? null;
+}
+
+async function cargarCredsGuarderia(gId: string) {
+  const [guarderia] = await db
+    .select({
+      puntoDeVenta: guarderias.puntoDeVenta,
+      cuit: guarderias.cuit,
+      rubro: guarderias.rubro,
+      condicionIva: guarderias.condicionIva,
+      tusfacturasApikey: guarderias.tusfacturasApikey,
+      tusfacturasApitoken: guarderias.tusfacturasApitoken,
+      tusfacturasUsertoken: guarderias.tusfacturasUsertoken,
+    })
+    .from(guarderias)
+    .where(eq(guarderias.id, gId))
+    .limit(1);
+
+  if (
+    !guarderia?.puntoDeVenta ||
+    !guarderia.tusfacturasApikey ||
+    !guarderia.tusfacturasApitoken ||
+    !guarderia.tusfacturasUsertoken
+  ) {
+    return null;
+  }
+
+  const creds: TusFacturasCredentials = {
+    apikey: guarderia.tusfacturasApikey,
+    apitoken: guarderia.tusfacturasApitoken,
+    usertoken: guarderia.tusfacturasUsertoken,
+  };
+  return { guarderia, creds };
+}
+
+/**
+ * Arma el payload de NC/ND y lo emite en TusFacturas. `asociado` es opcional:
+ * si viene, se manda `comprobantes_asociados` (camino "asociada"); si no, se
+ * omite (camino "libre"). Nunca se manda `pagos` — ni la NC ni la ND lo
+ * aceptan (confirmado contra la documentación oficial de TusFacturas).
+ */
+async function emitirNotaTusFacturas(params: {
+  tipoFactura: 'factura_a' | 'factura_b' | 'factura_c';
+  esNc: boolean;
+  importe: number;
+  descripcion: string;
+  cliente: TusFacturasCliente;
+  guarderia: { puntoDeVenta: number | null; rubro: string | null };
+  creds: TusFacturasCredentials;
+  asociado?: TusFacturasComprobanteAsociado;
+}) {
+  const notaId = randomUUID();
+  const hoy = toTusFecha(new Date());
+  const tipoApi = params.esNc ? TIPO_NC_API[params.tipoFactura] : TIPO_ND_API[params.tipoFactura];
+
+  const comprobante: TusFacturasComprobante = {
+    fecha: hoy,
+    vencimiento: hoy,
+    tipo: tipoApi,
+    idioma: 1,
+    external_reference: notaId,
+    operacion: 'V',
+    punto_venta: String(params.guarderia.puntoDeVenta),
+    moneda: 'PES',
+    cotizacion: 1,
+    periodo_facturado_desde: hoy,
+    periodo_facturado_hasta: hoy,
+    rubro: params.guarderia.rubro ?? 'Servicios náuticos',
+    rubro_grupo_contable: process.env.TUSFACTURAS_RUBRO_GRUPO ?? 'Servicios',
+    detalle: buildDetalle(
+      [{ descripcion: params.descripcion, cantidad: 1, importeUnitario: params.importe }],
+      params.tipoFactura,
+    ),
+    total: params.importe.toFixed(2),
+    ...(params.asociado ? { comprobantes_asociados: [params.asociado] } : {}),
+  };
+
+  const apiResponse = await crearFactura({ cliente: params.cliente, comprobante }, params.creds);
+  return { notaId, apiResponse };
+}
+
+/** Inserta el movimiento de cuenta corriente que corresponde a la nota: NC
+ * resta (haber, ya "pagado" — un crédito no queda pendiente de cobro), ND
+ * suma (debe, "facturado" — nace con su propio comprobante fiscal, como
+ * cualquier cargo ya facturado). */
+async function registrarMovimientoNota(params: {
+  socioId: string;
+  esNc: boolean;
+  importe: number;
+  concepto: string;
+  createdBy: string;
+}) {
+  const importeStr = params.importe.toFixed(2);
+  await db.insert(movimientosCuentaCorriente).values(
+    params.esNc
+      ? {
+          socioId: params.socioId,
+          concepto: params.concepto,
+          tipo: 'otro',
+          estado: 'pagado',
+          debe: '0',
+          haber: importeStr,
+          importeSigned: `-${importeStr}`,
+          fecha: new Date(),
+          createdBy: params.createdBy,
+        }
+      : {
+          socioId: params.socioId,
+          concepto: params.concepto,
+          tipo: 'otro',
+          estado: 'facturado',
+          debe: importeStr,
+          haber: '0',
+          importeSigned: importeStr,
+          fecha: new Date(),
+          createdBy: params.createdBy,
+        },
+  );
+}
+
+// ─── Camino "asociada": parte de un comprobante ya emitido ────────────────
+
+export type EmitirNotaAsociadaData = {
   facturaOriginalId: string;
-  motivo: EmitirNcMotivo;
-  /** Requerido si motivo !== 'anulacion_total'. */
+  esNc: boolean;
+  motivo: MotivoNota;
+  /** Requerido salvo NC + motivo === 'anulacion_total' (se completa con el importe original). */
   importe?: number;
   descripcion?: string;
   /** Define el prefijo del folio local: FM (individual) o FL (en lote). Default 'manual'. */
   origen?: 'manual' | 'lote';
 };
 
-export type EmitirNcResult = {
-  error?: string;
-  ncId?: string;
-  comprobanteNro?: string;
-  folioLocal?: string;
-  pdfUrl?: string;
-};
-
-export async function emitirNotaCreditoAction(data: EmitirNcData): Promise<EmitirNcResult> {
+export async function emitirNotaAsociadaAction(
+  data: EmitirNotaAsociadaData,
+): Promise<EmitirNotaResult> {
   const ctx = await getActiveMarina();
   if (!ctx) return { error: 'No autenticado' };
 
   const gId = ctx.activeMembership.guarderiaId;
+  const tipoNota = data.esNc ? 'NC' : 'ND';
 
   // 1. Cargar la factura original (validando scope)
   const [original] = await db
@@ -1269,13 +1449,12 @@ export async function emitirNotaCreditoAction(data: EmitirNcData): Promise<Emiti
     tipoOriginal !== 'factura_b' &&
     tipoOriginal !== 'factura_c'
   ) {
-    return { error: 'Solo se puede emitir NC sobre facturas ARCA (A, B o C).' };
+    return { error: `Solo se puede emitir ${tipoNota} sobre facturas ARCA (A, B o C).` };
   }
 
   if (!original.cae) {
     return {
-      error:
-        'Esta factura no tiene CAE registrado. Solo se pueden emitir NC sobre facturas emitidas desde este sistema.',
+      error: `Esta factura no tiene CAE registrado. Solo se pueden emitir ${tipoNota} sobre facturas emitidas desde este sistema.`,
     };
   }
 
@@ -1287,92 +1466,41 @@ export async function emitirNotaCreditoAction(data: EmitirNcData): Promise<Emiti
     return { error: 'El número de comprobante tiene formato inesperado.' };
   }
 
-  // 2. Determinar importe de la NC
+  // 2. Determinar importe. "Anulación total" solo tiene sentido para NC
+  // (completar automáticamente el importe original en una ND implicaría
+  // cobrarle al socio el doble, así que ahí el importe siempre es manual).
   const importeOriginal = parseFloat(original.importe ?? '0');
-  let ncImporte: number;
-  if (data.motivo === 'anulacion_total') {
-    ncImporte = importeOriginal;
+  let importeNota: number;
+  if (data.esNc && data.motivo === 'anulacion_total') {
+    importeNota = importeOriginal;
   } else {
     if (!data.importe || data.importe <= 0) {
-      return { error: 'Ingresá el importe de la nota de crédito.' };
+      return { error: `Ingresá el importe de la ${tipoNota}.` };
     }
     if (data.importe > importeOriginal) {
-      return { error: 'El importe de la NC no puede superar el total de la factura original.' };
+      return {
+        error: `El importe de la ${tipoNota} no puede superar el total de la factura original.`,
+      };
     }
-    ncImporte = data.importe;
+    importeNota = data.importe;
   }
 
   // 3. Cargar socio y creds de guardería
-  const [socio] = await db
-    .select({
-      id: profiles.id,
-      email: profiles.email,
-      nombre: profiles.nombre,
-      apellido: profiles.apellido,
-      razonSocial: profiles.razonSocial,
-      tipoDocumento: profiles.tipoDocumento,
-      numeroDocumento: profiles.numeroDocumento,
-      cuit: profiles.cuit,
-      direccion: profiles.direccion,
-      direccionFiscal: profiles.direccionFiscal,
-      condicionIva: profiles.condicionIva,
-      condicionIvaPersonal: profiles.condicionIvaPersonal,
-      emailFacturacion: profiles.emailFacturacion,
-      facturaFiscal: memberships.facturaFiscal,
-    })
-    .from(profiles)
-    .innerJoin(
-      memberships,
-      and(eq(memberships.userId, profiles.id), eq(memberships.guarderiaId, gId)),
-    )
-    .where(eq(profiles.id, original.socioId!))
-    .limit(1);
-
+  if (!original.socioId) return { error: 'La factura original no tiene socio asociado.' };
+  const socio = await cargarSocioParaFacturar(gId, original.socioId);
   if (!socio) return { error: 'No se encontró el socio de la factura original.' };
 
-  const [guarderia] = await db
-    .select({
-      puntoDeVenta: guarderias.puntoDeVenta,
-      cuit: guarderias.cuit,
-      rubro: guarderias.rubro,
-      tusfacturasApikey: guarderias.tusfacturasApikey,
-      tusfacturasApitoken: guarderias.tusfacturasApitoken,
-      tusfacturasUsertoken: guarderias.tusfacturasUsertoken,
-    })
-    .from(guarderias)
-    .where(eq(guarderias.id, gId))
-    .limit(1);
+  const credsInfo = await cargarCredsGuarderia(gId);
+  if (!credsInfo) return { error: 'Faltan datos de facturación de la guardería.' };
+  const { guarderia, creds } = credsInfo;
 
-  if (
-    !guarderia?.puntoDeVenta ||
-    !guarderia.tusfacturasApikey ||
-    !guarderia.tusfacturasApitoken ||
-    !guarderia.tusfacturasUsertoken
-  ) {
-    return { error: 'Faltan datos de facturación de la guardería.' };
-  }
-
-  const credsOverride: TusFacturasCredentials = {
-    apikey: guarderia.tusfacturasApikey,
-    apitoken: guarderia.tusfacturasApitoken,
-    usertoken: guarderia.tusfacturasUsertoken,
-  };
-
-  // 4. Construir payload NC
-  const ncId = randomUUID();
-  const hoy = toTusFecha(new Date());
+  // 4. Construir payload
   const condVenta = (original.condicionVenta ?? 'contado') as CondicionVenta;
   const cliente = buildCliente({ ...socio, condicionVenta: condVenta });
 
-  const MOTIVO_LABEL: Record<EmitirNcMotivo, string> = {
-    anulacion_total: 'Anulación total',
-    descuento_parcial: 'Descuento parcial',
-    devolucion_servicio: 'Devolución de servicio',
-  };
-
-  const descripcionNc =
+  const descripcionNota =
     data.descripcion?.trim() ||
-    `NC — ${MOTIVO_LABEL[data.motivo]} de comprobante ${original.codigo}`;
+    `${tipoNota} — ${MOTIVO_NOTA_LABEL[data.motivo]} de comprobante ${original.codigo}`;
 
   const asociado: TusFacturasComprobanteAsociado = {
     tipo_comprobante: TIPO_FACTURA_API[tipoOriginal],
@@ -1382,96 +1510,187 @@ export async function emitirNotaCreditoAction(data: EmitirNcData): Promise<Emiti
     cuit: (guarderia.cuit ?? '').replace(/[-\s]/g, ''),
   };
 
-  const ncComprobante: TusFacturasComprobante = {
-    fecha: hoy,
-    vencimiento: hoy,
-    tipo: TIPO_NC_API[tipoOriginal],
-    idioma: 1,
-    external_reference: ncId,
-    operacion: 'V',
-    punto_venta: String(guarderia.puntoDeVenta),
-    moneda: 'PES',
-    cotizacion: 1,
-    periodo_facturado_desde: hoy,
-    periodo_facturado_hasta: hoy,
-    rubro: guarderia.rubro ?? 'Servicios náuticos',
-    rubro_grupo_contable: process.env.TUSFACTURAS_RUBRO_GRUPO ?? 'Servicios',
-    detalle: buildDetalle(
-      [{ descripcion: descripcionNc, cantidad: 1, importeUnitario: ncImporte }],
-      tipoOriginal,
-    ),
-    total: ncImporte.toFixed(2),
-    // Sin `pagos`: a una nota de crédito NO se le aplica un pago (AFIP/TusFacturas
-    // lo rechaza). Confirmado por soporte de TusFacturas — era la causa del error
-    // "no se puede emitir la NC por API".
-    comprobantes_asociados: [asociado],
-  };
-
+  let notaId: string;
   let apiResponse;
   try {
-    apiResponse = await crearFactura({ cliente, comprobante: ncComprobante }, credsOverride);
+    ({ notaId, apiResponse } = await emitirNotaTusFacturas({
+      tipoFactura: tipoOriginal,
+      esNc: data.esNc,
+      importe: importeNota,
+      descripcion: descripcionNota,
+      cliente,
+      guarderia,
+      creds,
+      asociado,
+    }));
   } catch (err) {
-    return { error: err instanceof Error ? err.message : 'Error al emitir la NC en TusFacturas.' };
+    return {
+      error: err instanceof Error ? err.message : `Error al emitir la ${tipoNota} en TusFacturas.`,
+    };
   }
 
-  // 5. Persistir NC + movimiento de crédito
+  // 5. Persistir nota + movimiento
   try {
-    const ncTipoFactura = NC_TIPO_FACTURA[tipoOriginal] as
-      | 'nota_credito_a'
-      | 'nota_credito_b'
-      | 'nota_credito_c';
+    const tipoNotaFactura = (data.esNc ? NC_TIPO_FACTURA : ND_TIPO_FACTURA)[tipoOriginal];
     const folioLocal = await nextFolioLocal(gId, data.origen === 'lote' ? 'FL' : 'FM');
 
     await db.insert(facturacion).values({
-      id: ncId,
+      id: notaId,
       guarderiaId: gId,
       socioId: original.socioId,
-      tipoFactura: ncTipoFactura,
+      tipoFactura: tipoNotaFactura as never,
       estado: 'pagada',
       codigo: apiResponse.comprobante_nro ?? null,
       folioLocal,
       archivo: apiResponse.comprobante_pdf_url ?? null,
       cae: apiResponse.cae ?? null,
-      descripcion: descripcionNc,
-      importe: ncImporte.toFixed(2),
+      descripcion: descripcionNota,
+      importe: importeNota.toFixed(2),
       emision: new Date(),
-      externalReference: ncId,
+      externalReference: notaId,
       facturaOriginalId: data.facturaOriginalId,
     });
 
-    // Crear movimiento de crédito para ajustar saldo
-    if (original.socioId) {
-      await db.insert(movimientosCuentaCorriente).values({
-        socioId: original.socioId,
-        concepto: descripcionNc,
-        tipo: 'otro',
-        estado: 'pagado',
-        debe: '0',
-        haber: ncImporte.toFixed(2),
-        importeSigned: `-${ncImporte.toFixed(2)}`,
-        fecha: new Date(),
-        createdBy: ctx.user.id,
-      });
-    }
+    await registrarMovimientoNota({
+      socioId: original.socioId,
+      esNc: data.esNc,
+      importe: importeNota,
+      concepto: descripcionNota,
+      createdBy: ctx.user.id,
+    });
 
     revalidatePath('/ventas');
-    if (original.socioId) revalidatePath(`/usuarios/${original.socioId}`);
+    revalidatePath(`/usuarios/${original.socioId}`);
 
     return {
-      ncId,
+      notaId,
       comprobanteNro: apiResponse.comprobante_nro,
       folioLocal,
       pdfUrl: apiResponse.comprobante_pdf_url,
     };
   } catch (err) {
-    console.error('NC emitida en TusFacturas pero falló persistencia', {
+    console.error(`${tipoNota} emitida en TusFacturas pero falló persistencia`, {
       comprobanteNro: apiResponse.comprobante_nro,
       err,
     });
     return {
       error:
-        'La NC se emitió en ARCA pero no se pudo guardar. Contactá al administrador con el número ' +
-        (apiResponse.comprobante_nro ?? ncId),
+        `La ${tipoNota} se emitió en ARCA pero no se pudo guardar. Contactá al administrador con el número ` +
+        (apiResponse.comprobante_nro ?? notaId),
+    };
+  }
+}
+
+/** Alias de compatibilidad: la NC "asociada" tal como existía antes de
+ * agregar ND y el camino libre. Sigue usándola el lote de NC (solo
+ * anulación total), que no cambió. */
+export async function emitirNotaCreditoAction(
+  data: Omit<EmitirNotaAsociadaData, 'esNc'>,
+): Promise<EmitirNotaResult> {
+  return emitirNotaAsociadaAction({ ...data, esNc: true });
+}
+
+// ─── Camino "libre": decisión comercial nueva, sin comprobante de origen ──
+
+export type EmitirNotaLibreData = {
+  socioId: string;
+  esNc: boolean;
+  motivo: MotivoNota;
+  importe: number;
+  descripcion?: string;
+};
+
+export async function emitirNotaLibreAction(data: EmitirNotaLibreData): Promise<EmitirNotaResult> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+
+  const gId = ctx.activeMembership.guarderiaId;
+  const tipoNota = data.esNc ? 'NC' : 'ND';
+
+  if (!data.importe || data.importe <= 0) {
+    return { error: `Ingresá el importe de la ${tipoNota}.` };
+  }
+
+  const socio = await cargarSocioParaFacturar(gId, data.socioId);
+  if (!socio) return { error: 'El socio no pertenece a esta guardería.' };
+
+  const credsInfo = await cargarCredsGuarderia(gId);
+  if (!credsInfo) return { error: 'Faltan datos de facturación de la guardería.' };
+  const { guarderia, creds } = credsInfo;
+
+  // Sin factura original de la cual copiar el tipo: se deriva igual que al
+  // crear una factura manual, según condición de IVA de guardería + socio.
+  const socioCondicionIva = socio.facturaFiscal ? socio.condicionIvaPersonal : socio.condicionIva;
+  const tipoFactura = derivarTipoFactura(guarderia.condicionIva, socioCondicionIva);
+
+  const cliente = buildCliente({ ...socio, condicionVenta: 'cuenta_corriente' });
+  const descripcionNota =
+    data.descripcion?.trim() || `${tipoNota} — ${MOTIVO_NOTA_LABEL[data.motivo]}`;
+
+  let notaId: string;
+  let apiResponse;
+  try {
+    ({ notaId, apiResponse } = await emitirNotaTusFacturas({
+      tipoFactura,
+      esNc: data.esNc,
+      importe: data.importe,
+      descripcion: descripcionNota,
+      cliente,
+      guarderia,
+      creds,
+    }));
+  } catch (err) {
+    return {
+      error: err instanceof Error ? err.message : `Error al emitir la ${tipoNota} en TusFacturas.`,
+    };
+  }
+
+  try {
+    const tipoNotaFactura = (data.esNc ? NC_TIPO_FACTURA : ND_TIPO_FACTURA)[tipoFactura];
+    const folioLocal = await nextFolioLocal(gId, 'FM');
+
+    await db.insert(facturacion).values({
+      id: notaId,
+      guarderiaId: gId,
+      socioId: data.socioId,
+      tipoFactura: tipoNotaFactura as never,
+      estado: 'pagada',
+      codigo: apiResponse.comprobante_nro ?? null,
+      folioLocal,
+      archivo: apiResponse.comprobante_pdf_url ?? null,
+      cae: apiResponse.cae ?? null,
+      descripcion: descripcionNota,
+      importe: data.importe.toFixed(2),
+      emision: new Date(),
+      externalReference: notaId,
+    });
+
+    await registrarMovimientoNota({
+      socioId: data.socioId,
+      esNc: data.esNc,
+      importe: data.importe,
+      concepto: descripcionNota,
+      createdBy: ctx.user.id,
+    });
+
+    revalidatePath('/ventas');
+    revalidatePath(`/usuarios/${data.socioId}`);
+
+    return {
+      notaId,
+      comprobanteNro: apiResponse.comprobante_nro,
+      folioLocal,
+      pdfUrl: apiResponse.comprobante_pdf_url,
+    };
+  } catch (err) {
+    console.error(`${tipoNota} libre emitida en TusFacturas pero falló persistencia`, {
+      comprobanteNro: apiResponse.comprobante_nro,
+      err,
+    });
+    return {
+      error:
+        `La ${tipoNota} se emitió en ARCA pero no se pudo guardar. Contactá al administrador con el número ` +
+        (apiResponse.comprobante_nro ?? notaId),
     };
   }
 }

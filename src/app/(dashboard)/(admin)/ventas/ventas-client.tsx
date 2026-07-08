@@ -25,13 +25,16 @@ import {
   crearComprobanteInternoLoteAction,
   createBatchInvoicesAction,
   createInvoiceAction,
+  emitirNotaAsociadaAction,
   emitirNotaCreditoAction,
+  emitirNotaLibreAction,
   getSocioPendientesAction,
   getSocioPendientesInternoAction,
   markInvoicePaidAction,
+  MOTIVO_NOTA_LABEL,
   type BatchResult,
   type ComprobanteInternoLoteResult,
-  type EmitirNcMotivo,
+  type MotivoNota,
   type MovimientoPendiente,
 } from '@/app/actions/facturacion';
 import { reintentarCobroPaywayAction } from '@/app/actions/payway';
@@ -1849,11 +1852,45 @@ function MarcarPagadaModal({
 
 // ─── Modal: nota de crédito ────────────────────────────────────────────────
 
-const MOTIVO_OPTS = [
-  { value: 'anulacion_total', label: 'Anulación total' },
-  { value: 'descuento_parcial', label: 'Descuento parcial' },
-  { value: 'devolucion_servicio', label: 'Devolución de servicio' },
-];
+const MOTIVO_OPTS: { value: MotivoNota; label: string }[] = Object.entries(MOTIVO_NOTA_LABEL).map(
+  ([value, label]) => ({ value: value as MotivoNota, label }),
+);
+
+// "Anulación total" auto-completa el importe = al de la factura original —
+// solo tiene sentido para NC asociada. En ND (y en el camino libre) no se
+// ofrece: no existe la noción de "anular totalmente" cobrando de más.
+function motivoOptsPara(esNc: boolean) {
+  return esNc ? MOTIVO_OPTS : MOTIVO_OPTS.filter((o) => o.value !== 'anulacion_total');
+}
+
+function NcNdToggle({ esNc, onChange }: { esNc: boolean; onChange: (esNc: boolean) => void }) {
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      <button
+        type="button"
+        onClick={() => onChange(true)}
+        className={`rounded-[10px] border px-3 py-2.5 text-sm font-medium transition ${
+          esNc
+            ? 'border-[#175861] bg-[#EFF8F7] text-[#175861]'
+            : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+        }`}
+      >
+        Nota de Crédito
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange(false)}
+        className={`rounded-[10px] border px-3 py-2.5 text-sm font-medium transition ${
+          !esNc
+            ? 'border-[#175861] bg-[#EFF8F7] text-[#175861]'
+            : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+        }`}
+      >
+        Nota de Débito
+      </button>
+    </div>
+  );
+}
 
 function NotaCreditoModal({
   open,
@@ -1865,7 +1902,8 @@ function NotaCreditoModal({
   factura: Factura | null;
 }) {
   const router = useRouter();
-  const [motivo, setMotivo] = useState<EmitirNcMotivo>('anulacion_total');
+  const [esNc, setEsNc] = useState(true);
+  const [motivo, setMotivo] = useState<MotivoNota>('anulacion_total');
   const [importe, setImporte] = useState('');
   const [descripcion, setDescripcion] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -1879,15 +1917,17 @@ function NotaCreditoModal({
   if (!open || !factura) return null;
 
   const importeOriginal = parseFloat(factura.importe ?? '0');
-  const needsImporte = motivo !== 'anulacion_total';
+  const needsImporte = !(esNc && motivo === 'anulacion_total');
+  const tipoNota = esNc ? 'NC' : 'ND';
 
   function handleSubmit() {
     if (!factura) return;
     setError(null);
     const importeNum = needsImporte ? parseFloat(importe.replace(',', '.')) : undefined;
     startTransition(async () => {
-      const res = await emitirNotaCreditoAction({
+      const res = await emitirNotaAsociadaAction({
         facturaOriginalId: factura.id,
+        esNc,
         motivo,
         importe: importeNum,
         descripcion: descripcion || undefined,
@@ -1906,6 +1946,7 @@ function NotaCreditoModal({
   }
 
   function handleClose() {
+    setEsNc(true);
     setMotivo('anulacion_total');
     setImporte('');
     setDescripcion('');
@@ -1920,7 +1961,7 @@ function NotaCreditoModal({
         <div className="flex items-start justify-between p-6 pb-4">
           <div>
             <h2 className="text-[18px] font-bold" style={{ color: '#101828' }}>
-              Emitir Nota de Crédito
+              Emitir {esNc ? 'Nota de Crédito' : 'Nota de Débito'}
             </h2>
             <p className="mt-0.5 text-sm" style={{ color: '#669E9D' }}>
               Comprobante {factura.codigo ?? factura.id.slice(0, 8)} — {fmtMoney(factura.importe)}
@@ -1940,7 +1981,7 @@ function NotaCreditoModal({
             <div className="flex items-center gap-3 rounded-[10px] bg-teal-50 p-4">
               <CheckCircle2 className="h-5 w-5 shrink-0 text-teal-600" />
               <div>
-                <p className="font-semibold text-teal-900">NC emitida correctamente</p>
+                <p className="font-semibold text-teal-900">{tipoNota} emitida correctamente</p>
                 {result.comprobanteNro && (
                   <p className="text-sm text-teal-700">Nro: {result.comprobanteNro}</p>
                 )}
@@ -1969,6 +2010,15 @@ function NotaCreditoModal({
         ) : (
           <>
             <div className="space-y-4 p-6">
+              <NcNdToggle
+                esNc={esNc}
+                onChange={(v) => {
+                  setEsNc(v);
+                  if (!v && motivo === 'anulacion_total') setMotivo('descuento_parcial');
+                  setImporte('');
+                }}
+              />
+
               <div>
                 <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
                   Motivo
@@ -1977,11 +2027,11 @@ function NotaCreditoModal({
                   className={inputCls}
                   value={motivo}
                   onChange={(e) => {
-                    setMotivo(e.target.value as EmitirNcMotivo);
+                    setMotivo(e.target.value as MotivoNota);
                     setImporte('');
                   }}
                 >
-                  {MOTIVO_OPTS.map((o) => (
+                  {motivoOptsPara(esNc).map((o) => (
                     <option key={o.value} value={o.value}>
                       {o.label}
                     </option>
@@ -1995,7 +2045,7 @@ function NotaCreditoModal({
                     className="mb-1.5 block text-xs font-semibold"
                     style={{ color: '#101828' }}
                   >
-                    Importe a acreditar
+                    Importe {esNc ? 'a acreditar' : 'a debitar'}
                     <span className="ml-1 font-normal text-gray-400">
                       (máx. {fmtMoney(factura.importe)})
                     </span>
@@ -2044,7 +2094,216 @@ function NotaCreditoModal({
                   className="flex-1 rounded-[10px] py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
                   style={{ background: '#175861' }}
                 >
-                  {isPending ? 'Emitiendo...' : 'Emitir NC'}
+                  {isPending ? 'Emitiendo...' : `Emitir ${tipoNota}`}
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Modal: nota de crédito o débito libre (sin comprobante de origen) ────
+
+function NotaLibreModal({
+  open,
+  onClose,
+  socios,
+}: {
+  open: boolean;
+  onClose: () => void;
+  socios: Socio[];
+}) {
+  const router = useRouter();
+  const [socioId, setSocioId] = useState('');
+  const [esNc, setEsNc] = useState(true);
+  const [motivo, setMotivo] = useState<MotivoNota>('bonificacion');
+  const [importe, setImporte] = useState('');
+  const [descripcion, setDescripcion] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<{
+    comprobanteNro?: string;
+    folioLocal?: string;
+    pdfUrl?: string;
+  } | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  if (!open) return null;
+
+  const tipoNota = esNc ? 'NC' : 'ND';
+  const isValid = Boolean(socioId && parseFloat(importe.replace(',', '.')) > 0);
+
+  function handleSubmit() {
+    setError(null);
+    startTransition(async () => {
+      const res = await emitirNotaLibreAction({
+        socioId,
+        esNc,
+        motivo,
+        importe: parseFloat(importe.replace(',', '.')),
+        descripcion: descripcion || undefined,
+      });
+      if (res.error) {
+        setError(res.error);
+      } else {
+        setResult({
+          comprobanteNro: res.comprobanteNro,
+          folioLocal: res.folioLocal,
+          pdfUrl: res.pdfUrl,
+        });
+        router.refresh();
+      }
+    });
+  }
+
+  function handleClose() {
+    setSocioId('');
+    setEsNc(true);
+    setMotivo('bonificacion');
+    setImporte('');
+    setDescripcion('');
+    setError(null);
+    setResult(null);
+    onClose();
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl">
+        <div className="flex items-start justify-between p-6 pb-4">
+          <div>
+            <h2 className="text-[18px] font-bold" style={{ color: '#101828' }}>
+              Nota de crédito o débito
+            </h2>
+            <p className="mt-0.5 text-sm" style={{ color: '#669E9D' }}>
+              Sin comprobante de origen — decisión comercial nueva
+            </p>
+          </div>
+          <button
+            onClick={handleClose}
+            className="rounded-[8px] p-1 text-gray-400 hover:bg-gray-100"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="border-t border-gray-200" />
+
+        {result ? (
+          <div className="space-y-4 p-6">
+            <div className="flex items-center gap-3 rounded-[10px] bg-teal-50 p-4">
+              <CheckCircle2 className="h-5 w-5 shrink-0 text-teal-600" />
+              <div>
+                <p className="font-semibold text-teal-900">{tipoNota} emitida correctamente</p>
+                {result.comprobanteNro && (
+                  <p className="text-sm text-teal-700">Nro: {result.comprobanteNro}</p>
+                )}
+                {result.folioLocal && <p className="text-sm text-teal-700">{result.folioLocal}</p>}
+              </div>
+            </div>
+            {result.pdfUrl && (
+              <a
+                href={result.pdfUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex w-full items-center justify-center gap-2 rounded-[10px] border border-gray-200 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                <Download className="h-4 w-4" />
+                Descargar PDF
+              </a>
+            )}
+            <button
+              onClick={handleClose}
+              className="w-full rounded-[10px] py-2.5 text-sm font-semibold text-white transition hover:opacity-90"
+              style={{ background: '#175861' }}
+            >
+              Cerrar
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="space-y-4 p-6">
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
+                  Socio
+                </label>
+                <SocioCombobox socios={socios} value={socioId} onChange={setSocioId} />
+              </div>
+
+              <NcNdToggle
+                esNc={esNc}
+                onChange={(v) => {
+                  setEsNc(v);
+                  if (!v && motivo === 'anulacion_total') setMotivo('bonificacion');
+                }}
+              />
+
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
+                  Motivo
+                </label>
+                <select
+                  className={inputCls}
+                  value={motivo}
+                  onChange={(e) => setMotivo(e.target.value as MotivoNota)}
+                >
+                  {motivoOptsPara(esNc).map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
+                  Importe {esNc ? 'a acreditar' : 'a debitar'}
+                </label>
+                <input
+                  className={inputCls}
+                  inputMode="decimal"
+                  placeholder="0,00"
+                  value={importe}
+                  onChange={(e) => setImporte(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
+                  Descripción (opcional)
+                </label>
+                <input
+                  className={inputCls}
+                  placeholder="Se auto-genera si se deja vacío"
+                  value={descripcion}
+                  onChange={(e) => setDescripcion(e.target.value)}
+                />
+              </div>
+
+              {error && (
+                <div className="flex items-start gap-2 rounded-[10px] bg-red-50 p-3 text-sm text-red-700">
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span>{error}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="border-t border-gray-200 p-6">
+              <div className="flex gap-3">
+                <button
+                  onClick={handleClose}
+                  className="flex-1 rounded-[10px] border border-[#d1d5dc] bg-white py-2.5 text-sm font-medium text-[#364153] transition hover:bg-gray-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleSubmit}
+                  disabled={isPending || !isValid}
+                  className="flex-1 rounded-[10px] py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+                  style={{ background: '#175861' }}
+                >
+                  {isPending ? 'Emitiendo...' : `Emitir ${tipoNota}`}
                 </button>
               </div>
             </div>
@@ -2272,6 +2531,7 @@ export function VentasClient({
   const [loteOpen, setLoteOpen] = useState(false);
   const [comprobanteInternoOpen, setComprobanteInternoOpen] = useState(false);
   const [comprobanteInternoLoteOpen, setComprobanteInternoLoteOpen] = useState(false);
+  const [notaLibreOpen, setNotaLibreOpen] = useState(false);
   const [pagarFactura, setPagarFactura] = useState<Factura | null>(null);
   const [ncFactura, setNcFactura] = useState<Factura | null>(null);
   // Selección para NC en lote (anulación total) sobre la tabla AFIP.
@@ -2489,6 +2749,11 @@ export function VentasClient({
         factura={pagarFactura}
       />
       <NotaCreditoModal open={!!ncFactura} onClose={() => setNcFactura(null)} factura={ncFactura} />
+      <NotaLibreModal
+        open={notaLibreOpen}
+        onClose={() => setNotaLibreOpen(false)}
+        socios={socios}
+      />
       <LoteNotaCreditoModal
         open={loteNcOpen}
         onClose={() => {
@@ -2544,6 +2809,18 @@ export function VentasClient({
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => setComprobanteInternoLoteOpen(true)}>
                 Comprobante interno por lote
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                disabled={!puedeFacturar}
+                title={
+                  !puedeFacturar
+                    ? 'Configurá los datos de facturación y confirmá el certificado ARCA para poder facturar.'
+                    : undefined
+                }
+                onSelect={() => setNotaLibreOpen(true)}
+              >
+                Nota de crédito o débito
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -2877,7 +3154,7 @@ export function VentasClient({
                                 f.cae ? (
                                   <button
                                     onClick={() => setNcFactura(f)}
-                                    title="Emitir Nota de Crédito"
+                                    title="Emitir Nota de Crédito o Débito"
                                     className="rounded-[6px] p-1.5 text-gray-400 transition hover:bg-amber-50 hover:text-amber-600"
                                   >
                                     <CornerDownLeft className="h-4 w-4" />

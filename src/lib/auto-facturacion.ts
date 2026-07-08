@@ -4,18 +4,20 @@
  * Disparada por el cron diario, después de generar movimientos mensuales.
  * Para cada socio de las guarderías que cumplen `diaFacturacion === hoy`:
  *   1. Idempotencia: si ya hay factura creada hoy para este socio, skip.
- *   2. Regla "primera factura manual": solo emite si el socio ya tiene
- *      >= 1 factura emitida (la primera siempre la hace el admin).
- *   3. Solo emite si el socio tiene movimientos pendientes (debe > 0).
- *   4. Copia tipo/condicion/medioPago de la última factura del socio
- *      como heurística para que el formato siga siendo el que usó el
- *      admin la primera vez.
+ *   2. Solo emite si el socio tiene movimientos pendientes (debe > 0).
+ *   3. Copia tipo/condicion/medioPago de la última factura del socio, si
+ *      tiene una, como heurística para que el formato siga siendo el que
+ *      usó el admin la vez anterior. Si es la primera factura de este
+ *      socio (ya no hace falta que un admin la haya cargado antes a
+ *      mano), usa defaults: condicionVenta "cuenta_corriente" y medioPago
+ *      según lo que el socio tenga configurado (débito automático si
+ *      tiene token Payway activo, "efectivo" si no).
  *
  * Errores: si tusfacturas falla para un socio, se loguea y se sigue
  * con el siguiente.
  */
 
-import { and, count, desc, eq, gte, lte, sql } from 'drizzle-orm';
+import { and, count, desc, eq, gte, inArray, lte, sql } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import {
@@ -23,20 +25,26 @@ import {
   guarderias,
   memberships,
   movimientosCuentaCorriente,
+  paywayTokens,
   profiles,
 } from '@/lib/db/schema';
 import { crearFacturaCore } from '@/app/actions/facturacion';
+import { derivarTipoFactura } from '@/lib/derivar-tipo-factura';
 import { getCargosSaldadosFifo } from '@/lib/reconciliar-cuenta';
 
 type AutoEmisionResult = {
   emitted: number;
-  skippedSinFacturaPrevia: number;
   skippedSinPendientes: number;
   skippedYaEmitidaHoy: number;
   failed: { socioId: string; error: string }[];
 };
 
 const VENCIMIENTO_DIAS_DEFAULT = 10;
+
+// Tipos de comprobante fiscal (excluye "recibo", que documenta cobros/
+// comprobantes internos y no tiene condicionVenta/medioPago propios). Mismo
+// criterio que TIPOS_FISCALES en reconciliar-cuenta.ts.
+const TIPOS_FISCALES = ['factura_a', 'factura_b', 'factura_c'] as const;
 
 function ymd(d: Date): string {
   return d.toISOString().slice(0, 10);
@@ -60,34 +68,12 @@ function startOfDay(d: Date): Date {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
 }
 
-/**
- * Deriva el tipo de factura según las condiciones IVA del emisor (guardería) y
- * del receptor (socio). Devuelve null si no hay información suficiente para
- * determinarlo con certeza (el caller cae en fallback a la última factura).
- *
- * Lógica AFIP:
- *  - Guardería Monotributo → siempre Factura C (sin IVA discriminado).
- *  - Guardería RI + Socio RI → Factura A (B2B con IVA discriminado).
- *  - Guardería RI + cualquier otro → Factura B.
- */
-function derivarTipoFactura(
-  guardCondicionIva: string | null,
-  socioCondicionIva: string | null,
-): 'factura_a' | 'factura_b' | 'factura_c' | null {
-  if (guardCondicionIva === 'monotributo') return 'factura_c';
-  if (guardCondicionIva === 'responsable_inscripto') {
-    return socioCondicionIva === 'responsable_inscripto' ? 'factura_a' : 'factura_b';
-  }
-  return null;
-}
-
 export async function runAutoEmision(
   guarderiaIds: string[],
   now: Date = new Date(),
 ): Promise<AutoEmisionResult> {
   const result: AutoEmisionResult = {
     emitted: 0,
-    skippedSinFacturaPrevia: 0,
     skippedSinPendientes: 0,
     skippedYaEmitidaHoy: 0,
     failed: [],
@@ -145,18 +131,7 @@ export async function runAutoEmision(
         continue;
       }
 
-      // 2. Regla "primera factura manual": skip si nunca tuvo factura.
-      const [previas] = await db
-        .select({ n: count() })
-        .from(facturacion)
-        .where(and(eq(facturacion.guarderiaId, guarderiaId), eq(facturacion.socioId, socioId)));
-
-      if ((previas?.n ?? 0) === 0) {
-        result.skippedSinFacturaPrevia++;
-        continue;
-      }
-
-      // 3. Movimientos pendientes con debe > 0 (los pagos a cuenta tienen
+      // 2. Movimientos pendientes con debe > 0 (los pagos a cuenta tienen
       //    haber > 0 / debe = 0; no se facturan). createInvoiceAction se
       //    encarga de marcar los movimientos como 'facturado' al linkearlos,
       //    así que filtrar por estado='no_pagado' alcanza.
@@ -186,7 +161,17 @@ export async function runAutoEmision(
         continue;
       }
 
-      // 4. Copiar formato de la última factura.
+      // 3. Copiar formato de la última FACTURA FISCAL (factura_a/b/c), si tiene
+      //    una. `facturacion` guarda en la misma tabla recibos y comprobantes
+      //    internos (RB-/RC-), que no tienen condicionVenta/medioPago propios
+      //    — si no se filtra por tipo, "la última" puede ser un recibo y
+      //    copiaría esos campos vacíos a la próxima factura fiscal real. Si es
+      //    la primera factura fiscal de este socio (ya no es requisito tener
+      //    una previa), condicionVenta/medioPago no tienen de dónde copiarse:
+      //    se completan con un default razonable — "cuenta_corriente" (es
+      //    deuda todavía no cobrada) y el medio de pago que el socio tenga
+      //    configurado (débito automático de Payway si tiene token activo,
+      //    "efectivo" si no — mismo default que usa el alta manual).
       const [ultima] = await db
         .select({
           tipoFactura: facturacion.tipoFactura,
@@ -194,14 +179,15 @@ export async function runAutoEmision(
           medioPago: facturacion.medioPago,
         })
         .from(facturacion)
-        .where(and(eq(facturacion.guarderiaId, guarderiaId), eq(facturacion.socioId, socioId)))
+        .where(
+          and(
+            eq(facturacion.guarderiaId, guarderiaId),
+            eq(facturacion.socioId, socioId),
+            inArray(facturacion.tipoFactura, TIPOS_FISCALES),
+          ),
+        )
         .orderBy(desc(facturacion.emision))
         .limit(1);
-
-      if (!ultima) {
-        result.skippedSinFacturaPrevia++;
-        continue;
-      }
 
       const fechaFactura = ymd(now);
       const venc = ymd(addDays(now, VENCIMIENTO_DIAS_DEFAULT));
@@ -210,15 +196,29 @@ export async function runAutoEmision(
 
       const derivado = derivarTipoFactura(guardCondicionIva, socioCondicionIva);
       const tipoFactura =
-        derivado ?? (ultima.tipoFactura as 'factura_a' | 'factura_b' | 'factura_c');
+        derivado ??
+        (ultima?.tipoFactura as 'factura_a' | 'factura_b' | 'factura_c' | undefined) ??
+        'factura_b';
+
+      let condicionVenta = ultima?.condicionVenta;
+      let medioPago = ultima?.medioPago;
+      if (!ultima) {
+        const [tokenActivo] = await db
+          .select({ id: paywayTokens.id })
+          .from(paywayTokens)
+          .where(and(eq(paywayTokens.socioId, socioId), eq(paywayTokens.activo, true)))
+          .limit(1);
+        condicionVenta = 'cuenta_corriente';
+        medioPago = tokenActivo ? 'debito_automatico' : 'efectivo';
+      }
 
       const r = await crearFacturaCore(
         {
           guarderiaId,
           socioId,
           tipoFactura,
-          condicionVenta: ultima.condicionVenta as never,
-          medioPago: ultima.medioPago as never,
+          condicionVenta: condicionVenta as never,
+          medioPago: medioPago as never,
           estado: 'pendiente',
           descripcion: `Facturación mensual ${fechaFactura}`,
           fecha: fechaFactura,

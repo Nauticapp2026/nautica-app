@@ -23,6 +23,22 @@ export const NC_TIPO_FACTURA: Record<string, string> = {
   factura_c: 'nota_credito_c',
 };
 
+// factura original (db) → tipo ND para TusFacturas. Confirmado contra la
+// tabla de referencia oficial (developers.tusfacturas.app): el string exacto
+// es "NOTA DE DEBITO A/B/C", mismo patrón que la NC.
+export const TIPO_ND_API: Record<string, string> = {
+  factura_a: 'NOTA DE DEBITO A',
+  factura_b: 'NOTA DE DEBITO B',
+  factura_c: 'NOTA DE DEBITO C',
+};
+
+// factura original (db) → tipo ND para guardar en DB
+export const ND_TIPO_FACTURA: Record<string, string> = {
+  factura_a: 'nota_debito_a',
+  factura_b: 'nota_debito_b',
+  factura_c: 'nota_debito_c',
+};
+
 // tipo_documento (db) → tusfacturas documento_tipo
 export const TIPO_DOC_API: Record<string, string> = {
   dni: 'DNI',
