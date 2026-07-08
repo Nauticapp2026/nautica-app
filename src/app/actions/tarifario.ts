@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { and, desc, eq, gt, isNotNull, isNull, lt, ne, not, or, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, gte, isNotNull, isNull, lt, lte, ne, not, or, sql } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import {
@@ -11,6 +11,7 @@ import {
   servicios,
   serviciosAjustesProgramados,
   serviciosHistorial,
+  socioServicios,
   socioServiciosCancelados,
 } from '@/lib/db/schema';
 import { getActiveMarina } from '@/lib/auth/session';
@@ -527,6 +528,54 @@ async function contarSociosConServicio(servicioId: string): Promise<number> {
   return socios.size;
 }
 
+export type SocioConServicio = { id: string; nombre: string | null; apellido: string | null };
+
+/**
+ * Socios con un Servicio Contratado VIGENTE de esta tarifa (tabla
+ * `socio_servicios`, la fuente de verdad de "Servicios Contratados" — no la
+ * inferencia vieja de `contarSociosConServicio`, que sigue usándose solo
+ * para el bloqueo de inactivar). Se muestra antes de pausar, para que el
+ * admin sepa a quiénes no les va a poder cambiar el precio hasta reactivar,
+ * aunque pausar no les afecte el servicio que ya tienen.
+ */
+export async function getSociosConServicioAction(
+  servicioId: string,
+): Promise<{ error?: string; socios?: SocioConServicio[] }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+  if (!isAdmin(ctx)) return { error: 'Solo administradores pueden ver esta información.' };
+
+  const guarderiaId = ctx.activeMembership.guarderiaId;
+
+  const [tarifa] = await db
+    .select({ id: servicios.id })
+    .from(servicios)
+    .where(and(eq(servicios.id, servicioId), eq(servicios.guarderiaId, guarderiaId)))
+    .limit(1);
+  if (!tarifa) return { error: 'Tarifa no encontrada.' };
+
+  const hoy = todayArg();
+  const rows = await db
+    .selectDistinct({
+      id: profiles.id,
+      nombre: profiles.nombre,
+      apellido: profiles.apellido,
+    })
+    .from(socioServicios)
+    .innerJoin(profiles, eq(profiles.id, socioServicios.socioId))
+    .where(
+      and(
+        eq(socioServicios.servicioId, servicioId),
+        eq(socioServicios.guarderiaId, guarderiaId),
+        lte(socioServicios.fechaInicio, hoy),
+        or(isNull(socioServicios.fechaBaja), gte(socioServicios.fechaBaja, hoy)),
+      ),
+    )
+    .orderBy(profiles.nombre, profiles.apellido);
+
+  return { socios: rows };
+}
+
 export async function pausarTarifaAction(id: string): Promise<{ error?: string }> {
   const ctx = await getActiveMarina();
   if (!ctx) return { error: 'No autenticado' };
@@ -542,16 +591,10 @@ export async function pausarTarifaAction(id: string): Promise<{ error?: string }
   if (!current) return { error: 'Tarifa no encontrada.' };
   if (current.estado === 'pausado') return { error: 'La tarifa ya está pausada.' };
 
-  // No se puede pausar si hay socios con el servicio contratado.
-  const n = await contarSociosConServicio(id);
-  if (n > 0) {
-    return {
-      error: `No se puede pausar: ${n} socio${n === 1 ? '' : 's'} ${
-        n === 1 ? 'tiene' : 'tienen'
-      } este servicio contratado. Cancelalo en esos socios antes de pausar la tarifa.`,
-    };
-  }
-
+  // Pausar ya no se bloquea por tener socios con el servicio contratado: a
+  // esos socios no les afecta (siguen facturándose igual), solo deja de
+  // poder contratarse de nuevo mientras esté pausada. El admin ya vio el
+  // listado (getSociosConServicioAction) antes de confirmar, desde la UI.
   await db
     .update(servicios)
     .set({ estado: 'pausado', updatedAt: new Date() })

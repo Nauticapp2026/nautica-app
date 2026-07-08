@@ -31,12 +31,11 @@ import {
   getSocioPendientesAction,
   getSocioPendientesInternoAction,
   markInvoicePaidAction,
-  MOTIVO_NOTA_LABEL,
   type BatchResult,
   type ComprobanteInternoLoteResult,
-  type MotivoNota,
   type MovimientoPendiente,
 } from '@/app/actions/facturacion';
+import { MOTIVO_NOTA_LABEL, type MotivoNota } from '@/app/actions/nota-constants';
 import { reintentarCobroPaywayAction } from '@/app/actions/payway';
 import { toast } from 'sonner';
 import { formatArgentinaDate } from '@/lib/dates';

@@ -20,6 +20,7 @@ import { fechaCalendariaArg, todayArg } from '@/lib/dates';
 import { sendEmail } from '@/lib/email/resend';
 import { reciboEmail } from '@/lib/email/templates/recibo';
 import { crearSocioServicio, hayContratoVigente } from '@/lib/socio-servicios';
+import { MOTIVO_NOTA_LABEL, type MotivoNota } from './nota-constants';
 import {
   crearFactura,
   toTusFecha,
@@ -1230,23 +1231,6 @@ export async function enviarReciboPorMailAction(
 // Ambas comparten los helpers de más abajo (armar el payload de TusFacturas
 // y registrar el movimiento en cuenta corriente), que no dependen de cuál
 // de los dos caminos las llamó.
-
-export type MotivoNota =
-  | 'anulacion_total'
-  | 'descuento_parcial'
-  | 'devolucion_servicio'
-  | 'error_facturacion'
-  | 'bonificacion'
-  | 'cargo_extra';
-
-export const MOTIVO_NOTA_LABEL: Record<MotivoNota, string> = {
-  anulacion_total: 'Anulación total',
-  descuento_parcial: 'Descuento parcial',
-  devolucion_servicio: 'Devolución de servicio',
-  error_facturacion: 'Error de facturación',
-  bonificacion: 'Bonificación',
-  cargo_extra: 'Cargo extra',
-};
 
 export type EmitirNcMotivo = MotivoNota;
 

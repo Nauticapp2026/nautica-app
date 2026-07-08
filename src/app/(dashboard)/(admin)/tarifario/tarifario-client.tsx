@@ -20,11 +20,13 @@ import {
   ajusteMasivoTarifasAction,
   createTarifaAction,
   getHistorialTarifaAction,
+  getSociosConServicioAction,
   pausarTarifaAction,
   reactivarTarifaAction,
   updateTarifaAction,
   type AjusteMasivoData,
   type HistorialEntry,
+  type SocioConServicio,
 } from '@/app/actions/tarifario';
 import { precioConIva } from '@/lib/iva';
 import { EmptyState } from '@/components/shared/empty-state';
@@ -172,6 +174,11 @@ export function TarifarioClient({ tarifas }: { tarifas: Tarifa[] }) {
   const [ajusteOpen, setAjusteOpen] = useState(false);
 
   const [pausando, startPausar] = useTransition();
+  const [pausarConfirm, setPausarConfirm] = useState<{
+    tarifa: Tarifa;
+    socios: SocioConServicio[];
+  } | null>(null);
+  const [loadingSocios, setLoadingSocios] = useState(false);
 
   const grupos = useMemo(() => {
     const filtered = filtro === 'todas' ? tarifas : tarifas.filter((t) => t.tipo === filtro);
@@ -186,15 +193,32 @@ export function TarifarioClient({ tarifas }: { tarifas: Tarifa[] }) {
     }));
   }, [tarifas, filtro]);
 
-  function handlePausar(t: Tarifa) {
+  // Antes de pausar, mostramos quiénes tienen este servicio contratado hoy.
+  // Pausar no les afecta (siguen facturándose igual) — es solo información
+  // para que el admin sepa a quiénes no les va a poder ofrecer de nuevo esta
+  // tarifa mientras esté pausada.
+  async function handlePausar(t: Tarifa) {
+    setLoadingSocios(true);
+    const res = await getSociosConServicioAction(t.id);
+    setLoadingSocios(false);
+    if (res.error) {
+      toast.error(res.error);
+      return;
+    }
+    setPausarConfirm({ tarifa: t, socios: res.socios ?? [] });
+  }
+
+  function confirmarPausar() {
+    if (!pausarConfirm) return;
+    const t = pausarConfirm.tarifa;
     startPausar(async () => {
       const res = await pausarTarifaAction(t.id);
       if (res.error) {
-        // Alerta cuando hay socios con el servicio contratado (u otro error).
         toast.error(res.error);
         return;
       }
       toast.success(`"${t.nombre}" quedó en pausa.`);
+      setPausarConfirm(null);
       router.refresh();
     });
   }
@@ -292,7 +316,7 @@ export function TarifarioClient({ tarifas }: { tarifas: Tarifa[] }) {
               onEdit={(t) => setModal({ mode: 'edit', tarifa: t })}
               onPausar={handlePausar}
               onReactivar={handleReactivar}
-              accionDisabled={pausando}
+              accionDisabled={pausando || loadingSocios}
             />
           </section>
         ))
@@ -318,6 +342,57 @@ export function TarifarioClient({ tarifas }: { tarifas: Tarifa[] }) {
             router.refresh();
           }}
         />
+      )}
+
+      {pausarConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+            <p className="mb-1 text-base font-bold" style={{ color: '#101828' }}>
+              Pausar &quot;{pausarConfirm.tarifa.nombre}&quot;
+            </p>
+            {pausarConfirm.socios.length === 0 ? (
+              <p className="mb-5 text-sm text-gray-600">
+                Ningún socio tiene este servicio contratado hoy.
+              </p>
+            ) : (
+              <>
+                <p className="mb-3 text-sm text-gray-600">
+                  <strong>{pausarConfirm.socios.length}</strong> socio
+                  {pausarConfirm.socios.length === 1 ? '' : 's'} tiene
+                  {pausarConfirm.socios.length === 1 ? '' : 'n'} este servicio contratado hoy. No se
+                  ven afectados: siguen facturándose igual.
+                </p>
+                <ul className="mb-5 max-h-40 space-y-1 overflow-y-auto rounded-xl border border-gray-100 bg-gray-50 p-3 text-sm text-gray-700">
+                  {pausarConfirm.socios.map((s) => (
+                    <li key={s.id}>
+                      {[s.nombre, s.apellido].filter(Boolean).join(' ').trim() || 'Sin nombre'}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+            <p className="mb-5 text-sm text-gray-600">
+              Mientras esté pausada, no se va a poder contratar de nuevo a otros socios.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setPausarConfirm(null)}
+                disabled={pausando}
+                className="flex-1 rounded-[10px] border border-gray-200 py-2.5 text-sm font-medium text-gray-600 transition hover:bg-gray-50 disabled:opacity-40"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmarPausar}
+                disabled={pausando}
+                className="flex-1 rounded-[10px] py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-40"
+                style={{ background: '#175861' }}
+              >
+                {pausando ? 'Pausando...' : 'Pausar'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
