@@ -81,6 +81,10 @@ export default async function VentasPage() {
         socioId: facturacion.socioId,
         cae: facturacion.cae,
         facturaOriginalId: facturacion.facturaOriginalId,
+        rechazada: facturacion.rechazada,
+        motivoError: facturacion.motivoError,
+        condicionVenta: facturacion.condicionVenta,
+        medioPago: facturacion.medioPago,
         socioNombre: profiles.nombre,
         socioApellido: profiles.apellido,
         socioEmail: profiles.email,
@@ -241,6 +245,10 @@ export default async function VentasPage() {
     socioId: f.socioId,
     cae: f.cae,
     facturaOriginalId: f.facturaOriginalId,
+    rechazada: f.rechazada,
+    motivoError: f.motivoError,
+    condicionVenta: f.condicionVenta,
+    medioPago: f.medioPago,
     socioNombre: [f.socioNombre, f.socioApellido].filter(Boolean).join(' ') || f.socioEmail || '—',
   }));
 

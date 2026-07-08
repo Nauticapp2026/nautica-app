@@ -495,23 +495,81 @@ export async function crearFacturaCore(
     },
   };
 
+  const descripcionFactura =
+    data.descripcion?.trim() ||
+    `Factura ${TIPO_FACTURA_API[data.tipoFactura]} — ${items[0].descripcion}${
+      items.length > 1 ? ` (+${items.length - 1})` : ''
+    }`;
+
   let apiResponse;
   try {
     apiResponse = await crearFactura({ cliente, comprobante }, credsOverride);
   } catch (err) {
-    return {
-      error: err instanceof Error ? err.message : 'Error al emitir factura en TusFacturas.',
-    };
+    const motivoError =
+      err instanceof Error ? err.message : 'Error al emitir factura en TusFacturas.';
+    // ARCA rechazó el comprobante: se guarda igual (sin folioLocal/codigo/cae)
+    // para poder mostrarlo en Ventas y reenviarlo corregido, en vez de perder
+    // el intento. Los cargos quedan "facturado" — tomados por este intento,
+    // no disponibles para facturarse por otro lado hasta reenviar y resolver.
+    try {
+      await db.insert(facturacion).values({
+        id: facturaId,
+        guarderiaId: gId,
+        socioId: data.socioId,
+        descripcion: descripcionFactura,
+        tipoFactura: data.tipoFactura,
+        estado: data.estado ?? 'pendiente',
+        condicionVenta: data.condicionVenta,
+        medioPago: data.medioPago,
+        importe: total.toFixed(2),
+        emision: fechaCalendariaArg(data.fecha),
+        desde: fechaCalendariaArg(data.desde),
+        hasta: fechaCalendariaArg(data.hasta),
+        vencimiento: fechaCalendariaArg(data.vencimiento),
+        externalReference: facturaId,
+        rechazada: true,
+        motivoError,
+      });
+
+      for (let i = 0; i < items.length; i++) {
+        const it = items[i];
+        const [inserted] = await db
+          .insert(facturacionItems)
+          .values({
+            facturacionId: facturaId,
+            socioId: data.socioId,
+            importe: (it.cantidad * it.importeUnitario).toFixed(2),
+            confirmado: true,
+          })
+          .returning({ id: facturacionItems.id });
+
+        if (movimientoIds[i]) {
+          await db.insert(facturacionItemMovimientos).values({
+            facturacionItemId: inserted.id,
+            movimientoId: movimientoIds[i],
+          });
+        }
+      }
+
+      if (movimientoIds.length > 0) {
+        await db
+          .update(movimientosCuentaCorriente)
+          .set({ estado: 'facturado' })
+          .where(inArray(movimientosCuentaCorriente.id, movimientoIds));
+      }
+
+      revalidatePath('/ventas');
+      revalidatePath(`/usuarios/${data.socioId}`);
+    } catch (persistErr) {
+      console.error('No se pudo guardar la factura rechazada', { facturaId, persistErr });
+    }
+
+    return { error: motivoError, facturaId };
   }
 
   // 5. Persistir factura + items + linkear movimientos
   try {
     const estadoFactura = data.estado ?? 'pendiente';
-    const descripcionFactura =
-      data.descripcion?.trim() ||
-      `Factura ${TIPO_FACTURA_API[data.tipoFactura]} — ${items[0].descripcion}${
-        items.length > 1 ? ` (+${items.length - 1})` : ''
-      }`;
     const folioLocal = opts?.folioPrefix ? await nextFolioLocal(gId, opts.folioPrefix) : null;
 
     await db.insert(facturacion).values({
@@ -586,6 +644,231 @@ export async function crearFacturaCore(
         (apiResponse.comprobante_nro ?? facturaId),
     };
   }
+}
+
+// ─── Action: reenviar una factura rechazada por ARCA ──────────────────────
+
+export type ReenviarFacturaData = {
+  tipoFactura: TipoFactura;
+  condicionVenta: CondicionVenta;
+  medioPago: MedioPago;
+  descripcion?: string;
+  fecha: string;
+  vencimiento: string;
+};
+
+/**
+ * Corrige y reenvía una factura que quedó `rechazada` (ver el catch de
+ * `crearFacturaCore`). Los cargos NO se vuelven a elegir — son los mismos
+ * que ya quedaron linkeados (y en estado 'facturado') en el intento
+ * original; lo único editable es tipo/condición de venta/medio de
+ * pago/descripción/fecha, para que el admin pueda corregir lo que haya
+ * indicado el motivo del rechazo (o corregir el socio aparte y reenviar
+ * tal cual — el cliente se reconstruye con los datos frescos del socio).
+ */
+export async function reenviarFacturaRechazadaAction(
+  facturaId: string,
+  data: ReenviarFacturaData,
+): Promise<FacturaResult> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+  const gId = ctx.activeMembership.guarderiaId;
+
+  const [rechazada] = await db
+    .select({
+      id: facturacion.id,
+      socioId: facturacion.socioId,
+      rechazada: facturacion.rechazada,
+      desde: facturacion.desde,
+      hasta: facturacion.hasta,
+    })
+    .from(facturacion)
+    .where(and(eq(facturacion.id, facturaId), eq(facturacion.guarderiaId, gId)))
+    .limit(1);
+
+  if (!rechazada) return { error: 'Factura no encontrada.' };
+  if (!rechazada.rechazada) return { error: 'Esta factura no está rechazada.' };
+  if (!rechazada.socioId) return { error: 'La factura no tiene socio asociado.' };
+
+  // Cargos ya linkeados al intento original — no se vuelven a elegir.
+  const items = await db
+    .select({ id: facturacionItems.id })
+    .from(facturacionItems)
+    .where(eq(facturacionItems.facturacionId, facturaId));
+
+  const links = items.length
+    ? await db
+        .select({ movimientoId: facturacionItemMovimientos.movimientoId })
+        .from(facturacionItemMovimientos)
+        .where(
+          inArray(
+            facturacionItemMovimientos.facturacionItemId,
+            items.map((i) => i.id),
+          ),
+        )
+    : [];
+
+  const movimientoIds = links.map((l) => l.movimientoId);
+  if (movimientoIds.length === 0) {
+    return { error: 'No se encontraron los cargos de esta factura.' };
+  }
+
+  const movs = await db
+    .select({
+      concepto: movimientosCuentaCorriente.concepto,
+      debe: movimientosCuentaCorriente.debe,
+      servicioAlicuotaIva: servicios.alicuotaIva,
+    })
+    .from(movimientosCuentaCorriente)
+    .leftJoin(servicios, eq(servicios.id, movimientosCuentaCorriente.servicioId))
+    .where(inArray(movimientosCuentaCorriente.id, movimientoIds));
+
+  const detalleItems = movs.map((m) => ({
+    descripcion: m.concepto ?? 'Servicio',
+    cantidad: 1,
+    importeUnitario: parseFloat(m.debe ?? '0'),
+    alicuotaIva: m.servicioAlicuotaIva != null ? Number(m.servicioAlicuotaIva) : null,
+  }));
+  const total = totalItems(detalleItems);
+
+  // Socio y credenciales frescos: si el motivo del rechazo era un dato del
+  // socio (CUIT, condición de IVA), esto ya recoge la corrección.
+  const [socio] = await db
+    .select({
+      id: profiles.id,
+      email: profiles.email,
+      nombre: profiles.nombre,
+      apellido: profiles.apellido,
+      razonSocial: profiles.razonSocial,
+      tipoDocumento: profiles.tipoDocumento,
+      numeroDocumento: profiles.numeroDocumento,
+      cuit: profiles.cuit,
+      direccion: profiles.direccion,
+      direccionFiscal: profiles.direccionFiscal,
+      condicionIva: profiles.condicionIva,
+      condicionIvaPersonal: profiles.condicionIvaPersonal,
+      emailFacturacion: profiles.emailFacturacion,
+      facturaFiscal: memberships.facturaFiscal,
+    })
+    .from(profiles)
+    .innerJoin(
+      memberships,
+      and(eq(memberships.userId, profiles.id), eq(memberships.guarderiaId, gId)),
+    )
+    .where(and(eq(profiles.id, rechazada.socioId), eq(memberships.status, 'active')));
+
+  if (!socio) return { error: 'Socio no encontrado en esta guardería.' };
+
+  const validacionSocio = validarDocumentoSocio(socio);
+  if (validacionSocio) return { error: validacionSocio };
+
+  const [guarderia] = await db
+    .select({
+      puntoDeVenta: guarderias.puntoDeVenta,
+      rubro: guarderias.rubro,
+      tusfacturasApikey: guarderias.tusfacturasApikey,
+      tusfacturasApitoken: guarderias.tusfacturasApitoken,
+      tusfacturasUsertoken: guarderias.tusfacturasUsertoken,
+      certificadoAfipOk: guarderias.certificadoAfipOk,
+    })
+    .from(guarderias)
+    .where(eq(guarderias.id, gId))
+    .limit(1);
+
+  if (
+    !guarderia ||
+    guarderia.puntoDeVenta == null ||
+    !guarderia.tusfacturasApikey ||
+    !guarderia.tusfacturasApitoken ||
+    !guarderia.tusfacturasUsertoken
+  ) {
+    return { error: 'Esta guardería todavía no tiene los datos impositivos configurados.' };
+  }
+  if (!guarderia.certificadoAfipOk) {
+    return { error: 'El certificado de enlace con ARCA todavía no está confirmado.' };
+  }
+
+  const credsOverride: TusFacturasCredentials = {
+    apikey: guarderia.tusfacturasApikey,
+    apitoken: guarderia.tusfacturasApitoken,
+    usertoken: guarderia.tusfacturasUsertoken,
+  };
+
+  const cliente = buildCliente({ ...socio, condicionVenta: data.condicionVenta });
+  const comprobante: TusFacturasComprobante = {
+    fecha: toTusFecha(data.fecha),
+    vencimiento: toTusFecha(data.vencimiento),
+    tipo: TIPO_FACTURA_API[data.tipoFactura],
+    idioma: 1,
+    external_reference: facturaId,
+    operacion: 'V',
+    punto_venta: String(guarderia.puntoDeVenta),
+    moneda: 'PES',
+    cotizacion: 1,
+    periodo_facturado_desde: toTusFecha(rechazada.desde ?? fechaCalendariaArg(data.fecha)),
+    periodo_facturado_hasta: toTusFecha(rechazada.hasta ?? fechaCalendariaArg(data.fecha)),
+    rubro: guarderia.rubro ?? 'Servicios náuticos',
+    rubro_grupo_contable: process.env.TUSFACTURAS_RUBRO_GRUPO ?? 'Servicios',
+    detalle: buildDetalle(detalleItems, data.tipoFactura),
+    total: total.toFixed(2),
+    pagos: {
+      formas_pago: buildPagos(total, data.medioPago),
+      total,
+    },
+  };
+
+  let apiResponse;
+  try {
+    apiResponse = await crearFactura({ cliente, comprobante }, credsOverride);
+  } catch (err) {
+    const motivoError =
+      err instanceof Error ? err.message : 'Error al emitir factura en TusFacturas.';
+    await db
+      .update(facturacion)
+      .set({ motivoError, updatedAt: new Date() })
+      .where(eq(facturacion.id, facturaId));
+    return { error: motivoError, facturaId };
+  }
+
+  // Reenvío exitoso: recién ahora se asigna folio local (siempre FM — el
+  // reenvío siempre es una corrección manual, sea cual sea el origen del
+  // intento original) y se limpia el rechazo.
+  const descripcionFactura =
+    data.descripcion?.trim() ||
+    `Factura ${TIPO_FACTURA_API[data.tipoFactura]} — ${detalleItems[0].descripcion}${
+      detalleItems.length > 1 ? ` (+${detalleItems.length - 1})` : ''
+    }`;
+  const folioLocal = await nextFolioLocal(gId, 'FM');
+
+  await db
+    .update(facturacion)
+    .set({
+      codigo: apiResponse.comprobante_nro ?? null,
+      folioLocal,
+      archivo: apiResponse.comprobante_pdf_url ?? null,
+      cae: apiResponse.cae ?? null,
+      descripcion: descripcionFactura,
+      tipoFactura: data.tipoFactura,
+      condicionVenta: data.condicionVenta,
+      medioPago: data.medioPago,
+      importe: total.toFixed(2),
+      emision: fechaCalendariaArg(data.fecha),
+      vencimiento: fechaCalendariaArg(data.vencimiento),
+      rechazada: false,
+      motivoError: null,
+      updatedAt: new Date(),
+    })
+    .where(eq(facturacion.id, facturaId));
+
+  revalidatePath('/ventas');
+  revalidatePath(`/usuarios/${rechazada.socioId}`);
+
+  return {
+    facturaId,
+    comprobanteNro: apiResponse.comprobante_nro,
+    folioLocal,
+    pdfUrl: apiResponse.comprobante_pdf_url,
+  };
 }
 
 // ─── Action: factura en lote ────────────────────────────────────────────────

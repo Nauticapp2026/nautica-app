@@ -31,6 +31,7 @@ import {
   getSocioPendientesAction,
   getSocioPendientesInternoAction,
   markInvoicePaidAction,
+  reenviarFacturaRechazadaAction,
   type BatchResult,
   type ComprobanteInternoLoteResult,
   type MovimientoPendiente,
@@ -68,6 +69,10 @@ type Factura = {
   socioNombre: string;
   cae: string | null;
   facturaOriginalId: string | null;
+  rechazada: boolean;
+  motivoError: string | null;
+  condicionVenta: string | null;
+  medioPago: string | null;
 };
 
 type LoteMovimiento = {
@@ -2104,6 +2109,232 @@ function NotaCreditoModal({
   );
 }
 
+// ─── Modal: reenviar factura rechazada por ARCA ────────────────────────────
+
+// Recibe `factura` no-nulable a propósito: el padre solo la monta cuando hay
+// una seleccionada, con `key={factura.id}` — así el estado se inicializa de
+// nuevo (precargado) en cada apertura, sin necesitar un efecto que copie
+// props a state.
+function ReenviarFacturaModal({ onClose, factura }: { onClose: () => void; factura: Factura }) {
+  const router = useRouter();
+  const hoy = new Date().toISOString().slice(0, 10);
+  const [tipoFactura, setTipoFactura] = useState(factura.tipoFactura ?? 'factura_c');
+  const [condicionVenta, setCondicionVenta] = useState(factura.condicionVenta ?? 'contado');
+  const [medioPago, setMedioPago] = useState(factura.medioPago ?? 'efectivo');
+  const [descripcion, setDescripcion] = useState(factura.descripcion ?? '');
+  const [fecha, setFecha] = useState(hoy);
+  const [vencimiento, setVencimiento] = useState(hoy);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<{
+    comprobanteNro?: string;
+    folioLocal?: string;
+    pdfUrl?: string;
+  } | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  function handleSubmit() {
+    setError(null);
+    startTransition(async () => {
+      const res = await reenviarFacturaRechazadaAction(factura.id, {
+        tipoFactura: tipoFactura as never,
+        condicionVenta: condicionVenta as never,
+        medioPago: medioPago as never,
+        descripcion: descripcion || undefined,
+        fecha,
+        vencimiento,
+      });
+      if (res.error) {
+        setError(res.error);
+      } else {
+        setResult({
+          comprobanteNro: res.comprobanteNro,
+          folioLocal: res.folioLocal,
+          pdfUrl: res.pdfUrl,
+        });
+        router.refresh();
+      }
+    });
+  }
+
+  function handleClose() {
+    setError(null);
+    setResult(null);
+    onClose();
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl">
+        <div className="flex items-start justify-between p-6 pb-4">
+          <div>
+            <h2 className="text-[18px] font-bold" style={{ color: '#101828' }}>
+              Reenviar factura rechazada
+            </h2>
+            <p className="mt-0.5 text-sm" style={{ color: '#669E9D' }}>
+              {fmtMoney(factura.importe)}
+            </p>
+          </div>
+          <button
+            onClick={handleClose}
+            className="rounded-[8px] p-1 text-gray-400 hover:bg-gray-100"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="border-t border-gray-200" />
+
+        {result ? (
+          <div className="space-y-4 p-6">
+            <div className="flex items-center gap-3 rounded-[10px] bg-teal-50 p-4">
+              <CheckCircle2 className="h-5 w-5 shrink-0 text-teal-600" />
+              <div>
+                <p className="font-semibold text-teal-900">Factura aceptada por ARCA</p>
+                {result.comprobanteNro && (
+                  <p className="text-sm text-teal-700">Nro: {result.comprobanteNro}</p>
+                )}
+                {result.folioLocal && <p className="text-sm text-teal-700">{result.folioLocal}</p>}
+              </div>
+            </div>
+            {result.pdfUrl && (
+              <a
+                href={result.pdfUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex w-full items-center justify-center gap-2 rounded-[10px] border border-gray-200 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                <Download className="h-4 w-4" />
+                Descargar PDF
+              </a>
+            )}
+            <button
+              onClick={handleClose}
+              className="w-full rounded-[10px] py-2.5 text-sm font-semibold text-white transition hover:opacity-90"
+              style={{ background: '#175861' }}
+            >
+              Cerrar
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="space-y-4 p-6">
+              {factura.motivoError && (
+                <div className="flex items-start gap-2 rounded-[10px] bg-red-50 p-3 text-sm text-red-700">
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span>
+                    <strong>Motivo del rechazo:</strong> {factura.motivoError}
+                  </span>
+                </div>
+              )}
+
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
+                  Tipo de factura
+                </label>
+                <select
+                  className={inputCls}
+                  value={tipoFactura}
+                  onChange={(e) => setTipoFactura(e.target.value)}
+                >
+                  {TIPO_FACTURA_OPTS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label
+                    className="mb-1.5 block text-xs font-semibold"
+                    style={{ color: '#101828' }}
+                  >
+                    Condición de venta
+                  </label>
+                  <select
+                    className={inputCls}
+                    value={condicionVenta}
+                    onChange={(e) => setCondicionVenta(e.target.value)}
+                  >
+                    {CONDICION_VENTA_OPTS.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label
+                    className="mb-1.5 block text-xs font-semibold"
+                    style={{ color: '#101828' }}
+                  >
+                    Medio de pago
+                  </label>
+                  <select
+                    className={inputCls}
+                    value={medioPago}
+                    onChange={(e) => setMedioPago(e.target.value)}
+                  >
+                    {MEDIO_PAGO_OPTS.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
+                  Descripción (opcional)
+                </label>
+                <input
+                  className={inputCls}
+                  placeholder="Se auto-genera si se deja vacío"
+                  value={descripcion}
+                  onChange={(e) => setDescripcion(e.target.value)}
+                />
+              </div>
+
+              <p className="text-xs text-gray-400">
+                Los cargos incluidos son los mismos del intento original — no se vuelven a elegir.
+                Si el error era del socio (CUIT, condición de IVA), corregilo en su perfil antes de
+                reenviar.
+              </p>
+
+              {error && (
+                <div className="flex items-start gap-2 rounded-[10px] bg-red-50 p-3 text-sm text-red-700">
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span>{error}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="border-t border-gray-200 p-6">
+              <div className="flex gap-3">
+                <button
+                  onClick={handleClose}
+                  className="flex-1 rounded-[10px] border border-[#d1d5dc] bg-white py-2.5 text-sm font-medium text-[#364153] transition hover:bg-gray-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleSubmit}
+                  disabled={isPending}
+                  className="flex-1 rounded-[10px] py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+                  style={{ background: '#175861' }}
+                >
+                  {isPending ? 'Reenviando...' : 'Reenviar'}
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Modal: nota de crédito o débito libre (sin comprobante de origen) ────
 
 function NotaLibreModal({
@@ -2533,6 +2764,7 @@ export function VentasClient({
   const [notaLibreOpen, setNotaLibreOpen] = useState(false);
   const [pagarFactura, setPagarFactura] = useState<Factura | null>(null);
   const [ncFactura, setNcFactura] = useState<Factura | null>(null);
+  const [reenviarFactura, setReenviarFactura] = useState<Factura | null>(null);
   // Selección para NC en lote (anulación total) sobre la tabla AFIP.
   const [selectedNc, setSelectedNc] = useState<Set<string>>(() => new Set());
   const [loteNcOpen, setLoteNcOpen] = useState(false);
@@ -2748,6 +2980,13 @@ export function VentasClient({
         factura={pagarFactura}
       />
       <NotaCreditoModal open={!!ncFactura} onClose={() => setNcFactura(null)} factura={ncFactura} />
+      {reenviarFactura && (
+        <ReenviarFacturaModal
+          key={reenviarFactura.id}
+          onClose={() => setReenviarFactura(null)}
+          factura={reenviarFactura}
+        />
+      )}
       <NotaLibreModal
         open={notaLibreOpen}
         onClose={() => setNotaLibreOpen(false)}
@@ -3089,14 +3328,23 @@ export function VentasClient({
                               {fmtMoney(f.importe)}
                             </td>
                             <td className="px-4 py-3 text-center">
-                              <span
-                                className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${
-                                  ESTADO_BADGE[f.estado ?? 'pendiente'] ??
-                                  'bg-gray-100 text-gray-600'
-                                }`}
-                              >
-                                {ESTADO_LABEL[f.estado ?? 'pendiente'] ?? f.estado}
-                              </span>
+                              {f.rechazada ? (
+                                <span
+                                  title={f.motivoError ?? undefined}
+                                  className="inline-block cursor-help rounded-full bg-red-100 px-3 py-1 text-xs font-medium text-red-700"
+                                >
+                                  Rechazada
+                                </span>
+                              ) : (
+                                <span
+                                  className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${
+                                    ESTADO_BADGE[f.estado ?? 'pendiente'] ??
+                                    'bg-gray-100 text-gray-600'
+                                  }`}
+                                >
+                                  {ESTADO_LABEL[f.estado ?? 'pendiente'] ?? f.estado}
+                                </span>
+                              )}
                             </td>
                             <td className="px-4 py-3">
                               <div className="flex items-center justify-end gap-2">
@@ -3147,6 +3395,15 @@ export function VentasClient({
                                     <Download className="h-4 w-4" />
                                   </button>
                                 )}
+                                {f.rechazada ? (
+                                  <button
+                                    onClick={() => setReenviarFactura(f)}
+                                    title="Reenviar factura rechazada"
+                                    className="rounded-[6px] p-1.5 text-gray-400 transition hover:bg-red-50 hover:text-red-600"
+                                  >
+                                    <RefreshCw className="h-4 w-4" />
+                                  </button>
+                                ) : null}
                                 {(f.tipoFactura === 'factura_a' ||
                                   f.tipoFactura === 'factura_b' ||
                                   f.tipoFactura === 'factura_c') &&

@@ -1167,6 +1167,11 @@ export const facturacion = pgTable(
     anulada: boolean('anulada').notNull().default(false),
     anuladaAt: timestamp('anulada_at', { withTimezone: true }),
     cobranzaComprobanteIds: uuid('cobranza_comprobante_ids').array(),
+    // Factura fiscal rechazada por ARCA vía TusFacturas: se persiste igual
+    // (sin folioLocal/codigo/cae) para poder mostrar el motivo y reenviarla
+    // una vez corregida, en vez de perder el intento.
+    rechazada: boolean('rechazada').notNull().default(false),
+    motivoError: text('motivo_error'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
