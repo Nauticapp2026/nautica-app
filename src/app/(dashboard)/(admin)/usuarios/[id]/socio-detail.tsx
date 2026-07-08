@@ -41,12 +41,12 @@ import {
 import { assignEspacioToSocioAction, moveOcupanteAction } from '@/app/actions/espacios';
 import { toast } from 'sonner';
 import {
-  cancelarServicioAction,
   deleteSocioAction,
   deleteSocioDocumentoAction,
   toggleFacturaFiscalAction,
   updateNumeroSocioAction,
   updateSocioAction,
+  updateSocioServicioAction,
   updateSocioStatusAction,
   uploadSocioDocumentoAction,
 } from '@/app/actions/socios';
@@ -140,6 +140,24 @@ type Servicio = {
   alicuotaIva: string | null;
 };
 
+// Servicio Contratado: un registro por contrato (socio + servicio), con su
+// propia ventana de vigencia — no confundir con `Movimiento` (un cobro).
+type ServicioContratado = {
+  id: string;
+  servicioId: string;
+  servicioNombre: string | null;
+  servicioTipo: string | null;
+  servicioTipoCobro: 'fijo' | 'variable' | null;
+  servicioPrecio: string | null;
+  servicioAlicuotaIva: string | null;
+  servicioPoliticaBajaAnticipada: 'mes_completo' | 'proporcional';
+  espacioId: string | null;
+  numeroOperacion: number;
+  fechaAsignacion: string;
+  fechaInicio: string;
+  fechaBaja: string | null;
+};
+
 type Navegante = {
   id: string;
   nombre: string;
@@ -231,8 +249,9 @@ function fmtYmd(ymd: string): string {
 
 const ESTADO_BADGE: Record<string, string> = {
   pagado: 'bg-gray-900 text-white',
-  facturado: 'bg-green-100 text-green-700',
-  no_pagado: 'bg-green-100 text-green-700',
+  parcial: 'bg-blue-50 text-blue-700',
+  facturado: 'bg-amber-50 text-amber-700',
+  no_pagado: 'bg-amber-50 text-amber-700',
   vencido: 'bg-red-100 text-red-700',
 };
 
@@ -248,15 +267,20 @@ const MEMBERSHIP_STATUS_LABEL: Record<'active' | 'inactivo', string> = {
 
 const ESTADO_LABEL: Record<string, string> = {
   pagado: 'Pagado',
-  facturado: 'En Plazo',
-  no_pagado: 'En Plazo',
+  parcial: 'Parcial',
+  facturado: 'Pendiente',
+  no_pagado: 'Pendiente',
   vencido: 'Vencido',
 };
 
 // Agrega a cada movimiento (orden desc: más nuevo primero) el saldo acumulado y
 // el estado MOSTRADO. Un cargo figura "Pagado" cuando los pagos (haber) alcanzan
-// a cubrirlo, asignando del más viejo al más nuevo (FIFO). Es cálculo de display:
-// no cambia el estado guardado (la facturación sigue mirando el real).
+// a cubrirlo, "Parcial" cuando lo cobrado es menor al total del cargo, y
+// "Pendiente" cuando todavía no se le asignó ningún pago — asignando del más
+// viejo al más nuevo (FIFO). Es cálculo de display: no cambia el estado
+// guardado (la facturación sigue mirando el real). No confundir con la
+// columna "Situación" (En Plazo / Vencido), que compara la fecha de
+// vencimiento contra hoy — son dos ejes independientes.
 //
 // Un cargo ya `pagado` (cobranza/Payway/factura marcada pagada) CONSUME su parte
 // del pool de haberes: su pago ya está comprometido con ese cargo. Si no se
@@ -282,6 +306,11 @@ function calcularSaldoYEstado<
         // Cubierto por cobertura FIFO.
         estadoDisplay = 'pagado';
         poolHaber -= venta;
+      } else if (poolHaber > 0.001) {
+        // Cubierto solo en parte: consume todo el pool restante y no alcanza
+        // para el resto de este cargo ni para ningún otro más nuevo.
+        estadoDisplay = 'parcial';
+        poolHaber = 0;
       }
     }
     return { ...m, saldo: acum, estadoDisplay };
@@ -330,12 +359,14 @@ function AgregarServicioModal({
   const [concepto, setConcepto] = useState('');
   const [monto, setMonto] = useState('');
   const [fecha, setFecha] = useState(todayISODate);
+  const [fechaInicio, setFechaInicio] = useState(todayISODate);
+  const [fechaBaja, setFechaBaja] = useState('');
   const [comprobante, setComprobante] = useState<'interno' | 'fiscal'>('interno');
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ comprobante: 'interno' | 'fiscal' } | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const isValid = Boolean(servicioId && monto);
+  const isValid = Boolean(servicioId && monto && fechaInicio);
 
   function handleServicioChange(e: React.ChangeEvent<HTMLSelectElement>) {
     const id = e.target.value;
@@ -352,6 +383,8 @@ function AgregarServicioModal({
     setConcepto('');
     setMonto('');
     setFecha(todayISODate());
+    setFechaInicio(todayISODate());
+    setFechaBaja('');
     setComprobante('interno');
     setError(null);
     setResult(null);
@@ -368,6 +401,8 @@ function AgregarServicioModal({
         monto: montoToNumberStr(monto),
         fecha,
         comprobante,
+        fechaInicio,
+        fechaBaja: fechaBaja || null,
       });
       if (res.error) {
         setError(res.error);
@@ -487,6 +522,40 @@ function AgregarServicioModal({
                     className={inputCls}
                     value={fecha}
                     onChange={(e) => setFecha(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label
+                    className="mb-1.5 block text-xs font-semibold"
+                    style={{ color: '#101828' }}
+                  >
+                    Fecha de inicio del servicio
+                  </label>
+                  <input
+                    type="date"
+                    max={todayISODate()}
+                    className={inputCls}
+                    value={fechaInicio}
+                    onChange={(e) => setFechaInicio(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label
+                    className="mb-1.5 block text-xs font-semibold"
+                    style={{ color: '#101828' }}
+                  >
+                    Fecha de baja <span className="font-normal text-gray-400">(opcional)</span>
+                  </label>
+                  <input
+                    type="date"
+                    max={todayISODate()}
+                    min={fechaInicio}
+                    className={inputCls}
+                    value={fechaBaja}
+                    onChange={(e) => setFechaBaja(e.target.value)}
                   />
                 </div>
               </div>
@@ -1453,7 +1522,7 @@ export function SocioDetail({
   documentos = [],
   salidas = [],
   espaciosDisponibles,
-  cancelaciones = [],
+  serviciosContratados = [],
   paywayPublicKey = null,
   paywayToken = null,
 }: {
@@ -1466,7 +1535,7 @@ export function SocioDetail({
   documentos?: DocumentoItem[];
   salidas?: SalidaItem[];
   espaciosDisponibles: EspacioOption[];
-  cancelaciones?: { servicioId: string; fechaCancelacion: string }[];
+  serviciosContratados?: ServicioContratado[];
   paywayPublicKey?: string | null;
   paywayToken?: PaywayTokenInfo | null;
 }) {
@@ -1630,6 +1699,7 @@ export function SocioDetail({
     if (ccFechaDesde && (!fecha || fecha < ccFechaDesde)) return false;
     if (ccFechaHasta && (!fecha || fecha > ccFechaHasta)) return false;
     if (ccEstado === 'pagado' && est !== 'pagado') return false;
+    if (ccEstado === 'parcial' && est !== 'parcial') return false;
     if (ccEstado === 'en_plazo' && est !== 'facturado' && est !== 'no_pagado') return false;
     if (ccTipoComp === 'sin' && m.facturaTipo) return false;
     if (ccTipoComp && ccTipoComp !== 'sin' && m.facturaTipo !== ccTipoComp) return false;
@@ -2021,7 +2091,7 @@ export function SocioDetail({
       {activeTab === 'servicios-contratados' && (
         <ServiciosContratadosTab
           movimientos={movimientos}
-          cancelaciones={cancelaciones}
+          serviciosContratados={serviciosContratados}
           socioId={socio.id}
           onCargarServicio={() => setModalServicioOpen(true)}
         />
@@ -2066,7 +2136,8 @@ export function SocioDetail({
               >
                 <option value="">Todos</option>
                 <option value="pagado">Pagado</option>
-                <option value="en_plazo">En Plazo</option>
+                <option value="parcial">Parcial</option>
+                <option value="en_plazo">Pendiente</option>
               </select>
             </div>
             <div className="flex flex-col gap-1">
@@ -2859,151 +2930,28 @@ function ImpositivosTab({
 
 function ServiciosContratadosTab({
   movimientos,
-  cancelaciones,
+  serviciosContratados,
   socioId,
   onCargarServicio,
 }: {
   movimientos: Movimiento[];
-  cancelaciones: { servicioId: string; fechaCancelacion: string }[];
+  serviciosContratados: ServicioContratado[];
   socioId: string;
   onCargarServicio: () => void;
 }) {
   const router = useRouter();
-  const [cancelandoId, setCancelandoId] = useState<string | null>(null);
+  const [editingSC, setEditingSC] = useState<ServicioContratado | null>(null);
   const [editingMov, setEditingMov] = useState<Movimiento | null>(null);
-  const [montoOverride, setMontoOverride] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  // Resumen por servicio (no se muestra agrupado — se usa para el modal de
-  // cancelación, que necesita el último monto/fecha cobrados a este socio
-  // por ese servicio, y para los badges Fijo/Variable + Vigente/Cancelado
-  // de cada fila individual).
-  type Resumen = {
-    servicioId: string;
-    servicioNombre: string;
-    categoria: string | null;
-    tipoCobro: 'fijo' | 'variable' | null;
-    cantidad: number;
-    total: number;
-    ultimaFecha: string | null;
-    ultimoMonto: number;
-  };
-  const mapaServicios = new Map<string, Resumen>();
-  for (const m of movimientos) {
-    if (!m.servicioId || !m.servicioNombre) continue;
-    const prev = mapaServicios.get(m.servicioId);
-    const importe = parseFloat(m.debe ?? '0') || 0;
-    if (prev) {
-      prev.cantidad += 1;
-      prev.total += importe;
-      if (m.servicioTipoCobro && !prev.tipoCobro) prev.tipoCobro = m.servicioTipoCobro;
-      if (m.servicioTipo && !prev.categoria) prev.categoria = m.servicioTipo;
-      if (m.fecha && (!prev.ultimaFecha || m.fecha > prev.ultimaFecha)) {
-        prev.ultimaFecha = m.fecha;
-        prev.ultimoMonto = importe;
-      }
-    } else {
-      mapaServicios.set(m.servicioId, {
-        servicioId: m.servicioId,
-        servicioNombre: m.servicioNombre,
-        categoria: m.servicioTipo,
-        tipoCobro: m.servicioTipoCobro,
-        cantidad: 1,
-        total: importe,
-        ultimaFecha: m.fecha,
-        ultimoMonto: importe,
-      });
-    }
+  const hoy = todayISODate();
+  function esVigente(sc: ServicioContratado): boolean {
+    return sc.fechaInicio <= hoy && (!sc.fechaBaja || sc.fechaBaja >= hoy);
   }
-  const filas = [...mapaServicios.values()].sort((a, b) =>
-    a.servicioNombre.localeCompare(b.servicioNombre),
+
+  const filas = [...serviciosContratados].sort((a, b) =>
+    b.fechaAsignacion.localeCompare(a.fechaAsignacion),
   );
-
-  // Cada Servicio Contratado es un registro independiente — sin agrupar.
-  const filasIndividuales = movimientos
-    .filter((m) => m.servicioId && m.servicioNombre)
-    .sort((a, b) => {
-      if (!a.fecha) return 1;
-      if (!b.fecha) return -1;
-      return b.fecha.localeCompare(a.fecha);
-    });
-
-  const cancelacionMap = new Map(cancelaciones.map((c) => [c.servicioId, c.fechaCancelacion]));
-
-  // Calcula el proporcional en base al último monto REAL cobrado a este socio
-  // por este servicio (no el precio vigente del tarifario, que puede haber
-  // cambiado desde la última vez que se le cobró) y a los días transcurridos
-  // desde ese último cobro (no "qué día del mes es hoy": si cancelás el día 1
-  // de un mes nuevo eso daría un proporcional casi nulo aunque el último cobro
-  // haya sido hace semanas). Se limita a como máximo un mes completo, para no
-  // arrastrar meses atrasados que no se cobraron por otro motivo.
-  function calcularProporcional(
-    ultimoMonto: number,
-    ultimaFecha: string | null,
-  ): {
-    monto: number;
-    diasUsados: number;
-    diasMes: number;
-  } {
-    const hoy = new Date();
-    const diasMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0).getDate();
-    let diasUsados = diasMes;
-    if (ultimaFecha) {
-      const msPorDia = 1000 * 60 * 60 * 24;
-      const diasDesdeUltimoCobro = Math.round(
-        (hoy.getTime() - new Date(ultimaFecha).getTime()) / msPorDia,
-      );
-      diasUsados = Math.min(diasMes, Math.max(0, diasDesdeUltimoCobro));
-    }
-    const monto = Math.round((diasUsados / diasMes) * ultimoMonto * 100) / 100;
-    return { monto, diasUsados, diasMes };
-  }
-
-  // Servicio seleccionado para cancelar (para el dialog).
-  const servicioSeleccionado = cancelandoId
-    ? (filas.find((f) => f.servicioId === cancelandoId) ?? null)
-    : null;
-  const proporcional = servicioSeleccionado
-    ? calcularProporcional(servicioSeleccionado.ultimoMonto, servicioSeleccionado.ultimaFecha)
-    : null;
-  const montoFinal =
-    montoOverride !== null ? parseFloat(montoOverride) || 0 : (proporcional?.monto ?? 0);
-
-  function abrirCancelacion(servicioId: string) {
-    setMontoOverride(null);
-    setCancelandoId(servicioId);
-  }
-
-  function cerrarCancelacion() {
-    setMontoOverride(null);
-    setCancelandoId(null);
-  }
-
-  function handleCancelar(cobrarProporcional: boolean) {
-    if (!cancelandoId) return;
-    startTransition(async () => {
-      const hoy = new Date();
-      const res = await cancelarServicioAction({
-        socioId,
-        servicioId: cancelandoId,
-        cobrarProporcional,
-        ...(cobrarProporcional
-          ? {
-              monto: String(montoFinal),
-              fecha: hoy.toISOString().split('T')[0],
-              concepto: `Proporcional ${servicioSeleccionado?.servicioNombre ?? 'servicio'} — ${proporcional?.diasUsados ?? 0} días`,
-            }
-          : {}),
-      });
-      if (res?.error) {
-        toast.error(res.error);
-      } else {
-        toast.success('Servicio cancelado');
-        cerrarCancelacion();
-        router.refresh();
-      }
-    });
-  }
 
   if (filas.length === 0) {
     return (
@@ -3049,102 +2997,149 @@ function ServiciosContratadosTab({
               <tr className="border-b border-gray-100 text-left text-xs font-semibold text-gray-400 uppercase">
                 <th className="pr-4 pb-2">Servicio</th>
                 <th className="pr-4 pb-2">Categoría</th>
-                <th className="pr-4 pb-2">Fecha</th>
-                <th className="pr-4 pb-2 text-right">Precio</th>
+                <th className="pr-4 pb-2">Fecha de asignación</th>
+                <th className="pr-4 pb-2">Nº de operación</th>
+                <th className="pr-4 pb-2">Estado</th>
+                <th className="pr-4 pb-2">Fecha de inicio</th>
+                <th className="pr-4 pb-2">Fecha de baja</th>
                 <th className="pb-2" />
               </tr>
             </thead>
             <tbody>
-              {filasIndividuales.map((m) => {
-                const resumen = m.servicioId ? mapaServicios.get(m.servicioId) : undefined;
-                const cancelado = m.servicioId ? cancelacionMap.get(m.servicioId) : undefined;
+              {filas.map((sc) => {
+                const vigente = esVigente(sc);
+                const movsDelContrato = movimientos.filter(
+                  (m) =>
+                    m.servicioId === sc.servicioId &&
+                    m.fecha != null &&
+                    m.fecha.slice(0, 10) >= sc.fechaInicio &&
+                    (!sc.fechaBaja || m.fecha.slice(0, 10) <= sc.fechaBaja),
+                );
                 return (
-                  <tr key={m.id} className="border-b border-gray-50 last:border-0">
-                    <td className="py-3 pr-4">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="font-medium" style={{ color: '#101828' }}>
-                          {m.servicioNombre}
-                        </span>
-                        {resumen?.tipoCobro && (
-                          <span
-                            className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                              resumen.tipoCobro === 'fijo'
-                                ? 'bg-[#EFF8F7] text-[#175861]'
-                                : 'bg-[#FFF4E6] text-[#B45309]'
-                            }`}
-                          >
-                            {resumen.tipoCobro === 'fijo' ? 'Fijo' : 'Variable'}
+                  <>
+                    <tr key={sc.id} className="border-b border-gray-50 last:border-0">
+                      <td className="py-3 pr-4">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="font-medium" style={{ color: '#101828' }}>
+                            {sc.servicioNombre}
                           </span>
-                        )}
-                        {cancelado ? (
-                          <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-600">
-                            Cancelado {fmtDate(cancelado)}
-                          </span>
-                        ) : (
+                          {sc.servicioTipoCobro && (
+                            <span
+                              className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                                sc.servicioTipoCobro === 'fijo'
+                                  ? 'bg-[#EFF8F7] text-[#175861]'
+                                  : 'bg-[#FFF4E6] text-[#B45309]'
+                              }`}
+                            >
+                              {sc.servicioTipoCobro === 'fijo' ? 'Fijo' : 'Variable'}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-3 pr-4 text-gray-600">
+                        {sc.servicioTipo
+                          ? (CATEGORIA_SERVICIO_LABEL[sc.servicioTipo] ?? sc.servicioTipo)
+                          : '—'}
+                      </td>
+                      <td className="py-3 pr-4 text-gray-600">{fmtDate(sc.fechaAsignacion)}</td>
+                      <td className="py-3 pr-4 text-gray-600">
+                        {String(sc.numeroOperacion).padStart(6, '0')}
+                      </td>
+                      <td className="py-3 pr-4">
+                        {vigente ? (
                           <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
                             Vigente
                           </span>
+                        ) : (
+                          <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-600">
+                            No vigente
+                          </span>
                         )}
-                      </div>
-                      {m.concepto && <p className="mt-0.5 text-xs text-gray-400">{m.concepto}</p>}
-                    </td>
-                    <td className="py-3 pr-4 text-gray-600">
-                      {m.servicioTipo
-                        ? (CATEGORIA_SERVICIO_LABEL[m.servicioTipo] ?? m.servicioTipo)
-                        : '—'}
-                    </td>
-                    <td className="py-3 pr-4 text-gray-600">{m.fecha ? fmtDate(m.fecha) : '—'}</td>
-                    <td className="py-3 pr-4 text-right" style={{ color: '#101828' }}>
-                      {(() => {
-                        const montoConIva = parseFloat(m.debe ?? '0');
-                        const alicuota =
-                          m.servicioAlicuotaIva != null ? Number(m.servicioAlicuotaIva) : 0;
-                        return (
-                          <>
-                            <span className="block text-sm font-medium">
-                              {fmt(montoConIva)}
-                              {alicuota > 0 && (
-                                <span className="ml-1.5 text-xs font-normal text-gray-400">
-                                  c/IVA
-                                </span>
-                              )}
-                            </span>
-                            {alicuota > 0 ? (
-                              <span className="block text-xs text-gray-500">
-                                {fmt(precioSinIva(montoConIva, alicuota))}
-                                <span className="ml-1 text-gray-400">s/IVA · {alicuota}%</span>
-                              </span>
-                            ) : (
-                              <span className="block text-xs text-gray-400">
-                                Exento / No gravado
-                              </span>
-                            )}
-                          </>
-                        );
-                      })()}
-                    </td>
-                    <td className="py-3 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        {!cancelado && m.servicioId && (
+                      </td>
+                      <td className="py-3 pr-4 text-gray-600">{fmtYmd(sc.fechaInicio)}</td>
+                      <td className="py-3 pr-4 text-gray-600">
+                        {sc.fechaBaja ? fmtYmd(sc.fechaBaja) : '—'}
+                      </td>
+                      <td className="py-3 text-right">
+                        <div className="flex items-center justify-end gap-2">
                           <button
-                            onClick={() => abrirCancelacion(m.servicioId!)}
-                            className="rounded-[8px] border border-red-200 px-3 py-1 text-xs font-medium text-red-600 transition hover:bg-red-50"
+                            onClick={() => setExpandedId(expandedId === sc.id ? null : sc.id)}
+                            className="rounded-[8px] border border-gray-200 px-3 py-1 text-xs font-medium text-gray-600 transition hover:bg-gray-50"
                           >
-                            Cancelar
+                            {expandedId === sc.id ? 'Ocultar' : 'Ver movimientos'}
                           </button>
-                        )}
-                        {!m.facturaCodigo && (
                           <button
-                            onClick={() => setEditingMov(m)}
+                            onClick={() => setEditingSC(sc)}
                             className="rounded-[8px] border border-gray-200 p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
-                            title="Editar cargo"
+                            title="Editar servicio contratado"
                           >
                             <Pencil className="h-3.5 w-3.5" />
                           </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
+                        </div>
+                      </td>
+                    </tr>
+                    {expandedId === sc.id && (
+                      <tr className="border-b border-gray-50 bg-gray-50/60 last:border-0">
+                        <td colSpan={8} className="p-4">
+                          {movsDelContrato.length === 0 ? (
+                            <p className="text-xs text-gray-400">
+                              Todavía no hay cobros registrados para este contrato.
+                            </p>
+                          ) : (
+                            <table className="w-full text-sm">
+                              <thead>
+                                <tr className="text-left text-xs font-semibold text-gray-400 uppercase">
+                                  <th className="pr-4 pb-2">Fecha</th>
+                                  <th className="pr-4 pb-2">Concepto</th>
+                                  <th className="pr-4 pb-2 text-right">Precio</th>
+                                  <th className="pb-2" />
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {movsDelContrato.map((m) => {
+                                  const montoConIva = parseFloat(m.debe ?? '0');
+                                  const alicuota =
+                                    m.servicioAlicuotaIva != null
+                                      ? Number(m.servicioAlicuotaIva)
+                                      : 0;
+                                  return (
+                                    <tr key={m.id} className="border-t border-gray-100">
+                                      <td className="py-2 pr-4 text-gray-600">
+                                        {m.fecha ? fmtDate(m.fecha) : '—'}
+                                      </td>
+                                      <td className="py-2 pr-4 text-gray-600">
+                                        {m.concepto ?? '—'}
+                                      </td>
+                                      <td
+                                        className="py-2 pr-4 text-right"
+                                        style={{ color: '#101828' }}
+                                      >
+                                        {fmt(montoConIva)}
+                                        {alicuota > 0 && (
+                                          <span className="ml-1 text-xs text-gray-400">c/IVA</span>
+                                        )}
+                                      </td>
+                                      <td className="py-2 text-right">
+                                        {!m.facturaCodigo && (
+                                          <button
+                                            onClick={() => setEditingMov(m)}
+                                            className="rounded-[8px] border border-gray-200 p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+                                            title="Editar cargo"
+                                          >
+                                            <Pencil className="h-3.5 w-3.5" />
+                                          </button>
+                                        )}
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                  </>
                 );
               })}
             </tbody>
@@ -3163,88 +3158,218 @@ function ServiciosContratadosTab({
         />
       )}
 
-      {/* Dialog de cancelación */}
-      {cancelandoId && servicioSeleccionado && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
-            <p className="mb-1 text-base font-bold" style={{ color: '#101828' }}>
-              Cancelar servicio
-            </p>
-            <p className="mb-4 text-sm text-gray-500">{servicioSeleccionado.servicioNombre}</p>
-
-            {proporcional ? (
-              <>
-                <p className="mb-4 text-sm text-gray-700">
-                  Pasaron <strong>{proporcional.diasUsados}</strong> días desde el último cobro
-                  (sobre un mes de <strong>{proporcional.diasMes}</strong> días). ¿Querés cargar el
-                  proporcional a la cuenta corriente?
-                </p>
-                <div className="mb-5 rounded-xl border border-gray-100 bg-gray-50 p-3">
-                  <label className="mb-1 block text-xs text-gray-500">
-                    Importe proporcional (sugerido en base al último cobro real)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={montoOverride ?? proporcional.monto.toFixed(2)}
-                    onChange={(e) => setMontoOverride(e.target.value)}
-                    className="border-input focus-visible:border-ring focus-visible:ring-ring/50 h-10 w-full rounded-[8px] border bg-white px-3 text-center text-xl font-bold focus-visible:ring-[3px] focus-visible:outline-none"
-                    style={{ color: '#101828' }}
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={cerrarCancelacion}
-                    disabled={isPending}
-                    className="flex-1 rounded-[10px] border border-gray-200 py-2.5 text-sm font-medium text-gray-600 transition hover:bg-gray-50 disabled:opacity-40"
-                  >
-                    Volver
-                  </button>
-                  <button
-                    onClick={() => handleCancelar(false)}
-                    disabled={isPending}
-                    className="flex-1 rounded-[10px] border border-red-200 py-2.5 text-sm font-medium text-red-600 transition hover:bg-red-50 disabled:opacity-40"
-                  >
-                    Solo cancelar
-                  </button>
-                  <button
-                    onClick={() => handleCancelar(true)}
-                    disabled={isPending}
-                    className="flex-1 rounded-[10px] py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-40"
-                    style={{ background: '#175861' }}
-                  >
-                    {isPending ? '...' : 'Cobrar y cancelar'}
-                  </button>
-                </div>
-              </>
-            ) : (
-              <>
-                <p className="mb-5 text-sm text-gray-700">
-                  El historial de cargos quedará visible. Esta acción no se puede deshacer.
-                </p>
-                <div className="flex gap-2">
-                  <button
-                    onClick={cerrarCancelacion}
-                    disabled={isPending}
-                    className="flex-1 rounded-[10px] border border-gray-200 py-2.5 text-sm font-medium text-gray-600 transition hover:bg-gray-50 disabled:opacity-40"
-                  >
-                    Volver
-                  </button>
-                  <button
-                    onClick={() => handleCancelar(false)}
-                    disabled={isPending}
-                    className="flex-1 rounded-[10px] bg-red-600 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-40"
-                  >
-                    {isPending ? 'Cancelando...' : 'Confirmar cancelación'}
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
+      {editingSC && (
+        <EditServicioContratadoModal
+          sc={editingSC}
+          movimientos={movimientos.filter((m) => m.servicioId === editingSC.servicioId)}
+          onClose={() => setEditingSC(null)}
+          onSaved={() => {
+            setEditingSC(null);
+            router.refresh();
+          }}
+        />
       )}
     </>
+  );
+}
+
+// Calcula el proporcional en base al último monto REAL cobrado a este socio
+// por este servicio (no el precio vigente del tarifario, que puede haber
+// cambiado desde la última vez que se le cobró) y a los días transcurridos
+// desde ese último cobro. Se limita a como máximo un mes completo, para no
+// arrastrar meses atrasados que no se cobraron por otro motivo.
+function calcularProporcional(
+  ultimoMonto: number,
+  ultimaFecha: string | null,
+): { monto: number; diasUsados: number; diasMes: number } {
+  const hoy = new Date();
+  const diasMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0).getDate();
+  let diasUsados = diasMes;
+  if (ultimaFecha) {
+    const msPorDia = 1000 * 60 * 60 * 24;
+    const diasDesdeUltimoCobro = Math.round(
+      (hoy.getTime() - new Date(ultimaFecha).getTime()) / msPorDia,
+    );
+    diasUsados = Math.min(diasMes, Math.max(0, diasDesdeUltimoCobro));
+  }
+  const monto = Math.round((diasUsados / diasMes) * ultimoMonto * 100) / 100;
+  return { monto, diasUsados, diasMes };
+}
+
+function EditServicioContratadoModal({
+  sc,
+  movimientos,
+  onClose,
+  onSaved,
+}: {
+  sc: ServicioContratado;
+  movimientos: Movimiento[];
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [fechaInicio, setFechaInicio] = useState(sc.fechaInicio);
+  const [fechaBaja, setFechaBaja] = useState(sc.fechaBaja ?? '');
+  const [cobrar, setCobrar] = useState(true);
+  const [montoOverride, setMontoOverride] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  const hoy = todayISODate();
+  // Solo se ofrece cobrar cuando la baja recién se está dando de alta (el
+  // contrato estaba abierto y ahora se le pone fecha de baja) — no al
+  // simplemente corregir una fecha en un contrato que ya estaba cerrado.
+  const esBajaNueva = sc.fechaBaja === null && fechaBaja !== '';
+
+  const ultimoMov = [...movimientos]
+    .filter((m) => m.fecha)
+    .sort((a, b) => (b.fecha! > a.fecha! ? 1 : -1))[0];
+  const ultimoMonto = ultimoMov ? parseFloat(ultimoMov.debe ?? '0') || 0 : 0;
+  const precioCompleto =
+    sc.servicioPrecio != null
+      ? precioConIva(Number(sc.servicioPrecio), Number(sc.servicioAlicuotaIva ?? 0))
+      : 0;
+  const proporcional = calcularProporcional(
+    ultimoMonto || precioCompleto,
+    ultimoMov?.fecha ?? null,
+  );
+  const esMesCompleto = sc.servicioPoliticaBajaAnticipada === 'mes_completo';
+  const montoSugerido = esMesCompleto ? precioCompleto : proporcional.monto;
+  const montoFinal = montoOverride !== null ? parseFloat(montoOverride) || 0 : montoSugerido;
+
+  function handleGuardar() {
+    setError(null);
+    if (!fechaInicio) {
+      setError('La fecha de inicio es obligatoria.');
+      return;
+    }
+    if (fechaInicio > hoy) {
+      setError('La fecha de inicio no puede ser futura.');
+      return;
+    }
+    if (fechaBaja) {
+      if (fechaBaja > hoy) {
+        setError('La fecha de baja no puede ser futura.');
+        return;
+      }
+      if (fechaBaja < fechaInicio) {
+        setError('La fecha de baja no puede ser anterior a la fecha de inicio.');
+        return;
+      }
+    }
+    startTransition(async () => {
+      const res = await updateSocioServicioAction({
+        id: sc.id,
+        fechaInicio,
+        fechaBaja: fechaBaja || null,
+        cobro:
+          esBajaNueva && cobrar
+            ? {
+                monto: String(montoFinal),
+                concepto: `${esMesCompleto ? 'Mes completo' : 'Proporcional'} por baja de ${sc.servicioNombre ?? 'servicio'}`,
+              }
+            : null,
+      });
+      if (res?.error) {
+        setError(res.error);
+      } else {
+        toast.success('Servicio contratado actualizado');
+        onSaved();
+      }
+    });
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+        <div className="mb-4 flex items-start justify-between">
+          <div>
+            <p className="text-base font-bold" style={{ color: '#101828' }}>
+              Editar servicio contratado
+            </p>
+            <p className="text-sm text-gray-500">{sc.servicioNombre}</p>
+          </div>
+          <button onClick={onClose} className="rounded-[8px] p-1 text-gray-400 hover:bg-gray-100">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="space-y-3">
+          <div>
+            <label className="mb-1 block text-xs font-semibold" style={{ color: '#101828' }}>
+              Fecha de inicio del servicio
+            </label>
+            <input
+              type="date"
+              max={hoy}
+              className={inputCls}
+              value={fechaInicio}
+              onChange={(e) => setFechaInicio(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-semibold" style={{ color: '#101828' }}>
+              Fecha de baja del servicio
+            </label>
+            <input
+              type="date"
+              max={hoy}
+              min={fechaInicio}
+              className={inputCls}
+              value={fechaBaja}
+              onChange={(e) => setFechaBaja(e.target.value)}
+            />
+            <p className="mt-1 text-xs text-gray-400">
+              Vacío = sigue vigente. No se puede agendar a futuro.
+            </p>
+          </div>
+
+          {esBajaNueva && (
+            <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+              <label className="flex items-center gap-2 text-xs text-gray-600">
+                <input
+                  type="checkbox"
+                  checked={cobrar}
+                  onChange={(e) => setCobrar(e.target.checked)}
+                />
+                Cobrar por esta baja — política:{' '}
+                <strong>{esMesCompleto ? 'mes completo' : 'proporcional'}</strong>
+              </label>
+              {cobrar && (
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={montoOverride ?? montoSugerido.toFixed(2)}
+                  onChange={(e) => setMontoOverride(e.target.value)}
+                  className="border-input focus-visible:border-ring focus-visible:ring-ring/50 mt-2 h-10 w-full rounded-[8px] border bg-white px-3 text-center text-lg font-bold focus-visible:ring-[3px] focus-visible:outline-none"
+                  style={{ color: '#101828' }}
+                />
+              )}
+            </div>
+          )}
+        </div>
+
+        {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+
+        <div className="mt-5 flex gap-2">
+          <button
+            onClick={onClose}
+            disabled={isPending}
+            className="flex-1 rounded-[10px] border border-gray-200 py-2.5 text-sm font-medium text-gray-600 transition hover:bg-gray-50 disabled:opacity-40"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={handleGuardar}
+            disabled={isPending}
+            className="flex-1 rounded-[10px] py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-40"
+            style={{ background: '#175861' }}
+          >
+            {isPending ? 'Guardando...' : 'Guardar'}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 

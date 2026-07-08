@@ -16,9 +16,10 @@ import {
   servicios,
 } from '@/lib/db/schema';
 import { getActiveMarina } from '@/lib/auth/session';
-import { fechaCalendariaArg } from '@/lib/dates';
+import { fechaCalendariaArg, todayArg } from '@/lib/dates';
 import { sendEmail } from '@/lib/email/resend';
 import { reciboEmail } from '@/lib/email/templates/recibo';
+import { crearSocioServicio, hayContratoVigente } from '@/lib/socio-servicios';
 import {
   crearFactura,
   toTusFecha,
@@ -120,9 +121,9 @@ function precioSinIva(total: number, alicuota: string): number {
 
 // Identificación interna correlativa por guardería, que se suma al número
 // que devuelve ARCA: "FM-NNNNNN" para Facturación manual (y su NC), "FL-NNNNNN"
-// para Facturación por lote (y su NC). No aplica a recibos internos "RB-" ni
-// a la auto-facturación del cron.
-async function nextFolioLocal(gId: string, prefix: 'FM' | 'FL'): Promise<string> {
+// para Facturación por lote (y su NC), "FA-NNNNNN" para la auto-facturación
+// del cron. No aplica a recibos internos "RB-".
+async function nextFolioLocal(gId: string, prefix: 'FM' | 'FL' | 'FA'): Promise<string> {
   const [{ n }] = await db
     .select({ n: count() })
     .from(facturacion)
@@ -323,11 +324,11 @@ export async function createInvoiceAction(
  * Core de emisión de factura, sin chequeo de sesión. Llamable desde:
  * - createInvoiceAction (manual, con auth) → folio local "FM-NNNNNN"
  * - createInvoiceAction desde el lote → folio local "FL-NNNNNN"
- * - cron de auto-facturación (sin auth, recibe guarderiaId) → sin folio local
+ * - cron de auto-facturación (sin auth, recibe guarderiaId) → folio local "FA-NNNNNN"
  */
 export async function crearFacturaCore(
   data: CreateInvoiceData & { guarderiaId: string },
-  opts?: { folioPrefix?: 'FM' | 'FL' },
+  opts?: { folioPrefix?: 'FM' | 'FL' | 'FA' },
 ): Promise<FacturaResult> {
   const gId = data.guarderiaId;
 
@@ -801,6 +802,8 @@ export type CargarServicioData = {
   monto: string;
   fecha: string;
   comprobante: 'interno' | 'fiscal';
+  fechaInicio: string;
+  fechaBaja?: string | null;
 };
 
 export async function cargarServicioAction(data: CargarServicioData): Promise<{
@@ -813,6 +816,26 @@ export async function cargarServicioAction(data: CargarServicioData): Promise<{
 
   if (!data.servicioId || !data.monto) return { error: 'Faltan datos del servicio.' };
   const esInterno = data.comprobante === 'interno';
+
+  const hoyArg = todayArg();
+  if (!data.fechaInicio || data.fechaInicio > hoyArg) {
+    return { error: 'La fecha de inicio del servicio no puede ser futura.' };
+  }
+  if (data.fechaBaja) {
+    if (data.fechaBaja > hoyArg) {
+      return { error: 'La fecha de baja del servicio no puede ser futura.' };
+    }
+    if (data.fechaBaja < data.fechaInicio) {
+      return { error: 'La fecha de baja no puede ser anterior a la fecha de inicio.' };
+    }
+  }
+
+  if (await hayContratoVigente(gId, data.socioId, data.servicioId)) {
+    return {
+      error:
+        'Este socio ya tiene este servicio contratado y vigente. Usá "Editar" en Servicios Contratados en vez de cargarlo de nuevo.',
+    };
+  }
 
   // Crear el cargo en la cuenta corriente (igual que "Cargar consumo").
   //
@@ -845,16 +868,27 @@ export async function cargarServicioAction(data: CargarServicioData): Promise<{
 
   const conceptoFinal = data.concepto.trim() || serv.nombre;
 
-  await db.insert(movimientosCuentaCorriente).values({
-    socioId: data.socioId,
-    servicioId: data.servicioId,
-    concepto: conceptoFinal,
-    tipo: 'otro',
-    estado: 'no_pagado',
-    debe: data.monto,
-    fecha: data.fecha ? fechaCalendariaArg(data.fecha) : new Date(),
-    createdBy: ctx.profile.id,
-    comprobanteInterno: esInterno,
+  await db.transaction(async (tx) => {
+    await tx.insert(movimientosCuentaCorriente).values({
+      socioId: data.socioId,
+      servicioId: data.servicioId,
+      concepto: conceptoFinal,
+      tipo: 'otro',
+      estado: 'no_pagado',
+      debe: data.monto,
+      fecha: data.fecha ? fechaCalendariaArg(data.fecha) : new Date(),
+      createdBy: ctx.profile.id,
+      comprobanteInterno: esInterno,
+    });
+
+    await crearSocioServicio(tx, {
+      guarderiaId: gId,
+      socioId: data.socioId,
+      servicioId: data.servicioId,
+      fechaInicio: data.fechaInicio,
+      fechaBaja: data.fechaBaja,
+      createdBy: ctx.profile.id,
+    });
   });
 
   revalidatePath('/ventas');

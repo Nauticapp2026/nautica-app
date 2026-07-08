@@ -21,7 +21,7 @@ import {
   porteriaInvitados,
   profiles,
   servicios as serviciosTable,
-  socioServiciosCancelados,
+  socioServicios,
 } from '@/lib/db/schema';
 import { eq, and, desc, gte, inArray, isNull, asc, lte } from 'drizzle-orm';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -92,7 +92,7 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
     espaciosDisponibles,
     guarderiaRow,
     paywayTokenRow,
-    cancelacionesList,
+    serviciosContratadosList,
   ] = await Promise.all([
     db
       .select({
@@ -309,18 +309,28 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
       .where(and(eq(paywayTokens.socioId, id), eq(paywayTokens.guarderiaId, gId)))
       .limit(1),
 
+    // Servicios Contratados: un registro por contrato (socio + servicio),
+    // no por cobro. El más reciente primero.
     db
       .select({
-        servicioId: socioServiciosCancelados.servicioId,
-        fechaCancelacion: socioServiciosCancelados.fechaCancelacion,
+        id: socioServicios.id,
+        servicioId: socioServicios.servicioId,
+        servicioNombre: serviciosTable.nombre,
+        servicioTipo: serviciosTable.tipo,
+        servicioTipoCobro: serviciosTable.tipoCobro,
+        servicioPrecio: serviciosTable.precio,
+        servicioAlicuotaIva: serviciosTable.alicuotaIva,
+        servicioPoliticaBajaAnticipada: serviciosTable.politicaBajaAnticipada,
+        espacioId: socioServicios.espacioId,
+        numeroOperacion: socioServicios.numeroOperacion,
+        fechaAsignacion: socioServicios.fechaAsignacion,
+        fechaInicio: socioServicios.fechaInicio,
+        fechaBaja: socioServicios.fechaBaja,
       })
-      .from(socioServiciosCancelados)
-      .where(
-        and(
-          eq(socioServiciosCancelados.socioId, id),
-          eq(socioServiciosCancelados.guarderiaId, gId),
-        ),
-      ),
+      .from(socioServicios)
+      .innerJoin(serviciosTable, eq(serviciosTable.id, socioServicios.servicioId))
+      .where(and(eq(socioServicios.socioId, id), eq(socioServicios.guarderiaId, gId)))
+      .orderBy(desc(socioServicios.fechaAsignacion)),
   ]);
 
   // Para cada movimiento facturado, traer el código de la factura. Lo
@@ -515,9 +525,20 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
         };
       })}
       servicios={serviciosList}
-      cancelaciones={cancelacionesList.map((c) => ({
-        servicioId: c.servicioId,
-        fechaCancelacion: c.fechaCancelacion ?? new Date().toISOString().split('T')[0],
+      serviciosContratados={serviciosContratadosList.map((s) => ({
+        id: s.id,
+        servicioId: s.servicioId,
+        servicioNombre: s.servicioNombre,
+        servicioTipo: s.servicioTipo,
+        servicioTipoCobro: s.servicioTipoCobro,
+        servicioPrecio: s.servicioPrecio,
+        servicioAlicuotaIva: s.servicioAlicuotaIva,
+        servicioPoliticaBajaAnticipada: s.servicioPoliticaBajaAnticipada,
+        espacioId: s.espacioId,
+        numeroOperacion: s.numeroOperacion,
+        fechaAsignacion: s.fechaAsignacion.toISOString(),
+        fechaInicio: s.fechaInicio,
+        fechaBaja: s.fechaBaja,
       }))}
       navegantes={navegantesList.map((n) => ({
         ...n,

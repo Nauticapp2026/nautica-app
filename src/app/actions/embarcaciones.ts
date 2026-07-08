@@ -5,6 +5,7 @@ import { and, eq, ne } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { embarcaciones, espacios, memberships } from '@/lib/db/schema';
 import { getActiveMarina } from '@/lib/auth/session';
+import { cerrarContratoAbierto } from '@/lib/socio-servicios';
 
 export type EmbarcacionInput = {
   nombre: string;
@@ -171,6 +172,18 @@ export async function deleteEmbarcacionAction(id: string): Promise<{ error?: str
   if (!existing) return { error: 'Embarcación no pertenece a esta guardería.' };
 
   try {
+    // Si la embarcación tenía un espacio asignado, traer quién lo ocupaba y
+    // con qué tarifa antes de liberarlo, para cerrar el contrato en
+    // Servicios Contratados.
+    const espacioLiberado = existing.espacioId
+      ? await db
+          .select({ ocupanteId: espacios.ocupanteId, servicioId: espacios.servicioId })
+          .from(espacios)
+          .where(and(eq(espacios.id, existing.espacioId), eq(espacios.guarderiaId, gId)))
+          .limit(1)
+          .then((r) => r[0])
+      : null;
+
     await db.delete(embarcaciones).where(eq(embarcaciones.id, id));
 
     // Si la embarcación tenía un espacio asignado, liberarlo. Sin esto el
@@ -181,6 +194,14 @@ export async function deleteEmbarcacionAction(id: string): Promise<{ error?: str
         .update(espacios)
         .set({ ocupanteId: null, estado: 'disponible', fechaAsignacion: null })
         .where(and(eq(espacios.id, existing.espacioId), eq(espacios.guarderiaId, gId)));
+
+      if (espacioLiberado?.ocupanteId && espacioLiberado.servicioId) {
+        await cerrarContratoAbierto({
+          socioId: espacioLiberado.ocupanteId,
+          servicioId: espacioLiberado.servicioId,
+          espacioId: existing.espacioId,
+        });
+      }
     }
 
     // Si era la principal y quedan otras, promover la primera restante.

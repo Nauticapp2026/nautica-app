@@ -8,12 +8,13 @@ import {
   memberships,
   movimientosCuentaCorriente,
   profiles,
-  servicios as serviciosTable,
+  socioServicios,
   socioServiciosCancelados,
 } from '@/lib/db/schema';
 import { getActiveMarina } from '@/lib/auth/session';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { translateInviteError } from '@/lib/auth/errors';
+import { fechaCalendariaArg, todayArg } from '@/lib/dates';
 import { and, eq, max } from 'drizzle-orm';
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
@@ -553,79 +554,110 @@ export async function updateSocioStatusAction(
   }
 }
 
-// ─── Cancelar servicio contratado ────────────────────────────────────────────
+// ─── Editar servicio contratado (fecha de inicio / fecha de baja) ──────────
 
-const cancelarServicioSchema = z.object({
-  socioId: z.string().uuid(),
-  servicioId: z.string().uuid(),
-  cobrarProporcional: z.boolean(),
-  monto: z.string().optional(),
-  fecha: z.string().optional(),
-  concepto: z.string().optional(),
+function isAdminSocios(ctx: NonNullable<Awaited<ReturnType<typeof getActiveMarina>>>): boolean {
+  return (
+    ctx.profile.isSuperAdmin ||
+    ctx.activeMembership.rol === 'administrador_general' ||
+    ctx.activeMembership.rol === 'administrativo' ||
+    ctx.activeMembership.rol === 'contable'
+  );
+}
+
+const updateSocioServicioSchema = z.object({
+  id: z.string().uuid(),
+  fechaInicio: z.string(),
+  fechaBaja: z.string().nullable(),
+  cobro: z.object({ monto: z.string(), concepto: z.string() }).nullable(),
 });
 
-export async function cancelarServicioAction(input: unknown) {
+export async function updateSocioServicioAction(input: unknown): Promise<{ error?: string }> {
   const ctx = await getActiveMarina();
   if (!ctx) return { error: 'No autenticado' };
+  if (!isAdminSocios(ctx))
+    return { error: 'Solo administradores pueden editar servicios contratados.' };
 
-  const parsed = cancelarServicioSchema.safeParse(input);
+  const parsed = updateSocioServicioSchema.safeParse(input);
   if (!parsed.success) return { error: 'Datos inválidos' };
-
-  const { socioId, servicioId, cobrarProporcional, monto, fecha, concepto } = parsed.data;
+  const { id, fechaInicio, fechaBaja, cobro } = parsed.data;
   const guarderiaId = ctx.activeMembership.guarderiaId;
 
+  const hoy = todayArg();
+  if (!fechaInicio || fechaInicio > hoy) {
+    return { error: 'La fecha de inicio del servicio no puede ser futura.' };
+  }
+  if (fechaBaja) {
+    if (fechaBaja > hoy) return { error: 'La fecha de baja del servicio no puede ser futura.' };
+    if (fechaBaja < fechaInicio) {
+      return { error: 'La fecha de baja no puede ser anterior a la fecha de inicio.' };
+    }
+  }
+
   try {
-    // Verificar que el socio pertenece a la guardería.
-    const [membership] = await db
-      .select({ id: memberships.id })
-      .from(memberships)
-      .where(
-        and(
-          eq(memberships.userId, socioId),
-          eq(memberships.guarderiaId, guarderiaId),
-          eq(memberships.rol, 'socio'),
-        ),
-      )
-      .limit(1);
-    if (!membership) return { error: 'Socio no encontrado' };
-
-    // Verificar que el servicio pertenece a la guardería.
-    const [servicio] = await db
-      .select({ id: serviciosTable.id })
-      .from(serviciosTable)
-      .where(and(eq(serviciosTable.id, servicioId), eq(serviciosTable.guarderiaId, guarderiaId)))
-      .limit(1);
-    if (!servicio) return { error: 'Servicio no encontrado' };
-
-    // Registrar cancelación (ignora si ya existía).
-    await db
-      .insert(socioServiciosCancelados)
-      .values({
-        socioId,
-        servicioId,
-        guarderiaId,
-        fechaCancelacion: new Date().toISOString().split('T')[0],
+    const [current] = await db
+      .select({
+        id: socioServicios.id,
+        socioId: socioServicios.socioId,
+        servicioId: socioServicios.servicioId,
+        fechaBaja: socioServicios.fechaBaja,
       })
-      .onConflictDoNothing();
+      .from(socioServicios)
+      .where(and(eq(socioServicios.id, id), eq(socioServicios.guarderiaId, guarderiaId)))
+      .limit(1);
+    if (!current) return { error: 'Servicio contratado no encontrado.' };
 
-    // Si el admin eligió cobrar el proporcional, crear el movimiento.
-    if (cobrarProporcional && monto && fecha) {
-      await db.insert(movimientosCuentaCorriente).values({
-        socioId,
-        servicioId,
-        concepto: concepto ?? 'Proporcional por cancelación de servicio',
-        tipo: 'otro',
-        debe: monto,
-        fecha: new Date(fecha),
-        estado: 'no_pagado',
-        createdBy: ctx.user.id,
-      });
+    const estabaAbierto = current.fechaBaja === null;
+    const quedaCerrado = fechaBaja !== null;
+
+    await db
+      .update(socioServicios)
+      .set({ fechaInicio, fechaBaja, updatedAt: new Date() })
+      .where(eq(socioServicios.id, id));
+
+    if (quedaCerrado && estabaAbierto) {
+      // Recién se está dando de baja: frenar la facturación recurrente vía
+      // la tabla que ya lee el cron, y cobrar (si el admin lo eligió) el
+      // monto sugerido por la política de baja anticipada de la tarifa.
+      await db
+        .insert(socioServiciosCancelados)
+        .values({
+          socioId: current.socioId,
+          servicioId: current.servicioId,
+          guarderiaId,
+          fechaCancelacion: fechaBaja!,
+        })
+        .onConflictDoNothing();
+
+      if (cobro) {
+        await db.insert(movimientosCuentaCorriente).values({
+          socioId: current.socioId,
+          servicioId: current.servicioId,
+          concepto: cobro.concepto || 'Cobro por baja de servicio',
+          tipo: 'otro',
+          debe: cobro.monto,
+          fecha: fechaCalendariaArg(fechaBaja!),
+          estado: 'no_pagado',
+          createdBy: ctx.profile.id,
+        });
+      }
+    } else if (!quedaCerrado && !estabaAbierto) {
+      // Se reabre: dejar que el cron vuelva a facturar de forma recurrente.
+      await db
+        .delete(socioServiciosCancelados)
+        .where(
+          and(
+            eq(socioServiciosCancelados.socioId, current.socioId),
+            eq(socioServiciosCancelados.servicioId, current.servicioId),
+            eq(socioServiciosCancelados.guarderiaId, guarderiaId),
+          ),
+        );
     }
 
-    revalidatePath(`/usuarios/${socioId}`);
+    revalidatePath(`/usuarios/${current.socioId}`);
     return {};
   } catch {
-    return { error: 'Error al cancelar el servicio.' };
+    return { error: 'Error al editar el servicio contratado.' };
   }
 }
 

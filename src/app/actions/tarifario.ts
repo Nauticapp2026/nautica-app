@@ -83,12 +83,16 @@ type AlicuotaIva = (typeof ALICUOTAS_IVA)[number];
 const PLAZOS_PAGO = [0, 5, 10, 15, 20, 30] as const;
 type PlazoPagoDias = (typeof PLAZOS_PAGO)[number];
 
+const POLITICAS_BAJA_ANTICIPADA = ['mes_completo', 'proporcional'] as const;
+type PoliticaBajaAnticipada = (typeof POLITICAS_BAJA_ANTICIPADA)[number];
+
 export type TarifaInputBase = {
   nombre: string;
   tipoCobro: TipoCobro;
   precio: number;
   alicuotaIva: AlicuotaIva;
   plazoPagoDias: PlazoPagoDias;
+  politicaBajaAnticipada: PoliticaBajaAnticipada;
   vigenciaDesde: string;
   vigenciaHasta: string;
 };
@@ -141,6 +145,9 @@ function validar(data: CreateTarifaData): string | null {
   if (!TIPOS_COBRO.includes(data.tipoCobro)) return 'Tipo de cobro inválido.';
   if (!(PLAZOS_PAGO as readonly number[]).includes(data.plazoPagoDias)) {
     return 'Plazo de pago inválido.';
+  }
+  if (!POLITICAS_BAJA_ANTICIPADA.includes(data.politicaBajaAnticipada)) {
+    return 'Política de baja anticipada inválida.';
   }
   if (!Number.isFinite(data.precio) || data.precio < 0) {
     return 'El precio debe ser un número mayor o igual a 0.';
@@ -219,6 +226,7 @@ function buildValues(data: CreateTarifaData) {
     precio: data.precio.toFixed(2),
     alicuotaIva: data.alicuotaIva.toFixed(2),
     plazoPagoDias: data.plazoPagoDias,
+    politicaBajaAnticipada: data.politicaBajaAnticipada,
     vigenciaDesde: data.vigenciaDesde,
     vigenciaHasta: data.vigenciaHasta,
   };

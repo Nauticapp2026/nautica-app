@@ -181,6 +181,14 @@ export const tipoServicioEnum = pgEnum('tipo_servicio', [
 
 export const tipoCobroServicioEnum = pgEnum('tipo_cobro_servicio', ['fijo', 'variable']);
 
+// Cómo se factura la baja de un servicio cuando el socio cancela antes de fin
+// de mes. 'proporcional' es el comportamiento histórico (precio mensual /
+// días del mes, sin redondeo); 'mes_completo' factura el mes entero igual.
+export const politicaBajaAnticipadaEnum = pgEnum('politica_baja_anticipada', [
+  'mes_completo',
+  'proporcional',
+]);
+
 export const tipoComunicacionEnum = pgEnum('tipo_comunicacion', ['socios', 'publica']);
 
 export const tamanoPublicidadEnum = pgEnum('tamano_publicidad', ['350x300', '353x119']);
@@ -644,6 +652,9 @@ export const servicios = pgTable(
     vigenciaHasta: date('vigencia_hasta').notNull(),
     alicuotaIva: numeric('alicuota_iva', { precision: 5, scale: 2 }).notNull().default('21'),
     plazoPagoDias: smallint('plazo_pago_dias').notNull().default(0),
+    politicaBajaAnticipada: politicaBajaAnticipadaEnum('politica_baja_anticipada')
+      .notNull()
+      .default('proporcional'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
@@ -1533,6 +1544,53 @@ export const socioServiciosCancelados = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [unique().on(t.socioId, t.servicioId, t.guarderiaId)],
+);
+
+// Servicio Contratado: un registro por contrato (socio + servicio), con su
+// propia ventana de vigencia. A diferencia de `socioServiciosCancelados`
+// (existence check sin historial) esta tabla SÍ guarda historial — un socio
+// puede cancelar y volver a contratar el mismo servicio más adelante, cada
+// vez con su propia fila. `fechaInicio`/`fechaBaja` son siempre de efecto
+// inmediato (no se agenda a futuro): el cron de facturación mensual sigue
+// leyendo únicamente `socioServiciosCancelados` para decidir si frena el
+// cobro recurrente; esta tabla es la fuente de verdad para la UI de
+// "Servicios Contratados", no para el cron.
+export const socioServicios = pgTable(
+  'socio_servicios',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    guarderiaId: uuid('guarderia_id')
+      .notNull()
+      .references(() => guarderias.id, { onDelete: 'cascade' }),
+    socioId: uuid('socio_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    servicioId: uuid('servicio_id')
+      .notNull()
+      .references(() => servicios.id, { onDelete: 'cascade' }),
+    // Solo para contratos de Espacio de guarda: el espacio físico asociado.
+    espacioId: uuid('espacio_id').references(() => espacios.id, { onDelete: 'set null' }),
+    // Correlativo global por guardería (entre todos los socios), asignado
+    // una vez y nunca reasignado. Mismo patrón que `nextFolioLocal` en
+    // facturacion.ts, sin prefijo de letra.
+    numeroOperacion: integer('numero_operacion').notNull(),
+    // Fecha de creación del registro (inmutable, se muestra como "Fecha de
+    // asignación"). No confundir con `fechaInicio`.
+    fechaAsignacion: timestamp('fecha_asignacion', { withTimezone: true }).defaultNow().notNull(),
+    fechaInicio: date('fecha_inicio').notNull(),
+    fechaBaja: date('fecha_baja'),
+    createdBy: uuid('created_by').references(() => profiles.id, { onDelete: 'set null' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index('socio_servicios_guarderia_socio_servicio_idx').on(
+      t.guarderiaId,
+      t.socioId,
+      t.servicioId,
+    ),
+    index('socio_servicios_vigencia_idx').on(t.socioId, t.fechaInicio, t.fechaBaja),
+  ],
 );
 
 // Tabla genérica key/value para settings globales de la plataforma. Hoy guarda

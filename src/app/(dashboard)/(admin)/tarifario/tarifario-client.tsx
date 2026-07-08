@@ -63,6 +63,7 @@ export type MedidaTarifa =
 
 export type LocacionTarifa = 'camas' | 'amarra';
 export type UnidadMetraje = 'metros' | 'pies';
+export type PoliticaBajaAnticipada = 'mes_completo' | 'proporcional';
 
 export type Tarifa = {
   id: string;
@@ -81,6 +82,7 @@ export type Tarifa = {
   vigenciaHasta: string;
   alicuotaIva: number;
   plazoPagoDias: number;
+  politicaBajaAnticipada: PoliticaBajaAnticipada;
   // Ajuste de precio programado a futuro (Ajuste masivo con vigencia futura),
   // todavía sin aplicar. El cron lo aplica en `fechaAplicacion`.
   ajusteProgramado: { precioNuevo: number; fechaAplicacion: string } | null;
@@ -492,6 +494,9 @@ function TarifaModal({
   const [precio, setPrecio] = useState<string>(initial ? String(initial.precio) : '');
   const [alicuotaIva, setAlicuotaIva] = useState<number>(initial?.alicuotaIva ?? 21);
   const [plazoPagoDias, setPlazoPagoDias] = useState<number>(initial?.plazoPagoDias ?? 0);
+  const [politicaBajaAnticipada, setPoliticaBajaAnticipada] = useState<PoliticaBajaAnticipada>(
+    initial?.politicaBajaAnticipada ?? 'proporcional',
+  );
   // El modal ya no deja elegir Activo/Inactivo — Inactivar se sacó de la
   // edición (solo quedan Activo y Pausado, este último vía los botones
   // Pausar/Reactivar). Se preserva el estado actual de la tarifa tal cual
@@ -572,6 +577,7 @@ function TarifaModal({
         precio: precioNum,
         alicuotaIva: alicuotaIva as 0 | 10.5 | 21,
         plazoPagoDias: plazoPagoDias as 0 | 5 | 10 | 15 | 20 | 30,
+        politicaBajaAnticipada,
         locacion,
         unidadMetraje,
         eslora: toNumOrNull(eslora),
@@ -593,6 +599,7 @@ function TarifaModal({
         precio: precioNum,
         alicuotaIva: alicuotaIva as 0 | 10.5 | 21,
         plazoPagoDias: plazoPagoDias as 0 | 5 | 10 | 15 | 20 | 30,
+        politicaBajaAnticipada,
         vigenciaDesde,
         vigenciaHasta,
       };
@@ -819,6 +826,21 @@ function TarifaModal({
                 <option value={15}>15 días</option>
                 <option value={20}>20 días</option>
                 <option value={30}>30 días</option>
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-semibold text-gray-700">
+                Política de baja anticipada
+              </label>
+              <select
+                className={inputCls}
+                value={politicaBajaAnticipada}
+                onChange={(e) =>
+                  setPoliticaBajaAnticipada(e.target.value as PoliticaBajaAnticipada)
+                }
+              >
+                <option value="proporcional">Proporcional</option>
+                <option value="mes_completo">Mes completo</option>
               </select>
             </div>
           </div>

@@ -212,20 +212,23 @@ export async function runAutoEmision(
       const tipoFactura =
         derivado ?? (ultima.tipoFactura as 'factura_a' | 'factura_b' | 'factura_c');
 
-      const r = await crearFacturaCore({
-        guarderiaId,
-        socioId,
-        tipoFactura,
-        condicionVenta: ultima.condicionVenta as never,
-        medioPago: ultima.medioPago as never,
-        estado: 'pendiente',
-        descripcion: `Facturación mensual ${fechaFactura}`,
-        fecha: fechaFactura,
-        vencimiento: venc,
-        desde,
-        hasta,
-        movimientoIds: aFacturar.map((p) => p.id),
-      });
+      const r = await crearFacturaCore(
+        {
+          guarderiaId,
+          socioId,
+          tipoFactura,
+          condicionVenta: ultima.condicionVenta as never,
+          medioPago: ultima.medioPago as never,
+          estado: 'pendiente',
+          descripcion: `Facturación mensual ${fechaFactura}`,
+          fecha: fechaFactura,
+          vencimiento: venc,
+          desde,
+          hasta,
+          movimientoIds: aFacturar.map((p) => p.id),
+        },
+        { folioPrefix: 'FA' },
+      );
 
       if (r.error) {
         console.error('[auto-facturacion] error en socio', {

@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { and, asc, desc, eq, inArray } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import {
@@ -16,12 +16,15 @@ import {
   naves,
   pisos as pisosTable,
   servicios,
+  socioServicios,
   socioServiciosCancelados,
 } from '@/lib/db/schema';
 import { getActiveMarina } from '@/lib/auth/session';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { calcularProporcionalMes, ensureMonthlyMovimiento } from '@/lib/movimientos-mensuales';
 import { precioConIva } from '@/lib/iva';
+import { todayArg } from '@/lib/dates';
+import { cerrarContratoAbierto, crearSocioServicio } from '@/lib/socio-servicios';
 
 export type CreateAreaInput = { operarioIds?: string[] } & (
   | {
@@ -350,6 +353,7 @@ export async function updateEspacioAction(input: UpdateEspacioInput): Promise<{ 
   // Si el ocupante no cambió, conservamos el valor previo. Si pasa a null
   // (espacio liberado), también limpiamos la fecha.
   const ocupanteCambio = current.ocupanteId !== input.ocupanteId;
+  const servicioCambio = current.servicioId !== input.servicioId;
   let nuevaFechaAsignacion: Date | null;
   if (input.ocupanteId === null) {
     nuevaFechaAsignacion = null;
@@ -396,6 +400,19 @@ export async function updateEspacioAction(input: UpdateEspacioInput): Promise<{ 
       );
   }
 
+  // Si el espacio queda liberado, o si cambió de ocupante/servicio, el
+  // contrato anterior (si había uno) terminó acá — cerrarlo en el registro
+  // de Servicios Contratados. No hace falta tocar `socioServiciosCancelados`:
+  // la facturación de espacios ya se frena porque el cron exige
+  // `ocupanteId IS NOT NULL`.
+  if (current.ocupanteId && current.servicioId && (ocupanteCambio || servicioCambio)) {
+    await cerrarContratoAbierto({
+      socioId: current.ocupanteId,
+      servicioId: current.servicioId,
+      espacioId: input.id,
+    });
+  }
+
   // Si hay ocupante + servicio, garantizamos el movimiento mensual del mes
   // corriente. La base del proporcional es la mayor entre `fechaAsignacion`
   // y el inicio del mes corriente: si el socio entró al espacio este mes,
@@ -432,6 +449,21 @@ export async function updateEspacioAction(input: UpdateEspacioInput): Promise<{ 
         precio: importe,
         concepto,
       });
+      // Solo abrimos un contrato nuevo si algo cambió: si el ocupante y el
+      // servicio son los mismos que antes, ya existe una fila vigente y no
+      // hay que duplicarla.
+      if (ocupanteCambio || servicioCambio) {
+        await db.transaction((tx) =>
+          crearSocioServicio(tx, {
+            guarderiaId,
+            socioId: input.ocupanteId!,
+            servicioId: input.servicioId!,
+            espacioId: input.id,
+            fechaInicio: todayArg(),
+            createdBy: ctx.profile.id,
+          }),
+        );
+      }
     } catch (err) {
       // No bloqueamos el save del espacio si falla el movimiento.
       console.error('[ensureMonthlyMovimiento] error', err);
@@ -572,6 +604,16 @@ export async function assignEspacioToSocioAction(input: {
           precio: importe,
           concepto,
         });
+        await db.transaction((tx) =>
+          crearSocioServicio(tx, {
+            guarderiaId,
+            socioId: input.socioId,
+            servicioId: espacio.servicioId!,
+            espacioId: input.espacioId,
+            fechaInicio: todayArg(),
+            createdBy: ctx.profile.id,
+          }),
+        );
       }
     } catch (err) {
       console.error('[assignEspacioToSocioAction] ensureMonthlyMovimiento error', err);
@@ -608,6 +650,7 @@ export async function moveOcupanteAction(input: {
       id: espacios.id,
       ocupanteId: espacios.ocupanteId,
       fechaAsignacion: espacios.fechaAsignacion,
+      servicioId: espacios.servicioId,
     })
     .from(espacios)
     .where(and(eq(espacios.id, input.origenId), eq(espacios.guarderiaId, guarderiaId)))
@@ -621,6 +664,7 @@ export async function moveOcupanteAction(input: {
       ocupanteId: espacios.ocupanteId,
       estado: espacios.estado,
       eslora: espacios.eslora,
+      servicioId: espacios.servicioId,
       unidadMetraje: servicios.unidadMetraje,
     })
     .from(espacios)
@@ -694,6 +738,45 @@ export async function moveOcupanteAction(input: {
         eq(embarcaciones.profileId, origen.ocupanteId),
       ),
     );
+
+  // El contrato sigue el movimiento: si el destino tiene la misma tarifa,
+  // es el mismo contrato y solo cambia de espacio físico (mismo número de
+  // operación, sin tocar fechas). Si la tarifa es distinta (o el destino no
+  // tiene tarifa configurada), el contrato del origen termina acá y, si
+  // corresponde, arranca uno nuevo para la tarifa del destino.
+  if (origen.servicioId) {
+    if (origen.servicioId === destino.servicioId) {
+      await db
+        .update(socioServicios)
+        .set({ espacioId: input.destinoId, updatedAt: new Date() })
+        .where(
+          and(
+            eq(socioServicios.socioId, origen.ocupanteId),
+            eq(socioServicios.servicioId, origen.servicioId),
+            eq(socioServicios.espacioId, input.origenId),
+            isNull(socioServicios.fechaBaja),
+          ),
+        );
+    } else {
+      await cerrarContratoAbierto({
+        socioId: origen.ocupanteId,
+        servicioId: origen.servicioId,
+        espacioId: input.origenId,
+      });
+      if (destino.servicioId) {
+        await db.transaction((tx) =>
+          crearSocioServicio(tx, {
+            guarderiaId,
+            socioId: origen.ocupanteId!,
+            servicioId: destino.servicioId!,
+            espacioId: input.destinoId,
+            fechaInicio: todayArg(),
+            createdBy: ctx.profile.id,
+          }),
+        );
+      }
+    }
+  }
 
   revalidatePath('/espacios');
   revalidatePath(`/usuarios/${origen.ocupanteId}`);
