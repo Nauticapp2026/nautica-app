@@ -20,6 +20,7 @@ import { fechaCalendariaArg, todayArg } from '@/lib/dates';
 import { sendEmail } from '@/lib/email/resend';
 import { reciboEmail } from '@/lib/email/templates/recibo';
 import { identidadFacturacion, type SocioFacturacion } from '@/lib/facturacion/identidad';
+import { getCargosSaldadosFifo } from '@/lib/reconciliar-cuenta';
 import { crearSocioServicio, hayContratoVigente } from '@/lib/socio-servicios';
 import { MOTIVO_NOTA_LABEL, type MotivoNota } from './nota-constants';
 import {
@@ -438,6 +439,18 @@ export async function crearFacturaCore(
     // acá se rechaza del lado del server.
     if (movs.some((m) => m.comprobanteInterno)) {
       return { error: 'No se puede facturar un cargo con comprobante interno.' };
+    }
+
+    // Guard duro: un cargo ya cubierto por el pool de haberes (FIFO) — aunque
+    // su `estado` todavía diga 'no_pagado', por ej. un cobro Payway que no
+    // llegó a reconciliarse — no se vuelve a facturar. Mismo criterio que ya
+    // usa auto-facturacion.ts; acá faltaba en el camino manual/lote.
+    const saldados = await getCargosSaldadosFifo(data.socioId);
+    if (movs.some((m) => saldados.has(m.id))) {
+      return {
+        error:
+          'Uno o más cargos ya están cubiertos por un pago y no se pueden facturar. Actualizá la página.',
+      };
     }
 
     items = movs.map((m) => ({
@@ -1020,8 +1033,14 @@ export async function getSocioPendientesAction(
     )
     .orderBy(movimientosCuentaCorriente.fecha);
 
+  // Excluir cargos ya cubiertos por el pool de haberes (FIFO) aunque su
+  // `estado` todavía diga 'no_pagado' — mismo criterio que auto-facturación,
+  // para no ofrecer para facturar algo que un cobro Payway ya saldó en neto.
+  const saldados = await getCargosSaldadosFifo(socioId);
+  const pendientes = rows.filter((r) => !saldados.has(r.id));
+
   return {
-    movimientos: rows.map((r) => ({
+    movimientos: pendientes.map((r) => ({
       id: r.id,
       fecha: r.fecha ? r.fecha.toISOString() : null,
       concepto: r.concepto,
