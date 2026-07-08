@@ -18,10 +18,34 @@ export type CobranzaRow = {
   anuladaAt: string | null;
   socioNombre: string;
   numeroSocio: number | null;
+  formas: { tipo: string; monto: string }[];
 };
 
 function fmtMoney(value: string): string {
   return `$${parseFloat(value || '0').toLocaleString('es-AR', { minimumFractionDigits: 2 })}`;
+}
+
+const TIPO_COBRANZA_LABEL: Record<string, string> = {
+  efectivo: 'Efectivo',
+  efectivo_usd: 'Efectivo (USD)',
+  tarjeta_credito: 'Tarjeta de crédito',
+  tarjeta_debito: 'Tarjeta de débito',
+  transferencia: 'Transferencia',
+  cheque: 'Cheque',
+  mercado_pago: 'Mercado Pago',
+  otro: 'Otro',
+};
+
+// Hasta 3 columnas "Instrumento de Cobro N" — si hay más formas, la 3ª
+// acumula el resto como "+N más" en vez de agregar columnas de más.
+function instrumentoCobro(formas: { tipo: string; monto: string }[], slot: 0 | 1 | 2): string {
+  const f = formas[slot];
+  if (!f) return '—';
+  const label = TIPO_COBRANZA_LABEL[f.tipo] ?? f.tipo;
+  if (slot === 2 && formas.length > 3) {
+    return `${label} (${fmtMoney(f.monto)}) +${formas.length - 3} más`;
+  }
+  return `${label} (${fmtMoney(f.monto)})`;
 }
 
 export function CobranzaTabla({ cobranzas }: { cobranzas: CobranzaRow[] }) {
@@ -63,6 +87,9 @@ export function CobranzaTabla({ cobranzas }: { cobranzas: CobranzaRow[] }) {
             <th className="px-4 py-3">Fecha</th>
             <th className="px-4 py-3">Nº de recibo</th>
             <th className="px-4 py-3 text-right">Monto</th>
+            <th className="px-4 py-3">Instrumento de cobro 1</th>
+            <th className="px-4 py-3">Instrumento de cobro 2</th>
+            <th className="px-4 py-3">Instrumento de cobro 3</th>
             <th className="px-4 py-3">Estado</th>
             <th className="px-4 py-3 text-right">Acción</th>
           </tr>
@@ -79,6 +106,9 @@ export function CobranzaTabla({ cobranzas }: { cobranzas: CobranzaRow[] }) {
               <td className="px-4 py-3 text-right font-semibold text-[#101828]">
                 {fmtMoney(c.importe)}
               </td>
+              <td className="px-4 py-3 text-gray-700">{instrumentoCobro(c.formas, 0)}</td>
+              <td className="px-4 py-3 text-gray-700">{instrumentoCobro(c.formas, 1)}</td>
+              <td className="px-4 py-3 text-gray-700">{instrumentoCobro(c.formas, 2)}</td>
               <td className="px-4 py-3">
                 {c.anulada ? (
                   <span className="inline-flex flex-col">

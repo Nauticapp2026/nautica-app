@@ -1172,6 +1172,14 @@ export const facturacion = pgTable(
     // una vez corregida, en vez de perder el intento.
     rechazada: boolean('rechazada').notNull().default(false),
     motivoError: text('motivo_error'),
+    // Desglose del importe (solo se completa desde que se agregó — los
+    // comprobantes viejos quedan en null, no hay de dónde backfillearlos).
+    montoNeto: numeric('monto_neto', { precision: 12, scale: 2 }),
+    montoExento: numeric('monto_exento', { precision: 12, scale: 2 }),
+    montoIva: numeric('monto_iva', { precision: 12, scale: 2 }),
+    // Vencimiento del CAE que devuelve TusFacturas (no confundir con
+    // `vencimiento`, que es la fecha límite de pago).
+    caeVencimiento: date('cae_vencimiento'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },

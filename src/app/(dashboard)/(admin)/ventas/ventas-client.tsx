@@ -73,6 +73,16 @@ type Factura = {
   motivoError: string | null;
   condicionVenta: string | null;
   medioPago: string | null;
+  letra: string;
+  montoNeto: string | null;
+  montoExento: string | null;
+  montoIva: string | null;
+  caeVencimiento: string | null;
+  socioNumeroSocio: number | null;
+  socioCuitDni: string;
+  numeroOperacionSC: string;
+  entreEmisor: string;
+  centroEmisor: string;
 };
 
 type LoteMovimiento = {
@@ -218,6 +228,14 @@ function fmtMoney(value: string | number | null): string {
 }
 
 const fmtDate = formatArgentinaDate;
+
+// Formatea una fecha-calendario "YYYY-MM-DD" (columna `date`, sin hora) como
+// "DD/MM/YYYY" sin pasar por new Date()/TZ — evita el corrimiento de un día
+// que daría tratarla como timestamp UTC.
+function fmtYmd(ymd: string): string {
+  const [y, m, d] = ymd.split('-');
+  return `${d}/${m}/${y}`;
+}
 
 const TZ_AR = 'America/Argentina/Buenos_Aires';
 
@@ -3243,7 +3261,7 @@ export function VentasClient({
                   </div>
                 )}
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[900px] text-sm">
+                  <table className="w-full min-w-[1900px] text-sm">
                     <thead>
                       <tr className="bg-gray-50 text-left text-xs font-semibold text-gray-500">
                         <th className="w-10 px-4 py-3">
@@ -3261,12 +3279,22 @@ export function VentasClient({
                         </th>
                         <th className="px-4 py-3">Número</th>
                         <th className="px-4 py-3">Tipo</th>
+                        <th className="px-4 py-3">Letra</th>
                         <th className="px-4 py-3">Cliente</th>
+                        <th className="px-4 py-3">Nº Socio</th>
+                        <th className="px-4 py-3">CUIT/CUIL</th>
+                        <th className="px-4 py-3">Nº Op. SC</th>
                         <th className="px-4 py-3">Fecha</th>
                         <th className="px-4 py-3">Vencimiento</th>
+                        <th className="px-4 py-3">Venc. CAE</th>
                         <th className="px-4 py-3">Período</th>
+                        <th className="px-4 py-3 text-right">Neto</th>
+                        <th className="px-4 py-3 text-right">Exento</th>
+                        <th className="px-4 py-3 text-right">IVA</th>
                         <th className="px-4 py-3 text-right">Total</th>
                         <th className="px-4 py-3 text-center">Estado</th>
+                        <th className="px-4 py-3">Ente emisor</th>
+                        <th className="px-4 py-3">Centro emisor</th>
                         <th className="px-4 py-3 text-right">Acciones</th>
                       </tr>
                     </thead>
@@ -3306,11 +3334,18 @@ export function VentasClient({
                             <td className="px-4 py-3 text-gray-500">
                               {TIPO_FACTURA_LABEL[f.tipoFactura ?? ''] ?? '—'}
                             </td>
+                            <td className="px-4 py-3 text-gray-500">{f.letra}</td>
                             <td className="px-4 py-3 font-medium" style={{ color: '#175861' }}>
                               {f.socioNombre}
                             </td>
+                            <td className="px-4 py-3 text-gray-500">{f.socioNumeroSocio ?? '—'}</td>
+                            <td className="px-4 py-3 text-gray-500">{f.socioCuitDni}</td>
+                            <td className="px-4 py-3 text-gray-500">{f.numeroOperacionSC}</td>
                             <td className="px-4 py-3 text-gray-500">{fmtDate(f.emision)}</td>
                             <td className="px-4 py-3 text-gray-500">{fmtDate(f.vencimiento)}</td>
+                            <td className="px-4 py-3 text-gray-500">
+                              {f.caeVencimiento ? fmtYmd(f.caeVencimiento) : '—'}
+                            </td>
                             <td className="px-4 py-3 text-xs text-gray-500">
                               {f.desde ? (
                                 <div>
@@ -3320,6 +3355,15 @@ export function VentasClient({
                               ) : (
                                 '—'
                               )}
+                            </td>
+                            <td className="px-4 py-3 text-right text-gray-500">
+                              {f.montoNeto ? fmtMoney(f.montoNeto) : '—'}
+                            </td>
+                            <td className="px-4 py-3 text-right text-gray-500">
+                              {f.montoExento ? fmtMoney(f.montoExento) : '—'}
+                            </td>
+                            <td className="px-4 py-3 text-right text-gray-500">
+                              {f.montoIva ? fmtMoney(f.montoIva) : '—'}
                             </td>
                             <td
                               className="px-4 py-3 text-right font-medium"
@@ -3346,6 +3390,8 @@ export function VentasClient({
                                 </span>
                               )}
                             </td>
+                            <td className="px-4 py-3 text-gray-500">{f.entreEmisor}</td>
+                            <td className="px-4 py-3 text-gray-500">{f.centroEmisor}</td>
                             <td className="px-4 py-3">
                               <div className="flex items-center justify-end gap-2">
                                 <button

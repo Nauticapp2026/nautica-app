@@ -2,7 +2,13 @@ import { and, desc, eq, like } from 'drizzle-orm';
 
 import { getActiveMarina } from '@/lib/auth/session';
 import { db } from '@/lib/db';
-import { embarcaciones, facturacion, memberships, profiles } from '@/lib/db/schema';
+import {
+  embarcaciones,
+  facturacion,
+  memberships,
+  movimientosCuentaCorriente,
+  profiles,
+} from '@/lib/db/schema';
 
 import { CobranzaClient, type SocioOption } from './cobranza-client';
 import { CobranzaTabla, type CobranzaRow } from './cobranza-tabla';
@@ -53,12 +59,17 @@ export default async function CobranzasPage() {
         socioNombre: profiles.nombre,
         socioApellido: profiles.apellido,
         numeroSocio: memberships.numeroSocio,
+        datosPago: movimientosCuentaCorriente.datosPago,
       })
       .from(facturacion)
       .leftJoin(profiles, eq(profiles.id, facturacion.socioId))
       .leftJoin(
         memberships,
         and(eq(memberships.userId, facturacion.socioId), eq(memberships.guarderiaId, gId)),
+      )
+      .leftJoin(
+        movimientosCuentaCorriente,
+        eq(movimientosCuentaCorriente.id, facturacion.movimientoId),
       )
       .where(
         and(
@@ -88,16 +99,23 @@ export default async function CobranzasPage() {
     embarcaciones: barcosPorSocio.get(s.id) ?? [],
   }));
 
-  const cobranzas: CobranzaRow[] = recibos.map((r) => ({
-    id: r.id,
-    codigo: r.codigo,
-    fecha: r.emision ? r.emision.toISOString() : null,
-    importe: r.importe ?? '0',
-    anulada: r.anulada,
-    anuladaAt: r.anuladaAt ? r.anuladaAt.toISOString() : null,
-    socioNombre: [r.socioNombre, r.socioApellido].filter(Boolean).join(' ') || '—',
-    numeroSocio: r.numeroSocio,
-  }));
+  const cobranzas: CobranzaRow[] = recibos.map((r) => {
+    // `datosPago.formas` = [{ tipo, monto, datos }] — solo se muestra
+    // tipo+monto en la tabla, los campos de `datos` quedan en el recibo.
+    const datosPago = r.datosPago as { formas?: { tipo: string; monto: string }[] } | null;
+    const formas = (datosPago?.formas ?? []).map((f) => ({ tipo: f.tipo, monto: f.monto }));
+    return {
+      id: r.id,
+      codigo: r.codigo,
+      fecha: r.emision ? r.emision.toISOString() : null,
+      importe: r.importe ?? '0',
+      anulada: r.anulada,
+      anuladaAt: r.anuladaAt ? r.anuladaAt.toISOString() : null,
+      socioNombre: [r.socioNombre, r.socioApellido].filter(Boolean).join(' ') || '—',
+      numeroSocio: r.numeroSocio,
+      formas,
+    };
+  });
 
   return (
     <div className="p-4 md:p-8">

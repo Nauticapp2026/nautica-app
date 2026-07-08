@@ -1,19 +1,125 @@
-import { and, count, desc, eq, gte, lte, sql, sum } from 'drizzle-orm';
+import { and, count, desc, eq, gte, inArray, lte, sql, sum } from 'drizzle-orm';
 
 import { getActiveMarina } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import {
   embarcaciones,
   facturacion,
+  facturacionItemMovimientos,
+  facturacionItems,
   guarderias,
   memberships,
   movimientosCuentaCorriente,
   paywayCobros,
   profiles,
   servicios,
+  socioServicios,
 } from '@/lib/db/schema';
+import { identidadFacturacion } from '@/lib/facturacion/identidad';
 
 import { VentasClient } from './ventas-client';
+
+// "factura_a" → "A", "nota_credito_b" → "B", "recibo" → "—".
+function letraDeComprobante(tipoFactura: string | null): string {
+  if (!tipoFactura) return '—';
+  const letra = tipoFactura.split('_').pop();
+  return letra && letra.length === 1 ? letra.toUpperCase() : '—';
+}
+
+/**
+ * Nº de operación del Servicio Contratado asociado a cada factura, resuelto
+ * por mejor esfuerzo (no hay FK directa entre movimientos y socio_servicios):
+ * para cada movimiento linkeado, busca el Servicio Contratado vigente a la
+ * fecha del movimiento para ese (socio, servicio). Si una factura junta
+ * movimientos de más de un Servicio Contratado, devuelve "Varios".
+ */
+async function resolverNumeroOperacionPorFactura(
+  facturaIds: string[],
+): Promise<Map<string, string>> {
+  const resultado = new Map<string, string>();
+  if (facturaIds.length === 0) return resultado;
+
+  const items = await db
+    .select({ id: facturacionItems.id, facturacionId: facturacionItems.facturacionId })
+    .from(facturacionItems)
+    .where(inArray(facturacionItems.facturacionId, facturaIds));
+  if (items.length === 0) return resultado;
+
+  const itemToFactura = new Map(items.map((i) => [i.id, i.facturacionId]));
+  const links = await db
+    .select({
+      facturacionItemId: facturacionItemMovimientos.facturacionItemId,
+      movimientoId: facturacionItemMovimientos.movimientoId,
+    })
+    .from(facturacionItemMovimientos)
+    .where(
+      inArray(
+        facturacionItemMovimientos.facturacionItemId,
+        items.map((i) => i.id),
+      ),
+    );
+  if (links.length === 0) return resultado;
+
+  const movimientoIds = links.map((l) => l.movimientoId);
+  const movs = await db
+    .select({
+      id: movimientosCuentaCorriente.id,
+      socioId: movimientosCuentaCorriente.socioId,
+      servicioId: movimientosCuentaCorriente.servicioId,
+      fecha: movimientosCuentaCorriente.fecha,
+    })
+    .from(movimientosCuentaCorriente)
+    .where(inArray(movimientosCuentaCorriente.id, movimientoIds));
+  const movById = new Map(movs.map((m) => [m.id, m]));
+
+  const socioIds = [...new Set(movs.map((m) => m.socioId))];
+  const servicioIds = [...new Set(movs.map((m) => m.servicioId).filter((x): x is string => !!x))];
+  if (socioIds.length === 0 || servicioIds.length === 0) return resultado;
+
+  const scRows = await db
+    .select({
+      socioId: socioServicios.socioId,
+      servicioId: socioServicios.servicioId,
+      fechaInicio: socioServicios.fechaInicio,
+      fechaBaja: socioServicios.fechaBaja,
+      numeroOperacion: socioServicios.numeroOperacion,
+    })
+    .from(socioServicios)
+    .where(
+      and(
+        inArray(socioServicios.socioId, socioIds),
+        inArray(socioServicios.servicioId, servicioIds),
+      ),
+    );
+
+  // Por (facturacionId) → set de números de operación encontrados.
+  const porFactura = new Map<string, Set<number>>();
+  for (const l of links) {
+    const facturaId = itemToFactura.get(l.facturacionItemId);
+    const mov = movById.get(l.movimientoId);
+    if (!facturaId || !mov || !mov.servicioId || !mov.fecha) continue;
+    const fechaYmd = mov.fecha.toISOString().slice(0, 10);
+    const sc = scRows.find(
+      (r) =>
+        r.socioId === mov.socioId &&
+        r.servicioId === mov.servicioId &&
+        r.fechaInicio <= fechaYmd &&
+        (!r.fechaBaja || r.fechaBaja >= fechaYmd),
+    );
+    if (!sc) continue;
+    if (!porFactura.has(facturaId)) porFactura.set(facturaId, new Set());
+    porFactura.get(facturaId)!.add(sc.numeroOperacion);
+  }
+
+  for (const [facturaId, nums] of porFactura) {
+    if (nums.size === 1) {
+      resultado.set(facturaId, String([...nums][0]).padStart(6, '0'));
+    } else if (nums.size > 1) {
+      resultado.set(facturaId, 'Varios');
+    }
+  }
+  return resultado;
+}
 
 export default async function VentasPage() {
   const ctx = await getActiveMarina();
@@ -71,9 +177,13 @@ export default async function VentasPage() {
         folioLocal: facturacion.folioLocal,
         tipoFactura: facturacion.tipoFactura,
         importe: facturacion.importe,
+        montoNeto: facturacion.montoNeto,
+        montoExento: facturacion.montoExento,
+        montoIva: facturacion.montoIva,
         estado: facturacion.estado,
         emision: facturacion.emision,
         vencimiento: facturacion.vencimiento,
+        caeVencimiento: facturacion.caeVencimiento,
         desde: facturacion.desde,
         hasta: facturacion.hasta,
         archivo: facturacion.archivo,
@@ -88,9 +198,22 @@ export default async function VentasPage() {
         socioNombre: profiles.nombre,
         socioApellido: profiles.apellido,
         socioEmail: profiles.email,
+        socioEmailFacturacion: profiles.emailFacturacion,
+        socioRazonSocial: profiles.razonSocial,
+        socioTipoDocumento: profiles.tipoDocumento,
+        socioNumeroDocumento: profiles.numeroDocumento,
+        socioCuit: profiles.cuit,
+        socioCondicionIva: profiles.condicionIva,
+        socioCondicionIvaPersonal: profiles.condicionIvaPersonal,
+        socioNumeroSocio: memberships.numeroSocio,
+        socioFacturaFiscal: memberships.facturaFiscal,
       })
       .from(facturacion)
       .leftJoin(profiles, eq(profiles.id, facturacion.socioId))
+      .leftJoin(
+        memberships,
+        and(eq(memberships.userId, facturacion.socioId), eq(memberships.guarderiaId, gId)),
+      )
       .where(eq(facturacion.guarderiaId, gId))
       .orderBy(desc(facturacion.createdAt))
       .limit(200),
@@ -140,6 +263,8 @@ export default async function VentasPage() {
         puntoDeVenta: guarderias.puntoDeVenta,
         certificadoAfipOk: guarderias.certificadoAfipOk,
         condicionIva: guarderias.condicionIva,
+        nombre: guarderias.nombre,
+        razonSocial: guarderias.razonSocial,
       })
       .from(guarderias)
       .where(eq(guarderias.id, gId))
@@ -229,28 +354,66 @@ export default async function VentasPage() {
       .where(eq(embarcaciones.guarderiaId, gId)),
   ]);
 
-  const facturas = lista.map((f) => ({
-    id: f.id,
-    codigo: f.codigo,
-    folioLocal: f.folioLocal,
-    tipoFactura: f.tipoFactura,
-    importe: f.importe,
-    estado: f.estado,
-    emision: f.emision ? f.emision.toISOString() : null,
-    vencimiento: f.vencimiento ? f.vencimiento.toISOString() : null,
-    desde: f.desde ? f.desde.toISOString() : null,
-    hasta: f.hasta ? f.hasta.toISOString() : null,
-    archivo: f.archivo,
-    descripcion: f.descripcion,
-    socioId: f.socioId,
-    cae: f.cae,
-    facturaOriginalId: f.facturaOriginalId,
-    rechazada: f.rechazada,
-    motivoError: f.motivoError,
-    condicionVenta: f.condicionVenta,
-    medioPago: f.medioPago,
-    socioNombre: [f.socioNombre, f.socioApellido].filter(Boolean).join(' ') || f.socioEmail || '—',
-  }));
+  // Nº de operación del Servicio Contratado por factura — depende de los ids
+  // que trajo `lista`, así que va después del Promise.all (no se puede
+  // batchear en paralelo con la query que le da el input).
+  const numeroOperacionPorFactura = await resolverNumeroOperacionPorFactura(lista.map((f) => f.id));
+
+  const entreEmisor = guarderiaInfo?.razonSocial?.trim() || guarderiaInfo?.nombre || '—';
+  const centroEmisor =
+    guarderiaInfo?.puntoDeVenta != null ? String(guarderiaInfo.puntoDeVenta) : '—';
+
+  const facturas = lista.map((f) => {
+    const identidad = identidadFacturacion({
+      id: f.socioId ?? '',
+      email: f.socioEmail ?? '',
+      emailFacturacion: f.socioEmailFacturacion,
+      nombre: f.socioNombre,
+      apellido: f.socioApellido,
+      razonSocial: f.socioRazonSocial,
+      tipoDocumento: f.socioTipoDocumento,
+      numeroDocumento: f.socioNumeroDocumento,
+      cuit: f.socioCuit,
+      direccion: null,
+      direccionFiscal: null,
+      condicionIva: f.socioCondicionIva,
+      condicionIvaPersonal: f.socioCondicionIvaPersonal,
+      facturaFiscal: f.socioFacturaFiscal ?? false,
+    });
+    return {
+      id: f.id,
+      codigo: f.codigo,
+      folioLocal: f.folioLocal,
+      tipoFactura: f.tipoFactura,
+      letra: letraDeComprobante(f.tipoFactura),
+      importe: f.importe,
+      montoNeto: f.montoNeto,
+      montoExento: f.montoExento,
+      montoIva: f.montoIva,
+      estado: f.estado,
+      emision: f.emision ? f.emision.toISOString() : null,
+      vencimiento: f.vencimiento ? f.vencimiento.toISOString() : null,
+      caeVencimiento: f.caeVencimiento,
+      desde: f.desde ? f.desde.toISOString() : null,
+      hasta: f.hasta ? f.hasta.toISOString() : null,
+      archivo: f.archivo,
+      descripcion: f.descripcion,
+      socioId: f.socioId,
+      cae: f.cae,
+      facturaOriginalId: f.facturaOriginalId,
+      rechazada: f.rechazada,
+      motivoError: f.motivoError,
+      condicionVenta: f.condicionVenta,
+      medioPago: f.medioPago,
+      socioNombre:
+        [f.socioNombre, f.socioApellido].filter(Boolean).join(' ') || f.socioEmail || '—',
+      socioNumeroSocio: f.socioNumeroSocio,
+      socioCuitDni: identidad.numeroDocumento || '—',
+      numeroOperacionSC: numeroOperacionPorFactura.get(f.id) ?? '—',
+      entreEmisor,
+      centroEmisor,
+    };
+  });
 
   const movsBySocio = new Map<
     string,

@@ -19,6 +19,7 @@ import { getActiveMarina } from '@/lib/auth/session';
 import { fechaCalendariaArg, todayArg } from '@/lib/dates';
 import { sendEmail } from '@/lib/email/resend';
 import { reciboEmail } from '@/lib/email/templates/recibo';
+import { identidadFacturacion, type SocioFacturacion } from '@/lib/facturacion/identidad';
 import { crearSocioServicio, hayContratoVigente } from '@/lib/socio-servicios';
 import { MOTIVO_NOTA_LABEL, type MotivoNota } from './nota-constants';
 import {
@@ -122,6 +123,50 @@ function precioSinIva(total: number, alicuota: string): number {
   return +(total / (1 + a / 100)).toFixed(2);
 }
 
+/**
+ * Desglosa el total de una lista de ítems (cada `importeUnitario` ya viene
+ * con IVA incluido, como se cobra al socio) en neto/exento/IVA, para
+ * mostrar en la tabla de Ventas. Un ítem sin alícuota propia usa
+ * `fallbackAlicuota` (mismo default que ya usa `alicuotaPara` al armar el
+ * detalle de TusFacturas). Alícuota 0 → todo el ítem es "exento", no neto.
+ */
+function desglosarMontos(
+  items: { importeUnitario: number; cantidad: number; alicuotaIva?: number | null }[],
+  fallbackAlicuota: string,
+): { montoNeto: number; montoExento: number; montoIva: number } {
+  let montoNeto = 0;
+  let montoExento = 0;
+  let montoIva = 0;
+  for (const it of items) {
+    const total = it.importeUnitario * it.cantidad;
+    const alicuota = it.alicuotaIva != null ? String(it.alicuotaIva) : fallbackAlicuota;
+    if (parseFloat(alicuota) === 0) {
+      montoExento += total;
+    } else {
+      const neto = precioSinIva(total, alicuota);
+      montoNeto += neto;
+      montoIva += total - neto;
+    }
+  }
+  return {
+    montoNeto: +montoNeto.toFixed(2),
+    montoExento: +montoExento.toFixed(2),
+    montoIva: +montoIva.toFixed(2),
+  };
+}
+
+/**
+ * Inverso de `toTusFecha`: TusFacturas devuelve "DD/MM/YYYY". Devuelve
+ * "YYYY-MM-DD" (las columnas `date` de este esquema van como string, no
+ * como `Date` — mismo criterio que `vigenciaDesde`/`fechaInicio`, etc.).
+ */
+function parseTusFecha(fecha: string | undefined | null): string | null {
+  if (!fecha) return null;
+  const [d, m, y] = fecha.split('/');
+  if (!d || !m || !y) return null;
+  return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+}
+
 // Identificación interna correlativa por guardería, que se suma al número
 // que devuelve ARCA: "FM-NNNNNN" para Facturación manual (y su NC), "FL-NNNNNN"
 // para Facturación por lote (y su NC), "FA-NNNNNN" para la auto-facturación
@@ -132,63 +177,6 @@ async function nextFolioLocal(gId: string, prefix: 'FM' | 'FL' | 'FA'): Promise<
     .from(facturacion)
     .where(and(eq(facturacion.guarderiaId, gId), like(facturacion.folioLocal, `${prefix}-%`)));
   return `${prefix}-${String(Number(n) + 1).padStart(6, '0')}`;
-}
-
-/**
- * Datos del socio relevantes para construir la identidad de facturación.
- * facturaFiscal = true  → facturar con datos PERSONALES (pestaña Generales).
- * facturaFiscal = false → facturar con DATOS IMPOSITIVOS (razón social, CUIT).
- */
-type SocioFacturacion = {
-  id: string;
-  email: string;
-  emailFacturacion: string | null;
-  nombre: string | null;
-  apellido: string | null;
-  razonSocial: string | null;
-  tipoDocumento: string | null;
-  numeroDocumento: string | null;
-  cuit: string | null;
-  direccion: string | null;
-  direccionFiscal: string | null;
-  condicionIva: string | null;
-  condicionIvaPersonal: string | null;
-  facturaFiscal: boolean;
-};
-
-/**
- * Identidad fiscal efectiva del socio según el modo de facturación. Usada tanto
- * para validar el documento como para armar el cliente de TusFacturas, así ambos
- * siempre miran los mismos campos. Devuelve los valores en enums internos (DB).
- */
-function identidadFacturacion(p: SocioFacturacion): {
-  razon: string;
-  tipoDocumento: string | null;
-  numeroDocumento: string | null;
-  condicionIva: string | null;
-  domicilio: string;
-} {
-  const nombreCompleto = [p.nombre, p.apellido].filter(Boolean).join(' ').trim();
-
-  if (p.facturaFiscal) {
-    // Datos personales (Generales).
-    return {
-      razon: nombreCompleto || p.email,
-      tipoDocumento: p.tipoDocumento,
-      numeroDocumento: p.numeroDocumento,
-      condicionIva: p.condicionIvaPersonal,
-      domicilio: p.direccion?.trim() || '',
-    };
-  }
-
-  // Datos impositivos. Si tiene CUIT cargado, es el documento de facturación.
-  return {
-    razon: p.razonSocial?.trim() || nombreCompleto || p.email,
-    tipoDocumento: p.cuit?.trim() ? 'cuit' : p.tipoDocumento,
-    numeroDocumento: p.cuit?.trim() || p.numeroDocumento,
-    condicionIva: p.condicionIva,
-    domicilio: p.direccionFiscal?.trim() || p.direccion?.trim() || '',
-  };
 }
 
 function buildCliente(
@@ -500,6 +488,7 @@ export async function crearFacturaCore(
     `Factura ${TIPO_FACTURA_API[data.tipoFactura]} — ${items[0].descripcion}${
       items.length > 1 ? ` (+${items.length - 1})` : ''
     }`;
+  const montos = desglosarMontos(items, alicuotaPara(data.tipoFactura));
 
   let apiResponse;
   try {
@@ -522,6 +511,9 @@ export async function crearFacturaCore(
         condicionVenta: data.condicionVenta,
         medioPago: data.medioPago,
         importe: total.toFixed(2),
+        montoNeto: montos.montoNeto.toFixed(2),
+        montoExento: montos.montoExento.toFixed(2),
+        montoIva: montos.montoIva.toFixed(2),
         emision: fechaCalendariaArg(data.fecha),
         desde: fechaCalendariaArg(data.desde),
         hasta: fechaCalendariaArg(data.hasta),
@@ -580,12 +572,16 @@ export async function crearFacturaCore(
       folioLocal,
       archivo: apiResponse.comprobante_pdf_url ?? null,
       cae: apiResponse.cae ?? null,
+      caeVencimiento: parseTusFecha(apiResponse.vencimiento_cae),
       descripcion: descripcionFactura,
       tipoFactura: data.tipoFactura,
       estado: estadoFactura,
       condicionVenta: data.condicionVenta,
       medioPago: data.medioPago,
       importe: total.toFixed(2),
+      montoNeto: montos.montoNeto.toFixed(2),
+      montoExento: montos.montoExento.toFixed(2),
+      montoIva: montos.montoIva.toFixed(2),
       emision: fechaCalendariaArg(data.fecha),
       desde: fechaCalendariaArg(data.desde),
       hasta: fechaCalendariaArg(data.hasta),
@@ -839,6 +835,7 @@ export async function reenviarFacturaRechazadaAction(
       detalleItems.length > 1 ? ` (+${detalleItems.length - 1})` : ''
     }`;
   const folioLocal = await nextFolioLocal(gId, 'FM');
+  const montos = desglosarMontos(detalleItems, alicuotaPara(data.tipoFactura));
 
   await db
     .update(facturacion)
@@ -847,11 +844,15 @@ export async function reenviarFacturaRechazadaAction(
       folioLocal,
       archivo: apiResponse.comprobante_pdf_url ?? null,
       cae: apiResponse.cae ?? null,
+      caeVencimiento: parseTusFecha(apiResponse.vencimiento_cae),
       descripcion: descripcionFactura,
       tipoFactura: data.tipoFactura,
       condicionVenta: data.condicionVenta,
       medioPago: data.medioPago,
       importe: total.toFixed(2),
+      montoNeto: montos.montoNeto.toFixed(2),
+      montoExento: montos.montoExento.toFixed(2),
+      montoIva: montos.montoIva.toFixed(2),
       emision: fechaCalendariaArg(data.fecha),
       vencimiento: fechaCalendariaArg(data.vencimiento),
       rechazada: false,
@@ -1800,6 +1801,12 @@ export async function emitirNotaAsociadaAction(
   try {
     const tipoNotaFactura = (data.esNc ? NC_TIPO_FACTURA : ND_TIPO_FACTURA)[tipoOriginal];
     const folioLocal = await nextFolioLocal(gId, data.origen === 'lote' ? 'FL' : 'FM');
+    // Sin desglose por ítem (la nota es un monto único) — mismo fallback de
+    // alícuota que ya usa `buildDetalle` para este caso.
+    const montos = desglosarMontos(
+      [{ importeUnitario: importeNota, cantidad: 1 }],
+      alicuotaPara(tipoOriginal),
+    );
 
     await db.insert(facturacion).values({
       id: notaId,
@@ -1811,8 +1818,12 @@ export async function emitirNotaAsociadaAction(
       folioLocal,
       archivo: apiResponse.comprobante_pdf_url ?? null,
       cae: apiResponse.cae ?? null,
+      caeVencimiento: parseTusFecha(apiResponse.vencimiento_cae),
       descripcion: descripcionNota,
       importe: importeNota.toFixed(2),
+      montoNeto: montos.montoNeto.toFixed(2),
+      montoExento: montos.montoExento.toFixed(2),
+      montoIva: montos.montoIva.toFixed(2),
       emision: new Date(),
       externalReference: notaId,
       facturaOriginalId: data.facturaOriginalId,
@@ -1915,6 +1926,10 @@ export async function emitirNotaLibreAction(data: EmitirNotaLibreData): Promise<
   try {
     const tipoNotaFactura = (data.esNc ? NC_TIPO_FACTURA : ND_TIPO_FACTURA)[tipoFactura];
     const folioLocal = await nextFolioLocal(gId, 'FM');
+    const montos = desglosarMontos(
+      [{ importeUnitario: data.importe, cantidad: 1 }],
+      alicuotaPara(tipoFactura),
+    );
 
     await db.insert(facturacion).values({
       id: notaId,
@@ -1926,8 +1941,12 @@ export async function emitirNotaLibreAction(data: EmitirNotaLibreData): Promise<
       folioLocal,
       archivo: apiResponse.comprobante_pdf_url ?? null,
       cae: apiResponse.cae ?? null,
+      caeVencimiento: parseTusFecha(apiResponse.vencimiento_cae),
       descripcion: descripcionNota,
       importe: data.importe.toFixed(2),
+      montoNeto: montos.montoNeto.toFixed(2),
+      montoExento: montos.montoExento.toFixed(2),
+      montoIva: montos.montoIva.toFixed(2),
       emision: new Date(),
       externalReference: notaId,
     });
