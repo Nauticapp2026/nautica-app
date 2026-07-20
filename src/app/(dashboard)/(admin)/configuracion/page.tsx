@@ -153,6 +153,7 @@ export default async function ConfiguracionPage({ searchParams }: Props) {
           'administrador_general',
           'administrativo',
           'operario',
+          'marinero',
           'seguridad',
         ]),
       ),

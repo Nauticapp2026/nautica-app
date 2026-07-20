@@ -86,5 +86,17 @@ export function RealtimeRefresher({ guarderiaId }: { guarderiaId: string }) {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [scheduleRefresh]);
 
+  // Red de seguridad por polling: si el socket de Realtime se corta en
+  // silencio (proxy/red del club, laptop suspendida, etc.) y no reconecta,
+  // el tablero quedaba viejo hasta que alguien recargaba a mano. Mismo patrón
+  // "belt and suspenders" que ya usa el home del socio en mobile
+  // (`refetchInterval: 30_000` además de su propia suscripción Realtime).
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') scheduleRefresh();
+    }, 20_000);
+    return () => clearInterval(interval);
+  }, [scheduleRefresh]);
+
   return null;
 }

@@ -55,6 +55,7 @@ export type Tarea = {
   solicitudDiaUso: string | null;
   solicitudUpdatedAt: string | null;
   salidaCancelada: boolean;
+  yaLlego: boolean;
 };
 
 const ESTADO_SOLICITUD_LAVADO_LABEL: Record<EstadoSolicitudLavado, string> = {
@@ -263,7 +264,13 @@ function TareaCard({
   // Estados terminales (guardada/lavado) lockean el cambio de estado para
   // todos, incluido admin. El server también lo valida.
   const esTerminal = ESTADOS_TAREA_TERMINALES.includes(tarea.estado);
-  const puedeMoverEstado = !esTerminal && (canEditAll || (isOperario && esMia));
+  // El socio canceló la salida ANTES de que el barco navegara (todavía en
+  // Salida programada o Preparar) — no tiene sentido "avanzarla", queda fija
+  // hasta que desaparece del tablero al otro día. Si ya estaba Navegando
+  // cuando canceló, el barco sí salió y "Mover a Guardada" sigue aplicando.
+  const cancelActiva =
+    tarea.salidaCancelada && (tarea.estado === 'salida_programada' || tarea.estado === 'preparar');
+  const puedeMoverEstado = !esTerminal && !cancelActiva && (canEditAll || (isOperario && esMia));
   const puedeCambiarOperario = canEditAll || (isOperario && sinAsignar);
   const puedeEditarLavado = canEditAll || (isOperario && esMia);
 
@@ -294,6 +301,12 @@ function TareaCard({
       {tarea.salidaCancelada && (
         <span className="mt-1 inline-flex items-center rounded-full bg-[#FCE8E8] px-2 py-0.5 text-xs font-semibold text-[#C0392B]">
           Cancelada
+        </span>
+      )}
+
+      {!tarea.salidaCancelada && tarea.yaLlego && (
+        <span className="mt-1 inline-flex items-center rounded-full bg-[#E6F4EC] px-2 py-0.5 text-xs font-semibold text-[#175861]">
+          Ya llegó
         </span>
       )}
 
@@ -328,7 +341,7 @@ function TareaCard({
             </option>
           ))}
         </select>
-        {!esTerminal && (
+        {!esTerminal && !cancelActiva && (
           <select
             className="h-8 w-full rounded-[8px] border border-gray-200 bg-white px-2 text-xs text-[#175861] focus:border-[#175861] focus:outline-none"
             value=""

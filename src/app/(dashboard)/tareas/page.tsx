@@ -109,6 +109,7 @@ export default async function TareasPage() {
         solicitudDiaUso: solicitudesLavado.diaUso,
         solicitudUpdatedAt: solicitudesLavado.updatedAt,
         porteriaEstado: porteria.estado,
+        porteriaArribadaEn: porteria.arribadaEn,
       })
       .from(tareas)
       .leftJoin(profiles, eq(profiles.id, tareas.operarioId))
@@ -203,6 +204,9 @@ export default async function TareasPage() {
     // El socio canceló la salida → porteria.estado = 'revocado'. La tarea sigue
     // en 'salida_programada' pero se marca "Cancelada" en el tablero.
     salidaCancelada: t.porteriaEstado === 'revocado',
+    // El socio confirmó "Ya llegué" (porteria.arribada_en) pero el operario
+    // todavía no movió la tarea a 'guardada'. Se marca "Ya llegó" en Navegando.
+    yaLlego: t.estado === 'navegando' && !!t.porteriaArribadaEn && t.porteriaEstado !== 'revocado',
   }));
 
   const operarios = operariosList.map((o) => ({

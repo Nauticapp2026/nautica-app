@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, like, notExists, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, like, notExists, sql } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import {
@@ -395,6 +395,108 @@ export async function notifyMarinerosPushForPorteria(
   }
 
   // Marcar como despachadas (idempotencia: no se vuelven a pushear).
+  await db
+    .update(notificaciones)
+    .set({ pushSentAt: new Date() })
+    .where(
+      inArray(
+        notificaciones.id,
+        rows.map((r) => r.id),
+      ),
+    );
+
+  return { sent: rows.length };
+}
+
+// =============================================================================
+// Push de "embarcación guardada" (transaccional).
+//
+// El trigger `notificar_embarcacion_guardada` (mobile mig 0021) ya escribe la
+// campanita in-app apenas `tareas.estado` pasa a 'guardada', con
+// push_sent_at NULL y el payload {tarea_id, porteria_id, embarcacion_nombre}.
+// Esta función solo despacha el push a partir de esa fila — no vuelve a
+// consultar tareas/porteria. La llaman DOS entrypoints (la tarea se puede
+// mover a 'guardada' desde el kanban admin o desde el detalle de tarea del
+// operario/marinero mobile, que escribe directo contra Supabase): la server
+// action del admin la llama en el mismo proceso, y el mobile pega a
+// /api/tareas/notify-guardada que la envuelve. Idempotente vía push_sent_at.
+// =============================================================================
+
+export async function sendPushEmbarcacionGuardada(tareaId: string): Promise<void> {
+  const [notif] = await db
+    .select({
+      id: notificaciones.id,
+      userId: notificaciones.userId,
+      payload: notificaciones.payload,
+    })
+    .from(notificaciones)
+    .where(
+      and(
+        eq(notificaciones.tipo, 'embarcacion_guardada'),
+        isNull(notificaciones.pushSentAt),
+        sql`${notificaciones.payload}->>'tarea_id' = ${tareaId}`,
+      ),
+    )
+    .orderBy(desc(notificaciones.createdAt))
+    .limit(1);
+
+  if (!notif) return;
+
+  const payload = (notif.payload ?? {}) as Record<string, unknown>;
+  const embarcacionNombre =
+    typeof payload.embarcacion_nombre === 'string' ? payload.embarcacion_nombre : 'Tu embarcación';
+
+  await sendPushToUser({
+    userId: notif.userId,
+    title: 'Embarcación guardada',
+    body: `${embarcacionNombre} fue guardada.`,
+    data: { tipo: 'embarcacion_guardada', tareaId, notificacion_id: notif.id },
+  });
+
+  await db
+    .update(notificaciones)
+    .set({ pushSentAt: new Date() })
+    .where(eq(notificaciones.id, notif.id));
+}
+
+// =============================================================================
+// Push de "solicitud de lavado" al staff (transaccional).
+//
+// La función `_create_tarea_for_solicitud_lavado` (mig 0129) ya escribe una
+// campanita por cada operario/marinero destinatario apenas se crea la tarea
+// de lavado, con push_sent_at NULL y titulo/cuerpo en el payload (mismo
+// patrón que marina_*). El socio la crea desde su mobile directo contra
+// Supabase, así que esta función la llama /api/lavado/notify — mismo puente
+// que /api/marineros/notify.
+// =============================================================================
+
+export async function sendPushLavadoSolicitado(solicitudId: string): Promise<{ sent: number }> {
+  const rows = await db
+    .select({
+      id: notificaciones.id,
+      userId: notificaciones.userId,
+      tipo: notificaciones.tipo,
+      payload: notificaciones.payload,
+    })
+    .from(notificaciones)
+    .where(
+      and(
+        eq(notificaciones.tipo, 'lavado_solicitado'),
+        isNull(notificaciones.pushSentAt),
+        sql`${notificaciones.payload}->>'solicitud_id' = ${solicitudId}`,
+      ),
+    )
+    .limit(200);
+
+  if (rows.length === 0) return { sent: 0 };
+
+  for (const r of rows) {
+    const p = (r.payload ?? {}) as Record<string, unknown>;
+    const title = typeof p.titulo === 'string' ? p.titulo : 'NauticApp';
+    const body = typeof p.cuerpo === 'string' ? p.cuerpo : '';
+    await sendPushToUser({ userId: r.userId, title, body, data: { tipo: r.tipo, solicitudId } });
+  }
+
   await db
     .update(notificaciones)
     .set({ pushSentAt: new Date() })

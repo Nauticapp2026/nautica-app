@@ -127,6 +127,7 @@ const ROL_LABELS: Record<string, string> = {
   administrador_general: 'Admin',
   administrativo: 'Administrativo',
   operario: 'Operario',
+  marinero: 'Marinero',
   contable: 'Contable',
   mantenimiento: 'Mantenimiento',
   comunicaciones: 'Comunicaciones',
@@ -202,13 +203,14 @@ export default async function DashboardPage() {
         nombre: profiles.nombre,
         apellido: profiles.apellido,
         email: profiles.email,
+        rol: memberships.rol,
       })
       .from(memberships)
       .innerJoin(profiles, eq(profiles.id, memberships.userId))
       .where(
         and(
           eq(memberships.guarderiaId, gId),
-          eq(memberships.rol, 'operario'),
+          inArray(memberships.rol, ['operario', 'marinero']),
           eq(memberships.status, 'active'),
         ),
       ),
@@ -411,20 +413,20 @@ export default async function DashboardPage() {
           <AlertasOperativasList alertas={alertasOperativas} />
         </div>
 
-        {/* Operarios */}
+        {/* Operarios / Marineros */}
         <div className="rounded-2xl border border-gray-200 bg-white p-4 md:p-6">
           <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Anchor className="h-4 w-4" style={{ color: '#175861' }} />
               <h2 className="text-base font-semibold" style={{ color: '#101828' }}>
-                Operarios
+                Operarios / Marineros
               </h2>
             </div>
           </div>
           {operariosList.length === 0 ? (
             <EmptyState
               icon={<Ship className="h-7 w-7 opacity-40" />}
-              text="No hay operarios cargados."
+              text="No hay operarios ni marineros cargados."
             />
           ) : (
             <div className="space-y-2">
@@ -442,12 +444,15 @@ export default async function DashboardPage() {
                     >
                       {inicial}
                     </div>
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium" style={{ color: '#101828' }}>
                         {nombre}
                       </p>
                       <p className="truncate text-xs text-gray-400">{o.email}</p>
                     </div>
+                    <span className="shrink-0 rounded-full border border-gray-200 bg-white px-2 py-0.5 text-xs font-medium text-gray-500">
+                      {ROL_LABELS[o.rol] ?? o.rol}
+                    </span>
                   </div>
                 );
               })}

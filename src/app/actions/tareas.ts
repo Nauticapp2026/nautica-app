@@ -10,10 +10,11 @@ import {
   embarcaciones,
   espacios,
   guarderias,
+  porteria,
   solicitudesLavado,
 } from '@/lib/db/schema';
 import { getActiveMarina } from '@/lib/auth/session';
-import { sendPushToUser } from '@/lib/push-notifications';
+import { sendPushEmbarcacionGuardada, sendPushToUser } from '@/lib/push-notifications';
 import { createAdminClient } from '@/lib/supabase/admin';
 import {
   ESTADOS_SOLICITUD_LAVADO,
@@ -227,8 +228,9 @@ export async function updateTareaEstadoAction(
   const gId = ctx.activeMembership.guarderiaId;
 
   const [current] = await db
-    .select({ id: tareas.id, estado: tareas.estado })
+    .select({ id: tareas.id, estado: tareas.estado, porteriaEstado: porteria.estado })
     .from(tareas)
+    .leftJoin(porteria, eq(porteria.id, tareas.porteriaId))
     .where(and(eq(tareas.id, tareaId), eq(tareas.guarderiaId, gId)))
     .limit(1);
   if (!current) return { error: 'Tarea no encontrada.' };
@@ -240,10 +242,27 @@ export async function updateTareaEstadoAction(
     return { error: 'Esta tarea ya está en un estado final y no se puede mover.' };
   }
 
+  // El socio canceló la salida antes de que el barco navegara (todavía en
+  // salida_programada o preparar) — no se puede "avanzarla", queda fija hasta
+  // que sale del tablero. Si ya estaba navegando, sí se puede mover a guardada.
+  if (
+    current.porteriaEstado === 'revocado' &&
+    (current.estado === 'salida_programada' || current.estado === 'preparar')
+  ) {
+    return { error: 'El socio canceló esta salida antes de zarpar — no se puede mover.' };
+  }
+
   await db
     .update(tareas)
     .set({ estado })
     .where(and(eq(tareas.id, tareaId), eq(tareas.guarderiaId, gId)));
+
+  // Push al socio. La campanita in-app ya la escribió el trigger Postgres
+  // `notificar_embarcacion_guardada` en el mismo UPDATE; acá solo despachamos
+  // el push. Fire-and-forget (sendPushEmbarcacionGuardada ya no rompe si falla).
+  if (estado === 'guardada') {
+    await sendPushEmbarcacionGuardada(tareaId);
+  }
 
   revalidatePath('/tareas');
   return {};
