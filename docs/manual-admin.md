@@ -16,9 +16,10 @@ Guía paso a paso para gestionar tu club o guardería náutica desde el panel we
 8. [Publicaciones](#8-publicaciones)
 9. [Comunicaciones](#9-comunicaciones)
 10. [Ventas](#10-ventas)
-11. [Tarifario](#11-tarifario)
-12. [Mi perfil](#12-mi-perfil)
-13. [Débito automático (Payway)](#13-débito-automático-payway)
+11. [Cobranzas](#11-cobranzas)
+12. [Tarifario](#12-tarifario)
+13. [Mi perfil](#13-mi-perfil)
+14. [Débito automático (Payway)](#14-débito-automático-payway)
 
 ---
 
@@ -36,14 +37,13 @@ El menú lateral izquierdo es la navegación principal. Desde ahí accedés a to
 
 - **Dashboard** — resumen operativo del día
 - **Socios** — listado y perfil de los socios del club
-- **Ventas** — registro de ventas
-- **Cobranzas** — seguimiento de cobranzas
+- **Ventas** — emisión y seguimiento de facturas y comprobantes internos
+- **Cobranzas** — registrar cobros y ver el historial de débito automático
 - **Solicitudes** — pedidos de nuevos socios desde la app mobile
-- **Tareas** — tablero operativo para el equipo
+- **Tareas** — tablero operativo para el equipo (Operarios y Marineros)
 - **Espacios** — amarras, camas y ubicaciones
 - **Publicaciones** — avisos de amarras y camas en NautiShop
 - **Comunicaciones** — anuncios y novedades para socios
-- **Ventas** — emisión y seguimiento de facturas
 - **Tarifario** — precios y servicios
 - **Mi perfil** — datos del club, equipo, plan y datos impositivos
 
@@ -63,7 +63,7 @@ El Dashboard es la pantalla de inicio. Muestra el estado operativo del club en t
 - **Socios con deuda 2+ meses** — socios con movimientos pendientes de cobro desde hace más de dos meses.
 - **Socios con documentación incompleta** — socios a los que les falta subir documentación.
 
-Más abajo, el Dashboard también muestra un panel de **Operarios** y otro de **Comunicaciones recientes**.
+Más abajo, el Dashboard también muestra un panel de **Operarios / Marineros** (lista al personal de ambos roles, con un badge que indica cuál es cada uno) y otro de **Comunicaciones recientes**.
 
 ### Alertas operativas
 
@@ -99,7 +99,7 @@ La tabla muestra: número de socio (#), nombre, email, embarcación asignada, ub
 
 - Usá la barra de búsqueda para filtrar por nombre o email.
 - Al lado del buscador hay **filtros por columna**: **Nº socio**, **Nombre** y **Embarcación**. Filtran en vivo a medida que escribís y se combinan entre sí y con el buscador.
-- Hacé clic en el encabezado **#** para ordenar la lista por número de socio (ascendente o descendente).
+- Podés ordenar la lista haciendo clic en los encabezados **#**, **Nombre**, **Embarcación** o **Ubicación** (ascendente o descendente).
 - La columna **Ingreso** muestra la fecha en que se incorporó el socio al club.
 - La columna **Saldo** muestra el saldo de la cuenta del socio. Si **debe**, aparece el monto adeudado. Si tiene **saldo a favor** (pagó de más), aparece el monto en verde con la etiqueta **"a favor"**. Podés ordenar por esta columna haciendo clic en su encabezado (de mayor deuda a saldo a favor).
 - El **número de socio** (#NNN) aparece como un chip junto al nombre. Podés editarlo en el perfil del socio → pestaña **Generales**.
@@ -184,45 +184,32 @@ Cada embarcación tiene su **propio espacio asignado**. Dentro de la tarjeta de 
 
 #### Pestaña Servicios Contratados
 
-Lista los servicios que el socio tiene contratados o consume. Los servicios se agrupan por tipo, muestran un badge **Fijo** o **Variable** según su tarifa, y permiten ver el historial de movimientos asociados.
+Lista los servicios que el socio tiene contratados. Es un **contrato**, no un historial de cargos: cada fila muestra el servicio, un badge **Fijo** o **Variable** según su tarifa, la fecha de inicio y (si tiene) la fecha de baja.
 
-Desde esta pestaña cargás nuevos consumos con el botón **Cargar Servicio** (antes se llamaba "Cargar consumo" y estaba en la Cuenta Corriente). Se alimenta del **Tarifario**:
+**Cargar un servicio nuevo no genera ningún cargo en el momento.** Solo registra el contrato; el cargo real lo va a generar la facturación (mensual para los servicios Fijos, una vez para los Variables) cuando corresponda.
+
+**Cargar Servicio:**
 
 1. Hacé clic en **Cargar Servicio**.
-2. Elegí el servicio del tarifario (solo aparecen tarifas **Activas**), el concepto, el monto (se precarga con el precio c/IVA de la tarifa; podés editarlo) y la fecha.
-3. Elegí el **tipo de comprobante**:
-   - **Comprobante fiscal** — registra el cargo como facturable. **No se emite a ARCA en el momento**: queda pendiente y se factura después, manual o automáticamente, como cualquier otro cargo.
-   - **Comprobante interno** — marca el cargo como **no fiscal**: no aparece ni en la facturación automática ni en la manual. Queda pendiente hasta que lo consolidés en un comprobante desde **Ventas → Nuevo comprobante → Comprobante interno manual/lote** (ver sección Comprobantes internos).
-4. Confirmá. El cargo se suma a la Cuenta Corriente del socio.
+2. Elegí el servicio en el buscador (agrupado por categoría, igual que en el Tarifario — solo aparecen tarifas **Activas**).
+3. Completá el **Detalle del servicio** (texto libre, opcional) y la **Fecha de inicio** del servicio (obligatoria). La **Fecha de baja** es opcional — dejala vacía si el servicio sigue vigente.
+4. Elegí el **tipo de comprobante**:
+   - **Fiscal (ARCA)** — el cargo se va a facturar por ARCA cuando corresponda (manual o automático).
+   - **Interno** — el cargo queda excluido de toda facturación por ARCA; se consolida después en un comprobante interno desde **Ventas** (ver sección Comprobantes internos).
+5. Confirmá. El sistema muestra: _"Servicio contratado. Todavía no aparece en la cuenta corriente — va a impactar recién cuando corresponda facturarlo."_
 
-### Ver cargos individuales
+**Editar un servicio contratado:**
 
-Cada fila de servicio tiene un **chevron (▾)** a la izquierda del nombre. Al hacerle clic se despliegan los cargos individuales de ese servicio, ordenados del más reciente al más viejo, con fecha, concepto y monto de cada uno.
-
-### Editar un cargo
-
-1. Expandí la fila del servicio con el chevron.
-2. Hacé clic en el ícono de **lápiz** junto al cargo que querés corregir.
-3. En el modal podés modificar:
-   - **Concepto** — descripción del cargo.
-   - **Fecha** — fecha en que se registró.
+1. Hacé clic en el ícono de **lápiz** de la fila del servicio.
+2. En el modal podés modificar: **Fecha de inicio**, **Fecha de baja**, **Detalle del servicio** y el tipo de **Comprobante** (Interno / Fiscal).
+3. Si es la **primera vez** que le ponés fecha de baja a ese contrato, aparece un bloque adicional: un checkbox **"Cobrar por esta baja"** con el monto sugerido según la **política de baja anticipada** configurada en la tarifa (mes completo o proporcional al uso) — podés editar ese monto antes de guardar. Si lo tildás, se genera un cargo nuevo en la Cuenta Corriente por ese importe. Si no lo tildás (o si solo estás editando una baja ya cargada antes), no se genera ningún cargo.
 4. Hacé clic en **Guardar**.
 
-> El monto del cargo no se puede modificar desde este formulario. Los cargos que ya tienen una factura ARCA emitida no muestran el botón de edición.
+**Servicio de guarda (espacio):** ponerle fecha de baja a un servicio de guarda **detiene el cargo mensual automático** de ahí en más. El espacio **sigue asignado** (la embarcación queda en su lugar); si querés **liberar el lugar** para otro socio, hacelo desde la sección **Espacios**. Si más adelante le volvés a asignar ese espacio al socio, la baja se limpia sola y vuelve a facturarse.
 
-**Cancelar un servicio:**
+> **Recordá:** el único cargo que se genera **automáticamente cada mes** es el del **espacio de guarda**. Los demás servicios Fijos (cuota social, extras, etc.) empiezan a repetirse solos recién a partir del primer cargo fiscal que les cargues con **Cargar Servicio**; los servicios Variables no se repiten nunca solos.
 
-1. Hacé clic en **Cancelar** en el servicio que querés dar de baja.
-2. El sistema pregunta si querés cobrar un **proporcional** — el importe se sugiere en base al **último cargo real** que se le hizo a ese socio por ese servicio y a los **días pasados desde ese cobro** (con tope de un mes), y se puede **editar** antes de confirmar:
-   - **Solo cancelar** — da de baja el servicio sin generar ningún cargo adicional.
-   - **Cobrar y cancelar** — genera el cargo proporcional en la Cuenta Corriente (con el importe que hayas dejado en el campo) y da de baja el servicio. Ese cargo entra en la próxima factura.
-3. El servicio queda marcado como **Cancelado** con la fecha de baja. El historial de movimientos anteriores se conserva.
-
-**Servicio de guarda (espacio):** además del proporcional, al cancelar el sistema **deja de generar el cargo mensual** automáticamente de ahí en más. El espacio **sigue asignado** (la embarcación queda en su lugar); si querés **liberar el lugar** para otro socio, hacelo desde la sección **Espacios**. Si más adelante le volvés a asignar ese espacio al socio, la cancelación se limpia sola y vuelve a facturarse.
-
-> **Recordá:** el único cargo que se genera **automáticamente cada mes** es el del **espacio de guarda**. Los demás servicios (cuota social, extras, etc.) no se cobran solos — se van agregando a mano con **Cargar Servicio** a medida que se usan. Por eso, cancelar uno de esos simplemente lo da de baja.
-
-> La cancelación no borra datos. Para reactivar un servicio que no es de guarda, volvé a cargarlo mediante Cargar Servicio.
+> La baja no borra datos: el historial de movimientos anteriores del servicio se conserva. Para reactivar un servicio que no es de guarda, volvé a cargarlo mediante Cargar Servicio.
 
 #### Pestaña Cuenta Corriente
 
@@ -230,14 +217,12 @@ Muestra los movimientos del socio: facturas, cobros y saldo.
 
 Arriba de la tabla hay tres tarjetas: **Ingresos por venta**, **Cobranzas** y **Saldo** del socio.
 
-- **Registrar pago** — registrá un pago recibido del socio (te pide el medio de pago). Se crea una cobranza que descuenta del saldo; los cargos cubiertos pasan a figurar **Pagado**, asignando del más viejo al más nuevo. Si el pago supera la deuda, el excedente queda como **saldo a favor**.
-
-> Los consumos ya no se cargan desde esta pestaña: usá **Cargar Servicio** en la pestaña **Servicios Contratados**.
+> Esta pestaña es de **solo lectura** de movimientos. Para registrar un cobro del socio, andá a la sección **Cobranzas** (menú lateral) y usá **Nueva cobranza** — reemplaza al viejo botón "Registrar pago" que tenía esta pestaña. Los consumos tampoco se cargan acá: usá **Cargar Servicio** en la pestaña **Servicios Contratados**.
 
 **Filtros.** Sobre la tabla podés filtrar los movimientos por:
 
 - **Desde / Hasta** — rango de fechas.
-- **Estado** — Pagado o En Plazo. Un cargo figura **Pagado** cuando los pagos registrados alcanzan a cubrirlo (se asignan del más viejo al más nuevo); si todavía no está cubierto, figura **En Plazo**.
+- **Estado** — Todos / Cobrado / Anulado (NC) / Parcial / Pendiente.
 - **Tipo de comprobante** — Factura A/B/C, Recibo, Comprobante interno, Nota de crédito o Sin comprobante.
 
 Al aplicar **cualquier filtro**, la tarjeta de **Saldo** se **oculta**: su valor es el saldo total del socio y no se corresponde con el subconjunto de movimientos filtrados. Las tarjetas de **Ingresos por venta** y **Cobranzas** se mantienen. Al limpiar los filtros, la tarjeta de Saldo vuelve a aparecer.
@@ -247,7 +232,7 @@ Al aplicar **cualquier filtro**, la tarjeta de **Saldo** se **oculta**: su valor
 **Columnas de la tabla.** En orden: **Fecha**, **Tipo de comprobante**, **Nº Comprobante**, **Detalle**, **Vencimiento**, **Situación**, **Ventas**, **Cobranzas**, **Saldo** y **Estado**.
 
 - **Vencimiento** — fecha límite de pago del cargo. Se calcula como la **fecha de la factura más el Plazo de pago** definido en la tarifa del Tarifario (Contado, 5, 10, 15, 20 o 30 días). Ejemplo: una factura del 26/06 con plazo de 30 días vence el 26/07. Solo aparece en cargos con **comprobante fiscal**; en cargos sin facturar, recibos internos o cobranzas muestra "—".
-- **Situación** — estado según esa fecha: **En término** (verde) o **Vencida** (rojo). Una fila pasa a **Vencida** el día siguiente al vencimiento (siguiendo el ejemplo, el 27/07). Es **puramente por fecha**: un cargo pagado tarde también puede figurar Vencida. Es independiente de la columna **Estado** (que refleja el estado de pago: Pagado / En Plazo).
+- **Situación** — estado según esa fecha: **En término** (verde) o **Vencida** (rojo). Una fila pasa a **Vencida** el día siguiente al vencimiento (siguiendo el ejemplo, el 27/07). Es **puramente por fecha**: un cargo pagado tarde también puede figurar Vencida. Es independiente de la columna **Estado**, que refleja el estado de pago: **Cobrado** (cubierto por cobranzas), **Parcial** (cobrado en parte), **Pendiente** (sin cobrar), **Vencido** o **Anulado (NC)** (anulado por una nota de crédito).
 
 #### Pestaña Accesos Externos
 
@@ -377,7 +362,8 @@ Nada se borra físicamente: una tarea que desaparece del tablero por los criteri
 
 - **Salida programada** — se muestran de hoy en adelante. Las sin fecha o de fecha ya pasada no aparecen en el tablero.
 - **Preparar** — se oculta del tablero si la fecha de salida ya pasó y la tarea nunca avanzó a Navegando (queda solo en el Historial).
-- **Navegando cancelada** — si el socio revocó la salida desde la app mobile con el barco ya afuera, la tarjeta se marca **Cancelada** y se sigue viendo el resto del día; se oculta del tablero recién al día siguiente.
+- **Navegando cancelada** — si el socio revocó la salida desde la app mobile con el barco ya afuera, la tarjeta se marca **Cancelada** (badge rojo) y se sigue viendo el resto del día; se oculta del tablero recién al día siguiente.
+- **Navegando — Ya llegó** — cuando el socio confirma "Ya llegué" desde el celular mientras la tarjeta sigue en Navegando, aparece un badge verde **Ya llegó**. Indica que el barco ya volvió y está esperando que el Operario/Marinero lo mueva a Guardada.
 - **Guardada** — solo se ven las del **día en curso**: a las **00:00 (medianoche)** la tarjeta desaparece del tablero (pasa a verse solo en el Historial).
 - **Lavado lista** — cuando marcás un lavado como **Lista**, la tarjeta se mantiene visible el resto del día y desaparece del tablero al día siguiente.
 - **Lavado cancelado** — nunca se muestra en el tablero; solo aparece en el Historial.
@@ -406,17 +392,22 @@ Muestra **todas** las tareas y solicitudes de lavado, mezcladas en una sola tabl
 
 Desde la tarjeta de la tarea, usá el selector **Mover a...** para cambiar la columna.
 
+> **Si el socio canceló la salida antes de que el barco navegara** (la tarea todavía estaba en Salida programada o Preparar), la tarjeta queda de **solo lectura**: no aparece el selector "Mover a..." y no se puede arrastrar. Va a desaparecer sola del tablero al día siguiente, sin que haga falta tocarla. Si en cambio la cancelación llegó estando ya en **Navegando** (el barco sí llegó a salir), la tarjeta se sigue pudiendo mover normalmente hasta Guardada.
+
 ### Asignar o reasignar un operario
 
-En la tarjeta de la tarea, usá el selector **Operario** para asignar o cambiar la persona responsable.
+En la tarjeta de la tarea, usá el selector **Operario** para asignar o cambiar la persona responsable. La lista incluye tanto a los **Operarios** como a los **Marineros** de tu club.
 
-### Operarios por área (a quién le aparecen las tareas)
+### Operarios y Marineros por área (a quién le aparecen las tareas)
 
-Cada tarea (lavado, salida, etc.) se asocia automáticamente al **área** del espacio de la embarcación. Las tareas de un área le aparecen a **los operarios asignados a esa área**, y el que está disponible la **toma**.
+Cada tarea (lavado, salida, etc.) se asocia automáticamente al **área** del espacio de la embarcación. Las tareas de un área le aparecen solo al personal asignado a esa área:
 
-- Los operarios se asignan a cada área desde **Espacios** (ver "Asignar operarios a un área").
-- Una tarea **sin** área (ej. una tarea genérica sin embarcación) la ven **todos** los operarios de la guardería.
-- El administrador sigue viendo **todas** las tareas.
+- Si la embarcación está en un área **Nave**, la tarea es de **Operario**: la ven los operarios asignados a esa área.
+- Si está en un área **Marina**, la tarea es de **Marinero**: la ven los marineros asignados a esa área.
+- El personal se asigna a cada área desde **Espacios** (ver "Asignar operarios a un área").
+- Una tarea **sin** área (ej. una tarea genérica sin embarcación) la ven **todos** los operarios o marineros de la guardería, según corresponda.
+- El administrador sigue viendo **todas** las tareas, de ambos tipos.
+- Un operario y un marinero **no ven las tareas del otro**: cada uno solo opera las de su tipo (Nave o Marina). El que esté disponible dentro de esa área **toma** la tarea.
 
 ### Tareas de lavado
 
@@ -455,7 +446,7 @@ Los espacios se muestran con colores:
 
 En la sección **Áreas** (arriba de Espacios), cada tarjeta de área tiene un botón **Asignar** junto a la lista de personal. Ahí elegís uno o más operarios para esa área. Esos operarios son los que van a ver y poder tomar las tareas de las embarcaciones ubicadas en esa área (lavados, salidas, etc.). También podés asignar operarios **al crear el área** (ver abajo); después los cambiás desde la tarjeta.
 
-> **Marineros vs. Operarios.** La etiqueta del personal cambia según el tipo de área: en un área **Marina** se muestran como **Marineros** y en un área **Nave** como **Operarios**. Es solo el nombre que ves en pantalla: el rol y los permisos son los mismos (operario) en ambos casos.
+> **Marineros vs. Operarios.** Son dos roles de staff distintos, cada uno con su propia lista de personal. En un área **Marina** el botón Asignar te deja elegir entre el personal con rol **Marinero**; en un área **Nave**, entre el personal con rol **Operario**. Los dos operan igual dentro de **Tareas** (crear, mover estado, tomar tareas) — la diferencia es que cada uno solo ve y gestiona las tareas de su tipo de área.
 
 ### Crear una nueva área
 
@@ -629,7 +620,7 @@ Las tarjetas superiores muestran:
 ### Emitir una factura individual
 
 1. Hacé clic en **Nuevo comprobante** → **Facturación manual**.
-2. Seleccioná el **socio** en el campo Cliente.
+2. Buscá y seleccioná el **socio** en el campo Cliente — el buscador filtra por nombre, número de socio o embarcación (mismo buscador que usás en Cobranzas).
 3. El sistema muestra automáticamente los **conceptos pendientes** del socio (movimientos sin facturar). Marcá los que querés incluir. Podés usar **Todos** o **Ninguno** para seleccionar rápido.
 4. Completá los campos:
    - **Tipo de comprobante** — se determina automáticamente según la condición IVA del club y del socio (campo de solo lectura):
@@ -682,7 +673,18 @@ Los cargos Interno pendientes no generan nada por sí solos: hay que consolidarl
 
 El comprobante generado muestra fecha de emisión, descripción del o los servicios incluidos, precio y datos del cliente — como una factura, pero sin validez fiscal.
 
-Todos aparecen en **Ventas → tab Recibos internos** y quedan disponibles para imprimir o enviar por mail.
+Todos aparecen en **Ventas → tab Comprobantes internos** y quedan disponibles para imprimir o enviar por mail.
+
+### Anular un comprobante interno (Nota de Crédito interna)
+
+Si necesitás anular un comprobante interno (CM- o CL-) ya emitido, hay una Nota de Crédito interna — no pasa por ARCA, no tiene CAE ni validez fiscal, es solo para dejar constancia dentro del club.
+
+1. En el tab **Comprobantes internos**, en la fila del comprobante CM-/CL- que querés anular, hacé clic en el ícono de flecha curva (↩) — **"Emitir Nota de Crédito interna"**.
+2. Elegí el motivo: **Anulación total**, **Descuento parcial** o **Devolución de servicio**.
+3. Si no es anulación total, ingresá el **importe a acreditar** (no puede superar el importe original). La **descripción** es opcional — si la dejás vacía, el sistema arma una automática.
+4. Confirmá. Se numera con su propia serie **NCI-NNNNNN** y se ve/imprime desde el mismo visor que el resto de los comprobantes.
+
+> En la Cuenta Corriente del socio, el cargo cubierto por una Nota de Crédito interna se muestra igual que una NC fiscal: **Anulado (NC)**.
 
 ### Emitir una nota de crédito
 
@@ -720,6 +722,10 @@ En el tab **Comprobantes ARCA** podés acotar la tabla con los siguientes filtro
 
 Para exportar los comprobantes actualmente visibles (respetando los filtros activos), hacé clic en **Exportar** — se descarga un archivo CSV.
 
+**Columnas de la tabla Comprobantes ARCA.** En orden: casilla de selección, Nº Op. SC, Fecha, Tipo de comprobante, Letra, Número (con el folio interno FM-/FL- debajo), Nº Socio, Razón social, CUIT/CUIL, Vencimiento, CAE, Vencimiento del CAE, Período (Desde/Hasta), Neto, Exento, IVA, Total, Estado de envío (Aceptado/Rechazado), Estado de cobro, Ente emisor, CUIT emisor, Centro emisor y Acciones.
+
+**Columnas de la tabla Comprobantes internos.** En orden: Número, Tipo, Nº Op. SC, Nº Socio, Razón social, CUIT/CUIL, Fecha, Neto, Exento, IVA, Total, Ente emisor, CUIT emisor, Centro emisor y Acciones.
+
 ### Marcar una factura como pagada
 
 Cuando un socio te abona **una factura puntual** que le emitiste, marcala como pagada:
@@ -728,11 +734,59 @@ Cuando un socio te abona **una factura puntual** que le emitiste, marcala como p
 2. Seleccioná el **medio de pago**.
 3. Confirmá. La factura pasa de **Pendiente** a **Pagada** y los cargos vinculados a ella quedan saldados.
 
-> **No la confundas con "Registrar pago"** (pestaña Cuenta Corriente del socio): esa registra un **cobro** que descuenta del **saldo** del socio. Esta acción solo cambia el estado de **una factura** y **no modifica el saldo** de la cuenta corriente. Si necesitás que baje la deuda del socio, registrá el cobro con **Registrar pago** o por débito automático.
+> **No la confundas con una cobranza** (sección **Cobranzas** → **Nueva cobranza**): esa registra un **cobro** que descuenta del **saldo** del socio. Esta acción solo cambia el estado de **una factura** y **no modifica el saldo** de la cuenta corriente. Si necesitás que baje la deuda del socio, registrá el cobro desde **Cobranzas** o por débito automático.
 
 ---
 
-## 11. Tarifario
+## 11. Cobranzas
+
+Desde acá registrás los cobros que recibís de tus socios (efectivo, transferencia, tarjeta, cheque, Mercado Pago, etc.) y los aplicás a sus comprobantes pendientes. También es donde ves el historial de cobros por **débito automático** (Payway). Reemplaza al viejo botón "Registrar pago" que tenía la pestaña Cuenta Corriente del socio.
+
+### Cómo se ve la pantalla
+
+La pantalla tiene dos pestañas:
+
+- **Cobranzas** — el registro de cobros manuales que fuiste cargando.
+- **Débito automático** — el historial de cobros automáticos por Payway (ver capítulo 14).
+
+Arriba de la tabla de Cobranzas está el botón **Nueva cobranza**.
+
+### Registrar una cobranza nueva
+
+1. Hacé clic en **Nueva cobranza**.
+2. Buscá al socio por nombre, número de socio o embarcación, y hacé clic sobre él en la lista.
+3. El sistema te muestra los **comprobantes pendientes de cobro** de ese socio: facturas ARCA (A/B/C) y recibos internos que todavía no están pagados. No incluye notas de crédito ni comprobantes ya cubiertos por un pago anterior.
+4. Tildá los comprobantes que estás cobrando (o usá **Seleccionar todos**). Abajo se muestra el **Total seleccionado**.
+5. Hacé clic en **Continuar**.
+6. Revisá o ajustá el **Monto a pagar** (viene precargado con el total seleccionado) y la **Fecha** del cobro.
+   - Si el monto es **menor** al total seleccionado, es un **pago parcial**: el sistema cubre los comprobantes más viejos primero, hasta donde alcance; el resto queda pendiente.
+   - Si el monto es **mayor**, el excedente queda como **saldo a favor** del socio.
+7. Elegí la **forma de pago**: Efectivo (pesos), Efectivo (dólares), Tarjeta de crédito, Tarjeta de débito, Transferencia bancaria, Cheque, Mercado Pago u Otro. Cada una pide sus propios datos (por ejemplo, Efectivo en dólares pide el tipo de cambio y calcula el equivalente en pesos; si el socio ya tiene una tarjeta cargada para débito automático, podés reutilizarla con un clic).
+8. **Podés combinar más de una forma de pago** en el mismo cobro: hacé clic en **Agregar forma de pago** y repetí el paso anterior para cada una. La suma de todas tiene que coincidir con el Monto a pagar.
+9. Hacé clic en **Registrar cobranza**.
+
+### Qué pasa al confirmar
+
+Al registrar la cobranza, el sistema genera un **recibo de cobranza** con numeración propia **RC-NNNNNN**, marca como **Cobrados** los comprobantes que quedaron cubiertos enteros (del más viejo al más nuevo) y actualiza la Cuenta Corriente del socio. Si el pago fue parcial, los comprobantes no cubiertos del todo quedan pendientes para una próxima cobranza.
+
+El recibo se puede ver e imprimir con el ícono **Ver** (ojo) de su fila.
+
+### Anular una cobranza
+
+1. En la tabla de Cobranzas, hacé clic en **Anular recibo** en la fila del recibo (solo disponible si todavía está **Vigente**).
+2. Confirmá.
+
+Al anular: el pago se revierte, los comprobantes que ese recibo había marcado como cobrados vuelven a pendiente, y los cargos vuelven a su estado previo. El recibo queda marcado **Anulado**, con su fecha de anulación, y no se puede volver a anular ni se genera ningún comprobante nuevo.
+
+> La anulación es siempre por el **total** del recibo — no se puede anular parcialmente una cobranza.
+
+### Pestaña Débito automático
+
+Historial de cobros automáticos por Payway (antes vivía en Ventas). Ver el capítulo **14. Débito automático (Payway)** para el detalle completo de estados y cómo reintentar un cobro fallido.
+
+---
+
+## 12. Tarifario
 
 Desde aquí definís los precios de los servicios que ofrece tu club.
 
@@ -745,7 +799,7 @@ Cada tarifa muestra su concepto, un badge **Fijo** o **Variable** (fijo = precio
 - **Precio c/IVA** — el total que se le cobra al socio, calculado automáticamente sumando la alícuota al precio de lista (precio × (1 + alícuota)).
 - **Precio s/IVA** — el precio de lista que cargaste (sin impuesto). La línea "s/IVA" solo aparece cuando la alícuota es mayor a 0; si la tarifa es **Exento / No gravado** (0 %), no se muestra.
 
-**Estados de una tarifa:** **Activa**; **Vencida** (en ámbar, si pasó su fecha de vencimiento); **Pausada**; o **Inactiva**. Con el botón **Pausar** dejás de aplicar una tarifa sin borrarla (no se puede pausar una que tenga socios con ese servicio contratado), y con **Reactivar** la volvés a habilitar. Cambiar el **Estado** a "Inactivo" desde Editar tiene la misma restricción: no se puede si hay socios con el servicio contratado. Una tarifa Pausada o Inactiva deja de generar cargos nuevos (el cron mensual la salta, no se puede cargar manualmente por "Cargar Servicio", y no aparece en los selectores para asignarla a un espacio o socio nuevo).
+**Estados de una tarifa:** **Activa**; **Vencida** (en ámbar, si pasó su fecha de vencimiento); **Pausada**; o **Inactiva**. Con el botón **Pausar** dejás de aplicar una tarifa sin borrarla, y con **Reactivar** la volvés a habilitar — si hay socios con ese servicio contratado, el sistema te los muestra a modo informativo antes de confirmar, pero **no bloquea** la pausa (a esos socios no les afecta, siguen facturándose igual; solo deja de poder contratarse de nuevo mientras esté pausada). Cambiar el **Estado** a "Inactivo" desde Editar es más restrictivo: **si hay socios con el servicio contratado, no se puede** — hay que darlos de baja primero. Una tarifa Pausada o Inactiva deja de generar cargos nuevos (el cron mensual la salta, no se puede cargar manualmente por "Cargar Servicio", y no aparece en los selectores para asignarla a un espacio o socio nuevo).
 
 ### Crear una tarifa
 
@@ -758,7 +812,13 @@ Cada tarifa muestra su concepto, un badge **Fijo** o **Variable** (fijo = precio
    - **Vigencia desde** — fecha a partir de la cual la tarifa está activa.
    - **Vencimiento** — fecha hasta la que aplica.
    - No pueden existir dos tarifas del mismo concepto con fechas superpuestas.
-6. Hacé clic en **Guardar tarifa**.
+6. Si el servicio es **Fijo**, opcionalmente tildá **"Establecer política de baja anticipada"**. Al tildarlo aparecen dos opciones (queda seleccionada "proporcional" por defecto, podés cambiarla):
+   - **Cobrar mes completo.**
+   - **Cobrar días proporcionales de uso.**
+
+   Esta política es la que se usa después para sugerir el monto cuando alguien da de baja el servicio desde la ficha de un socio (ver "Editar un servicio contratado" en la sección Socios). Para tarifas **Variables** este campo no aplica y no se muestra.
+
+7. Hacé clic en **Guardar tarifa**.
 
 ### Editar una tarifa
 
@@ -784,7 +844,7 @@ Cada tarifa tiene un acordeón **Historial de cambios** donde podés ver los pre
 
 ---
 
-## 12. Mi perfil
+## 13. Mi perfil
 
 Desde **Mi perfil** administrás los datos de tu club y las integraciones.
 
@@ -857,8 +917,9 @@ Gestioná el personal del club que tiene acceso al panel web o a la app mobile.
    - **Rol** _(requerido)_:
      - **Admin** — acceso total al panel web.
      - **Administrativo** — mismos permisos que Admin.
-     - **Operario** — solo ve y resuelve las tareas asignadas.
-     - **Portería/Seguridad** — opera exclusivamente desde la app mobile (ingreso y egreso de embarcaciones).
+     - **Operario** — ve y resuelve las tareas de embarcaciones guardadas en **Nave** (guarda en seco).
+     - **Marinero** — igual que Operario, pero para embarcaciones en **Marina** (amarras en agua): ve y resuelve las tareas de sus áreas de marina.
+     - **Portería / Seguridad** — opera exclusivamente desde la app mobile (ingreso y egreso de embarcaciones).
    - **DNI**, **Teléfono**, **Sede** _(opcionales)_
 3. Hacé clic en **Guardar**. El nuevo miembro recibe un email de invitación para activar su cuenta.
 
@@ -883,7 +944,7 @@ Si confirmaste un cambio y querés cancelarlo antes de que se aplique, aparece u
 
 ---
 
-## 13. Débito automático (Payway)
+## 14. Débito automático (Payway)
 
 El débito automático permite cobrar la cuota mensual directamente desde la tarjeta de crédito o débito del socio, sin necesidad de que el socio realice ninguna acción. El cobro se genera automáticamente el día de facturación de tu club.
 
@@ -940,7 +1001,7 @@ Cuando el cobro se aprueba, se registra un pago **Pago — Débito automático**
 
 ### Ver el historial de cobros
 
-1. Andá a **Ventas** en el menú lateral.
+1. Andá a **Cobranzas** en el menú lateral.
 2. Hacé clic en la pestaña **Débito automático**.
 
 Vas a ver:

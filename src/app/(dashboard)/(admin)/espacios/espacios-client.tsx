@@ -214,9 +214,8 @@ function countEspacios(a: AreaView): {
   return acc;
 }
 
-// El rol siempre es "operario" (misma funcionalidad); solo cambia la etiqueta
-// visible según el tipo de área: en una Marina se muestran como "Marineros",
-// en una Nave como "Operarios".
+// Marina asigna personal con rol "marinero"; Nave, con rol "operario" (son
+// roles distintos del enum, no una relabeling del mismo rol).
 function rolAreaLabel(tipo: 'marina' | 'nave', plural = true): string {
   if (tipo === 'marina') return plural ? 'Marineros' : 'Marinero';
   return plural ? 'Operarios' : 'Operario';
