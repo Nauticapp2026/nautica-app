@@ -8,12 +8,14 @@ import {
   guarderias,
   memberships,
   movimientosCuentaCorriente,
+  paywayCobros,
   profiles,
 } from '@/lib/db/schema';
 import { identidadFacturacion } from '@/lib/facturacion/identidad';
 
 import { CobranzaClient, type SocioOption } from './cobranza-client';
-import { CobranzaTabla, type CobranzaRow } from './cobranza-tabla';
+import { CobranzasTabsClient } from './cobranzas-tabs-client';
+import { type CobranzaRow } from './cobranza-tabla';
 
 export default async function CobranzasPage() {
   const ctx = await getActiveMarina();
@@ -21,7 +23,7 @@ export default async function CobranzasPage() {
 
   const gId = ctx.activeMembership.guarderiaId;
 
-  const [socios, barcos, recibos, [guarderiaInfo]] = await Promise.all([
+  const [socios, barcos, recibos, [guarderiaInfo], cobrosLista] = await Promise.all([
     db
       .select({
         id: profiles.id,
@@ -98,6 +100,24 @@ export default async function CobranzasPage() {
       .from(guarderias)
       .where(eq(guarderias.id, gId))
       .limit(1),
+
+    db
+      .select({
+        id: paywayCobros.id,
+        socioId: paywayCobros.socioId,
+        socioNombre: profiles.nombre,
+        socioApellido: profiles.apellido,
+        monto: paywayCobros.monto,
+        estado: paywayCobros.estado,
+        errorMensaje: paywayCobros.errorMensaje,
+        movimientosIds: paywayCobros.movimientosIds,
+        createdAt: paywayCobros.createdAt,
+      })
+      .from(paywayCobros)
+      .leftJoin(profiles, eq(profiles.id, paywayCobros.socioId))
+      .where(eq(paywayCobros.guarderiaId, gId))
+      .orderBy(desc(paywayCobros.createdAt))
+      .limit(200),
   ]);
 
   // Agrupar embarcaciones (nombre/matrícula) por socio para el filtro.
@@ -156,6 +176,17 @@ export default async function CobranzasPage() {
     };
   });
 
+  const cobrosPayway = cobrosLista.map((c) => ({
+    id: c.id,
+    socioId: c.socioId,
+    socioNombre: [c.socioNombre, c.socioApellido].filter(Boolean).join(' ') || '—',
+    monto: c.monto,
+    estado: c.estado,
+    errorMensaje: c.errorMensaje,
+    movimientosIds: c.movimientosIds,
+    createdAt: c.createdAt.toISOString(),
+  }));
+
   return (
     <div className="p-4 md:p-8">
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -167,7 +198,7 @@ export default async function CobranzasPage() {
         </div>
         <CobranzaClient socios={sociosOptions} />
       </div>
-      <CobranzaTabla cobranzas={cobranzas} />
+      <CobranzasTabsClient cobranzas={cobranzas} cobrosPayway={cobrosPayway} />
     </div>
   );
 }

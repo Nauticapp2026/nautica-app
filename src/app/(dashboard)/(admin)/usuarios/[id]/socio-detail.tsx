@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useState, useTransition, useRef, useEffect } from 'react';
+import { Fragment, useState, useTransition, useRef, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Script from 'next/script';
@@ -30,7 +30,6 @@ import {
   UserCheck,
   X,
 } from 'lucide-react';
-import { updateMovimientoAction } from '@/app/actions/movimientos';
 import { cargarServicioAction } from '@/app/actions/facturacion';
 import {
   createEmbarcacionAction,
@@ -60,12 +59,7 @@ import { precioConIva, precioSinIva } from '@/lib/iva';
 import { ASTILLEROS } from '../astilleros';
 import { EmptyState } from '@/components/shared/empty-state';
 import { Pagination } from '@/components/shared/pagination';
-import {
-  inputCls,
-  Field,
-  sanitizeMontoInput,
-  montoToNumberStr,
-} from '@/components/shared/forma-pago';
+import { inputCls, Field } from '@/components/shared/forma-pago';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -127,15 +121,24 @@ type Movimiento = {
   facturaCodigo: string | null;
   facturaArchivo: string | null;
   facturaTipo: string | null;
+  facturaTipoRecibo: 'fiscal' | 'interno' | null;
   comprobanteInterno: boolean;
   // Fecha de vencimiento (YYYY-MM-DD) = emisión de factura + plazo de pago de la
   // tarifa. Null si el cargo no está facturado (o es comprobante interno).
   fechaVencimiento: string | null;
+  // Cuánto de este cargo cubre puntualmente una Nota de Crédito de SU propia
+  // factura (no una bolsa común) — ver src/lib/nc-cobertura.ts. Null si
+  // ninguna NC aplica a este cargo.
+  montoCubiertoNc: string | null;
+  // true si este movimiento ES el asiento de una NC ya aplicada arriba —
+  // no debe sumar al pool genérico de cobertura (ver calcularSaldoYEstado).
+  esMovimientoNc: boolean;
 };
 
 type Servicio = {
   id: string;
   nombre: string;
+  tipo: string;
   precio: string | null;
   alicuotaIva: string | null;
 };
@@ -150,12 +153,14 @@ type ServicioContratado = {
   servicioTipoCobro: 'fijo' | 'variable' | null;
   servicioPrecio: string | null;
   servicioAlicuotaIva: string | null;
-  servicioPoliticaBajaAnticipada: 'mes_completo' | 'proporcional';
+  servicioPoliticaBajaAnticipada: 'mes_completo' | 'proporcional' | null;
   espacioId: string | null;
   numeroOperacion: number;
   fechaAsignacion: string;
   fechaInicio: string;
   fechaBaja: string | null;
+  concepto: string | null;
+  comprobanteInterno: boolean;
 };
 
 type Navegante = {
@@ -253,6 +258,7 @@ const ESTADO_BADGE: Record<string, string> = {
   facturado: 'bg-amber-50 text-amber-700',
   no_pagado: 'bg-amber-50 text-amber-700',
   vencido: 'bg-red-100 text-red-700',
+  anulado_nc: 'bg-purple-50 text-purple-700',
 };
 
 const MEMBERSHIP_STATUS_CLASSES: Record<'active' | 'inactivo', string> = {
@@ -266,49 +272,73 @@ const MEMBERSHIP_STATUS_LABEL: Record<'active' | 'inactivo', string> = {
 };
 
 const ESTADO_LABEL: Record<string, string> = {
-  pagado: 'Pagado',
+  pagado: 'Cobrado',
   parcial: 'Parcial',
   facturado: 'Pendiente',
   no_pagado: 'Pendiente',
   vencido: 'Vencido',
+  anulado_nc: 'Anulado (NC)',
 };
 
 // Agrega a cada movimiento (orden desc: más nuevo primero) el saldo acumulado y
-// el estado MOSTRADO. Un cargo figura "Pagado" cuando los pagos (haber) alcanzan
-// a cubrirlo, "Parcial" cuando lo cobrado es menor al total del cargo, y
-// "Pendiente" cuando todavía no se le asignó ningún pago — asignando del más
-// viejo al más nuevo (FIFO). Es cálculo de display: no cambia el estado
-// guardado (la facturación sigue mirando el real). No confundir con la
-// columna "Situación" (En Plazo / Vencido), que compara la fecha de
-// vencimiento contra hoy — son dos ejes independientes.
+// el estado MOSTRADO. Un cargo figura "Anulado (NC)" cuando lo cubre puntualmente
+// una Nota de Crédito de SU PROPIA factura (`montoCubiertoNc`, calculado en el
+// server — ver src/lib/nc-cobertura.ts — nunca una bolsa común: una NC que anula
+// una factura de $X no puede "sobrar" para cubrir cargos que nunca tuvo
+// intención de cancelar). "Cobrado" es cuando lo cubren pagos reales (pool
+// genérico FIFO), "Parcial" cuando lo cubierto (NC + pagos) es menor al total
+// del cargo, y "Pendiente" cuando todavía no se le asignó nada — asignando del
+// más viejo al más nuevo. Es cálculo de display: no cambia el estado guardado
+// (la facturación sigue mirando el real). No confundir con la columna
+// "Situación" (En Plazo / Vencido), que compara la fecha de vencimiento contra
+// hoy — son dos ejes independientes.
+//
+// Los movimientos con `esMovimientoNc` (el propio asiento-crédito de una NC ya
+// aplicada puntualmente arriba) NO suman al pool genérico — si no, esa plata
+// "sobra" y vuelve a cubrir cargos no relacionados (el bug original).
 //
 // Un cargo ya `pagado` (cobranza/Payway/factura marcada pagada) CONSUME su parte
-// del pool de haberes: su pago ya está comprometido con ese cargo. Si no se
-// descontara, ese haber quedaría como "crédito fantasma" cubriendo otros cargos
-// más nuevos y mostrándolos pagados de más (doble conteo). Así el total de cargos
-// que figuran impagos queda consistente con el saldo neto (Σdebe − Σhaber).
+// del pool: su pago ya está comprometido con ese cargo. Si no se descontara, ese
+// haber quedaría como "crédito fantasma" cubriendo otros cargos más nuevos y
+// mostrándolos pagados de más (doble conteo). Así el total de cargos que figuran
+// impagos queda consistente con el saldo neto (Σdebe − Σhaber).
 function calcularSaldoYEstado<
-  T extends { debe: string | null; haber: string | null; estado: string | null },
+  T extends {
+    debe: string | null;
+    haber: string | null;
+    estado: string | null;
+    montoCubiertoNc: string | null;
+    esMovimientoNc: boolean;
+  },
 >(movimientos: T[]): (T & { saldo: number; estadoDisplay: string | null })[] {
   const asc = [...movimientos].reverse();
   let acum = 0;
-  let poolHaber = movimientos.reduce((acc, m) => acc + parseFloat(m.haber ?? '0'), 0);
+  let poolHaber = 0;
+  for (const m of movimientos) {
+    if (m.esMovimientoNc) continue;
+    poolHaber += parseFloat(m.haber ?? '0');
+  }
   const conSaldo = asc.map((m) => {
     const venta = parseFloat(m.debe ?? '0');
     const cobranza = parseFloat(m.haber ?? '0');
     acum = acum + venta - cobranza;
     let estadoDisplay = m.estado;
+    const montoNc = parseFloat(m.montoCubiertoNc ?? '0');
     if (venta > 0) {
       if (m.estado === 'pagado') {
-        // Ya pagado: consume el pool (su haber está comprometido), no se reescribe.
+        // Ya pagado: consume el pool (su pago ya está comprometido con ese
+        // cargo), no se reescribe.
         poolHaber -= venta;
-      } else if (poolHaber >= venta - 0.001) {
-        // Cubierto por cobertura FIFO.
-        estadoDisplay = 'pagado';
-        poolHaber -= venta;
-      } else if (poolHaber > 0.001) {
-        // Cubierto solo en parte: consume todo el pool restante y no alcanza
-        // para el resto de este cargo ni para ningún otro más nuevo.
+      } else if (montoNc >= venta - 0.001) {
+        // Cubierto puntualmente por la NC de su propia factura.
+        estadoDisplay = 'anulado_nc';
+      } else if (montoNc + poolHaber >= venta - 0.001) {
+        // La NC cubre una parte, el pool genérico completa el resto.
+        estadoDisplay = 'anulado_nc';
+        poolHaber -= venta - montoNc;
+      } else if (montoNc + poolHaber > 0.001) {
+        // Cubierto solo en parte: consume todo lo que queda y no alcanza
+        // para el resto de este cargo ni para otro más nuevo.
         estadoDisplay = 'parcial';
         poolHaber = 0;
       }
@@ -329,6 +359,21 @@ const TIPO_COMPROBANTE_LABEL: Record<string, string> = {
   nota_credito_c: 'Nota de crédito C',
 };
 
+// 'recibo' agrupa RC- (cobranza), CM-/CL- (comprobante interno) y RB- —
+// ninguno tiene validez fiscal en sí mismo, pero un RC- puede estar cobrando
+// una factura fiscal. `facturaTipoRecibo` (solo se completa para RC-, al
+// registrar la cobranza) dice de qué tipo era la deuda que cancela; sin ese
+// dato es siempre interno (CM-/CL- solo consolidan cargos Interno).
+function tipoComprobanteLabel(m: {
+  facturaTipo: string | null;
+  facturaTipoRecibo: 'fiscal' | 'interno' | null;
+}): string {
+  if (m.facturaTipo === 'recibo') {
+    return m.facturaTipoRecibo === 'fiscal' ? 'Recibo fiscal' : 'Recibo interno';
+  }
+  return TIPO_COMPROBANTE_LABEL[m.facturaTipo ?? ''] ?? m.facturaTipo ?? '—';
+}
+
 // Categorías del Tarifario (tipoServicioEnum) — mismos labels que tarifario-client.tsx.
 const CATEGORIA_SERVICIO_LABEL: Record<string, string> = {
   espacio_guarda: 'Espacio de guarda',
@@ -340,6 +385,105 @@ const CATEGORIA_SERVICIO_LABEL: Record<string, string> = {
 };
 
 // ─── Agregar Servicio Modal ───────────────────────────────────────────────────
+
+function ServicioCombobox({
+  servicios,
+  value,
+  onChange,
+}: {
+  servicios: Servicio[];
+  value: string;
+  onChange: (servicioId: string) => void;
+}) {
+  const [query, setQuery] = useState('');
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const seleccionado = servicios.find((s) => s.id === value);
+
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
+  }, []);
+
+  function labelDe(s: Servicio): string {
+    return s.precio
+      ? `${s.nombre} — ${fmt(precioConIva(parseFloat(s.precio), parseFloat(s.alicuotaIva ?? '0')))}`
+      : s.nombre;
+  }
+
+  const grupos = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const filtrados = q ? servicios.filter((s) => s.nombre.toLowerCase().includes(q)) : servicios;
+    const map = new Map<string, Servicio[]>();
+    for (const s of filtrados) {
+      if (!map.has(s.tipo)) map.set(s.tipo, []);
+      map.get(s.tipo)!.push(s);
+    }
+    return Object.keys(CATEGORIA_SERVICIO_LABEL)
+      .filter((tipo) => map.has(tipo))
+      .map((tipo) => ({ tipo, items: map.get(tipo)! }));
+  }, [servicios, query]);
+
+  function select(servicioId: string) {
+    onChange(servicioId);
+    setQuery('');
+    setOpen(false);
+  }
+
+  return (
+    <div className="relative" ref={containerRef}>
+      <input
+        className={inputCls}
+        placeholder="Buscar por nombre o categoría..."
+        value={open ? query : seleccionado ? labelDe(seleccionado) : ''}
+        onFocus={() => {
+          setOpen(true);
+          setQuery('');
+        }}
+        onChange={(e) => setQuery(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') setOpen(false);
+        }}
+      />
+      {open && (
+        <div className="absolute z-20 mt-1 max-h-72 w-full overflow-y-auto rounded-[10px] border border-gray-200 bg-white shadow-lg">
+          {grupos.length === 0 ? (
+            <p className="px-3 py-2 text-sm text-gray-400">Sin resultados</p>
+          ) : (
+            grupos.map(({ tipo, items }) => (
+              <div key={tipo}>
+                <p className="bg-gray-50 px-3 py-1.5 text-xs font-semibold text-gray-400 uppercase">
+                  {CATEGORIA_SERVICIO_LABEL[tipo] ?? tipo}
+                </p>
+                {items.map((s) => (
+                  <button
+                    type="button"
+                    key={s.id}
+                    onClick={() => select(s.id)}
+                    className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-gray-50"
+                  >
+                    <span style={{ color: '#101828' }}>{s.nombre}</span>
+                    {s.precio && (
+                      <span className="text-xs text-gray-400">
+                        {fmt(precioConIva(parseFloat(s.precio), parseFloat(s.alicuotaIva ?? '0')))}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function AgregarServicioModal({
   open,
@@ -357,37 +501,23 @@ function AgregarServicioModal({
   const router = useRouter();
   const [servicioId, setServicioId] = useState('');
   const [concepto, setConcepto] = useState('');
-  const [monto, setMonto] = useState('');
-  const [fecha, setFecha] = useState(todayISODate);
   const [fechaInicio, setFechaInicio] = useState(todayISODate);
   const [fechaBaja, setFechaBaja] = useState('');
   const [comprobante, setComprobante] = useState<'interno' | 'fiscal'>('interno');
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<{ comprobante: 'interno' | 'fiscal' } | null>(null);
+  const [result, setResult] = useState(false);
   const [isPending, startTransition] = useTransition();
 
-  const isValid = Boolean(servicioId && monto && fechaInicio);
-
-  function handleServicioChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    const id = e.target.value;
-    setServicioId(id);
-    const s = servicios.find((s) => s.id === id);
-    if (s?.precio) {
-      const conIva = precioConIva(parseFloat(s.precio), parseFloat(s.alicuotaIva ?? '0'));
-      setMonto(conIva.toFixed(2));
-    }
-  }
+  const isValid = Boolean(servicioId && fechaInicio);
 
   function handleClose() {
     setServicioId('');
     setConcepto('');
-    setMonto('');
-    setFecha(todayISODate());
     setFechaInicio(todayISODate());
     setFechaBaja('');
     setComprobante('interno');
     setError(null);
-    setResult(null);
+    setResult(false);
     onClose();
   }
 
@@ -398,8 +528,6 @@ function AgregarServicioModal({
         socioId,
         servicioId,
         concepto,
-        monto: montoToNumberStr(monto),
-        fecha,
         comprobante,
         fechaInicio,
         fechaBaja: fechaBaja || null,
@@ -407,7 +535,7 @@ function AgregarServicioModal({
       if (res.error) {
         setError(res.error);
       } else {
-        setResult({ comprobante: res.comprobante! });
+        setResult(true);
         router.refresh();
       }
     });
@@ -441,17 +569,11 @@ function AgregarServicioModal({
             <div className="flex items-start gap-3 rounded-[10px] bg-teal-50 p-4">
               <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-teal-600" />
               <div>
-                <p className="font-semibold text-teal-900">Servicio cargado</p>
-                {result.comprobante === 'interno' ? (
-                  <p className="text-sm text-teal-700">
-                    Marcado como no fiscal. Vas a poder emitirle un Comprobante interno desde
-                    Ventas.
-                  </p>
-                ) : (
-                  <p className="text-sm text-teal-700">
-                    Se facturará por ARCA (manual o automático), como el resto.
-                  </p>
-                )}
+                <p className="font-semibold text-teal-900">Servicio contratado</p>
+                <p className="text-sm text-teal-700">
+                  Todavía no aparece en la cuenta corriente — va a impactar recién cuando
+                  corresponda facturarlo.
+                </p>
               </div>
             </div>
             <button
@@ -467,19 +589,13 @@ function AgregarServicioModal({
             <div className="flex-1 space-y-4 overflow-y-auto p-6">
               <div>
                 <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
-                  Servicio
+                  Concepto
                 </label>
-                <select className={inputCls} value={servicioId} onChange={handleServicioChange}>
-                  <option value="">Seleccione un servicio</option>
-                  {servicios.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.nombre}
-                      {s.precio
-                        ? ` — ${fmt(precioConIva(parseFloat(s.precio), parseFloat(s.alicuotaIva ?? '0')))}`
-                        : ''}
-                    </option>
-                  ))}
-                </select>
+                <ServicioCombobox
+                  servicios={servicios}
+                  value={servicioId}
+                  onChange={setServicioId}
+                />
               </div>
 
               <div>
@@ -500,43 +616,10 @@ function AgregarServicioModal({
                     className="mb-1.5 block text-xs font-semibold"
                     style={{ color: '#101828' }}
                   >
-                    Monto
-                  </label>
-                  <input
-                    className={inputCls}
-                    inputMode="decimal"
-                    placeholder="0,00"
-                    value={monto}
-                    onChange={(e) => setMonto(sanitizeMontoInput(e.target.value))}
-                  />
-                </div>
-                <div>
-                  <label
-                    className="mb-1.5 block text-xs font-semibold"
-                    style={{ color: '#101828' }}
-                  >
-                    Fecha
-                  </label>
-                  <input
-                    type="date"
-                    className={inputCls}
-                    value={fecha}
-                    onChange={(e) => setFecha(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div>
-                  <label
-                    className="mb-1.5 block text-xs font-semibold"
-                    style={{ color: '#101828' }}
-                  >
                     Fecha de inicio del servicio
                   </label>
                   <input
                     type="date"
-                    max={todayISODate()}
                     className={inputCls}
                     value={fechaInicio}
                     onChange={(e) => setFechaInicio(e.target.value)}
@@ -551,7 +634,6 @@ function AgregarServicioModal({
                   </label>
                   <input
                     type="date"
-                    max={todayISODate()}
                     min={fechaInicio}
                     className={inputCls}
                     value={fechaBaja}
@@ -590,8 +672,8 @@ function AgregarServicioModal({
                 </div>
                 <p className="mt-1.5 text-xs text-gray-400">
                   {comprobante === 'interno'
-                    ? 'Marca el cargo como no fiscal (NO se factura por ARCA). Podés emitirle un Comprobante interno desde Ventas cuando quieras.'
-                    : 'El cargo se factura por ARCA después (manual o automático), como el resto.'}
+                    ? 'Marca los cargos como no fiscales (NO se facturan por ARCA). Vas a poder emitirles un Comprobante interno desde Ventas cuando corresponda.'
+                    : 'Los cargos se facturan por ARCA cuando corresponda (manual o automático), como el resto.'}
                 </p>
               </div>
 
@@ -1699,6 +1781,7 @@ export function SocioDetail({
     if (ccFechaDesde && (!fecha || fecha < ccFechaDesde)) return false;
     if (ccFechaHasta && (!fecha || fecha > ccFechaHasta)) return false;
     if (ccEstado === 'pagado' && est !== 'pagado') return false;
+    if (ccEstado === 'anulado_nc' && est !== 'anulado_nc') return false;
     if (ccEstado === 'parcial' && est !== 'parcial') return false;
     if (ccEstado === 'en_plazo' && est !== 'facturado' && est !== 'no_pagado') return false;
     if (ccTipoComp === 'sin' && m.facturaTipo) return false;
@@ -2135,7 +2218,8 @@ export function SocioDetail({
                 className="border-input focus-visible:border-ring focus-visible:ring-ring/50 h-9 rounded-[8px] border bg-white px-3 text-sm focus-visible:ring-[3px] focus-visible:outline-none"
               >
                 <option value="">Todos</option>
-                <option value="pagado">Pagado</option>
+                <option value="pagado">Cobrado</option>
+                <option value="anulado_nc">Anulado (NC)</option>
                 <option value="parcial">Parcial</option>
                 <option value="en_plazo">Pendiente</option>
               </select>
@@ -2322,10 +2406,10 @@ export function SocioDetail({
                           >
                             <td className="px-4 py-3 text-gray-500">{fmtDate(m.fecha)}</td>
                             <td className="px-4 py-3 text-gray-500">
-                              {m.comprobanteInterno
+                              {m.comprobanteInterno && !m.facturaTipo
                                 ? 'Comprobante interno'
                                 : m.facturaTipo
-                                  ? (TIPO_COMPROBANTE_LABEL[m.facturaTipo] ?? m.facturaTipo)
+                                  ? tipoComprobanteLabel(m)
                                   : '—'}
                             </td>
                             <td className="px-4 py-3 text-gray-500">
@@ -2941,8 +3025,6 @@ function ServiciosContratadosTab({
 }) {
   const router = useRouter();
   const [editingSC, setEditingSC] = useState<ServicioContratado | null>(null);
-  const [editingMov, setEditingMov] = useState<Movimiento | null>(null);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const hoy = todayISODate();
   function esVigente(sc: ServicioContratado): boolean {
@@ -2995,7 +3077,7 @@ function ServiciosContratadosTab({
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 text-left text-xs font-semibold text-gray-400 uppercase">
-                <th className="pr-4 pb-2">Servicio</th>
+                <th className="pr-4 pb-2">Concepto</th>
                 <th className="pr-4 pb-2">Categoría</th>
                 <th className="pr-4 pb-2">Fecha de asignación</th>
                 <th className="pr-4 pb-2">Nº de operación</th>
@@ -3008,13 +3090,6 @@ function ServiciosContratadosTab({
             <tbody>
               {filas.map((sc) => {
                 const vigente = esVigente(sc);
-                const movsDelContrato = movimientos.filter(
-                  (m) =>
-                    m.servicioId === sc.servicioId &&
-                    m.fecha != null &&
-                    m.fecha.slice(0, 10) >= sc.fechaInicio &&
-                    (!sc.fechaBaja || m.fecha.slice(0, 10) <= sc.fechaBaja),
-                );
                 return (
                   <Fragment key={sc.id}>
                     <tr className="border-b border-gray-50 last:border-0">
@@ -3063,12 +3138,6 @@ function ServiciosContratadosTab({
                       <td className="py-3 text-right">
                         <div className="flex items-center justify-end gap-2">
                           <button
-                            onClick={() => setExpandedId(expandedId === sc.id ? null : sc.id)}
-                            className="rounded-[8px] border border-gray-200 px-3 py-1 text-xs font-medium text-gray-600 transition hover:bg-gray-50"
-                          >
-                            {expandedId === sc.id ? 'Ocultar' : 'Ver movimientos'}
-                          </button>
-                          <button
                             onClick={() => setEditingSC(sc)}
                             className="rounded-[8px] border border-gray-200 p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
                             title="Editar servicio contratado"
@@ -3078,67 +3147,6 @@ function ServiciosContratadosTab({
                         </div>
                       </td>
                     </tr>
-                    {expandedId === sc.id && (
-                      <tr className="border-b border-gray-50 bg-gray-50/60 last:border-0">
-                        <td colSpan={8} className="p-4">
-                          {movsDelContrato.length === 0 ? (
-                            <p className="text-xs text-gray-400">
-                              Todavía no hay cobros registrados para este contrato.
-                            </p>
-                          ) : (
-                            <table className="w-full text-sm">
-                              <thead>
-                                <tr className="text-left text-xs font-semibold text-gray-400 uppercase">
-                                  <th className="pr-4 pb-2">Fecha</th>
-                                  <th className="pr-4 pb-2">Concepto</th>
-                                  <th className="pr-4 pb-2 text-right">Precio</th>
-                                  <th className="pb-2" />
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {movsDelContrato.map((m) => {
-                                  const montoConIva = parseFloat(m.debe ?? '0');
-                                  const alicuota =
-                                    m.servicioAlicuotaIva != null
-                                      ? Number(m.servicioAlicuotaIva)
-                                      : 0;
-                                  return (
-                                    <tr key={m.id} className="border-t border-gray-100">
-                                      <td className="py-2 pr-4 text-gray-600">
-                                        {m.fecha ? fmtDate(m.fecha) : '—'}
-                                      </td>
-                                      <td className="py-2 pr-4 text-gray-600">
-                                        {m.concepto ?? '—'}
-                                      </td>
-                                      <td
-                                        className="py-2 pr-4 text-right"
-                                        style={{ color: '#101828' }}
-                                      >
-                                        {fmt(montoConIva)}
-                                        {alicuota > 0 && (
-                                          <span className="ml-1 text-xs text-gray-400">c/IVA</span>
-                                        )}
-                                      </td>
-                                      <td className="py-2 text-right">
-                                        {!m.facturaCodigo && (
-                                          <button
-                                            onClick={() => setEditingMov(m)}
-                                            className="rounded-[8px] border border-gray-200 p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
-                                            title="Editar cargo"
-                                          >
-                                            <Pencil className="h-3.5 w-3.5" />
-                                          </button>
-                                        )}
-                                      </td>
-                                    </tr>
-                                  );
-                                })}
-                              </tbody>
-                            </table>
-                          )}
-                        </td>
-                      </tr>
-                    )}
                   </Fragment>
                 );
               })}
@@ -3146,17 +3154,6 @@ function ServiciosContratadosTab({
           </table>
         </div>
       </div>
-
-      {editingMov && (
-        <EditMovimientoModal
-          mov={editingMov}
-          onClose={() => setEditingMov(null)}
-          onSaved={() => {
-            setEditingMov(null);
-            router.refresh();
-          }}
-        />
-      )}
 
       {editingSC && (
         <EditServicioContratadoModal
@@ -3209,12 +3206,15 @@ function EditServicioContratadoModal({
 }) {
   const [fechaInicio, setFechaInicio] = useState(sc.fechaInicio);
   const [fechaBaja, setFechaBaja] = useState(sc.fechaBaja ?? '');
+  const [concepto, setConcepto] = useState(sc.concepto ?? '');
+  const [comprobante, setComprobante] = useState<'interno' | 'fiscal'>(
+    sc.comprobanteInterno ? 'interno' : 'fiscal',
+  );
   const [cobrar, setCobrar] = useState(true);
   const [montoOverride, setMontoOverride] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const hoy = todayISODate();
   // Solo se ofrece cobrar cuando la baja recién se está dando de alta (el
   // contrato estaba abierto y ahora se le pone fecha de baja) — no al
   // simplemente corregir una fecha en un contrato que ya estaba cerrado.
@@ -3242,25 +3242,17 @@ function EditServicioContratadoModal({
       setError('La fecha de inicio es obligatoria.');
       return;
     }
-    if (fechaInicio > hoy) {
-      setError('La fecha de inicio no puede ser futura.');
+    if (fechaBaja && fechaBaja < fechaInicio) {
+      setError('La fecha de baja no puede ser anterior a la fecha de inicio.');
       return;
-    }
-    if (fechaBaja) {
-      if (fechaBaja > hoy) {
-        setError('La fecha de baja no puede ser futura.');
-        return;
-      }
-      if (fechaBaja < fechaInicio) {
-        setError('La fecha de baja no puede ser anterior a la fecha de inicio.');
-        return;
-      }
     }
     startTransition(async () => {
       const res = await updateSocioServicioAction({
         id: sc.id,
         fechaInicio,
         fechaBaja: fechaBaja || null,
+        concepto: concepto.trim() || null,
+        comprobanteInterno: comprobante === 'interno',
         cobro:
           esBajaNueva && cobrar
             ? {
@@ -3300,7 +3292,6 @@ function EditServicioContratadoModal({
             </label>
             <input
               type="date"
-              max={hoy}
               className={inputCls}
               value={fechaInicio}
               onChange={(e) => setFechaInicio(e.target.value)}
@@ -3312,15 +3303,54 @@ function EditServicioContratadoModal({
             </label>
             <input
               type="date"
-              max={hoy}
               min={fechaInicio}
               className={inputCls}
               value={fechaBaja}
               onChange={(e) => setFechaBaja(e.target.value)}
             />
-            <p className="mt-1 text-xs text-gray-400">
-              Vacío = sigue vigente. No se puede agendar a futuro.
-            </p>
+            <p className="mt-1 text-xs text-gray-400">Vacío = sigue vigente.</p>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-semibold" style={{ color: '#101828' }}>
+              Detalle del servicio
+            </label>
+            <input
+              className={inputCls}
+              placeholder="Descripción opcional"
+              value={concepto}
+              onChange={(e) => setConcepto(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-semibold" style={{ color: '#101828' }}>
+              Comprobante
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setComprobante('interno')}
+                className={`rounded-[10px] border px-3 py-2 text-sm font-medium transition ${
+                  comprobante === 'interno'
+                    ? 'border-[#175861] bg-[#EFF8F7] text-[#175861]'
+                    : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                Interno
+              </button>
+              <button
+                type="button"
+                onClick={() => setComprobante('fiscal')}
+                className={`rounded-[10px] border px-3 py-2 text-sm font-medium transition ${
+                  comprobante === 'fiscal'
+                    ? 'border-[#175861] bg-[#EFF8F7] text-[#175861]'
+                    : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                Fiscal (ARCA)
+              </button>
+            </div>
           </div>
 
           {esBajaNueva && (
@@ -3362,98 +3392,6 @@ function EditServicioContratadoModal({
           <button
             onClick={handleGuardar}
             disabled={isPending}
-            className="flex-1 rounded-[10px] py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-40"
-            style={{ background: '#175861' }}
-          >
-            {isPending ? 'Guardando...' : 'Guardar'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function EditMovimientoModal({
-  mov,
-  onClose,
-  onSaved,
-}: {
-  mov: Movimiento;
-  onClose: () => void;
-  onSaved: () => void;
-}) {
-  const [concepto, setConcepto] = useState(mov.concepto ?? '');
-  const [fecha, setFecha] = useState(mov.fecha ? mov.fecha.slice(0, 10) : todayISODate());
-  const [error, setError] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
-
-  function handleSave() {
-    setError(null);
-    if (!fecha) {
-      setError('La fecha es requerida.');
-      return;
-    }
-    startTransition(async () => {
-      const res = await updateMovimientoAction({
-        movimientoId: mov.id,
-        concepto,
-        fecha,
-      });
-      if (res.error) setError(res.error);
-      else onSaved();
-    });
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
-        <div className="mb-4 flex items-start justify-between">
-          <p className="text-base font-bold" style={{ color: '#101828' }}>
-            Editar cargo
-          </p>
-          <button onClick={onClose} className="rounded-[8px] p-1 text-gray-400 hover:bg-gray-100">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        <div className="space-y-3">
-          <div>
-            <label className="mb-1 block text-xs font-semibold" style={{ color: '#101828' }}>
-              Concepto
-            </label>
-            <input
-              className={inputCls}
-              placeholder="Descripción del cargo"
-              value={concepto}
-              onChange={(e) => setConcepto(e.target.value)}
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-semibold" style={{ color: '#101828' }}>
-              Fecha
-            </label>
-            <input
-              type="date"
-              className={inputCls}
-              value={fecha}
-              onChange={(e) => setFecha(e.target.value)}
-            />
-          </div>
-        </div>
-
-        {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
-
-        <div className="mt-5 flex gap-2">
-          <button
-            onClick={onClose}
-            disabled={isPending}
-            className="flex-1 rounded-[10px] border border-gray-200 py-2.5 text-sm font-medium text-gray-600 transition hover:bg-gray-50 disabled:opacity-40"
-          >
-            Cancelar
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={isPending || !fecha}
             className="flex-1 rounded-[10px] py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-40"
             style={{ background: '#175861' }}
           >

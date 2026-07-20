@@ -8,7 +8,6 @@ import {
   ChevronDown,
   ChevronRight,
   CornerDownLeft,
-  CreditCard,
   Download,
   Edit3,
   FileDown,
@@ -16,6 +15,7 @@ import {
   Plus,
   Printer,
   RefreshCw,
+  Search,
   Send,
   X,
 } from 'lucide-react';
@@ -27,6 +27,7 @@ import {
   createInvoiceAction,
   emitirNotaAsociadaAction,
   emitirNotaCreditoAction,
+  emitirNotaCreditoInternaAction,
   emitirNotaLibreAction,
   getSocioPendientesAction,
   getSocioPendientesInternoAction,
@@ -37,7 +38,6 @@ import {
   type MovimientoPendiente,
 } from '@/app/actions/facturacion';
 import { MOTIVO_NOTA_LABEL, type MotivoNota } from '@/app/actions/nota-constants';
-import { reintentarCobroPaywayAction } from '@/app/actions/payway';
 import { toast } from 'sonner';
 import { formatArgentinaDate } from '@/lib/dates';
 import { EmptyState } from '@/components/shared/empty-state';
@@ -57,6 +57,7 @@ type Factura = {
   codigo: string | null;
   folioLocal: string | null;
   tipoFactura: string | null;
+  tipoRecibo: 'fiscal' | 'interno' | null;
   importe: string | null;
   estado: string | null;
   emision: string | null;
@@ -138,23 +139,6 @@ function numeroDocumentoEfectivo(
   return socio.cuit?.trim() || socio.numeroDocumento;
 }
 
-type CobroPayway = {
-  id: string;
-  socioId: string;
-  socioNombre: string;
-  monto: number; // centavos
-  estado: 'aprobado' | 'rechazado' | 'pendiente' | 'error';
-  errorMensaje: string | null;
-  movimientosIds: string[];
-  createdAt: string;
-};
-
-const ESTADO_OPTS = [
-  { value: 'pendiente', label: 'Pendiente' },
-  { value: 'pagada', label: 'Pagada' },
-  { value: 'vencida', label: 'Vencida' },
-];
-
 type Kpis = {
   pendientes: number;
   pagadasMes: number;
@@ -172,7 +156,23 @@ const TIPO_FACTURA_LABEL: Record<string, string> = {
   nota_credito_a: 'NC A',
   nota_credito_b: 'NC B',
   nota_credito_c: 'NC C',
+  nota_credito_interna: 'NC interna',
 };
+
+// 'recibo' agrupa RC- (cobranza), CM-/CL- (comprobante interno) y RB- — todos
+// documentos sin validez fiscal en sí mismos, pero un RC- puede estar
+// cobrando una factura fiscal. `tipoRecibo` (columna propia, se computa al
+// registrar la cobranza) dice de qué tipo era la deuda que cancela; sin ese
+// dato (CM-/CL-, que solo consolidan cargos Interno) es siempre interno.
+function tipoComprobanteLabel(f: {
+  tipoFactura: string | null;
+  tipoRecibo: 'fiscal' | 'interno' | null;
+}): string {
+  if (f.tipoFactura === 'recibo') {
+    return f.tipoRecibo === 'fiscal' ? 'Recibo fiscal' : 'Recibo interno';
+  }
+  return TIPO_FACTURA_LABEL[f.tipoFactura ?? ''] ?? f.tipoFactura ?? '—';
+}
 
 const TIPO_FACTURA_OPTS = [
   { value: 'factura_c', label: 'Factura C (Monotributo)' },
@@ -321,8 +321,9 @@ function SocioCombobox({
 
   return (
     <div className="relative" ref={containerRef}>
+      <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400" />
       <input
-        className={inputCls}
+        className={`${inputCls} pl-9`}
         placeholder="Buscar por nombre, Nº de socio o embarcación..."
         value={open ? query : (seleccionado?.nombre ?? '')}
         onFocus={() => {
@@ -351,7 +352,7 @@ function SocioCombobox({
                 </span>
                 {(s.numeroSocio != null || s.embarcaciones.length > 0) && (
                   <span className="text-xs text-gray-400">
-                    {s.numeroSocio != null ? `Nº ${s.numeroSocio}` : ''}
+                    {s.numeroSocio != null ? `Socio #${s.numeroSocio}` : ''}
                     {s.numeroSocio != null && s.embarcaciones.length > 0 ? ' · ' : ''}
                     {s.embarcaciones.join(', ')}
                   </span>
@@ -430,10 +431,16 @@ function NuevaFacturaModal({
         .reduce((s, m) => s + parseFloat(m.debe || '0'), 0),
     [movimientos, selectedMovs],
   );
+  // Mismo criterio que alicuotaPara() en facturacion.ts: Factura C
+  // (Monotributo) no discrimina IVA, A/B sí, siempre al 21%.
+  const alicuotaSeleccionada = form.tipoFactura === 'factura_c' ? 0 : 21;
+  const netoSeleccionado =
+    alicuotaSeleccionada > 0
+      ? totalSeleccionado / (1 + alicuotaSeleccionada / 100)
+      : totalSeleccionado;
 
   const isValid = Boolean(
     form.socioId &&
-    form.descripcion.trim() &&
     form.fecha &&
     form.vencimiento &&
     form.desde &&
@@ -647,30 +654,16 @@ function NuevaFacturaModal({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div>
-              <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
-                Descripción*
-              </label>
-              <input
-                className={inputCls}
-                placeholder="Detalle del comprobante"
-                value={form.descripcion}
-                onChange={set('descripcion')}
-              />
-            </div>
-            <div>
-              <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
-                Estado*
-              </label>
-              <select className={inputCls} value={form.estado} onChange={set('estado')}>
-                {ESTADO_OPTS.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
+              Descripción <span className="font-normal text-gray-400">(opcional)</span>
+            </label>
+            <input
+              className={inputCls}
+              placeholder="Detalle del comprobante"
+              value={form.descripcion}
+              onChange={set('descripcion')}
+            />
           </div>
 
           <div>
@@ -738,13 +731,23 @@ function NuevaFacturaModal({
         <div className="border-t border-gray-200 p-6">
           {/* Total destacado */}
           {form.socioId && selectedMovs.size > 0 && (
-            <div className="mb-4 flex items-center justify-between rounded-[10px] bg-gray-50 px-4 py-3">
-              <p className="text-sm font-semibold" style={{ color: '#101828' }}>
-                Total a emitir
-              </p>
-              <p className="text-lg font-bold" style={{ color: '#175861' }}>
-                {fmtMoney(totalSeleccionado)}
-              </p>
+            <div className="mb-4 rounded-[10px] bg-gray-50 px-4 py-3">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold" style={{ color: '#101828' }}>
+                  Total a emitir
+                </p>
+                <p className="text-lg font-bold" style={{ color: '#175861' }}>
+                  {fmtMoney(totalSeleccionado)}
+                </p>
+              </div>
+              {alicuotaSeleccionada > 0 ? (
+                <p className="mt-1 text-right text-xs text-gray-500">
+                  {fmtMoney(netoSeleccionado)} + IVA {alicuotaSeleccionada}% (
+                  {fmtMoney(totalSeleccionado - netoSeleccionado)})
+                </p>
+              ) : (
+                <p className="mt-1 text-right text-xs text-gray-400">Exento / No gravado</p>
+              )}
             </div>
           )}
           <div className="flex gap-3">
@@ -2129,6 +2132,190 @@ function NotaCreditoModal({
   );
 }
 
+// ─── Modal: nota de crédito interna (sobre un Comprobante interno CM-/CL-) ──
+//
+// Mismo molde que NotaCreditoModal pero sin NcNdToggle (solo NC, no hay ND
+// interna) y sin nada de TusFacturas (no hay CAE ni PDF que descargar — el
+// comprobante se ve/imprime en /ventas/recibo/[id] como cualquier CM-/CL-).
+
+function NotaCreditoInternaModal({
+  open,
+  onClose,
+  factura,
+}: {
+  open: boolean;
+  onClose: () => void;
+  factura: Factura | null;
+}) {
+  const router = useRouter();
+  const [motivo, setMotivo] = useState<MotivoNota>('anulacion_total');
+  const [importe, setImporte] = useState('');
+  const [descripcion, setDescripcion] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<{ codigo?: string } | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  if (!open || !factura) return null;
+
+  const importeOriginal = parseFloat(factura.importe ?? '0');
+  const needsImporte = motivo !== 'anulacion_total';
+
+  function handleSubmit() {
+    if (!factura) return;
+    setError(null);
+    const importeNum = needsImporte ? parseFloat(importe.replace(',', '.')) : undefined;
+    startTransition(async () => {
+      const res = await emitirNotaCreditoInternaAction({
+        facturaOriginalId: factura.id,
+        motivo,
+        importe: importeNum,
+        descripcion: descripcion || undefined,
+      });
+      if (res.error) {
+        setError(res.error);
+      } else {
+        setResult({ codigo: res.codigo });
+        router.refresh();
+      }
+    });
+  }
+
+  function handleClose() {
+    setMotivo('anulacion_total');
+    setImporte('');
+    setDescripcion('');
+    setError(null);
+    setResult(null);
+    onClose();
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl">
+        <div className="flex items-start justify-between p-6 pb-4">
+          <div>
+            <h2 className="text-[18px] font-bold" style={{ color: '#101828' }}>
+              Emitir Nota de Crédito interna
+            </h2>
+            <p className="mt-0.5 text-sm" style={{ color: '#669E9D' }}>
+              Comprobante {factura.codigo ?? factura.id.slice(0, 8)} — {fmtMoney(factura.importe)}
+            </p>
+          </div>
+          <button
+            onClick={handleClose}
+            className="rounded-[8px] p-1 text-gray-400 hover:bg-gray-100"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="border-t border-gray-200" />
+
+        {result ? (
+          <div className="space-y-4 p-6">
+            <div className="flex items-center gap-3 rounded-[10px] bg-teal-50 p-4">
+              <CheckCircle2 className="h-5 w-5 shrink-0 text-teal-600" />
+              <div>
+                <p className="font-semibold text-teal-900">NC interna emitida correctamente</p>
+                {result.codigo && <p className="text-sm text-teal-700">Nro: {result.codigo}</p>}
+              </div>
+            </div>
+            <button
+              onClick={handleClose}
+              className="w-full rounded-[10px] py-2.5 text-sm font-semibold text-white transition hover:opacity-90"
+              style={{ background: '#175861' }}
+            >
+              Cerrar
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="space-y-4 p-6">
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
+                  Motivo
+                </label>
+                <select
+                  className={inputCls}
+                  value={motivo}
+                  onChange={(e) => {
+                    setMotivo(e.target.value as MotivoNota);
+                    setImporte('');
+                  }}
+                >
+                  {MOTIVO_OPTS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {needsImporte && (
+                <div>
+                  <label
+                    className="mb-1.5 block text-xs font-semibold"
+                    style={{ color: '#101828' }}
+                  >
+                    Importe a acreditar
+                    <span className="ml-1 font-normal text-gray-400">
+                      (máx. {fmtMoney(factura.importe)})
+                    </span>
+                  </label>
+                  <input
+                    className={inputCls}
+                    inputMode="decimal"
+                    placeholder={`0,00 (máx ${importeOriginal.toFixed(2)})`}
+                    value={importe}
+                    onChange={(e) => setImporte(e.target.value)}
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
+                  Descripción (opcional)
+                </label>
+                <input
+                  className={inputCls}
+                  placeholder="Se auto-genera si se deja vacío"
+                  value={descripcion}
+                  onChange={(e) => setDescripcion(e.target.value)}
+                />
+              </div>
+
+              {error && (
+                <div className="flex items-start gap-2 rounded-[10px] bg-red-50 p-3 text-sm text-red-700">
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span>{error}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="border-t border-gray-200 p-6">
+              <div className="flex gap-3">
+                <button
+                  onClick={handleClose}
+                  className="flex-1 rounded-[10px] border border-[#d1d5dc] bg-white py-2.5 text-sm font-medium text-[#364153] transition hover:bg-gray-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleSubmit}
+                  disabled={isPending || (needsImporte && !importe)}
+                  className="flex-1 rounded-[10px] py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+                  style={{ background: '#175861' }}
+                >
+                  {isPending ? 'Emitiendo...' : 'Emitir NC interna'}
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Modal: reenviar factura rechazada por ARCA ────────────────────────────
 
 // Recibe `factura` no-nulable a propósito: el padre solo la monta cuando hay
@@ -2759,7 +2946,6 @@ export function VentasClient({
   kpis,
   posConfigurado,
   certificadoOk,
-  cobrosPayway,
   guarderiaCondicionIva,
 }: {
   facturas: Factura[];
@@ -2768,10 +2954,9 @@ export function VentasClient({
   kpis: Kpis;
   posConfigurado: boolean;
   certificadoOk: boolean;
-  cobrosPayway: CobroPayway[];
   guarderiaCondicionIva: string | null;
 }) {
-  const [activeTab, setActiveTab] = useState<'afip' | 'recibos' | 'payway'>('afip');
+  const [activeTab, setActiveTab] = useState<'afip' | 'recibos'>('afip');
   const [search, setSearch] = useState('');
   const [filterEstado, setFilterEstado] = useState('');
   const [filterTipo, setFilterTipo] = useState('');
@@ -2784,6 +2969,7 @@ export function VentasClient({
   const [notaLibreOpen, setNotaLibreOpen] = useState(false);
   const [pagarFactura, setPagarFactura] = useState<Factura | null>(null);
   const [ncFactura, setNcFactura] = useState<Factura | null>(null);
+  const [ncInternaComprobante, setNcInternaComprobante] = useState<Factura | null>(null);
   const [reenviarFactura, setReenviarFactura] = useState<Factura | null>(null);
   // Selección para NC en lote (anulación total) sobre la tabla AFIP.
   const [selectedNc, setSelectedNc] = useState<Set<string>>(() => new Set());
@@ -2863,10 +3049,11 @@ export function VentasClient({
     });
   }
 
-  // Tabla Recibos internos
+  // Tabla Recibos internos — incluye las NC internas (anulan un CM-/CL- de
+  // acá mismo, tiene sentido verlas al lado de lo que referencian).
   const filtradosRecibos = useMemo(() => {
     return facturas
-      .filter((f) => f.tipoFactura === 'recibo')
+      .filter((f) => f.tipoFactura === 'recibo' || f.tipoFactura === 'nota_credito_interna')
       .filter((f) => {
         if (search.trim()) {
           const q = search.toLowerCase();
@@ -2952,10 +3139,11 @@ export function VentasClient({
       a.click();
       URL.revokeObjectURL(url);
     } else {
-      const cols = ['Número', 'Cliente', 'Fecha', 'Total', 'Descripción'];
+      const cols = ['Número', 'Tipo', 'Cliente', 'Fecha', 'Total', 'Descripción'];
       const rows = filtradosRecibos.map((f) =>
         [
           f.codigo ?? '',
+          tipoComprobanteLabel(f),
           f.socioNombre,
           f.emision ? fmtDate(f.emision) : '',
           f.importe ?? '0',
@@ -3000,6 +3188,11 @@ export function VentasClient({
         factura={pagarFactura}
       />
       <NotaCreditoModal open={!!ncFactura} onClose={() => setNcFactura(null)} factura={ncFactura} />
+      <NotaCreditoInternaModal
+        open={!!ncInternaComprobante}
+        onClose={() => setNcInternaComprobante(null)}
+        factura={ncInternaComprobante}
+      />
       {reenviarFactura && (
         <ReenviarFacturaModal
           key={reenviarFactura.id}
@@ -3134,31 +3327,19 @@ export function VentasClient({
               : 'text-gray-500 hover:text-gray-700'
           }`}
         >
-          Recibos internos
+          Comprobantes internos
           <span className="ml-2 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
-            {facturas.filter((f) => f.tipoFactura === 'recibo').length}
-          </span>
-        </button>
-        <button
-          onClick={() => setActiveTab('payway')}
-          className={`px-4 py-2.5 text-sm font-semibold transition ${
-            activeTab === 'payway'
-              ? 'border-b-2 border-[#175861] text-[#175861]'
-              : 'text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          Débito automático
-          <span className="ml-2 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
-            {cobrosPayway.length}
+            {
+              facturas.filter(
+                (f) => f.tipoFactura === 'recibo' || f.tipoFactura === 'nota_credito_interna',
+              ).length
+            }
           </span>
         </button>
       </div>
 
-      {/* Tab: Débito automático Payway */}
-      {activeTab === 'payway' && <PaywayCobrosList cobros={cobrosPayway} />}
-
       {/* Tabla afip / recibos */}
-      {activeTab !== 'payway' && (
+      {(activeTab === 'afip' || activeTab === 'recibos') && (
         <div className="rounded-2xl border border-gray-200 bg-white">
           <div className="space-y-3 border-b border-gray-100 p-4">
             {/* Fila 1: búsqueda + exportar */}
@@ -3246,14 +3427,16 @@ export function VentasClient({
                     <span className="text-sm font-medium text-[#175861]">
                       {selectedNc.size} seleccionada{selectedNc.size === 1 ? '' : 's'}
                     </span>
-                    <button
-                      onClick={() => setLoteNcOpen(true)}
-                      className="inline-flex items-center gap-1.5 rounded-[8px] px-3 py-1.5 text-sm font-semibold text-white transition hover:opacity-90"
-                      style={{ background: '#175861' }}
-                    >
-                      <CornerDownLeft className="h-4 w-4" />
-                      Emitir NC en lote
-                    </button>
+                    {selectedNc.size > 1 && (
+                      <button
+                        onClick={() => setLoteNcOpen(true)}
+                        className="inline-flex items-center gap-1.5 rounded-[8px] px-3 py-1.5 text-sm font-semibold text-white transition hover:opacity-90"
+                        style={{ background: '#175861' }}
+                      >
+                        <CornerDownLeft className="h-4 w-4" />
+                        Emitir NC en lote
+                      </button>
+                    )}
                     <button
                       onClick={() => setSelectedNc(new Set())}
                       className="text-sm text-gray-500 transition hover:text-gray-700"
@@ -3279,14 +3462,14 @@ export function VentasClient({
                             onChange={toggleTodosNc}
                           />
                         </th>
-                        <th className="px-4 py-3">Número</th>
-                        <th className="px-4 py-3">Tipo</th>
-                        <th className="px-4 py-3">Letra</th>
-                        <th className="px-4 py-3">Razón social</th>
-                        <th className="px-4 py-3">Nº Socio</th>
-                        <th className="px-4 py-3">CUIT/CUIL</th>
                         <th className="px-4 py-3">Nº Op. SC</th>
                         <th className="px-4 py-3">Fecha</th>
+                        <th className="px-4 py-3">Tipo comprobante</th>
+                        <th className="px-4 py-3">Letra</th>
+                        <th className="px-4 py-3">Número</th>
+                        <th className="px-4 py-3">Nº Socio</th>
+                        <th className="px-4 py-3">Razón social</th>
+                        <th className="px-4 py-3">CUIT/CUIL</th>
                         <th className="px-4 py-3">Vencimiento</th>
                         <th className="px-4 py-3">CAE</th>
                         <th className="px-4 py-3">Venc. CAE</th>
@@ -3296,7 +3479,7 @@ export function VentasClient({
                         <th className="px-4 py-3 text-right">IVA</th>
                         <th className="px-4 py-3 text-right">Total</th>
                         <th className="px-4 py-3 text-center">Estado envío</th>
-                        <th className="px-4 py-3 text-center">Estado</th>
+                        <th className="px-4 py-3 text-center">Estado de cobro</th>
                         <th className="px-4 py-3">Ente emisor</th>
                         <th className="px-4 py-3">CUIT emisor</th>
                         <th className="px-4 py-3">Centro emisor</th>
@@ -3328,6 +3511,12 @@ export function VentasClient({
                                 onChange={() => toggleNc(f.id)}
                               />
                             </td>
+                            <td className="px-4 py-3 text-gray-500">{f.numeroOperacionSC}</td>
+                            <td className="px-4 py-3 text-gray-500">{fmtDate(f.emision)}</td>
+                            <td className="px-4 py-3 text-gray-500">
+                              {TIPO_FACTURA_LABEL[f.tipoFactura ?? ''] ?? '—'}
+                            </td>
+                            <td className="px-4 py-3 text-gray-500">{f.letra}</td>
                             <td className="px-4 py-3 font-medium" style={{ color: '#101828' }}>
                               {f.codigo ?? '—'}
                               {f.folioLocal && (
@@ -3336,17 +3525,11 @@ export function VentasClient({
                                 </div>
                               )}
                             </td>
-                            <td className="px-4 py-3 text-gray-500">
-                              {TIPO_FACTURA_LABEL[f.tipoFactura ?? ''] ?? '—'}
-                            </td>
-                            <td className="px-4 py-3 text-gray-500">{f.letra}</td>
+                            <td className="px-4 py-3 text-gray-500">{f.socioNumeroSocio ?? '—'}</td>
                             <td className="px-4 py-3 font-medium" style={{ color: '#175861' }}>
                               {f.socioRazonSocial}
                             </td>
-                            <td className="px-4 py-3 text-gray-500">{f.socioNumeroSocio ?? '—'}</td>
                             <td className="px-4 py-3 text-gray-500">{f.socioCuitDni}</td>
-                            <td className="px-4 py-3 text-gray-500">{f.numeroOperacionSC}</td>
-                            <td className="px-4 py-3 text-gray-500">{fmtDate(f.emision)}</td>
                             <td className="px-4 py-3 text-gray-500">{fmtDate(f.vencimiento)}</td>
                             <td className="px-4 py-3 font-mono text-xs text-gray-500">
                               {f.cae ?? '—'}
@@ -3495,14 +3678,14 @@ export function VentasClient({
                 />
               </>
             )
-          ) : // Tab: Recibos internos
+          ) : // Tab: Comprobantes internos
           filtradosRecibos.length === 0 ? (
             <EmptyState
               icon={<FileText className="h-7 w-7 opacity-40" />}
               text={
                 hasFiltrosRecibos
-                  ? 'No se encontraron recibos con ese criterio.'
-                  : 'Todavía no hay recibos internos emitidos.'
+                  ? 'No se encontraron comprobantes con ese criterio.'
+                  : 'Todavía no hay comprobantes internos emitidos.'
               }
             />
           ) : (
@@ -3512,6 +3695,7 @@ export function VentasClient({
                   <thead>
                     <tr className="bg-gray-50 text-left text-xs font-semibold text-gray-500">
                       <th className="px-4 py-3">Número</th>
+                      <th className="px-4 py-3">Tipo</th>
                       <th className="px-4 py-3">Nº Op. SC</th>
                       <th className="px-4 py-3">Nº Socio</th>
                       <th className="px-4 py-3">Razón social</th>
@@ -3536,6 +3720,7 @@ export function VentasClient({
                         <td className="px-4 py-3 font-medium" style={{ color: '#101828' }}>
                           {f.codigo ?? '—'}
                         </td>
+                        <td className="px-4 py-3 text-gray-500">{tipoComprobanteLabel(f)}</td>
                         <td className="px-4 py-3 text-gray-500">{f.numeroOperacionSC}</td>
                         <td className="px-4 py-3 text-gray-500">{f.socioNumeroSocio ?? '—'}</td>
                         <td className="px-4 py-3 font-medium" style={{ color: '#175861' }}>
@@ -3562,7 +3747,17 @@ export function VentasClient({
                         <td className="px-4 py-3 text-gray-500">{f.entreEmisorCuit}</td>
                         <td className="px-4 py-3 text-gray-500">{f.centroEmisor}</td>
                         <td className="px-4 py-3">
-                          <div className="flex items-center justify-end">
+                          <div className="flex items-center justify-end gap-1">
+                            {(f.codigo?.startsWith('CM-') || f.codigo?.startsWith('CL-')) && (
+                              <button
+                                type="button"
+                                onClick={() => setNcInternaComprobante(f)}
+                                title="Emitir Nota de Crédito interna"
+                                className="rounded-[6px] p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-[#175861]"
+                              >
+                                <CornerDownLeft className="h-4 w-4" />
+                              </button>
+                            )}
                             <a
                               href={`/ventas/recibo/${f.id}`}
                               target="_blank"
@@ -3589,178 +3784,6 @@ export function VentasClient({
           )}
         </div>
       )}
-    </div>
-  );
-}
-
-// ─── Panel cobros Payway ─────────────────────────────────────────────────────
-
-const COBRO_ESTADO_BADGE: Record<string, string> = {
-  aprobado: 'bg-teal-50 text-[#175861]',
-  rechazado: 'bg-red-50 text-red-700',
-  error: 'bg-orange-50 text-orange-700',
-  pendiente: 'bg-amber-50 text-amber-700',
-};
-
-const COBRO_ESTADO_LABEL: Record<string, string> = {
-  aprobado: 'Aprobado',
-  rechazado: 'Rechazado',
-  error: 'Error',
-  pendiente: 'Pendiente',
-};
-
-function PaywayCobrosList({ cobros }: { cobros: CobroPayway[] }) {
-  const [search, setSearch] = useState('');
-  const [filterEstado, setFilterEstado] = useState('');
-  const [isPending, startTransition] = useTransition();
-  const [retryingId, setRetryingId] = useState<string | null>(null);
-  const router = useRouter();
-
-  const filtrados = useMemo(() => {
-    return cobros.filter((c) => {
-      if (search.trim()) {
-        const q = search.toLowerCase();
-        if (!c.socioNombre.toLowerCase().includes(q)) return false;
-      }
-      if (filterEstado && c.estado !== filterEstado) return false;
-      return true;
-    });
-  }, [cobros, search, filterEstado]);
-
-  const totalAprobado = cobros
-    .filter((c) => c.estado === 'aprobado')
-    .reduce((acc, c) => acc + c.monto / 100, 0);
-  const countRechazados = cobros.filter(
-    (c) => c.estado === 'rechazado' || c.estado === 'error',
-  ).length;
-
-  function handleReintentar(cobro: CobroPayway) {
-    setRetryingId(cobro.id);
-    startTransition(async () => {
-      const res = await reintentarCobroPaywayAction(cobro.id);
-      setRetryingId(null);
-      if (res.error) {
-        toast.error(res.error);
-      } else {
-        toast.success('Cobro aprobado y movimientos marcados como pagados.');
-        router.refresh();
-      }
-    });
-  }
-
-  return (
-    <div className="space-y-4">
-      {/* KPIs rápidos */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-        <div className="rounded-2xl border border-gray-200 bg-white p-4">
-          <p className="text-xs font-medium text-gray-500">Total cobrado</p>
-          <p className="mt-1 text-xl font-bold" style={{ color: '#175861' }}>
-            {fmtMoney(totalAprobado)}
-          </p>
-        </div>
-        <div className="rounded-2xl border border-gray-200 bg-white p-4">
-          <p className="text-xs font-medium text-gray-500">Aprobados</p>
-          <p className="mt-1 text-xl font-bold text-[#101828]">
-            {cobros.filter((c) => c.estado === 'aprobado').length}
-          </p>
-        </div>
-        <div className="rounded-2xl border border-gray-200 bg-white p-4">
-          <p className="text-xs font-medium text-gray-500">Con error / Rechazados</p>
-          <p className="mt-1 text-xl font-bold text-red-600">{countRechazados}</p>
-        </div>
-      </div>
-
-      {/* Tabla */}
-      <div className="rounded-2xl border border-gray-200 bg-white">
-        <div className="flex flex-col gap-3 border-b border-gray-100 p-4 sm:flex-row">
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar por socio..."
-            className="h-10 flex-1 rounded-[10px] border border-gray-200 bg-white px-4 text-sm focus:border-[#175861] focus:ring-1 focus:ring-[#175861] focus:outline-none"
-          />
-          <select
-            value={filterEstado}
-            onChange={(e) => setFilterEstado(e.target.value)}
-            className="h-10 rounded-[10px] border border-gray-200 bg-white px-3 text-sm focus:border-[#175861] focus:ring-1 focus:ring-[#175861] focus:outline-none"
-          >
-            <option value="">Todos los estados</option>
-            <option value="aprobado">Aprobado</option>
-            <option value="rechazado">Rechazado</option>
-            <option value="error">Error</option>
-            <option value="pendiente">Pendiente</option>
-          </select>
-        </div>
-
-        {filtrados.length === 0 ? (
-          <EmptyState
-            icon={<CreditCard className="h-7 w-7 opacity-40" />}
-            text={
-              search || filterEstado
-                ? 'No se encontraron cobros con ese criterio.'
-                : 'Todavía no hay cobros de débito automático.'
-            }
-          />
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] text-sm">
-              <thead>
-                <tr className="bg-gray-50 text-left text-xs font-semibold text-gray-500">
-                  <th className="px-4 py-3">Socio</th>
-                  <th className="px-4 py-3">Fecha</th>
-                  <th className="px-4 py-3 text-right">Monto</th>
-                  <th className="px-4 py-3">Estado</th>
-                  <th className="px-4 py-3">Detalle</th>
-                  <th className="px-4 py-3 text-right">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtrados.map((c) => (
-                  <tr
-                    key={c.id}
-                    className="border-t border-gray-100 transition hover:bg-gray-50/50"
-                  >
-                    <td className="px-4 py-3 font-medium" style={{ color: '#175861' }}>
-                      {c.socioNombre}
-                    </td>
-                    <td className="px-4 py-3 text-gray-500">{fmtDate(c.createdAt)}</td>
-                    <td className="px-4 py-3 text-right font-medium" style={{ color: '#101828' }}>
-                      {fmtMoney(c.monto / 100)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${COBRO_ESTADO_BADGE[c.estado] ?? 'bg-gray-100 text-gray-600'}`}
-                      >
-                        {COBRO_ESTADO_LABEL[c.estado] ?? c.estado}
-                      </span>
-                    </td>
-                    <td className="max-w-[200px] truncate px-4 py-3 text-xs text-gray-400">
-                      {c.errorMensaje ?? '—'}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-end">
-                        {(c.estado === 'rechazado' || c.estado === 'error') && (
-                          <button
-                            onClick={() => handleReintentar(c)}
-                            disabled={isPending && retryingId === c.id}
-                            title="Reintentar cobro"
-                            className="flex items-center gap-1.5 rounded-[6px] border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-600 transition hover:bg-gray-50 disabled:opacity-50"
-                          >
-                            <RefreshCw
-                              className={`h-3.5 w-3.5 ${isPending && retryingId === c.id ? 'animate-spin' : ''}`}
-                            />
-                            Reintentar
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
     </div>
   );
 }

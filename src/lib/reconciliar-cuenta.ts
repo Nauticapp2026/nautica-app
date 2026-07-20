@@ -29,6 +29,7 @@ import {
   facturacionItems,
   movimientosCuentaCorriente,
 } from '@/lib/db/schema';
+import { calcularCoberturaNotasCredito } from '@/lib/nc-cobertura';
 
 /**
  * Read-only. Devuelve el conjunto de ids de cargos (movimientos con debe>0) que
@@ -41,6 +42,8 @@ import {
  * para detectar qué comprobantes quedaron 100% saldados.
  */
 export async function getCargosSaldadosFifo(socioId: string): Promise<Set<string>> {
+  const { montoPorMovimiento, movimientosDeNc } = await calcularCoberturaNotasCredito(socioId);
+
   const movs = await db
     .select({
       id: movimientosCuentaCorriente.id,
@@ -52,10 +55,20 @@ export async function getCargosSaldadosFifo(socioId: string): Promise<Set<string
     .where(eq(movimientosCuentaCorriente.socioId, socioId))
     .orderBy(asc(movimientosCuentaCorriente.fecha), asc(movimientosCuentaCorriente.createdAt));
 
-  let pool = movs.reduce((acc, m) => acc + parseFloat(m.haber ?? '0'), 0);
   const saldados = new Set<string>();
+  for (const [movId, monto] of montoPorMovimiento) {
+    const m = movs.find((x) => x.id === movId);
+    if (m && monto >= parseFloat(m.debe ?? '0') - 0.001) saldados.add(movId);
+  }
+
+  // Pool genérico: excluye los movimientos que son el asiento de una NC ya
+  // aplicada puntualmente arriba (ver calcularCoberturaNotasCredito).
+  let pool = movs
+    .filter((m) => !movimientosDeNc.has(m.id))
+    .reduce((acc, m) => acc + parseFloat(m.haber ?? '0'), 0);
 
   for (const m of movs) {
+    if (saldados.has(m.id)) continue;
     const debe = parseFloat(m.debe ?? '0');
     if (debe <= 0) continue;
     if (m.estado === 'pagado') {
@@ -75,6 +88,8 @@ export async function getCargosSaldadosFifo(socioId: string): Promise<Set<string
 }
 
 export async function reconciliarCuentaSocio(socioId: string): Promise<string[]> {
+  const { movimientosDeNc } = await calcularCoberturaNotasCredito(socioId);
+
   const movs = await db
     .select({
       id: movimientosCuentaCorriente.id,
@@ -87,7 +102,13 @@ export async function reconciliarCuentaSocio(socioId: string): Promise<string[]>
     .where(eq(movimientosCuentaCorriente.socioId, socioId))
     .orderBy(asc(movimientosCuentaCorriente.fecha), asc(movimientosCuentaCorriente.createdAt));
 
-  let pool = movs.reduce((acc, m) => acc + parseFloat(m.haber ?? '0'), 0);
+  // Excluye los movimientos que son el asiento de una NC ya aplicada
+  // puntualmente a su propia factura (ver calcularCoberturaNotasCredito) —
+  // esta función solo reconcilia pagos genéricos (ej. Payway), no créditos
+  // ya targeteados.
+  let pool = movs
+    .filter((m) => !movimientosDeNc.has(m.id))
+    .reduce((acc, m) => acc + parseFloat(m.haber ?? '0'), 0);
   const toMark: string[] = [];
 
   for (const m of movs) {

@@ -84,7 +84,7 @@ export type Tarifa = {
   vigenciaHasta: string;
   alicuotaIva: number;
   plazoPagoDias: number;
-  politicaBajaAnticipada: PoliticaBajaAnticipada;
+  politicaBajaAnticipada: PoliticaBajaAnticipada | null;
   // Ajuste de precio programado a futuro (Ajuste masivo con vigencia futura),
   // todavía sin aplicar. El cron lo aplica en `fechaAplicacion`.
   ajusteProgramado: { precioNuevo: number; fechaAplicacion: string } | null;
@@ -569,9 +569,8 @@ function TarifaModal({
   const [precio, setPrecio] = useState<string>(initial ? String(initial.precio) : '');
   const [alicuotaIva, setAlicuotaIva] = useState<number>(initial?.alicuotaIva ?? 21);
   const [plazoPagoDias, setPlazoPagoDias] = useState<number>(initial?.plazoPagoDias ?? 0);
-  const [politicaBajaAnticipada, setPoliticaBajaAnticipada] = useState<PoliticaBajaAnticipada>(
-    initial?.politicaBajaAnticipada ?? 'proporcional',
-  );
+  const [politicaBajaAnticipada, setPoliticaBajaAnticipada] =
+    useState<PoliticaBajaAnticipada | null>(initial?.politicaBajaAnticipada ?? null);
   // El modal ya no deja elegir Activo/Inactivo — Inactivar se sacó de la
   // edición (solo quedan Activo y Pausado, este último vía los botones
   // Pausar/Reactivar). Se preserva el estado actual de la tarifa tal cual
@@ -886,39 +885,60 @@ function TarifaModal({
                 <option value={21}>21%</option>
               </select>
             </div>
-            <div>
-              <label className="mb-1 block text-sm font-semibold text-gray-700">
-                Plazo de pago <span className="font-normal text-gray-400">(fecha de factura)</span>
-              </label>
-              <select
-                className={inputCls}
-                value={plazoPagoDias}
-                onChange={(e) => setPlazoPagoDias(Number(e.target.value))}
-              >
-                <option value={0}>Contado</option>
-                <option value={5}>5 días</option>
-                <option value={10}>10 días</option>
-                <option value={15}>15 días</option>
-                <option value={20}>20 días</option>
-                <option value={30}>30 días</option>
-              </select>
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-semibold text-gray-700">
-                Política de baja anticipada
-              </label>
-              <select
-                className={inputCls}
-                value={politicaBajaAnticipada}
-                onChange={(e) =>
-                  setPoliticaBajaAnticipada(e.target.value as PoliticaBajaAnticipada)
-                }
-              >
-                <option value="proporcional">Proporcional</option>
-                <option value="mes_completo">Mes completo</option>
-              </select>
-            </div>
           </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-semibold text-gray-700">
+              Plazo de pago <span className="font-normal text-gray-400">(fecha de factura)</span>
+            </label>
+            <select
+              className={inputCls}
+              value={plazoPagoDias}
+              onChange={(e) => setPlazoPagoDias(Number(e.target.value))}
+            >
+              <option value={0}>Contado</option>
+              <option value={5}>5 días</option>
+              <option value={10}>10 días</option>
+              <option value={15}>15 días</option>
+              <option value={20}>20 días</option>
+              <option value={30}>30 días</option>
+            </select>
+          </div>
+
+          {tipoCobro !== 'variable' && (
+            <div>
+              <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={politicaBajaAnticipada !== null}
+                  onChange={(e) =>
+                    setPoliticaBajaAnticipada(e.target.checked ? 'proporcional' : null)
+                  }
+                />
+                Establecer política de baja anticipada
+              </label>
+              {politicaBajaAnticipada !== null && (
+                <div className="mt-1.5 ml-6 space-y-1.5">
+                  <label className="flex items-center gap-2 text-sm text-gray-700">
+                    <input
+                      type="radio"
+                      checked={politicaBajaAnticipada === 'mes_completo'}
+                      onChange={() => setPoliticaBajaAnticipada('mes_completo')}
+                    />
+                    Cobrar mes completo.
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-gray-700">
+                    <input
+                      type="radio"
+                      checked={politicaBajaAnticipada === 'proporcional'}
+                      onChange={() => setPoliticaBajaAnticipada('proporcional')}
+                    />
+                    Cobrar días proporcionales de uso.
+                  </label>
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <div>

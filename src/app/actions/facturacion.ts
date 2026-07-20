@@ -16,13 +16,14 @@ import {
   servicios,
 } from '@/lib/db/schema';
 import { getActiveMarina } from '@/lib/auth/session';
-import { fechaCalendariaArg, todayArg } from '@/lib/dates';
+import { fechaCalendariaArg } from '@/lib/dates';
 import { sendEmail } from '@/lib/email/resend';
 import { reciboEmail } from '@/lib/email/templates/recibo';
 import { identidadFacturacion, type SocioFacturacion } from '@/lib/facturacion/identidad';
 import { getCargosSaldadosFifo } from '@/lib/reconciliar-cuenta';
 import { crearSocioServicio, hayContratoVigente } from '@/lib/socio-servicios';
 import { MOTIVO_NOTA_LABEL, type MotivoNota } from './nota-constants';
+import { CATEGORIA_SERVICIO_LABEL } from './categoria-constants';
 import {
   crearFactura,
   toTusFecha,
@@ -122,6 +123,16 @@ function precioSinIva(total: number, alicuota: string): number {
   const a = parseFloat(alicuota);
   if (!a) return total;
   return +(total / (1 + a / 100)).toFixed(2);
+}
+
+// Prefija la categoría del servicio (Cuota social, Espacio de guarda, etc.)
+// al concepto del cargo, para que quede visible en el detalle/ítem que se
+// manda a ARCA. `tipo` es null en cargos libres ("Cargar consumo" sin
+// servicio del tarifario) — ahí no hay categoría que anteponer.
+function descripcionConCategoria(concepto: string | null, tipo: string | null): string {
+  const base = concepto ?? 'Servicio';
+  const categoria = tipo ? CATEGORIA_SERVICIO_LABEL[tipo] : null;
+  return categoria ? `${categoria} — ${base}` : base;
 }
 
 /**
@@ -424,6 +435,7 @@ export async function crearFacturaCore(
         // 21% en servicios Exentos o al 10,5%. Null si el cargo es libre
         // ("Cargar consumo" sin servicio) — se usa el default.
         servicioAlicuotaIva: servicios.alicuotaIva,
+        servicioTipo: servicios.tipo,
       })
       .from(movimientosCuentaCorriente)
       .leftJoin(servicios, eq(servicios.id, movimientosCuentaCorriente.servicioId))
@@ -454,7 +466,7 @@ export async function crearFacturaCore(
     }
 
     items = movs.map((m) => ({
-      descripcion: m.concepto ?? 'Servicio',
+      descripcion: descripcionConCategoria(m.concepto, m.servicioTipo),
       cantidad: 1,
       importeUnitario: parseFloat(m.debe ?? '0'),
       alicuotaIva: m.servicioAlicuotaIva != null ? Number(m.servicioAlicuotaIva) : null,
@@ -727,13 +739,14 @@ export async function reenviarFacturaRechazadaAction(
       concepto: movimientosCuentaCorriente.concepto,
       debe: movimientosCuentaCorriente.debe,
       servicioAlicuotaIva: servicios.alicuotaIva,
+      servicioTipo: servicios.tipo,
     })
     .from(movimientosCuentaCorriente)
     .leftJoin(servicios, eq(servicios.id, movimientosCuentaCorriente.servicioId))
     .where(inArray(movimientosCuentaCorriente.id, movimientoIds));
 
   const detalleItems = movs.map((m) => ({
-    descripcion: m.concepto ?? 'Servicio',
+    descripcion: descripcionConCategoria(m.concepto, m.servicioTipo),
     cantidad: 1,
     importeUnitario: parseFloat(m.debe ?? '0'),
     alicuotaIva: m.servicioAlicuotaIva != null ? Number(m.servicioAlicuotaIva) : null,
@@ -1105,8 +1118,6 @@ export type CargarServicioData = {
   socioId: string;
   servicioId: string;
   concepto: string;
-  monto: string;
-  fecha: string;
   comprobante: 'interno' | 'fiscal';
   fechaInicio: string;
   fechaBaja?: string | null;
@@ -1114,26 +1125,19 @@ export type CargarServicioData = {
 
 export async function cargarServicioAction(data: CargarServicioData): Promise<{
   error?: string;
-  comprobante?: 'interno' | 'fiscal';
 }> {
   const ctx = await getActiveMarina();
   if (!ctx) return { error: 'No autenticado' };
   const gId = ctx.activeMembership.guarderiaId;
 
-  if (!data.servicioId || !data.monto) return { error: 'Faltan datos del servicio.' };
+  if (!data.servicioId) return { error: 'Faltan datos del servicio.' };
   const esInterno = data.comprobante === 'interno';
 
-  const hoyArg = todayArg();
-  if (!data.fechaInicio || data.fechaInicio > hoyArg) {
-    return { error: 'La fecha de inicio del servicio no puede ser futura.' };
+  if (!data.fechaInicio) {
+    return { error: 'La fecha de inicio del servicio es obligatoria.' };
   }
-  if (data.fechaBaja) {
-    if (data.fechaBaja > hoyArg) {
-      return { error: 'La fecha de baja del servicio no puede ser futura.' };
-    }
-    if (data.fechaBaja < data.fechaInicio) {
-      return { error: 'La fecha de baja no puede ser anterior a la fecha de inicio.' };
-    }
+  if (data.fechaBaja && data.fechaBaja < data.fechaInicio) {
+    return { error: 'La fecha de baja no puede ser anterior a la fecha de inicio.' };
   }
 
   if (await hayContratoVigente(gId, data.socioId, data.servicioId)) {
@@ -1143,16 +1147,12 @@ export async function cargarServicioAction(data: CargarServicioData): Promise<{
     };
   }
 
-  // Crear el cargo en la cuenta corriente (igual que "Cargar consumo").
-  //
-  // Interno: se marca comprobante_interno = true y queda pendiente, para
-  // consolidarlo después en un comprobante CM-/CL- desde Ventas → Nuevo
-  // comprobante → Comprobante interno manual/lote. No se emite nada acá.
-  //
-  // Fiscal: NO se emite a AFIP ahora. El cargo queda como un consumo
-  // facturable normal (comprobante_interno = false), y la factura AFIP se
-  // emite después por la facturación manual o automática (como cualquier
-  // otro cargo).
+  // "Cargar Servicio" solo registra el contrato (socio_servicios). Ya NO
+  // crea un movimiento en cuenta corriente acá: eso lo hace el cron de
+  // facturación mensual (`runMonthlyGeneracionServiciosRecurrentes`) cuando
+  // corresponda facturar — Fijo, en cada ciclo mensual; Variable, una sola
+  // vez. Así la cuenta corriente del socio recién se mueve cuando el
+  // servicio efectivamente se factura, no al contratarlo.
   const [serv] = await db
     .select({
       nombre: servicios.nombre,
@@ -1172,34 +1172,24 @@ export async function cargarServicioAction(data: CargarServicioData): Promise<{
     return { error: 'Esta tarifa no está vigente. No se puede cargar el servicio.' };
   }
 
-  const conceptoFinal = data.concepto.trim() || serv.nombre;
+  const conceptoFinal = data.concepto.trim() || null;
 
   await db.transaction(async (tx) => {
-    await tx.insert(movimientosCuentaCorriente).values({
-      socioId: data.socioId,
-      servicioId: data.servicioId,
-      concepto: conceptoFinal,
-      tipo: 'otro',
-      estado: 'no_pagado',
-      debe: data.monto,
-      fecha: data.fecha ? fechaCalendariaArg(data.fecha) : new Date(),
-      createdBy: ctx.profile.id,
-      comprobanteInterno: esInterno,
-    });
-
     await crearSocioServicio(tx, {
       guarderiaId: gId,
       socioId: data.socioId,
       servicioId: data.servicioId,
       fechaInicio: data.fechaInicio,
       fechaBaja: data.fechaBaja,
+      comprobanteInterno: esInterno,
+      concepto: conceptoFinal,
       createdBy: ctx.profile.id,
     });
   });
 
   revalidatePath('/ventas');
   revalidatePath(`/usuarios/${data.socioId}`);
-  return { comprobante: esInterno ? 'interno' : 'fiscal' };
+  return {};
 }
 
 // ─── Action: comprobante interno manual/lote ──────────────────────────────────
@@ -1677,33 +1667,39 @@ async function registrarMovimientoNota(params: {
   importe: number;
   concepto: string;
   createdBy: string;
-}) {
+}): Promise<string> {
   const importeStr = params.importe.toFixed(2);
-  await db.insert(movimientosCuentaCorriente).values(
-    params.esNc
-      ? {
-          socioId: params.socioId,
-          concepto: params.concepto,
-          tipo: 'otro',
-          estado: 'pagado',
-          debe: '0',
-          haber: importeStr,
-          importeSigned: `-${importeStr}`,
-          fecha: new Date(),
-          createdBy: params.createdBy,
-        }
-      : {
-          socioId: params.socioId,
-          concepto: params.concepto,
-          tipo: 'otro',
-          estado: 'facturado',
-          debe: importeStr,
-          haber: '0',
-          importeSigned: importeStr,
-          fecha: new Date(),
-          createdBy: params.createdBy,
-        },
-  );
+  const [row] = await db
+    .insert(movimientosCuentaCorriente)
+    .values(
+      params.esNc
+        ? {
+            socioId: params.socioId,
+            concepto: params.concepto,
+            // 'nota_credito' (no 'otro'): la cuenta corriente lo usa para
+            // mostrar "Anulado (NC)" en vez de "Cobrado" en el cargo que cubre.
+            tipo: 'nota_credito',
+            estado: 'pagado',
+            debe: '0',
+            haber: importeStr,
+            importeSigned: `-${importeStr}`,
+            fecha: new Date(),
+            createdBy: params.createdBy,
+          }
+        : {
+            socioId: params.socioId,
+            concepto: params.concepto,
+            tipo: 'otro',
+            estado: 'facturado',
+            debe: importeStr,
+            haber: '0',
+            importeSigned: importeStr,
+            fecha: new Date(),
+            createdBy: params.createdBy,
+          },
+    )
+    .returning({ id: movimientosCuentaCorriente.id });
+  return row.id;
 }
 
 // ─── Camino "asociada": parte de un comprobante ya emitido ────────────────
@@ -1892,13 +1888,17 @@ export async function emitirNotaAsociadaAction(
       facturaOriginalId: data.facturaOriginalId,
     });
 
-    await registrarMovimientoNota({
+    const movimientoId = await registrarMovimientoNota({
       socioId: original.socioId,
       esNc: data.esNc,
       importe: importeNota,
       concepto: descripcionNota,
       createdBy: ctx.user.id,
     });
+    // Vincula la nota a su propio movimiento (mismo patrón que RC-/CM-/CL-)
+    // para que el cálculo de cobertura sepa a qué cargo puntual aplica esta
+    // NC, en vez de tratarla como crédito genérico.
+    await db.update(facturacion).set({ movimientoId }).where(eq(facturacion.id, notaId));
 
     revalidatePath('/ventas');
     revalidatePath(`/usuarios/${original.socioId}`);
@@ -1929,6 +1929,124 @@ export async function emitirNotaCreditoAction(
   data: Omit<EmitirNotaAsociadaData, 'esNc'>,
 ): Promise<EmitirNotaResult> {
   return emitirNotaAsociadaAction({ ...data, esNc: true });
+}
+
+// ─── Nota de Crédito interna: anula/reduce un Comprobante interno (CM-/CL-) ──
+//
+// A diferencia de emitirNotaAsociadaAction, NO pasa por TusFacturas/ARCA —
+// un Comprobante interno no tiene validez fiscal, así que no hay nada que
+// reportarle a AFIP. Mismo molde (motivo, importe opcional si es anulación
+// total, descripción) pero simplificado: sin CAE, sin estado "rechazada",
+// numeración propia NCI-NNNNNN. El asiento en cuenta corriente reusa
+// registrarMovimientoNota tal cual — el mismo `tipo: 'nota_credito'` que ya
+// usa la NC fiscal es lo que hace que la Cuenta Corriente lo muestre como
+// "Anulado (NC)" en vez de "Cobrado".
+
+async function nextNotaCreditoInternaCodigo(gId: string): Promise<string> {
+  const [{ n }] = await db
+    .select({ n: count() })
+    .from(facturacion)
+    .where(and(eq(facturacion.guarderiaId, gId), like(facturacion.codigo, 'NCI-%')));
+  return `NCI-${String(Number(n) + 1).padStart(6, '0')}`;
+}
+
+export type EmitirNotaCreditoInternaData = {
+  facturaOriginalId: string;
+  motivo: MotivoNota;
+  /** Requerido salvo motivo === 'anulacion_total' (se completa con el importe original). */
+  importe?: number;
+  descripcion?: string;
+};
+
+export async function emitirNotaCreditoInternaAction(
+  data: EmitirNotaCreditoInternaData,
+): Promise<{ error?: string; id?: string; codigo?: string }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+  const gId = ctx.activeMembership.guarderiaId;
+
+  const [original] = await db
+    .select({
+      id: facturacion.id,
+      codigo: facturacion.codigo,
+      tipoFactura: facturacion.tipoFactura,
+      importe: facturacion.importe,
+      socioId: facturacion.socioId,
+    })
+    .from(facturacion)
+    .where(and(eq(facturacion.id, data.facturaOriginalId), eq(facturacion.guarderiaId, gId)))
+    .limit(1);
+
+  if (!original) return { error: 'Comprobante no encontrado.' };
+  if (
+    original.tipoFactura !== 'recibo' ||
+    !(original.codigo?.startsWith('CM-') || original.codigo?.startsWith('CL-'))
+  ) {
+    return {
+      error:
+        'Solo se puede emitir una Nota de Crédito interna sobre un Comprobante interno (CM-/CL-).',
+    };
+  }
+  if (!original.socioId) return { error: 'El comprobante no tiene socio asociado.' };
+
+  const importeOriginal = parseFloat(original.importe ?? '0');
+  let importeNota: number;
+  if (data.motivo === 'anulacion_total') {
+    importeNota = importeOriginal;
+  } else {
+    if (!data.importe || data.importe <= 0) {
+      return { error: 'Ingresá el importe de la Nota de Crédito interna.' };
+    }
+    if (data.importe > importeOriginal) {
+      return { error: 'El importe no puede superar el total del comprobante original.' };
+    }
+    importeNota = data.importe;
+  }
+
+  const descripcionNota =
+    data.descripcion?.trim() ||
+    `NC interna — ${MOTIVO_NOTA_LABEL[data.motivo]} de comprobante ${original.codigo}`;
+
+  // Sin tipo fiscal (es interno): mismo fallback de alícuota que usa
+  // crearComprobanteInternoCore para lo interno.
+  const montos = desglosarMontos([{ importeUnitario: importeNota, cantidad: 1 }], '21');
+
+  const notaId = randomUUID();
+  const codigo = await nextNotaCreditoInternaCodigo(gId);
+
+  try {
+    await db.insert(facturacion).values({
+      id: notaId,
+      guarderiaId: gId,
+      socioId: original.socioId,
+      tipoFactura: 'nota_credito_interna',
+      estado: 'pagada',
+      codigo,
+      descripcion: descripcionNota,
+      importe: importeNota.toFixed(2),
+      montoNeto: montos.montoNeto.toFixed(2),
+      montoExento: montos.montoExento.toFixed(2),
+      montoIva: montos.montoIva.toFixed(2),
+      emision: new Date(),
+      facturaOriginalId: data.facturaOriginalId,
+    });
+
+    const movimientoId = await registrarMovimientoNota({
+      socioId: original.socioId,
+      esNc: true,
+      importe: importeNota,
+      concepto: descripcionNota,
+      createdBy: ctx.user.id,
+    });
+    await db.update(facturacion).set({ movimientoId }).where(eq(facturacion.id, notaId));
+
+    revalidatePath('/ventas');
+    revalidatePath(`/usuarios/${original.socioId}`);
+
+    return { id: notaId, codigo };
+  } catch {
+    return { error: 'No se pudo emitir la Nota de Crédito interna.' };
+  }
 }
 
 // ─── Camino "libre": decisión comercial nueva, sin comprobante de origen ──
@@ -2037,13 +2155,14 @@ export async function emitirNotaLibreAction(data: EmitirNotaLibreData): Promise<
       externalReference: notaId,
     });
 
-    await registrarMovimientoNota({
+    const movimientoId = await registrarMovimientoNota({
       socioId: data.socioId,
       esNc: data.esNc,
       importe: data.importe,
       concepto: descripcionNota,
       createdBy: ctx.user.id,
     });
+    await db.update(facturacion).set({ movimientoId }).where(eq(facturacion.id, notaId));
 
     revalidatePath('/ventas');
     revalidatePath(`/usuarios/${data.socioId}`);

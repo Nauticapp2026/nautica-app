@@ -26,6 +26,7 @@ import {
 import { eq, and, desc, gte, inArray, isNull, asc, lte } from 'drizzle-orm';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { addDiasYmd, argYmd } from '@/lib/dates';
+import { calcularCoberturaNotasCredito } from '@/lib/nc-cobertura';
 import { SocioDetail } from './socio-detail';
 
 export default async function SocioPage({ params }: { params: Promise<{ id: string }> }) {
@@ -139,6 +140,7 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
       .select({
         id: serviciosTable.id,
         nombre: serviciosTable.nombre,
+        tipo: serviciosTable.tipo,
         precio: serviciosTable.precio,
         alicuotaIva: serviciosTable.alicuotaIva,
       })
@@ -326,6 +328,8 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
         fechaAsignacion: socioServicios.fechaAsignacion,
         fechaInicio: socioServicios.fechaInicio,
         fechaBaja: socioServicios.fechaBaja,
+        concepto: socioServicios.concepto,
+        comprobanteInterno: socioServicios.comprobanteInterno,
       })
       .from(socioServicios)
       .innerJoin(serviciosTable, eq(serviciosTable.id, socioServicios.servicioId))
@@ -339,7 +343,14 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
   const movimientoIds = movimientosList.map((m) => m.id);
   const facturasPorMovimiento = new Map<
     string,
-    { codigo: string | null; archivo: string | null; tipo: string | null; emision: Date | null }
+    {
+      codigo: string | null;
+      archivo: string | null;
+      tipo: string | null;
+      tipoRecibo: 'fiscal' | 'interno' | null;
+      emision: Date | null;
+      vencimiento: Date | null;
+    }
   >();
   if (movimientoIds.length > 0) {
     const rows = await db
@@ -349,7 +360,9 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
         codigo: facturacion.codigo,
         archivo: facturacion.archivo,
         tipoFactura: facturacion.tipoFactura,
+        tipoRecibo: facturacion.tipoRecibo,
         emision: facturacion.emision,
+        vencimiento: facturacion.vencimiento,
       })
       .from(facturacionItemMovimientos)
       .innerJoin(
@@ -366,7 +379,9 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
         archivo:
           r.archivo ?? (r.tipoFactura === 'recibo' ? `/ventas/recibo/${r.facturacionId}` : null),
         tipo: r.tipoFactura,
+        tipoRecibo: r.tipoRecibo,
         emision: r.emision,
+        vencimiento: r.vencimiento,
       });
     }
 
@@ -381,7 +396,9 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
         codigo: facturacion.codigo,
         archivo: facturacion.archivo,
         tipoFactura: facturacion.tipoFactura,
+        tipoRecibo: facturacion.tipoRecibo,
         emision: facturacion.emision,
+        vencimiento: facturacion.vencimiento,
       })
       .from(facturacion)
       .where(inArray(facturacion.movimientoId, movimientoIds));
@@ -392,7 +409,9 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
         // Sin PDF: el recibo interno se ve/imprime en su página dedicada.
         archivo: r.archivo ?? `/ventas/recibo/${r.id}`,
         tipo: r.tipoFactura,
+        tipoRecibo: r.tipoRecibo,
         emision: r.emision,
+        vencimiento: r.vencimiento,
       });
     }
   }
@@ -476,6 +495,13 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
     alicuotaIva: e.alicuotaIva ?? null,
   }));
 
+  // A qué cargo puntual aplica cada Nota de Crédito del socio — el display
+  // de Cuenta Corriente necesita esto para mostrar "Anulado (NC)" en el
+  // cargo correcto en vez de una bolsa común de crédito genérico (ver
+  // src/lib/nc-cobertura.ts).
+  const { montoPorMovimiento: montoNcPorMovimiento, movimientosDeNc } =
+    await calcularCoberturaNotasCredito(id);
+
   return (
     <SocioDetail
       paywayPublicKey={guarderiaRow[0]?.paywayPublicKey ?? null}
@@ -507,21 +533,31 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
       espaciosDisponibles={espaciosDisponiblesView}
       movimientos={movimientosList.map((m) => {
         const fac = facturasPorMovimiento.get(m.id);
-        // Fecha de vencimiento = emisión de la factura + plazo de pago de la
-        // tarifa. Solo para cargos facturados con comprobante fiscal (no para
-        // recibos internos ni cargos todavía sin facturar → "—").
+        // Fecha de vencimiento: si el cargo ya tiene una factura emitida,
+        // usamos el vencimiento REAL que quedó guardado en esa factura (el
+        // que se eligió al emitirla, no necesariamente el plazo por default
+        // de la tarifa). Solo para comprobante fiscal (no para recibos
+        // internos, que no tienen vencimiento). Si el cargo todavía no fue
+        // facturado, mostramos una estimación: emisión (hoy) + plazo de pago
+        // actual de la tarifa — puede no coincidir con lo que termine
+        // eligiéndose al facturar.
         const emisionYmd = m.comprobanteInterno ? null : argYmd(fac?.emision);
+        const vencimientoFactura = m.comprobanteInterno ? null : argYmd(fac?.vencimiento);
         const fechaVencimiento =
-          emisionYmd != null && m.plazoPagoDias != null
+          vencimientoFactura ??
+          (emisionYmd != null && m.plazoPagoDias != null
             ? addDiasYmd(emisionYmd, m.plazoPagoDias)
-            : null;
+            : null);
         return {
           ...m,
           fecha: m.fecha?.toISOString() ?? null,
           facturaCodigo: fac?.codigo ?? null,
           facturaArchivo: fac?.archivo ?? null,
           facturaTipo: fac?.tipo ?? null,
+          facturaTipoRecibo: fac?.tipoRecibo ?? null,
           fechaVencimiento,
+          montoCubiertoNc: montoNcPorMovimiento.get(m.id)?.toFixed(2) ?? null,
+          esMovimientoNc: movimientosDeNc.has(m.id),
         };
       })}
       servicios={serviciosList}
@@ -539,6 +575,8 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
         fechaAsignacion: s.fechaAsignacion.toISOString(),
         fechaInicio: s.fechaInicio,
         fechaBaja: s.fechaBaja,
+        concepto: s.concepto,
+        comprobanteInterno: s.comprobanteInterno,
       }))}
       navegantes={navegantesList.map((n) => ({
         ...n,

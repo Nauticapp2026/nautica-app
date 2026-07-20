@@ -14,6 +14,7 @@ import {
 } from '@/lib/db/schema';
 import { getActiveMarina } from '@/lib/auth/session';
 import { fechaCalendariaArg } from '@/lib/dates';
+import { calcularCoberturaNotasCredito } from '@/lib/nc-cobertura';
 
 type Ctx = NonNullable<Awaited<ReturnType<typeof getActiveMarina>>>;
 
@@ -200,9 +201,13 @@ export async function getComprobantesPendientesAction(socioId: string): Promise<
 }
 
 // Conjunto de ids de cargos (movimientos con debe>0) que están saldados para el
-// socio: los ya `pagado`, más los cubiertos por el pool de haberes vía FIFO (del
-// más viejo al más nuevo). Mismo criterio que `calcularSaldoYEstado` en el display.
+// socio: los ya `pagado`, más los cubiertos puntualmente por una Nota de
+// Crédito de su propia factura (`calcularCoberturaNotasCredito`), más los
+// cubiertos por el pool de pagos genéricos vía FIFO (del más viejo al más
+// nuevo). Mismo criterio que `calcularSaldoYEstado` en el display.
 async function getCargosPagadosFifo(socioId: string): Promise<Set<string>> {
+  const { montoPorMovimiento, movimientosDeNc } = await calcularCoberturaNotasCredito(socioId);
+
   const movs = await db
     .select({
       id: movimientosCuentaCorriente.id,
@@ -214,10 +219,21 @@ async function getCargosPagadosFifo(socioId: string): Promise<Set<string>> {
     .where(eq(movimientosCuentaCorriente.socioId, socioId))
     .orderBy(asc(movimientosCuentaCorriente.fecha), asc(movimientosCuentaCorriente.createdAt));
 
-  let pool = movs.reduce((acc, m) => acc + parseFloat(m.haber ?? '0'), 0);
   const pagados = new Set<string>();
+  for (const [movId, monto] of montoPorMovimiento) {
+    const m = movs.find((x) => x.id === movId);
+    if (m && monto >= parseFloat(m.debe ?? '0') - 0.001) pagados.add(movId);
+  }
+
+  // Pool genérico: pagos reales + NC "libres" sin factura original — excluye
+  // los movimientos que son el asiento de una NC ya aplicada puntualmente
+  // arriba, para no contar esa plata dos veces.
+  let pool = movs
+    .filter((m) => !movimientosDeNc.has(m.id))
+    .reduce((acc, m) => acc + parseFloat(m.haber ?? '0'), 0);
 
   for (const m of movs) {
+    if (pagados.has(m.id)) continue;
     const debe = parseFloat(m.debe ?? '0');
     if (debe <= 0) continue;
     if (m.estado === 'pagado') {

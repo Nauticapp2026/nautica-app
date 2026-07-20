@@ -10,7 +10,6 @@ import {
   guarderias,
   memberships,
   movimientosCuentaCorriente,
-  paywayCobros,
   profiles,
   servicios,
   socioServicios,
@@ -139,7 +138,6 @@ export default async function VentasPage() {
     lista,
     sociosList,
     [guarderiaInfo],
-    cobrosLista,
     movsPendientesList,
     movsPendientesInternoList,
     embarcacionesList,
@@ -177,6 +175,7 @@ export default async function VentasPage() {
         codigo: facturacion.codigo,
         folioLocal: facturacion.folioLocal,
         tipoFactura: facturacion.tipoFactura,
+        tipoRecibo: facturacion.tipoRecibo,
         importe: facturacion.importe,
         montoNeto: facturacion.montoNeto,
         montoExento: facturacion.montoExento,
@@ -261,24 +260,6 @@ export default async function VentasPage() {
       .from(guarderias)
       .where(eq(guarderias.id, gId))
       .limit(1),
-
-    db
-      .select({
-        id: paywayCobros.id,
-        socioId: paywayCobros.socioId,
-        socioNombre: profiles.nombre,
-        socioApellido: profiles.apellido,
-        monto: paywayCobros.monto,
-        estado: paywayCobros.estado,
-        errorMensaje: paywayCobros.errorMensaje,
-        movimientosIds: paywayCobros.movimientosIds,
-        createdAt: paywayCobros.createdAt,
-      })
-      .from(paywayCobros)
-      .leftJoin(profiles, eq(profiles.id, paywayCobros.socioId))
-      .where(eq(paywayCobros.guarderiaId, gId))
-      .orderBy(desc(paywayCobros.createdAt))
-      .limit(200),
 
     // Movimientos pendientes individuales para el lote (con tipo de servicio)
     db
@@ -378,6 +359,7 @@ export default async function VentasPage() {
       codigo: f.codigo,
       folioLocal: f.folioLocal,
       tipoFactura: f.tipoFactura,
+      tipoRecibo: f.tipoRecibo,
       letra: letraDeComprobante(f.tipoFactura),
       importe: f.importe,
       montoNeto: f.montoNeto,
@@ -508,17 +490,6 @@ export default async function VentasPage() {
   const certificadoOk = guarderiaInfo?.certificadoAfipOk ?? false;
   const guarderiaCondicionIva = guarderiaInfo?.condicionIva ?? null;
 
-  const cobrosPayway = cobrosLista.map((c) => ({
-    id: c.id,
-    socioId: c.socioId,
-    socioNombre: [c.socioNombre, c.socioApellido].filter(Boolean).join(' ') || '—',
-    monto: c.monto,
-    estado: c.estado,
-    errorMensaje: c.errorMensaje,
-    movimientosIds: c.movimientosIds,
-    createdAt: c.createdAt.toISOString(),
-  }));
-
   return (
     <VentasClient
       facturas={facturas}
@@ -532,7 +503,6 @@ export default async function VentasPage() {
       }}
       posConfigurado={posConfigurado}
       certificadoOk={certificadoOk}
-      cobrosPayway={cobrosPayway}
       guarderiaCondicionIva={guarderiaCondicionIva}
     />
   );

@@ -6,7 +6,6 @@ import { and, desc, eq, gt, gte, isNotNull, isNull, lt, lte, ne, not, or, sql } 
 import { db } from '@/lib/db';
 import {
   espacios,
-  movimientosCuentaCorriente,
   profiles,
   servicios,
   serviciosAjustesProgramados,
@@ -93,7 +92,10 @@ export type TarifaInputBase = {
   precio: number;
   alicuotaIva: AlicuotaIva;
   plazoPagoDias: PlazoPagoDias;
-  politicaBajaAnticipada: PoliticaBajaAnticipada;
+  // NULL = sin política definida (checkbox destildado). Solo aplica a Fijo;
+  // para Variable se fuerza a null server-side sea lo que sea que mande el
+  // cliente.
+  politicaBajaAnticipada: PoliticaBajaAnticipada | null;
   vigenciaDesde: string;
   vigenciaHasta: string;
 };
@@ -147,7 +149,10 @@ function validar(data: CreateTarifaData): string | null {
   if (!(PLAZOS_PAGO as readonly number[]).includes(data.plazoPagoDias)) {
     return 'Plazo de pago inválido.';
   }
-  if (!POLITICAS_BAJA_ANTICIPADA.includes(data.politicaBajaAnticipada)) {
+  if (
+    data.politicaBajaAnticipada !== null &&
+    !POLITICAS_BAJA_ANTICIPADA.includes(data.politicaBajaAnticipada)
+  ) {
     return 'Política de baja anticipada inválida.';
   }
   if (!Number.isFinite(data.precio) || data.precio < 0) {
@@ -227,7 +232,9 @@ function buildValues(data: CreateTarifaData) {
     precio: data.precio.toFixed(2),
     alicuotaIva: data.alicuotaIva.toFixed(2),
     plazoPagoDias: data.plazoPagoDias,
-    politicaBajaAnticipada: data.politicaBajaAnticipada,
+    // Solo tiene sentido para Fijo — un servicio Variable no se "cancela
+    // antes de tiempo", se cobra una vez y listo.
+    politicaBajaAnticipada: data.tipoCobro === 'variable' ? null : data.politicaBajaAnticipada,
     vigenciaDesde: data.vigenciaDesde,
     vigenciaHasta: data.vigenciaHasta,
   };
@@ -503,14 +510,26 @@ export async function getHistorialTarifaAction(
 }
 
 // Cuenta cuántos socios DISTINTOS tienen contratada la tarifa: los que tienen
-// algún movimiento con ese servicio o un espacio asignado con ese servicio,
-// excluyendo a los que ya lo cancelaron (socio_servicios_cancelados).
+// un contrato vigente en `socio_servicios` (Cargar Servicio) o un espacio
+// asignado con ese servicio, excluyendo a los que ya lo cancelaron
+// (socio_servicios_cancelados). Antes se inferían los contratos "Cargar
+// Servicio" por la existencia de un movimiento en cuenta corriente, pero
+// desde que "Cargar Servicio" ya no crea un movimiento al contratar (el cron
+// lo crea cuando corresponde facturar), un contrato recién cargado no tenía
+// todavía ningún movimiento — hay que leer `socio_servicios` directamente.
 async function contarSociosConServicio(servicioId: string): Promise<number> {
-  const [movs, esps, cancelados] = await Promise.all([
+  const hoy = todayArg();
+  const [contratos, esps, cancelados] = await Promise.all([
     db
-      .selectDistinct({ socio: movimientosCuentaCorriente.socioId })
-      .from(movimientosCuentaCorriente)
-      .where(eq(movimientosCuentaCorriente.servicioId, servicioId)),
+      .selectDistinct({ socio: socioServicios.socioId })
+      .from(socioServicios)
+      .where(
+        and(
+          eq(socioServicios.servicioId, servicioId),
+          lte(socioServicios.fechaInicio, hoy),
+          or(isNull(socioServicios.fechaBaja), gte(socioServicios.fechaBaja, hoy)),
+        ),
+      ),
     db
       .selectDistinct({ socio: espacios.ocupanteId })
       .from(espacios)
@@ -523,7 +542,7 @@ async function contarSociosConServicio(servicioId: string): Promise<number> {
 
   const cancelSet = new Set(cancelados.map((c) => c.socio));
   const socios = new Set<string>();
-  for (const m of movs) if (m.socio && !cancelSet.has(m.socio)) socios.add(m.socio);
+  for (const c of contratos) if (!cancelSet.has(c.socio)) socios.add(c.socio);
   for (const e of esps) if (e.socio && !cancelSet.has(e.socio)) socios.add(e.socio);
   return socios.size;
 }
@@ -531,12 +550,10 @@ async function contarSociosConServicio(servicioId: string): Promise<number> {
 export type SocioConServicio = { id: string; nombre: string | null; apellido: string | null };
 
 /**
- * Socios con un Servicio Contratado VIGENTE de esta tarifa (tabla
- * `socio_servicios`, la fuente de verdad de "Servicios Contratados" — no la
- * inferencia vieja de `contarSociosConServicio`, que sigue usándose solo
- * para el bloqueo de inactivar). Se muestra antes de pausar, para que el
- * admin sepa a quiénes no les va a poder cambiar el precio hasta reactivar,
- * aunque pausar no les afecte el servicio que ya tienen.
+ * Socios con un Servicio Contratado VIGENTE de esta tarifa, para mostrar el
+ * detalle (nombre/apellido) antes de pausar — `contarSociosConServicio`
+ * hace básicamente la misma consulta pero solo devuelve un total (y suma
+ * también los de Espacio de guarda) para el bloqueo de inactivar.
  */
 export async function getSociosConServicioAction(
   servicioId: string,

@@ -65,11 +65,10 @@ export function FormasDePago({
 
   return (
     <div className="space-y-3">
-      {formas.map((forma, i) => (
+      {formas.map((forma) => (
         <Linea
           key={forma.id}
           forma={forma}
-          index={i}
           canRemove={formas.length > 1}
           soloUnaForma={formas.length === 1}
           tarjetaGuardada={tarjetaGuardada}
@@ -91,7 +90,6 @@ export function FormasDePago({
 
 function Linea({
   forma,
-  index,
   canRemove,
   soloUnaForma,
   tarjetaGuardada,
@@ -99,7 +97,6 @@ function Linea({
   onRemove,
 }: {
   forma: FormaCobranza;
-  index: number;
   canRemove: boolean;
   soloUnaForma: boolean;
   tarjetaGuardada: TarjetaGuardada;
@@ -128,9 +125,8 @@ function Linea({
 
   return (
     <div className="rounded-[12px] border border-gray-200 p-3">
-      <div className="mb-2 flex items-center justify-between">
-        <span className="text-xs font-semibold text-gray-500">Forma {index + 1}</span>
-        {canRemove && (
+      {canRemove && (
+        <div className="mb-2 flex items-center justify-end">
           <button
             type="button"
             onClick={onRemove}
@@ -138,8 +134,8 @@ function Linea({
           >
             <Trash2 className="h-4 w-4" />
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       <div className="space-y-3">
         <Field label="Forma de pago">

@@ -169,6 +169,10 @@ export const tipoFacturaEnum = pgEnum('tipo_factura', [
   'nota_debito_a',
   'nota_debito_b',
   'nota_debito_c',
+  // A diferencia de nota_credito_a/b/c (siempre fiscales, van a ARCA), esta
+  // anula/reduce un Comprobante interno (CM-/CL-) sin pasar por TusFacturas.
+  // Numeración propia NCI-NNNNNN.
+  'nota_credito_interna',
 ]);
 
 // Solo para recibos de cobranza (RC-): si los comprobantes que cobró son
@@ -176,7 +180,15 @@ export const tipoFacturaEnum = pgEnum('tipo_factura', [
 // puede mezclar los dos tipos, se valida al registrar la cobranza.
 export const tipoReciboEnum = pgEnum('tipo_recibo', ['fiscal', 'interno']);
 
-export const tipoCuentaCorrienteEnum = pgEnum('tipo_cta_cte', ['mensual', 'espacio', 'otro']);
+export const tipoCuentaCorrienteEnum = pgEnum('tipo_cta_cte', [
+  'mensual',
+  'espacio',
+  'otro',
+  // Asiento (haber) que genera una Nota de Crédito al anular/reducir un
+  // cargo — se distingue de 'otro' para que la cuenta corriente pueda
+  // mostrar "Anulado (NC)" en vez de "Cobrado" quien cubre el cargo.
+  'nota_credito',
+]);
 
 export const tipoServicioEnum = pgEnum('tipo_servicio', [
   'espacio_guarda',
@@ -660,9 +672,9 @@ export const servicios = pgTable(
     vigenciaHasta: date('vigencia_hasta').notNull(),
     alicuotaIva: numeric('alicuota_iva', { precision: 5, scale: 2 }).notNull().default('21'),
     plazoPagoDias: smallint('plazo_pago_dias').notNull().default(0),
-    politicaBajaAnticipada: politicaBajaAnticipadaEnum('politica_baja_anticipada')
-      .notNull()
-      .default('proporcional'),
+    // NULL = sin política definida (checkbox "Establecer política de baja
+    // anticipada" destildado en el form). Solo aplica a servicios Fijo.
+    politicaBajaAnticipada: politicaBajaAnticipadaEnum('politica_baja_anticipada'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
@@ -1577,11 +1589,13 @@ export const socioServiciosCancelados = pgTable(
 // propia ventana de vigencia. A diferencia de `socioServiciosCancelados`
 // (existence check sin historial) esta tabla SÍ guarda historial — un socio
 // puede cancelar y volver a contratar el mismo servicio más adelante, cada
-// vez con su propia fila. `fechaInicio`/`fechaBaja` son siempre de efecto
-// inmediato (no se agenda a futuro): el cron de facturación mensual sigue
-// leyendo únicamente `socioServiciosCancelados` para decidir si frena el
-// cobro recurrente; esta tabla es la fuente de verdad para la UI de
-// "Servicios Contratados", no para el cron.
+// vez con su propia fila. `fechaInicio`/`fechaBaja` pueden ser pasadas o
+// futuras (solo se exige fechaBaja >= fechaInicio) y son la fuente de verdad
+// tanto para la UI de "Servicios Contratados" como para el cron de
+// facturación mensual (`runMonthlyGeneracionServiciosRecurrentes`), que las
+// usa para decidir a quién cobrar — "Cargar Servicio" ya no crea ningún
+// movimiento en cuenta corriente al contratar, eso lo hace el cron cuando
+// corresponda facturar.
 export const socioServicios = pgTable(
   'socio_servicios',
   {
@@ -1606,6 +1620,13 @@ export const socioServicios = pgTable(
     fechaAsignacion: timestamp('fecha_asignacion', { withTimezone: true }).defaultNow().notNull(),
     fechaInicio: date('fecha_inicio').notNull(),
     fechaBaja: date('fecha_baja'),
+    // true = los cargos que genere el cron para este contrato se marcan como
+    // comprobante interno (no fiscal), igual que `comprobanteInterno` en
+    // movimientos_cuenta_corriente. Elegido una vez al contratar.
+    comprobanteInterno: boolean('comprobante_interno').notNull().default(false),
+    // Detalle opcional tipeado al contratar; si es null, el cron usa el
+    // nombre de la tarifa como concepto del cargo.
+    concepto: text('concepto'),
     createdBy: uuid('created_by').references(() => profiles.id, { onDelete: 'set null' }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),

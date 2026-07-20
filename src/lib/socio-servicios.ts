@@ -57,6 +57,8 @@ export async function crearSocioServicio(
     espacioId?: string;
     fechaInicio: string;
     fechaBaja?: string | null;
+    comprobanteInterno?: boolean;
+    concepto?: string | null;
     createdBy: string;
   },
 ): Promise<{ id: string; numeroOperacion: number }> {
@@ -82,6 +84,8 @@ export async function crearSocioServicio(
       numeroOperacion,
       fechaInicio: params.fechaInicio,
       fechaBaja: params.fechaBaja ?? null,
+      comprobanteInterno: params.comprobanteInterno ?? false,
+      concepto: params.concepto ?? null,
       createdBy: params.createdBy,
     })
     .returning({ id: socioServicios.id });

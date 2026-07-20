@@ -82,7 +82,7 @@ export default async function TarifarioPage() {
       vigenciaHasta: r.vigenciaHasta,
       alicuotaIva: r.alicuotaIva != null ? Number(r.alicuotaIva) : 21,
       plazoPagoDias: r.plazoPagoDias ?? 0,
-      politicaBajaAnticipada: r.politicaBajaAnticipada ?? 'proporcional',
+      politicaBajaAnticipada: r.politicaBajaAnticipada,
       ajusteProgramado: aj
         ? { precioNuevo: Number(aj.precioNuevo), fechaAplicacion: aj.fechaAplicacion }
         : null,

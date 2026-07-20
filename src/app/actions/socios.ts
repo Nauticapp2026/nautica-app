@@ -14,7 +14,7 @@ import {
 import { getActiveMarina } from '@/lib/auth/session';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { translateInviteError } from '@/lib/auth/errors';
-import { fechaCalendariaArg, todayArg } from '@/lib/dates';
+import { fechaCalendariaArg } from '@/lib/dates';
 import { and, eq, max } from 'drizzle-orm';
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
@@ -569,6 +569,8 @@ const updateSocioServicioSchema = z.object({
   id: z.string().uuid(),
   fechaInicio: z.string(),
   fechaBaja: z.string().nullable(),
+  concepto: z.string().nullable(),
+  comprobanteInterno: z.boolean(),
   cobro: z.object({ monto: z.string(), concepto: z.string() }).nullable(),
 });
 
@@ -580,18 +582,14 @@ export async function updateSocioServicioAction(input: unknown): Promise<{ error
 
   const parsed = updateSocioServicioSchema.safeParse(input);
   if (!parsed.success) return { error: 'Datos inválidos' };
-  const { id, fechaInicio, fechaBaja, cobro } = parsed.data;
+  const { id, fechaInicio, fechaBaja, concepto, comprobanteInterno, cobro } = parsed.data;
   const guarderiaId = ctx.activeMembership.guarderiaId;
 
-  const hoy = todayArg();
-  if (!fechaInicio || fechaInicio > hoy) {
-    return { error: 'La fecha de inicio del servicio no puede ser futura.' };
+  if (!fechaInicio) {
+    return { error: 'La fecha de inicio del servicio es obligatoria.' };
   }
-  if (fechaBaja) {
-    if (fechaBaja > hoy) return { error: 'La fecha de baja del servicio no puede ser futura.' };
-    if (fechaBaja < fechaInicio) {
-      return { error: 'La fecha de baja no puede ser anterior a la fecha de inicio.' };
-    }
+  if (fechaBaja && fechaBaja < fechaInicio) {
+    return { error: 'La fecha de baja no puede ser anterior a la fecha de inicio.' };
   }
 
   try {
@@ -612,7 +610,13 @@ export async function updateSocioServicioAction(input: unknown): Promise<{ error
 
     await db
       .update(socioServicios)
-      .set({ fechaInicio, fechaBaja, updatedAt: new Date() })
+      .set({
+        fechaInicio,
+        fechaBaja,
+        concepto: concepto?.trim() || null,
+        comprobanteInterno,
+        updatedAt: new Date(),
+      })
       .where(eq(socioServicios.id, id));
 
     if (quedaCerrado && estabaAbierto) {
