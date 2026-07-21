@@ -784,6 +784,10 @@ function ComprobanteInternoManualModal({
   socios: Socio[];
 }) {
   const router = useRouter();
+  // Mismo flujo por pasos que "Nueva cobranza": primero elegir el socio en una
+  // lista amplia con buscador, después la fecha y los cargos a consolidar.
+  const [step, setStep] = useState<'socio' | 'detalle'>('socio');
+  const [query, setQuery] = useState('');
   const [socioId, setSocioId] = useState('');
   const [fecha, setFecha] = useState(todayIso);
   const [movimientos, setMovimientos] = useState<MovimientoPendiente[]>([]);
@@ -793,12 +797,30 @@ function ComprobanteInternoManualModal({
   const [success, setSuccess] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  function handleSocioChange(id: string) {
+  const socioNombre = useMemo(
+    () => socios.find((s) => s.id === socioId)?.nombre ?? '',
+    [socios, socioId],
+  );
+
+  const sociosFiltrados = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return socios.slice(0, 50);
+    return socios
+      .filter((s) => {
+        if (s.nombre.toLowerCase().includes(q)) return true;
+        if (s.numeroSocio != null && String(s.numeroSocio).includes(q)) return true;
+        if (s.embarcaciones.some((e) => e.toLowerCase().includes(q))) return true;
+        return false;
+      })
+      .slice(0, 50);
+  }, [socios, query]);
+
+  function handleSelectSocio(id: string) {
     setSocioId(id);
     setMovimientos([]);
     setSelectedMovs(new Set());
     setError(null);
-    if (!id) return;
+    setStep('detalle');
     setLoadingMovs(true);
     getSocioPendientesInternoAction(id)
       .then((res) => {
@@ -811,6 +833,14 @@ function ComprobanteInternoManualModal({
         }
       })
       .finally(() => setLoadingMovs(false));
+  }
+
+  function volverASocio() {
+    setStep('socio');
+    setSocioId('');
+    setMovimientos([]);
+    setSelectedMovs(new Set());
+    setError(null);
   }
 
   const totalSeleccionado = useMemo(
@@ -841,6 +871,8 @@ function ComprobanteInternoManualModal({
   }
 
   function handleClose() {
+    setStep('socio');
+    setQuery('');
     setSocioId('');
     setFecha(todayIso());
     setMovimientos([]);
@@ -882,7 +914,9 @@ function ComprobanteInternoManualModal({
               Comprobante interno manual
             </h2>
             <p className="mt-0.5 text-sm" style={{ color: '#669E9D' }}>
-              Consolidá los cargos Interno pendientes del socio en un solo comprobante
+              {step === 'socio'
+                ? 'Elegí el socio para consolidar sus cargos Interno pendientes'
+                : `Socio: ${socioNombre}`}
             </p>
           </div>
           <button
@@ -895,13 +929,42 @@ function ComprobanteInternoManualModal({
         <div className="border-t border-gray-200" />
 
         <div className="flex-1 space-y-4 overflow-y-auto p-6">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div>
-              <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
-                Socio*
-              </label>
-              <SocioCombobox socios={socios} value={socioId} onChange={handleSocioChange} />
-            </div>
+          {/* Paso 1: elegir socio — mismo diseño que "Nueva cobranza". */}
+          {step === 'socio' && (
+            <>
+              <div className="relative">
+                <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <input
+                  autoFocus
+                  className={`${inputCls} pl-9`}
+                  placeholder="Buscar por nombre, nº de socio o embarcación…"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                />
+              </div>
+              <div className="max-h-[50vh] divide-y divide-gray-100 overflow-y-auto rounded-[10px] border border-gray-200">
+                {sociosFiltrados.length === 0 ? (
+                  <p className="p-4 text-center text-sm text-gray-400">Sin resultados.</p>
+                ) : (
+                  sociosFiltrados.map((s) => (
+                    <button
+                      key={s.id}
+                      onClick={() => handleSelectSocio(s.id)}
+                      className="flex w-full flex-col items-start px-4 py-3 text-left transition hover:bg-gray-50"
+                    >
+                      <span className="text-sm font-medium text-[#101828]">{s.nombre}</span>
+                      <span className="text-xs text-gray-400">
+                        {s.numeroSocio != null ? `Socio #${s.numeroSocio}` : 'Sin nº'}
+                        {s.embarcaciones.length > 0 ? ` · ${s.embarcaciones.join(', ')}` : ''}
+                      </span>
+                    </button>
+                  ))
+                )}
+              </div>
+            </>
+          )}
+
+          {step === 'detalle' && (
             <div>
               <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
                 Fecha*
@@ -913,9 +976,9 @@ function ComprobanteInternoManualModal({
                 onChange={(e) => setFecha(e.target.value)}
               />
             </div>
-          </div>
+          )}
 
-          {socioId && (
+          {step === 'detalle' && socioId && (
             <div className="rounded-[10px] border border-gray-100 bg-white">
               <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
                 <div>
@@ -991,7 +1054,7 @@ function ComprobanteInternoManualModal({
         </div>
 
         <div className="border-t border-gray-200 p-6">
-          {socioId && selectedMovs.size > 0 && (
+          {step === 'detalle' && socioId && selectedMovs.size > 0 && (
             <div className="mb-4 flex items-center justify-between rounded-[10px] bg-gray-50 px-4 py-3">
               <p className="text-sm font-semibold" style={{ color: '#101828' }}>
                 Total a emitir
@@ -1002,20 +1065,31 @@ function ComprobanteInternoManualModal({
             </div>
           )}
           <div className="flex gap-3">
-            <button
-              onClick={handleClose}
-              className="flex-1 rounded-[10px] border border-[#d1d5dc] bg-white py-2.5 text-sm font-medium text-[#364153] transition hover:bg-gray-50"
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={handleSubmit}
-              disabled={isPending || !isValid}
-              className="flex-1 rounded-[10px] py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-              style={{ background: '#175861' }}
-            >
-              {isPending ? 'Emitiendo...' : 'Emitir comprobante'}
-            </button>
+            {step === 'socio' ? (
+              <button
+                onClick={handleClose}
+                className="flex-1 rounded-[10px] border border-[#d1d5dc] bg-white py-2.5 text-sm font-medium text-[#364153] transition hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={volverASocio}
+                  className="flex-1 rounded-[10px] border border-[#d1d5dc] bg-white py-2.5 text-sm font-medium text-[#364153] transition hover:bg-gray-50"
+                >
+                  Atrás
+                </button>
+                <button
+                  onClick={handleSubmit}
+                  disabled={isPending || !isValid}
+                  className="flex-1 rounded-[10px] py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+                  style={{ background: '#175861' }}
+                >
+                  {isPending ? 'Emitiendo...' : 'Emitir comprobante'}
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
