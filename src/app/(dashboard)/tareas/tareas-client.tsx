@@ -65,8 +65,19 @@ const ESTADO_SOLICITUD_LAVADO_LABEL: Record<EstadoSolicitudLavado, string> = {
   cancelada: 'Cancelada',
 };
 
-type OperarioOpt = { id: string; nombre: string };
+type OperarioOpt = { id: string; nombre: string; rol: 'operario' | 'marinero' };
 type EmbarcacionOpt = { id: string; nombre: string };
+
+// Mismo criterio que el Dashboard: cada persona se rotula con su rol para
+// distinguir operarios (nave) de marineros (marina) en selects y filtros.
+const ROL_STAFF_LABEL: Record<OperarioOpt['rol'], string> = {
+  operario: 'Operario',
+  marinero: 'Marinero',
+};
+
+function operarioOptLabel(o: OperarioOpt): string {
+  return `${o.nombre} — ${ROL_STAFF_LABEL[o.rol]}`;
+}
 
 type Props = {
   tareas: Tarea[];
@@ -337,7 +348,7 @@ function TareaCard({
           {/* Admin ve a todos los operarios; operario solo se ve a sí mismo. */}
           {(canEditAll ? operarios : operarios.filter((o) => o.id === currentUserId)).map((o) => (
             <option key={o.id} value={o.id}>
-              {o.nombre}
+              {operarioOptLabel(o)}
             </option>
           ))}
         </select>
@@ -538,13 +549,13 @@ function TareaModal({
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
-                Operario
+                Operario / Marinero
               </label>
               <select className={inputCls} value={form.operarioId} onChange={set('operarioId')}>
                 <option value="">Sin asignar</option>
                 {operarios.map((o) => (
                   <option key={o.id} value={o.id}>
-                    {o.nombre}
+                    {operarioOptLabel(o)}
                   </option>
                 ))}
               </select>
@@ -965,10 +976,10 @@ export function TareasClient({
               value={filterOperario}
               onChange={(e) => setFilterOperario(e.target.value)}
             >
-              <option value="">Operario</option>
+              <option value="">Operario / Marinero</option>
               {operarios.map((o) => (
                 <option key={o.id} value={o.id}>
-                  {o.nombre}
+                  {operarioOptLabel(o)}
                 </option>
               ))}
             </select>
@@ -1112,10 +1123,10 @@ export function TareasClient({
               value={filterOperario}
               onChange={(e) => setFilterOperario(e.target.value)}
             >
-              <option value="">Operario</option>
+              <option value="">Operario / Marinero</option>
               {operarios.map((o) => (
                 <option key={o.id} value={o.id}>
-                  {o.nombre}
+                  {operarioOptLabel(o)}
                 </option>
               ))}
             </select>

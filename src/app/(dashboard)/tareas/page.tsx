@@ -147,6 +147,7 @@ export default async function TareasPage() {
         nombre: profiles.nombre,
         apellido: profiles.apellido,
         email: profiles.email,
+        rol: memberships.rol,
       })
       .from(memberships)
       .innerJoin(profiles, eq(profiles.id, memberships.userId))
@@ -212,6 +213,7 @@ export default async function TareasPage() {
   const operarios = operariosList.map((o) => ({
     id: o.id,
     nombre: [o.nombre, o.apellido].filter(Boolean).join(' ') || o.email,
+    rol: o.rol === 'marinero' ? ('marinero' as const) : ('operario' as const),
   }));
 
   const embarcacionesOpts = embarcacionesList.map((e) => ({
