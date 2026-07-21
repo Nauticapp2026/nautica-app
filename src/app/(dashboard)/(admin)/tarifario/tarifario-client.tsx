@@ -72,6 +72,8 @@ export type Tarifa = {
   nombre: string;
   tipo: TipoTarifa;
   tipoCobro: 'fijo' | 'variable';
+  // Solo para Variable: si el precio es por día o por mes. Null en Fijo.
+  tarifaVariable: 'diaria' | 'mensual' | null;
   precio: number;
   estado: EstadoTarifa;
   medida: MedidaTarifa | null;
@@ -445,7 +447,11 @@ function TablaTarifas({
                           : 'bg-[#FFF4E6] text-[#B45309]'
                       }`}
                     >
-                      {t.tipoCobro === 'fijo' ? 'Fijo' : 'Variable'}
+                      {t.tipoCobro === 'fijo'
+                        ? 'Fijo'
+                        : t.tarifaVariable === 'diaria'
+                          ? 'Variable · Diaria'
+                          : 'Variable'}
                     </span>
                   </div>
                 </td>
@@ -564,6 +570,9 @@ function TarifaModal({
   const initial = isEdit ? state.tarifa : null;
 
   const [tipoCobro, setTipoCobro] = useState<'fijo' | 'variable'>(initial?.tipoCobro ?? 'fijo');
+  const [tarifaVariable, setTarifaVariable] = useState<'diaria' | 'mensual'>(
+    initial?.tarifaVariable ?? 'mensual',
+  );
   const [tipo, setTipo] = useState<TipoTarifa | ''>(initial?.tipo ?? '');
   const [nombre, setNombre] = useState(initial?.nombre ?? '');
   const [precio, setPrecio] = useState<string>(initial ? String(initial.precio) : '');
@@ -647,6 +656,7 @@ function TarifaModal({
       payload = {
         tipo: 'espacio_guarda' as const,
         tipoCobro,
+        tarifaVariable: tipoCobro === 'variable' ? tarifaVariable : null,
         nombre: nombre.trim(),
         precio: precioNum,
         alicuotaIva: alicuotaIva as 0 | 10.5 | 21,
@@ -669,6 +679,7 @@ function TarifaModal({
           | 'expensas_extraordinarias'
           | 'servicio_extra',
         tipoCobro,
+        tarifaVariable: tipoCobro === 'variable' ? tarifaVariable : null,
         nombre: nombre.trim(),
         precio: precioNum,
         alicuotaIva: alicuotaIva as 0 | 10.5 | 21,
@@ -734,6 +745,38 @@ function TarifaModal({
               </label>
             </div>
           </div>
+
+          {tipoCobro === 'variable' && (
+            <div>
+              <label className="mb-1 block text-sm font-semibold text-gray-700">
+                Tipo de tarifa
+              </label>
+              <div className="flex gap-5">
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="radio"
+                    checked={tarifaVariable === 'diaria'}
+                    onChange={() => setTarifaVariable('diaria')}
+                  />
+                  Tarifa diaria
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="radio"
+                    checked={tarifaVariable === 'mensual'}
+                    onChange={() => setTarifaVariable('mensual')}
+                  />
+                  Tarifa mensual
+                </label>
+              </div>
+              {tarifaVariable === 'diaria' && (
+                <p className="mt-1 text-xs text-gray-400">
+                  El precio es por día: al cargar el servicio a un socio se pide la cantidad de días
+                  y se cobra precio × días.
+                </p>
+              )}
+            </div>
+          )}
 
           <div>
             <label className="mb-1 block text-sm font-semibold text-gray-700">Categoría</label>

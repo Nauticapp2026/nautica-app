@@ -200,6 +200,7 @@ export const tipoServicioEnum = pgEnum('tipo_servicio', [
 ]);
 
 export const tipoCobroServicioEnum = pgEnum('tipo_cobro_servicio', ['fijo', 'variable']);
+export const periodoTarifaVariableEnum = pgEnum('periodo_tarifa_variable', ['diaria', 'mensual']);
 
 // Cómo se factura la baja de un servicio cuando el socio cancela antes de fin
 // de mes. 'proporcional' es el comportamiento histórico (precio mensual /
@@ -655,6 +656,10 @@ export const servicios = pgTable(
     nombre: text('nombre').notNull(),
     tipo: tipoServicioEnum('tipo').notNull(),
     tipoCobro: tipoCobroServicioEnum('tipo_cobro').notNull().default('fijo'),
+    // Solo para tipoCobro = 'variable': si el precio es por día o por mes.
+    // NULL en servicios Fijo. Con 'diaria', "Cargar Servicio" pide la
+    // cantidad de días y el cargo único sale de precio diario × días.
+    tarifaVariable: periodoTarifaVariableEnum('tarifa_variable'),
     estado: estadoServicioEnum('estado').default('activo'),
     precio: numeric('precio', { precision: 12, scale: 2 }),
     eslora: numeric('eslora', { precision: 8, scale: 2 }),
@@ -1627,6 +1632,10 @@ export const socioServicios = pgTable(
     // Detalle opcional tipeado al contratar; si es null, el cron usa el
     // nombre de la tarifa como concepto del cargo.
     concepto: text('concepto'),
+    // Solo para contratos de tarifa Variable diaria (servicios.tarifa_variable
+    // = 'diaria'): cantidad de días contratados, tipeada al cargar el
+    // servicio. El cargo único del cron = precio diario × cantidad de días.
+    cantidadDias: integer('cantidad_dias'),
     createdBy: uuid('created_by').references(() => profiles.id, { onDelete: 'set null' }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),

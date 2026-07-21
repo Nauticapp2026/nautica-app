@@ -193,10 +193,11 @@ Lista los servicios que el socio tiene contratados. Es un **contrato**, no un hi
 1. Hacé clic en **Cargar Servicio**.
 2. Elegí el servicio en el buscador (agrupado por categoría, igual que en el Tarifario — solo aparecen tarifas **Activas**).
 3. Completá el **Detalle del servicio** (texto libre, opcional) y la **Fecha de inicio** del servicio (obligatoria). La **Fecha de baja** es opcional — dejala vacía si el servicio sigue vigente.
-4. Elegí el **tipo de comprobante**:
+4. Si el servicio elegido es **Variable con tarifa diaria** (en el buscador su precio aparece como "por día"), aparece un campo más: **Cantidad de días** (obligatorio). El cargo va a ser el precio diario multiplicado por esos días — el total se muestra abajo del campo antes de confirmar, y la cantidad queda visible en la fila del contrato (por ej. "5 días").
+5. Elegí el **tipo de comprobante**:
    - **Fiscal (ARCA)** — el cargo se va a facturar por ARCA cuando corresponda (manual o automático).
    - **Interno** — el cargo queda excluido de toda facturación por ARCA; se consolida después en un comprobante interno desde **Ventas** (ver sección Comprobantes internos).
-5. Confirmá. El sistema muestra: _"Servicio contratado. Todavía no aparece en la cuenta corriente — va a impactar recién cuando corresponda facturarlo."_
+6. Confirmá. El sistema muestra: _"Servicio contratado. Todavía no aparece en la cuenta corriente — va a impactar recién cuando corresponda facturarlo."_
 
 **Editar un servicio contratado:**
 
@@ -794,7 +795,7 @@ Desde aquí definís los precios de los servicios que ofrece tu club.
 
 Las tarifas están agrupadas por categoría. Podés filtrar usando los botones: **Todas**, **Espacio de guarda**, **Cuota social**, **Membresía**, **Expensas ordinarias**, **Expensas extraordinarias** y **Servicio extra**.
 
-Cada tarifa muestra su concepto, un badge **Fijo** o **Variable** (fijo = precio único; variable = se cobra según el metraje de la embarcación), el período de vigencia, el precio y el estado. **Fijo/Variable también define si se repite sola todos los meses**: las Fijas sí, las Variables se cobran una sola vez (ver "¿Qué conceptos entran en la factura automática?" más abajo). En la columna de precio se muestran dos valores:
+Cada tarifa muestra su concepto, un badge **Fijo** o **Variable** (fijo = precio único; variable = se cobra según el metraje de la embarcación) — si la Variable es de **tarifa diaria**, el badge dice **Variable · Diaria** —, el período de vigencia, el precio y el estado. **Fijo/Variable también define si se repite sola todos los meses**: las Fijas sí, las Variables se cobran una sola vez (ver "¿Qué conceptos entran en la factura automática?" más abajo). En la columna de precio se muestran dos valores:
 
 - **Precio c/IVA** — el total que se le cobra al socio, calculado automáticamente sumando la alícuota al precio de lista (precio × (1 + alícuota)).
 - **Precio s/IVA** — el precio de lista que cargaste (sin impuesto). La línea "s/IVA" solo aparece cuando la alícuota es mayor a 0; si la tarifa es **Exento / No gravado** (0 %), no se muestra.
@@ -805,7 +806,12 @@ Cada tarifa muestra su concepto, un badge **Fijo** o **Variable** (fijo = precio
 
 1. Hacé clic en **Nueva tarifa**.
 2. Seleccioná la **Categoría**: Espacio de guarda, Cuota social, Membresía, Expensas ordinarias, Expensas extraordinarias o Servicio extra.
-3. Indicá si el servicio es **Fijo** (precio único) o **Variable** (se cobra según el metraje de la embarcación).
+3. Indicá si el servicio es **Fijo** (precio único) o **Variable** (se cobra según el metraje de la embarcación). Si elegís **Variable**, aparece un campo más, **Tipo de tarifa**:
+   - **Tarifa mensual** — el precio se cobra tal cual, una sola vez (como hasta ahora).
+   - **Tarifa diaria** — el precio que cargás es **por día**. Al cargarle el servicio a un socio, el sistema pide la **cantidad de días** y cobra precio × días.
+
+   > **Importante:** el campo "Cantidad de días" solo existe en **Cargar Servicio** (ficha del socio → Servicios Contratados). Si creás una tarifa de categoría "Espacio de guarda" que sea Variable con tarifa diaria y la asignás desde **Espacios → Asignar espacio**, ahí no se piden los días y se cobraría el precio de un solo día. Para tarifas diarias, usá siempre **Cargar Servicio**.
+
 4. Ingresá el **Precio (sin IVA)** y la **Alícuota de IVA**: **Exento / No gravado**, **10,5 %** o **21 %**. El sistema suma el IVA automáticamente para calcular lo que se le cobra al socio.
 5. Configurá el **Plazo de pago** (días) y la **Vigencia**:
    - El **Plazo de pago** (Contado, 5, 10, 15, 20 o 30 días) define la **fecha de vencimiento** de los cargos de esa tarifa en la Cuenta Corriente del socio: vencimiento = fecha de la factura + el plazo elegido.

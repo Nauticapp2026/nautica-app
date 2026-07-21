@@ -59,6 +59,8 @@ export async function crearSocioServicio(
     fechaBaja?: string | null;
     comprobanteInterno?: boolean;
     concepto?: string | null;
+    // Solo para tarifas Variable diaria: días contratados.
+    cantidadDias?: number | null;
     createdBy: string;
   },
 ): Promise<{ id: string; numeroOperacion: number }> {
@@ -86,6 +88,7 @@ export async function crearSocioServicio(
       fechaBaja: params.fechaBaja ?? null,
       comprobanteInterno: params.comprobanteInterno ?? false,
       concepto: params.concepto ?? null,
+      cantidadDias: params.cantidadDias ?? null,
       createdBy: params.createdBy,
     })
     .returning({ id: socioServicios.id });

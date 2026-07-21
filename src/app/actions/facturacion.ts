@@ -1121,6 +1121,9 @@ export type CargarServicioData = {
   comprobante: 'interno' | 'fiscal';
   fechaInicio: string;
   fechaBaja?: string | null;
+  // Solo para tarifas Variable diaria: días contratados (el cargo único del
+  // cron = precio diario × días). Se ignora para el resto de las tarifas.
+  cantidadDias?: number | null;
 };
 
 export async function cargarServicioAction(data: CargarServicioData): Promise<{
@@ -1157,6 +1160,8 @@ export async function cargarServicioAction(data: CargarServicioData): Promise<{
     .select({
       nombre: servicios.nombre,
       estado: servicios.estado,
+      tipoCobro: servicios.tipoCobro,
+      tarifaVariable: servicios.tarifaVariable,
       vigenciaDesde: servicios.vigenciaDesde,
       vigenciaHasta: servicios.vigenciaHasta,
     })
@@ -1172,6 +1177,14 @@ export async function cargarServicioAction(data: CargarServicioData): Promise<{
     return { error: 'Esta tarifa no está vigente. No se puede cargar el servicio.' };
   }
 
+  // Tarifa Variable diaria: la cantidad de días es obligatoria (el cargo
+  // único del cron = precio diario × días). Para el resto se fuerza null.
+  const esDiaria = serv.tipoCobro === 'variable' && serv.tarifaVariable === 'diaria';
+  if (esDiaria && (!Number.isInteger(data.cantidadDias) || (data.cantidadDias ?? 0) < 1)) {
+    return { error: 'Indicá la cantidad de días (un número entero mayor a 0).' };
+  }
+  const cantidadDias = esDiaria ? (data.cantidadDias ?? null) : null;
+
   const conceptoFinal = data.concepto.trim() || null;
 
   await db.transaction(async (tx) => {
@@ -1183,6 +1196,7 @@ export async function cargarServicioAction(data: CargarServicioData): Promise<{
       fechaBaja: data.fechaBaja,
       comprobanteInterno: esInterno,
       concepto: conceptoFinal,
+      cantidadDias,
       createdBy: ctx.profile.id,
     });
   });

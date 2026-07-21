@@ -139,6 +139,10 @@ type Servicio = {
   id: string;
   nombre: string;
   tipo: string;
+  tipoCobro: 'fijo' | 'variable';
+  // Solo para Variable: 'diaria' = el precio es por día y al cargar el
+  // servicio se pide la cantidad de días. Null en Fijo.
+  tarifaVariable: 'diaria' | 'mensual' | null;
   precio: string | null;
   alicuotaIva: string | null;
 };
@@ -161,6 +165,8 @@ type ServicioContratado = {
   fechaBaja: string | null;
   concepto: string | null;
   comprobanteInterno: boolean;
+  // Solo para contratos de tarifa Variable diaria: días contratados.
+  cantidadDias: number | null;
 };
 
 type Navegante = {
@@ -386,6 +392,10 @@ const CATEGORIA_SERVICIO_LABEL: Record<string, string> = {
 
 // ─── Agregar Servicio Modal ───────────────────────────────────────────────────
 
+function esTarifaDiaria(s: Servicio | undefined): boolean {
+  return s?.tipoCobro === 'variable' && s.tarifaVariable === 'diaria';
+}
+
 function ServicioCombobox({
   servicios,
   value,
@@ -412,9 +422,9 @@ function ServicioCombobox({
   }, []);
 
   function labelDe(s: Servicio): string {
-    return s.precio
-      ? `${s.nombre} — ${fmt(precioConIva(parseFloat(s.precio), parseFloat(s.alicuotaIva ?? '0')))}`
-      : s.nombre;
+    if (!s.precio) return s.nombre;
+    const precio = fmt(precioConIva(parseFloat(s.precio), parseFloat(s.alicuotaIva ?? '0')));
+    return `${s.nombre} — ${precio}${esTarifaDiaria(s) ? ' por día' : ''}`;
   }
 
   const grupos = useMemo(() => {
@@ -472,6 +482,7 @@ function ServicioCombobox({
                     {s.precio && (
                       <span className="text-xs text-gray-400">
                         {fmt(precioConIva(parseFloat(s.precio), parseFloat(s.alicuotaIva ?? '0')))}
+                        {esTarifaDiaria(s) ? ' por día' : ''}
                       </span>
                     )}
                   </button>
@@ -504,11 +515,17 @@ function AgregarServicioModal({
   const [fechaInicio, setFechaInicio] = useState(todayISODate);
   const [fechaBaja, setFechaBaja] = useState('');
   const [comprobante, setComprobante] = useState<'interno' | 'fiscal'>('interno');
+  const [cantidadDias, setCantidadDias] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState(false);
   const [isPending, startTransition] = useTransition();
 
-  const isValid = Boolean(servicioId && fechaInicio);
+  const seleccionado = servicios.find((s) => s.id === servicioId);
+  const esDiaria = esTarifaDiaria(seleccionado);
+  const diasNum = Number(cantidadDias);
+  const diasValidos = Number.isInteger(diasNum) && diasNum >= 1;
+
+  const isValid = Boolean(servicioId && fechaInicio) && (!esDiaria || diasValidos);
 
   function handleClose() {
     setServicioId('');
@@ -516,6 +533,7 @@ function AgregarServicioModal({
     setFechaInicio(todayISODate());
     setFechaBaja('');
     setComprobante('interno');
+    setCantidadDias('');
     setError(null);
     setResult(false);
     onClose();
@@ -531,6 +549,7 @@ function AgregarServicioModal({
         comprobante,
         fechaInicio,
         fechaBaja: fechaBaja || null,
+        cantidadDias: esDiaria ? diasNum : null,
       });
       if (res.error) {
         setError(res.error);
@@ -641,6 +660,36 @@ function AgregarServicioModal({
                   />
                 </div>
               </div>
+
+              {esDiaria && (
+                <div>
+                  <label
+                    className="mb-1.5 block text-xs font-semibold"
+                    style={{ color: '#101828' }}
+                  >
+                    Cantidad de días
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    step={1}
+                    className={inputCls}
+                    placeholder="Ej: 5"
+                    value={cantidadDias}
+                    onChange={(e) => setCantidadDias(e.target.value)}
+                  />
+                  <p className="mt-1.5 text-xs text-gray-400">
+                    {diasValidos && seleccionado?.precio
+                      ? `Total a cobrar: ${fmt(
+                          precioConIva(
+                            parseFloat(seleccionado.precio) * diasNum,
+                            parseFloat(seleccionado.alicuotaIva ?? '0'),
+                          ),
+                        )} (tarifa diaria × ${diasNum} ${diasNum === 1 ? 'día' : 'días'})`
+                      : 'Esta tarifa es por día: se cobra el precio del tarifario multiplicado por los días que indiques.'}
+                  </p>
+                </div>
+              )}
 
               <div>
                 <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
@@ -3107,6 +3156,11 @@ function ServiciosContratadosTab({
                               }`}
                             >
                               {sc.servicioTipoCobro === 'fijo' ? 'Fijo' : 'Variable'}
+                            </span>
+                          )}
+                          {sc.cantidadDias != null && (
+                            <span className="text-xs text-gray-400">
+                              {sc.cantidadDias} {sc.cantidadDias === 1 ? 'día' : 'días'}
                             </span>
                           )}
                         </div>

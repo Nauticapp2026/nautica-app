@@ -442,6 +442,8 @@ export async function runMonthlyGeneracionServiciosRecurrentes(
       servicioPrecio: servicios.precio,
       servicioAlicuotaIva: servicios.alicuotaIva,
       tipoCobro: servicios.tipoCobro,
+      tarifaVariable: servicios.tarifaVariable,
+      cantidadDias: socioServicios.cantidadDias,
       diaFacturacion: guarderias.diaFacturacion,
       facturacionPrimerHabil: guarderias.facturacionPrimerHabil,
     })
@@ -504,11 +506,16 @@ export async function runMonthlyGeneracionServiciosRecurrentes(
     const concepto = c.concepto ?? c.servicioNombre;
 
     if (c.tipoCobro === 'variable') {
+      // Tarifa Variable diaria: el precio del tarifario es por día y el
+      // contrato guarda cuántos días se contrataron — el cargo único es
+      // (precio neto × días) + IVA. Sin días (tarifa mensual o contratos
+      // viejos), se cobra el precio tal cual, como siempre.
+      const dias = c.tarifaVariable === 'diaria' ? c.cantidadDias : null;
       const res = await ensureOnceMovimientoServicio({
         socioId: c.socioId,
         servicioId: c.servicioId,
-        precio,
-        concepto,
+        precio: dias != null ? precioConIva(precioNeto * dias, alicuotaIva) : precio,
+        concepto: dias != null ? `${concepto} (${dias} ${dias === 1 ? 'día' : 'días'})` : concepto,
         comprobanteInterno: c.comprobanteInterno,
         now,
       });

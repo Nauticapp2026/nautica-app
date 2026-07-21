@@ -43,6 +43,9 @@ type Tipo = (typeof TIPOS)[number];
 const TIPOS_COBRO = ['fijo', 'variable'] as const;
 type TipoCobro = (typeof TIPOS_COBRO)[number];
 
+const PERIODOS_VARIABLE = ['diaria', 'mensual'] as const;
+type PeriodoTarifaVariable = (typeof PERIODOS_VARIABLE)[number];
+
 const ESTADOS = ['activo', 'inactivo'] as const;
 type Estado = (typeof ESTADOS)[number];
 
@@ -89,6 +92,9 @@ type PoliticaBajaAnticipada = (typeof POLITICAS_BAJA_ANTICIPADA)[number];
 export type TarifaInputBase = {
   nombre: string;
   tipoCobro: TipoCobro;
+  // Solo aplica a Variable ('diaria' = el precio es por día); para Fijo se
+  // fuerza a null server-side sea lo que sea que mande el cliente.
+  tarifaVariable: PeriodoTarifaVariable | null;
   precio: number;
   alicuotaIva: AlicuotaIva;
   plazoPagoDias: PlazoPagoDias;
@@ -146,6 +152,9 @@ function validar(data: CreateTarifaData): string | null {
   if (!data.nombre.trim()) return 'El concepto es obligatorio.';
   if (!TIPOS.includes(data.tipo)) return 'Categoría inválida.';
   if (!TIPOS_COBRO.includes(data.tipoCobro)) return 'Tipo de cobro inválido.';
+  if (data.tarifaVariable !== null && !PERIODOS_VARIABLE.includes(data.tarifaVariable)) {
+    return 'Tipo de tarifa variable inválido.';
+  }
   if (!(PLAZOS_PAGO as readonly number[]).includes(data.plazoPagoDias)) {
     return 'Plazo de pago inválido.';
   }
@@ -229,6 +238,9 @@ function buildValues(data: CreateTarifaData) {
     nombre: data.nombre.trim(),
     tipo: data.tipo,
     tipoCobro: data.tipoCobro,
+    // Solo tiene sentido para Variable; si el cliente no lo manda, las
+    // Variables se comportan como hasta ahora (precio por mes).
+    tarifaVariable: data.tipoCobro === 'variable' ? (data.tarifaVariable ?? 'mensual') : null,
     precio: data.precio.toFixed(2),
     alicuotaIva: data.alicuotaIva.toFixed(2),
     plazoPagoDias: data.plazoPagoDias,

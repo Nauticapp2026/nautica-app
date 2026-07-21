@@ -141,6 +141,8 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
         id: serviciosTable.id,
         nombre: serviciosTable.nombre,
         tipo: serviciosTable.tipo,
+        tipoCobro: serviciosTable.tipoCobro,
+        tarifaVariable: serviciosTable.tarifaVariable,
         precio: serviciosTable.precio,
         alicuotaIva: serviciosTable.alicuotaIva,
       })
@@ -330,6 +332,7 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
         fechaBaja: socioServicios.fechaBaja,
         concepto: socioServicios.concepto,
         comprobanteInterno: socioServicios.comprobanteInterno,
+        cantidadDias: socioServicios.cantidadDias,
       })
       .from(socioServicios)
       .innerJoin(serviciosTable, eq(serviciosTable.id, socioServicios.servicioId))
@@ -577,6 +580,7 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
         fechaBaja: s.fechaBaja,
         concepto: s.concepto,
         comprobanteInterno: s.comprobanteInterno,
+        cantidadDias: s.cantidadDias,
       }))}
       navegantes={navegantesList.map((n) => ({
         ...n,
