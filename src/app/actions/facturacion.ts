@@ -1,11 +1,12 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { and, asc, count, eq, inArray, like, ne } from 'drizzle-orm';
+import { and, asc, count, eq, inArray, like, ne, sql } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 
 import { db } from '@/lib/db';
 import {
+  cargosPendientes,
   facturacion,
   facturacionItemMovimientos,
   facturacionItems,
@@ -14,6 +15,7 @@ import {
   movimientosCuentaCorriente,
   profiles,
   servicios,
+  socioServicios,
 } from '@/lib/db/schema';
 import { getActiveMarina } from '@/lib/auth/session';
 import { fechaCalendariaArg } from '@/lib/dates';
@@ -21,6 +23,13 @@ import { sendEmail } from '@/lib/email/resend';
 import { reciboEmail } from '@/lib/email/templates/recibo';
 import { identidadFacturacion, type SocioFacturacion } from '@/lib/facturacion/identidad';
 import { getCargosSaldadosFifo } from '@/lib/reconciliar-cuenta';
+import {
+  claveItem,
+  listarPendientesFacturar,
+  type DbExecutor,
+  type ItemPendiente,
+  type ItemPendienteKey,
+} from '@/lib/pendientes-facturar';
 import { crearSocioServicio, hayContratoVigente } from '@/lib/socio-servicios';
 import { MOTIVO_NOTA_LABEL, type MotivoNota } from './nota-constants';
 import { CATEGORIA_SERVICIO_LABEL } from './categoria-constants';
@@ -90,14 +99,28 @@ export type CreateInvoiceData = {
   vencimiento: string;
   desde: string;
   hasta: string;
-  /** Si se provee, se marcan como facturados/pagados y se linkean a items de la factura. */
+  /**
+   * Pendientes de facturar computados desde los contratos vigentes (modelo
+   * "los cargos nacen al emitir"): la emisión los re-computa server-side y
+   * crea sus movimientos dentro de la misma transacción del comprobante.
+   */
+  itemKeys?: ItemPendienteKey[];
+  /**
+   * LEGACY (transición): cargos ya existentes en cuenta corriente sin
+   * comprobante. Se marcan como facturados/pagados y se linkean a items de
+   * la factura. Se retira cuando el pool legacy drene.
+   */
   movimientoIds?: string[];
   /** Línea libre si no hay movimientos. */
   items?: { descripcion: string; cantidad: number; importeUnitario: number }[];
 };
 
 export type CreateBatchInvoiceData = {
-  socioMovimientos: { socioId: string; movimientoIds: string[] }[];
+  socioMovimientos: {
+    socioId: string;
+    movimientoIds?: string[];
+    itemKeys?: ItemPendienteKey[];
+  }[];
   medioPago: MedioPago;
   fecha: string;
 };
@@ -191,6 +214,160 @@ async function nextFolioLocal(gId: string, prefix: 'FM' | 'FL' | 'FA'): Promise<
     .from(facturacion)
     .where(and(eq(facturacion.guarderiaId, gId), like(facturacion.folioLocal, `${prefix}-%`)));
   return `${prefix}-${String(Number(n) + 1).padStart(6, '0')}`;
+}
+
+// ─── Emisión con cargos que nacen al emitir ─────────────────────────────────
+// Patrón reservar → emitir → confirmar: la transacción de reserva (TX1) crea
+// los movimientos y la factura con un sentinel `rechazada`; la llamada a
+// TusFacturas ocurre DESPUÉS del commit (HTTP largo fuera de la tx del
+// pooler); el resultado confirma (limpia el sentinel) o deja la factura
+// rechazada con el motivo real — recuperable por Reenviar. Un crash a mitad
+// deja el mismo estado que un rechazo: nada se pierde ni se duplica.
+
+const SENTINEL_EMISION = 'EMISION_EN_CURSO';
+
+/** Error de emisión con mensaje apto para mostrar al admin. */
+class EmisionError extends Error {}
+
+function esUniqueViolation(err: unknown): boolean {
+  return (
+    typeof err === 'object' &&
+    err !== null &&
+    'code' in err &&
+    (err as { code?: string }).code === '23505'
+  );
+}
+
+function mensajeErrorEmision(err: unknown): string | null {
+  if (err instanceof EmisionError) return err.message;
+  if (esUniqueViolation(err)) {
+    return 'Uno o más servicios ya fueron facturados para este período. Actualizá la página y volvé a intentar.';
+  }
+  return null;
+}
+
+function inicioMesSiguiente(d: Date): Date {
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1, 0, 0, 0, 0));
+}
+
+/**
+ * Serializa las emisiones de un mismo socio (manual vs. cron, dos admins,
+ * doble click). Advisory lock scoped a la transacción: seguro con el pooler
+ * de Supabase en modo transacción (toda la tx viaja por una sola conexión).
+ * Nunca usar la variante de sesión acá.
+ */
+async function lockEmisionSocio(tx: DbExecutor, gId: string, socioId: string): Promise<void> {
+  await tx.execute(
+    sql`SELECT pg_advisory_xact_lock(hashtextextended(${'fact:' + gId + ':' + socioId}, 0))`,
+  );
+}
+
+type FuenteDetalle = {
+  descripcion: string;
+  cantidad: number;
+  importeUnitario: number;
+  alicuotaIva?: number | null;
+  /** Movimiento a linkear al item de la factura (null solo en línea libre). */
+  movimientoId: string | null;
+};
+
+/**
+ * Materializa dentro de la transacción de emisión los ítems pendientes
+ * seleccionados: re-computa los pendientes (post-lock), matchea la selección
+ * del cliente por key y crea el movimiento de cada uno (nace 'facturado').
+ * Además consume los cargos_pendientes (baja anticipada) y cierra los
+ * contratos Variable. Los índices únicos de la mig 0133 son el backstop
+ * físico si algo se filtra igual.
+ */
+async function materializarItemsPendientes(
+  tx: DbExecutor,
+  params: {
+    guarderiaId: string;
+    socioId: string;
+    keys: ItemPendienteKey[];
+    canal: 'fiscal' | 'interno';
+    now: Date;
+  },
+): Promise<FuenteDetalle[]> {
+  const { guarderiaId, socioId, keys, canal, now } = params;
+  const vigentes = await listarPendientesFacturar(guarderiaId, { socioId, now, dbx: tx });
+  const porClave = new Map(vigentes.map((i) => [claveItem(i.key), i]));
+  const todayStr = now.toISOString().slice(0, 10);
+  const fuentes: FuenteDetalle[] = [];
+
+  for (const key of keys) {
+    const item = porClave.get(claveItem(key));
+    if (!item) {
+      throw new EmisionError(
+        'Uno o más servicios ya fueron facturados o cambiaron. Actualizá la página y volvé a intentar.',
+      );
+    }
+    if (canal === 'fiscal' && item.comprobanteInterno) {
+      throw new EmisionError(
+        'Los servicios marcados como Interno se emiten con comprobante interno, no con factura.',
+      );
+    }
+    if (canal === 'interno' && !item.comprobanteInterno) {
+      throw new EmisionError(
+        'Solo se pueden incluir servicios marcados como Interno en un comprobante interno.',
+      );
+    }
+
+    const importe = item.importe.toFixed(2);
+    const [mov] = await tx
+      .insert(movimientosCuentaCorriente)
+      .values({
+        socioId,
+        servicioId: item.servicioId,
+        espacioId: item.espacioId,
+        socioServicioId: item.contratoId,
+        periodo: item.periodo,
+        concepto: item.concepto,
+        tipo: item.tipoMovimiento,
+        estado: 'facturado',
+        debe: importe,
+        importeSigned: importe,
+        fecha: now,
+        proximoPago: item.tipoMovimiento === 'mensual' ? inicioMesSiguiente(now) : null,
+        comprobanteInterno: item.comprobanteInterno,
+      })
+      .returning({ id: movimientosCuentaCorriente.id });
+
+    if (item.key.origen === 'baja') {
+      const consumido = await tx
+        .update(cargosPendientes)
+        .set({ movimientoId: mov.id, updatedAt: new Date() })
+        .where(
+          and(
+            eq(cargosPendientes.id, item.key.cargoPendienteId),
+            sql`${cargosPendientes.movimientoId} IS NULL`,
+          ),
+        )
+        .returning({ id: cargosPendientes.id });
+      if (consumido.length === 0) {
+        throw new EmisionError(
+          'El cobro por baja ya fue incluido en otro comprobante. Actualizá la página.',
+        );
+      }
+    }
+
+    if (item.esVariable && item.contratoId) {
+      await tx
+        .update(socioServicios)
+        .set({ fechaBaja: todayStr, updatedAt: new Date() })
+        .where(eq(socioServicios.id, item.contratoId));
+    }
+
+    fuentes.push({
+      descripcion: item.concepto,
+      cantidad: 1,
+      importeUnitario: item.importe,
+      alicuotaIva: item.alicuotaIva,
+      movimientoId: mov.id,
+    });
+  }
+
+  return fuentes;
 }
 
 function buildCliente(
@@ -417,76 +594,182 @@ export async function crearFacturaCore(
     usertoken: guarderia.tusfacturasUsertoken,
   };
 
-  // 2. Construir items desde movimientos (si llegaron) o desde items libres
-  let items: {
-    descripcion: string;
-    cantidad: number;
-    importeUnitario: number;
-    alicuotaIva?: number | null;
-  }[] = [];
-  let movimientoIds = data.movimientoIds ?? [];
+  // 2. Reservar (TX1): materializar los ítems computados, tomar los cargos
+  // legacy, e insertar la factura con sentinel + items + links — todo en una
+  // transacción, ANTES de tocar ARCA. Si algo falla acá, no se creó nada en
+  // TusFacturas y los pendientes siguen intactos.
+  const itemKeys = data.itemKeys ?? [];
+  const legacyIds = data.movimientoIds ?? [];
 
-  if (movimientoIds.length > 0) {
-    const movs = await db
-      .select({
-        id: movimientosCuentaCorriente.id,
-        concepto: movimientosCuentaCorriente.concepto,
-        debe: movimientosCuentaCorriente.debe,
-        comprobanteInterno: movimientosCuentaCorriente.comprobanteInterno,
-        // Alícuota real del servicio del cargo (si lo tiene) para no asumir
-        // 21% en servicios Exentos o al 10,5%. Null si el cargo es libre
-        // ("Cargar consumo" sin servicio) — se usa el default.
-        servicioAlicuotaIva: servicios.alicuotaIva,
-        servicioTipo: servicios.tipo,
-      })
-      .from(movimientosCuentaCorriente)
-      .leftJoin(servicios, eq(servicios.id, movimientosCuentaCorriente.servicioId))
-      .where(
-        and(
-          inArray(movimientosCuentaCorriente.id, movimientoIds),
-          eq(movimientosCuentaCorriente.socioId, data.socioId),
-        ),
-      );
+  if (itemKeys.length === 0 && legacyIds.length === 0 && !(data.items && data.items.length > 0)) {
+    return { error: 'No hay items para facturar.' };
+  }
 
-    // Guard duro: un cargo con comprobante interno NO se factura (no va por
-    // TusFacturas). Las listas ya lo ocultan, pero el id podría llegar igual;
-    // acá se rechaza del lado del server.
-    if (movs.some((m) => m.comprobanteInterno)) {
-      return { error: 'No se puede facturar un cargo con comprobante interno.' };
-    }
-
-    // Guard duro: un cargo ya cubierto por el pool de haberes (FIFO) — aunque
-    // su `estado` todavía diga 'no_pagado', por ej. un cobro Payway que no
-    // llegó a reconciliarse — no se vuelve a facturar. Mismo criterio que ya
-    // usa auto-facturacion.ts; acá faltaba en el camino manual/lote.
+  // Guard legacy (pre-tx): un cargo ya cubierto por el pool de haberes (FIFO)
+  // — aunque su `estado` todavía diga 'no_pagado', por ej. un cobro Payway
+  // que no llegó a reconciliarse — no se vuelve a facturar.
+  if (legacyIds.length > 0) {
     const saldados = await getCargosSaldadosFifo(data.socioId);
-    if (movs.some((m) => saldados.has(m.id))) {
+    if (legacyIds.some((id) => saldados.has(id))) {
       return {
         error:
           'Uno o más cargos ya están cubiertos por un pago y no se pueden facturar. Actualizá la página.',
       };
     }
-
-    items = movs.map((m) => ({
-      descripcion: descripcionConCategoria(m.concepto, m.servicioTipo),
-      cantidad: 1,
-      importeUnitario: parseFloat(m.debe ?? '0'),
-      alicuotaIva: m.servicioAlicuotaIva != null ? Number(m.servicioAlicuotaIva) : null,
-    }));
-    movimientoIds = movs.map((m) => m.id);
-  } else if (data.items && data.items.length > 0) {
-    items = data.items;
   }
 
-  if (items.length === 0) return { error: 'No hay items para facturar.' };
-
-  const total = totalItems(items);
-  if (total <= 0) return { error: 'El total de la factura debe ser mayor a 0.' };
-
-  // 3. Pre-generar ID para usar como external_reference
   const facturaId = randomUUID();
+  const now = new Date();
+  const estadoFactura = data.estado ?? 'pendiente';
 
-  // 4. Construir payload y llamar a la API
+  const fuentes: FuenteDetalle[] = [];
+  let total = 0;
+  let descripcionFactura = '';
+  let montos = { montoNeto: 0, montoExento: 0, montoIva: 0 };
+
+  try {
+    await db.transaction(async (tx) => {
+      await lockEmisionSocio(tx, gId, data.socioId);
+
+      if (itemKeys.length > 0) {
+        fuentes.push(
+          ...(await materializarItemsPendientes(tx, {
+            guarderiaId: gId,
+            socioId: data.socioId,
+            keys: itemKeys,
+            canal: 'fiscal',
+            now,
+          })),
+        );
+      }
+
+      if (legacyIds.length > 0) {
+        const movs = await tx
+          .select({
+            id: movimientosCuentaCorriente.id,
+            concepto: movimientosCuentaCorriente.concepto,
+            debe: movimientosCuentaCorriente.debe,
+            comprobanteInterno: movimientosCuentaCorriente.comprobanteInterno,
+            // Alícuota real del servicio del cargo (si lo tiene) para no
+            // asumir 21% en servicios Exentos o al 10,5%.
+            servicioAlicuotaIva: servicios.alicuotaIva,
+            servicioTipo: servicios.tipo,
+          })
+          .from(movimientosCuentaCorriente)
+          .leftJoin(servicios, eq(servicios.id, movimientosCuentaCorriente.servicioId))
+          .where(
+            and(
+              inArray(movimientosCuentaCorriente.id, legacyIds),
+              eq(movimientosCuentaCorriente.socioId, data.socioId),
+              // Re-check post-lock: si otro proceso los facturó mientras
+              // tanto, ya no están 'no_pagado' y la emisión aborta limpia.
+              eq(movimientosCuentaCorriente.estado, 'no_pagado'),
+            ),
+          );
+
+        if (movs.length !== legacyIds.length) {
+          throw new EmisionError(
+            'Uno o más cargos ya fueron facturados. Actualizá la página y volvé a intentar.',
+          );
+        }
+        // Guard duro: un cargo con comprobante interno NO se factura (no va
+        // por TusFacturas). Las listas ya lo ocultan, pero el id podría
+        // llegar igual; acá se rechaza del lado del server.
+        if (movs.some((m) => m.comprobanteInterno)) {
+          throw new EmisionError('No se puede facturar un cargo con comprobante interno.');
+        }
+
+        for (const m of movs) {
+          fuentes.push({
+            descripcion: descripcionConCategoria(m.concepto, m.servicioTipo),
+            cantidad: 1,
+            importeUnitario: parseFloat(m.debe ?? '0'),
+            alicuotaIva: m.servicioAlicuotaIva != null ? Number(m.servicioAlicuotaIva) : null,
+            movimientoId: m.id,
+          });
+        }
+        await tx
+          .update(movimientosCuentaCorriente)
+          .set({ estado: 'facturado' })
+          .where(
+            inArray(
+              movimientosCuentaCorriente.id,
+              movs.map((m) => m.id),
+            ),
+          );
+      }
+
+      if (fuentes.length === 0 && data.items && data.items.length > 0) {
+        for (const it of data.items) {
+          fuentes.push({ ...it, alicuotaIva: null, movimientoId: null });
+        }
+      }
+
+      if (fuentes.length === 0) throw new EmisionError('No hay items para facturar.');
+      total = totalItems(fuentes);
+      if (total <= 0) throw new EmisionError('El total de la factura debe ser mayor a 0.');
+
+      descripcionFactura =
+        data.descripcion?.trim() ||
+        `Factura ${TIPO_FACTURA_API[data.tipoFactura]} — ${fuentes[0].descripcion}${
+          fuentes.length > 1 ? ` (+${fuentes.length - 1})` : ''
+        }`;
+      montos = desglosarMontos(fuentes, alicuotaPara(data.tipoFactura));
+
+      await tx.insert(facturacion).values({
+        id: facturaId,
+        guarderiaId: gId,
+        socioId: data.socioId,
+        descripcion: descripcionFactura,
+        tipoFactura: data.tipoFactura,
+        estado: estadoFactura,
+        condicionVenta: data.condicionVenta,
+        medioPago: data.medioPago,
+        importe: total.toFixed(2),
+        montoNeto: montos.montoNeto.toFixed(2),
+        montoExento: montos.montoExento.toFixed(2),
+        montoIva: montos.montoIva.toFixed(2),
+        emision: fechaCalendariaArg(data.fecha),
+        desde: fechaCalendariaArg(data.desde),
+        hasta: fechaCalendariaArg(data.hasta),
+        vencimiento: fechaCalendariaArg(data.vencimiento),
+        externalReference: facturaId,
+        rechazada: true,
+        motivoError: SENTINEL_EMISION,
+      });
+
+      // Items + links por id real del movimiento (nada posicional).
+      for (const f of fuentes) {
+        const [inserted] = await tx
+          .insert(facturacionItems)
+          .values({
+            facturacionId: facturaId,
+            socioId: data.socioId,
+            importe: (f.cantidad * f.importeUnitario).toFixed(2),
+            confirmado: true,
+          })
+          .returning({ id: facturacionItems.id });
+
+        if (f.movimientoId) {
+          await tx.insert(facturacionItemMovimientos).values({
+            facturacionItemId: inserted.id,
+            movimientoId: f.movimientoId,
+          });
+        }
+      }
+    });
+  } catch (err) {
+    const msg = mensajeErrorEmision(err);
+    if (msg) return { error: msg };
+    console.error('Error reservando la emisión de la factura', { facturaId, err });
+    return { error: 'No se pudo iniciar la emisión. Probá de nuevo en unos segundos.' };
+  }
+
+  // 3. Emitir en TusFacturas — fuera de la transacción (HTTP largo). La
+  // reserva ya está commiteada: si esto falla, la factura queda `rechazada`
+  // con sus cargos linkeados (el período queda tomado por este intento) y se
+  // resuelve por Reenviar. Un crash acá deja el sentinel EMISION_EN_CURSO —
+  // mismo estado, mismo camino de salida.
   const cliente = buildCliente({ ...socio, condicionVenta: data.condicionVenta });
   const comprobante: TusFacturasComprobante = {
     fecha: toTusFecha(data.fecha),
@@ -502,7 +785,7 @@ export async function crearFacturaCore(
     periodo_facturado_hasta: toTusFecha(data.hasta),
     rubro: rubroGuarderia,
     rubro_grupo_contable: process.env.TUSFACTURAS_RUBRO_GRUPO ?? 'Servicios',
-    detalle: buildDetalle(items, data.tipoFactura),
+    detalle: buildDetalle(fuentes, data.tipoFactura),
     total: total.toFixed(2),
     pagos: {
       formas_pago: buildPagos(total, data.medioPago),
@@ -510,140 +793,48 @@ export async function crearFacturaCore(
     },
   };
 
-  const descripcionFactura =
-    data.descripcion?.trim() ||
-    `Factura ${TIPO_FACTURA_API[data.tipoFactura]} — ${items[0].descripcion}${
-      items.length > 1 ? ` (+${items.length - 1})` : ''
-    }`;
-  const montos = desglosarMontos(items, alicuotaPara(data.tipoFactura));
-
   let apiResponse;
   try {
     apiResponse = await crearFactura({ cliente, comprobante }, credsOverride);
   } catch (err) {
     const motivoError =
       err instanceof Error ? err.message : 'Error al emitir factura en TusFacturas.';
-    // ARCA rechazó el comprobante: se guarda igual (sin folioLocal/codigo/cae)
-    // para poder mostrarlo en Ventas y reenviarlo corregido, en vez de perder
-    // el intento. Los cargos quedan "facturado" — tomados por este intento,
-    // no disponibles para facturarse por otro lado hasta reenviar y resolver.
     try {
-      await db.insert(facturacion).values({
-        id: facturaId,
-        guarderiaId: gId,
-        socioId: data.socioId,
-        descripcion: descripcionFactura,
-        tipoFactura: data.tipoFactura,
-        estado: data.estado ?? 'pendiente',
-        condicionVenta: data.condicionVenta,
-        medioPago: data.medioPago,
-        importe: total.toFixed(2),
-        montoNeto: montos.montoNeto.toFixed(2),
-        montoExento: montos.montoExento.toFixed(2),
-        montoIva: montos.montoIva.toFixed(2),
-        emision: fechaCalendariaArg(data.fecha),
-        desde: fechaCalendariaArg(data.desde),
-        hasta: fechaCalendariaArg(data.hasta),
-        vencimiento: fechaCalendariaArg(data.vencimiento),
-        externalReference: facturaId,
-        rechazada: true,
-        motivoError,
-      });
-
-      for (let i = 0; i < items.length; i++) {
-        const it = items[i];
-        const [inserted] = await db
-          .insert(facturacionItems)
-          .values({
-            facturacionId: facturaId,
-            socioId: data.socioId,
-            importe: (it.cantidad * it.importeUnitario).toFixed(2),
-            confirmado: true,
-          })
-          .returning({ id: facturacionItems.id });
-
-        if (movimientoIds[i]) {
-          await db.insert(facturacionItemMovimientos).values({
-            facturacionItemId: inserted.id,
-            movimientoId: movimientoIds[i],
-          });
-        }
-      }
-
-      if (movimientoIds.length > 0) {
-        await db
-          .update(movimientosCuentaCorriente)
-          .set({ estado: 'facturado' })
-          .where(inArray(movimientosCuentaCorriente.id, movimientoIds));
-      }
-
+      await db.update(facturacion).set({ motivoError }).where(eq(facturacion.id, facturaId));
       revalidatePath('/ventas');
       revalidatePath(`/usuarios/${data.socioId}`);
     } catch (persistErr) {
-      console.error('No se pudo guardar la factura rechazada', { facturaId, persistErr });
+      console.error('No se pudo registrar el motivo del rechazo', { facturaId, persistErr });
     }
-
     return { error: motivoError, facturaId };
   }
 
-  // 5. Persistir factura + items + linkear movimientos
+  // 4. Confirmar: limpiar el sentinel y completar los datos de ARCA.
   try {
-    const estadoFactura = data.estado ?? 'pendiente';
     const folioLocal = opts?.folioPrefix ? await nextFolioLocal(gId, opts.folioPrefix) : null;
 
-    await db.insert(facturacion).values({
-      id: facturaId,
-      guarderiaId: gId,
-      socioId: data.socioId,
-      codigo: apiResponse.comprobante_nro ?? null,
-      folioLocal,
-      archivo: apiResponse.comprobante_pdf_url ?? null,
-      cae: apiResponse.cae ?? null,
-      caeVencimiento: parseTusFecha(apiResponse.vencimiento_cae),
-      descripcion: descripcionFactura,
-      tipoFactura: data.tipoFactura,
-      estado: estadoFactura,
-      condicionVenta: data.condicionVenta,
-      medioPago: data.medioPago,
-      importe: total.toFixed(2),
-      montoNeto: montos.montoNeto.toFixed(2),
-      montoExento: montos.montoExento.toFixed(2),
-      montoIva: montos.montoIva.toFixed(2),
-      emision: fechaCalendariaArg(data.fecha),
-      desde: fechaCalendariaArg(data.desde),
-      hasta: fechaCalendariaArg(data.hasta),
-      vencimiento: fechaCalendariaArg(data.vencimiento),
-      externalReference: facturaId,
-    });
+    await db
+      .update(facturacion)
+      .set({
+        codigo: apiResponse.comprobante_nro ?? null,
+        folioLocal,
+        archivo: apiResponse.comprobante_pdf_url ?? null,
+        cae: apiResponse.cae ?? null,
+        caeVencimiento: parseTusFecha(apiResponse.vencimiento_cae),
+        rechazada: false,
+        motivoError: null,
+      })
+      .where(eq(facturacion.id, facturaId));
 
-    // Insertar items y linkear movimientos
-    for (let i = 0; i < items.length; i++) {
-      const it = items[i];
-      const [inserted] = await db
-        .insert(facturacionItems)
-        .values({
-          facturacionId: facturaId,
-          socioId: data.socioId,
-          importe: (it.cantidad * it.importeUnitario).toFixed(2),
-          confirmado: true,
-        })
-        .returning({ id: facturacionItems.id });
-
-      if (movimientoIds[i]) {
-        await db.insert(facturacionItemMovimientos).values({
-          facturacionItemId: inserted.id,
-          movimientoId: movimientoIds[i],
-        });
-      }
-    }
-
-    if (movimientoIds.length > 0) {
+    if (estadoFactura === 'pagada') {
       // Si la factura se crea ya pagada, los movimientos también quedan pagados.
-      const movEstado = estadoFactura === 'pagada' ? 'pagado' : 'facturado';
-      await db
-        .update(movimientosCuentaCorriente)
-        .set({ estado: movEstado })
-        .where(inArray(movimientosCuentaCorriente.id, movimientoIds));
+      const movIds = fuentes.map((f) => f.movimientoId).filter((id): id is string => id != null);
+      if (movIds.length > 0) {
+        await db
+          .update(movimientosCuentaCorriente)
+          .set({ estado: 'pagado' })
+          .where(inArray(movimientosCuentaCorriente.id, movIds));
+      }
     }
 
     revalidatePath('/ventas');
@@ -656,8 +847,10 @@ export async function crearFacturaCore(
       pdfUrl: apiResponse.comprobante_pdf_url,
     };
   } catch (err) {
-    // Factura ya emitida en tusfacturas pero falló nuestra DB → loguear y avisar
-    console.error('Factura emitida en tusfacturas pero falló persistencia local', {
+    // Emitida en ARCA pero falló la confirmación local: la factura queda con
+    // el sentinel (rechazada) — NO reenviarla sin verificar en TusFacturas,
+    // por eso el mensaje pide contactar al administrador con el número.
+    console.error('Factura emitida en tusfacturas pero falló la confirmación local', {
       comprobanteNro: apiResponse.comprobante_nro,
       err,
     });
@@ -957,13 +1150,13 @@ export async function createBatchInvoicesAction(
 
   const result: BatchResult = { succeeded: [], skipped: [], failed: [] };
 
-  for (const { socioId, movimientoIds } of data.socioMovimientos) {
+  for (const { socioId, movimientoIds, itemKeys } of data.socioMovimientos) {
     if (!validSocioMap.has(socioId)) {
       result.skipped.push({ socioId, reason: 'Socio fuera de la guardería activa' });
       continue;
     }
-    if (!movimientoIds.length) {
-      result.skipped.push({ socioId, reason: 'Sin movimientos seleccionados' });
+    if (!(movimientoIds?.length || itemKeys?.length)) {
+      result.skipped.push({ socioId, reason: 'Sin servicios seleccionados' });
       continue;
     }
 
@@ -980,6 +1173,7 @@ export async function createBatchInvoicesAction(
         desde,
         hasta,
         movimientoIds,
+        itemKeys,
       },
       { folioPrefix: 'FL' },
     );
@@ -1061,6 +1255,115 @@ export async function getSocioPendientesAction(
       concepto: r.concepto,
       debe: r.debe ?? '0',
     })),
+  };
+}
+
+// ─── Action: pendientes de emisión (computados + legacy) ────────────────────
+// Modelo "los cargos nacen al emitir": la lista de emisión sale del cómputo
+// en vivo sobre socio_servicios + espacios + cargos_pendientes (ver
+// src/lib/pendientes-facturar.ts), más — durante la transición — los cargos
+// legacy que quedaron en cuenta corriente sin comprobante. Ambos comparten la
+// forma de fila para que los modales los muestren en una sola lista; al
+// emitir, las filas computadas viajan como `itemKeys` y las legacy como
+// `movimientoIds`.
+
+export type PendienteEmision = {
+  /** Id de fila para la UI: uuid del movimiento legacy o clave computada. */
+  id: string;
+  concepto: string;
+  debe: string;
+  fecha: string | null;
+  /** null = cargo legacy de cuenta corriente. */
+  itemKey: ItemPendienteKey | null;
+  tipoServicio: string | null;
+  esProporcional: boolean;
+  esVariable: boolean;
+  origen: 'contrato' | 'espacio' | 'baja' | 'legacy';
+};
+
+function itemPendienteARow(item: ItemPendiente): PendienteEmision {
+  return {
+    id: claveItem(item.key),
+    concepto: item.concepto,
+    debe: item.importe.toFixed(2),
+    fecha: null,
+    itemKey: item.key,
+    tipoServicio: item.servicioTipo,
+    esProporcional: item.esProporcional,
+    esVariable: item.esVariable,
+    origen: item.origen,
+  };
+}
+
+export async function getPendientesEmisionAction(
+  socioId: string,
+  canal: 'fiscal' | 'interno',
+): Promise<{ error?: string; pendientes?: PendienteEmision[] }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+
+  const gId = ctx.activeMembership.guarderiaId;
+
+  const [m] = await db
+    .select({ id: memberships.id })
+    .from(memberships)
+    .where(
+      and(
+        eq(memberships.userId, socioId),
+        eq(memberships.guarderiaId, gId),
+        eq(memberships.status, 'active'),
+      ),
+    );
+  if (!m) return { error: 'Socio no pertenece a esta guardería.' };
+
+  const items = await listarPendientesFacturar(gId, { socioId });
+  const computados = items
+    .filter((i) => (canal === 'interno' ? i.comprobanteInterno : !i.comprobanteInterno))
+    .map(itemPendienteARow);
+
+  // Legacy: cargos de cuenta corriente sin comprobante (transición).
+  const rows = await db
+    .select({
+      id: movimientosCuentaCorriente.id,
+      fecha: movimientosCuentaCorriente.fecha,
+      concepto: movimientosCuentaCorriente.concepto,
+      debe: movimientosCuentaCorriente.debe,
+      tipoServicio: servicios.tipo,
+    })
+    .from(movimientosCuentaCorriente)
+    .leftJoin(servicios, eq(servicios.id, movimientosCuentaCorriente.servicioId))
+    .where(
+      and(
+        eq(movimientosCuentaCorriente.socioId, socioId),
+        eq(movimientosCuentaCorriente.estado, 'no_pagado'),
+        eq(movimientosCuentaCorriente.comprobanteInterno, canal === 'interno'),
+      ),
+    )
+    .orderBy(movimientosCuentaCorriente.fecha);
+
+  // En fiscal, excluir cargos ya cubiertos por el pool de haberes (FIFO) —
+  // mismo criterio histórico de getSocioPendientesAction.
+  let legacy = rows;
+  if (canal === 'fiscal' && rows.length > 0) {
+    const saldados = await getCargosSaldadosFifo(socioId);
+    legacy = rows.filter((r) => !saldados.has(r.id));
+  }
+
+  return {
+    pendientes: [
+      ...computados,
+      ...legacy.map((r) => ({
+        id: r.id,
+        concepto: r.concepto ?? 'Servicio',
+        debe: r.debe ?? '0',
+        fecha: r.fecha ? r.fecha.toISOString() : null,
+        itemKey: null,
+        tipoServicio: r.tipoServicio,
+        esProporcional: false,
+        esVariable: false,
+        origen: 'legacy' as const,
+      })),
+    ],
   };
 }
 
@@ -1276,8 +1579,22 @@ export async function cargarServicioAction(data: CargarServicioData): Promise<{
 // comprobante emitido todavía) en un solo documento no fiscal. No interactúa
 // con ARCA ni con las facturas: es solo un recibo para imprimir/mandar.
 
-async function nextComprobanteInternoCodigo(gId: string, prefix: 'CM' | 'CL'): Promise<string> {
-  const [{ n }] = await db
+// CM = manual, CL = lote, CA = automático (cron) — espeja FM/FL/FA.
+type PrefijoInterno = 'CM' | 'CL' | 'CA';
+
+async function nextComprobanteInternoCodigo(
+  dbx: DbExecutor,
+  gId: string,
+  prefix: PrefijoInterno,
+): Promise<string> {
+  // Serializa el count-then-insert entre emisiones concurrentes de la misma
+  // guardería (el lock por socio no cubre a dos socios distintos). Solo tiene
+  // efecto si dbx es una transacción — el codigo se asigna siempre dentro de
+  // la tx de emisión.
+  await dbx.execute(
+    sql`SELECT pg_advisory_xact_lock(hashtextextended(${'ci:' + gId + ':' + prefix}, 0))`,
+  );
+  const [{ n }] = await dbx
     .select({ n: count() })
     .from(facturacion)
     .where(
@@ -1337,103 +1654,159 @@ export async function getSocioPendientesInternoAction(
   };
 }
 
-async function crearComprobanteInternoCore(
-  data: { socioId: string; movimientoIds: string[]; fecha: string; guarderiaId: string },
-  prefix: 'CM' | 'CL',
+// Exportada para la auto-emisión del cron (prefijo CA), igual que
+// crearFacturaCore. Ninguna de las dos valida sesión — el caller es
+// responsable del scope de guardería.
+export async function crearComprobanteInternoCore(
+  data: {
+    socioId: string;
+    movimientoIds?: string[];
+    itemKeys?: ItemPendienteKey[];
+    fecha: string;
+    guarderiaId: string;
+  },
+  prefix: PrefijoInterno,
 ): Promise<{ error?: string; id?: string; codigo?: string }> {
   const gId = data.guarderiaId;
+  const legacyIds = data.movimientoIds ?? [];
+  const itemKeys = data.itemKeys ?? [];
 
-  if (!data.movimientoIds.length) return { error: 'Seleccioná al menos un ítem.' };
-
-  const movs = await db
-    .select({
-      id: movimientosCuentaCorriente.id,
-      concepto: movimientosCuentaCorriente.concepto,
-      debe: movimientosCuentaCorriente.debe,
-      comprobanteInterno: movimientosCuentaCorriente.comprobanteInterno,
-      servicioAlicuotaIva: servicios.alicuotaIva,
-    })
-    .from(movimientosCuentaCorriente)
-    .leftJoin(servicios, eq(servicios.id, movimientosCuentaCorriente.servicioId))
-    .where(
-      and(
-        inArray(movimientosCuentaCorriente.id, data.movimientoIds),
-        eq(movimientosCuentaCorriente.socioId, data.socioId),
-        eq(movimientosCuentaCorriente.estado, 'no_pagado'),
-      ),
-    );
-
-  if (movs.length === 0) return { error: 'No hay ítems para emitir.' };
-  if (movs.some((m) => !m.comprobanteInterno)) {
-    return { error: 'Solo se pueden incluir cargos marcados como Interno.' };
-  }
-
-  const total = movs.reduce((s, m) => s + parseFloat(m.debe ?? '0'), 0);
-  if (total <= 0) return { error: 'El total del comprobante debe ser mayor a 0.' };
-
-  const descripcion = `${movs[0].concepto ?? 'Servicio'}${movs.length > 1 ? ` (+${movs.length - 1})` : ''}`;
-  // Sin tipo fiscal (es interno): fallback '21' si el cargo no viene de un
-  // servicio del tarifario con alícuota propia. Mismo criterio que fiscal.
-  const montos = desglosarMontos(
-    movs.map((m) => ({
-      importeUnitario: parseFloat(m.debe ?? '0'),
-      cantidad: 1,
-      alicuotaIva: m.servicioAlicuotaIva != null ? Number(m.servicioAlicuotaIva) : null,
-    })),
-    '21',
-  );
+  if (!legacyIds.length && !itemKeys.length) return { error: 'Seleccioná al menos un ítem.' };
 
   const facturaId = randomUUID();
-  const codigo = await nextComprobanteInternoCodigo(gId, prefix);
-  const emision = fechaCalendariaArg(data.fecha);
+  const now = new Date();
 
-  await db.insert(facturacion).values({
-    id: facturaId,
-    guarderiaId: gId,
-    socioId: data.socioId,
-    tipoFactura: 'recibo',
-    estado: 'pendiente',
-    codigo,
-    importe: total.toFixed(2),
-    montoNeto: montos.montoNeto.toFixed(2),
-    montoExento: montos.montoExento.toFixed(2),
-    montoIva: montos.montoIva.toFixed(2),
-    descripcion,
-    emision,
-  });
+  try {
+    const res = await db.transaction(async (tx) => {
+      await lockEmisionSocio(tx, gId, data.socioId);
 
-  const movimientoIds = movs.map((m) => m.id);
-  for (const m of movs) {
-    const [inserted] = await db
-      .insert(facturacionItems)
-      .values({
-        facturacionId: facturaId,
+      const fuentes: FuenteDetalle[] = [];
+
+      if (itemKeys.length > 0) {
+        fuentes.push(
+          ...(await materializarItemsPendientes(tx, {
+            guarderiaId: gId,
+            socioId: data.socioId,
+            keys: itemKeys,
+            canal: 'interno',
+            now,
+          })),
+        );
+      }
+
+      if (legacyIds.length > 0) {
+        const movs = await tx
+          .select({
+            id: movimientosCuentaCorriente.id,
+            concepto: movimientosCuentaCorriente.concepto,
+            debe: movimientosCuentaCorriente.debe,
+            comprobanteInterno: movimientosCuentaCorriente.comprobanteInterno,
+            servicioAlicuotaIva: servicios.alicuotaIva,
+          })
+          .from(movimientosCuentaCorriente)
+          .leftJoin(servicios, eq(servicios.id, movimientosCuentaCorriente.servicioId))
+          .where(
+            and(
+              inArray(movimientosCuentaCorriente.id, legacyIds),
+              eq(movimientosCuentaCorriente.socioId, data.socioId),
+              eq(movimientosCuentaCorriente.estado, 'no_pagado'),
+            ),
+          );
+
+        if (movs.length !== legacyIds.length) {
+          throw new EmisionError(
+            'Uno o más ítems ya fueron incluidos en otro comprobante. Actualizá la página.',
+          );
+        }
+        if (movs.some((m) => !m.comprobanteInterno)) {
+          throw new EmisionError('Solo se pueden incluir cargos marcados como Interno.');
+        }
+
+        for (const m of movs) {
+          fuentes.push({
+            descripcion: m.concepto ?? 'Servicio',
+            cantidad: 1,
+            importeUnitario: parseFloat(m.debe ?? '0'),
+            alicuotaIva: m.servicioAlicuotaIva != null ? Number(m.servicioAlicuotaIva) : null,
+            movimientoId: m.id,
+          });
+        }
+        await tx
+          .update(movimientosCuentaCorriente)
+          .set({ estado: 'facturado' })
+          .where(
+            inArray(
+              movimientosCuentaCorriente.id,
+              movs.map((m) => m.id),
+            ),
+          );
+      }
+
+      if (fuentes.length === 0) throw new EmisionError('No hay ítems para emitir.');
+      const total = totalItems(fuentes);
+      if (total <= 0) throw new EmisionError('El total del comprobante debe ser mayor a 0.');
+
+      const descripcion = `${fuentes[0].descripcion}${
+        fuentes.length > 1 ? ` (+${fuentes.length - 1})` : ''
+      }`;
+      // Sin tipo fiscal (es interno): fallback '21' si el ítem no viene de un
+      // servicio del tarifario con alícuota propia. Mismo criterio que fiscal.
+      const montos = desglosarMontos(fuentes, '21');
+
+      const codigo = await nextComprobanteInternoCodigo(tx, gId, prefix);
+
+      await tx.insert(facturacion).values({
+        id: facturaId,
+        guarderiaId: gId,
         socioId: data.socioId,
-        importe: parseFloat(m.debe ?? '0').toFixed(2),
-        confirmado: true,
-      })
-      .returning({ id: facturacionItems.id });
+        tipoFactura: 'recibo',
+        estado: 'pendiente',
+        codigo,
+        importe: total.toFixed(2),
+        montoNeto: montos.montoNeto.toFixed(2),
+        montoExento: montos.montoExento.toFixed(2),
+        montoIva: montos.montoIva.toFixed(2),
+        descripcion,
+        emision: fechaCalendariaArg(data.fecha),
+      });
 
-    await db.insert(facturacionItemMovimientos).values({
-      facturacionItemId: inserted.id,
-      movimientoId: m.id,
+      for (const f of fuentes) {
+        const [inserted] = await tx
+          .insert(facturacionItems)
+          .values({
+            facturacionId: facturaId,
+            socioId: data.socioId,
+            importe: (f.cantidad * f.importeUnitario).toFixed(2),
+            confirmado: true,
+          })
+          .returning({ id: facturacionItems.id });
+
+        if (f.movimientoId) {
+          await tx.insert(facturacionItemMovimientos).values({
+            facturacionItemId: inserted.id,
+            movimientoId: f.movimientoId,
+          });
+        }
+      }
+
+      return { id: facturaId, codigo };
     });
+
+    revalidatePath('/ventas');
+    revalidatePath(`/usuarios/${data.socioId}`);
+    return res;
+  } catch (err) {
+    const msg = mensajeErrorEmision(err);
+    if (msg) return { error: msg };
+    console.error('Error emitiendo comprobante interno', { facturaId, err });
+    return { error: 'No se pudo emitir el comprobante. Probá de nuevo en unos segundos.' };
   }
-
-  await db
-    .update(movimientosCuentaCorriente)
-    .set({ estado: 'facturado' })
-    .where(inArray(movimientosCuentaCorriente.id, movimientoIds));
-
-  revalidatePath('/ventas');
-  revalidatePath(`/usuarios/${data.socioId}`);
-
-  return { id: facturaId, codigo };
 }
 
 export type CrearComprobanteInternoData = {
   socioId: string;
-  movimientoIds: string[];
+  movimientoIds?: string[];
+  itemKeys?: ItemPendienteKey[];
   fecha: string;
 };
 
@@ -1456,7 +1829,11 @@ export type ComprobanteInternoLoteResult = {
 
 export async function crearComprobanteInternoLoteAction(data: {
   fecha: string;
-  socioMovimientos: { socioId: string; movimientoIds: string[] }[];
+  socioMovimientos: {
+    socioId: string;
+    movimientoIds?: string[];
+    itemKeys?: ItemPendienteKey[];
+  }[];
 }): Promise<{ error?: string; result?: ComprobanteInternoLoteResult }> {
   const ctx = await getActiveMarina();
   if (!ctx) return { error: 'No autenticado' };
@@ -1465,13 +1842,13 @@ export async function crearComprobanteInternoLoteAction(data: {
   const gId = ctx.activeMembership.guarderiaId;
   const result: ComprobanteInternoLoteResult = { succeeded: [], skipped: [], failed: [] };
 
-  for (const { socioId, movimientoIds } of data.socioMovimientos) {
-    if (!movimientoIds.length) {
+  for (const { socioId, movimientoIds, itemKeys } of data.socioMovimientos) {
+    if (!(movimientoIds?.length || itemKeys?.length)) {
       result.skipped.push({ socioId, reason: 'Sin ítems seleccionados' });
       continue;
     }
     const res = await crearComprobanteInternoCore(
-      { socioId, movimientoIds, fecha: data.fecha, guarderiaId: gId },
+      { socioId, movimientoIds, itemKeys, fecha: data.fecha, guarderiaId: gId },
       'CL',
     );
     if (res.error) {

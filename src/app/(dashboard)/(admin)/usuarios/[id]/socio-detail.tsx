@@ -3508,15 +3508,21 @@ function EditServicioContratadoModal({
                 <strong>{esMesCompleto ? 'mes completo' : 'proporcional'}</strong>
               </label>
               {cobrar && (
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={montoOverride ?? montoSugerido.toFixed(2)}
-                  onChange={(e) => setMontoOverride(e.target.value)}
-                  className="border-input focus-visible:border-ring focus-visible:ring-ring/50 mt-2 h-10 w-full rounded-[8px] border bg-white px-3 text-center text-lg font-bold focus-visible:ring-[3px] focus-visible:outline-none"
-                  style={{ color: '#101828' }}
-                />
+                <>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={montoOverride ?? montoSugerido.toFixed(2)}
+                    onChange={(e) => setMontoOverride(e.target.value)}
+                    className="border-input focus-visible:border-ring focus-visible:ring-ring/50 mt-2 h-10 w-full rounded-[8px] border bg-white px-3 text-center text-lg font-bold focus-visible:ring-[3px] focus-visible:outline-none"
+                    style={{ color: '#101828' }}
+                  />
+                  <p className="mt-1.5 text-xs text-gray-500">
+                    El cobro queda pendiente y se incluirá en el próximo comprobante que se emita al
+                    socio (manual o automático).
+                  </p>
+                </>
               )}
             </div>
           )}

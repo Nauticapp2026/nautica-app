@@ -1,23 +1,36 @@
 /**
- * Auto-emisión de facturas mensuales.
+ * Auto-emisión de comprobantes del día de facturación.
  *
- * Disparada por el cron diario, después de generar movimientos mensuales.
- * Para cada socio de las guarderías que cumplen `diaFacturacion === hoy`:
- *   1. Idempotencia: si ya hay factura creada hoy para este socio, skip.
- *   2. Solo emite si el socio tiene movimientos pendientes (debe > 0).
- *   3. Copia tipo/condicion/medioPago de la última factura del socio, si
- *      tiene una, como heurística para que el formato siga siendo el que
- *      usó el admin la vez anterior. Si es la primera factura de este
- *      socio (ya no hace falta que un admin la haya cargado antes a
- *      mano), usa defaults: condicionVenta "cuenta_corriente" y medioPago
- *      según lo que el socio tenga configurado (débito automático si
- *      tiene token Payway activo, "efectivo" si no).
+ * Modelo "los cargos nacen al emitir" (2026-07): ya no existe un paso previo
+ * que genere cargos en cuenta corriente. Para cada guardería cuyo día de
+ * facturación es hoy, esta rutina computa los pendientes de facturar desde
+ * los contratos vigentes (`listarPendientesFacturar`) y emite directamente:
  *
- * Errores: si tusfacturas falla para un socio, se loguea y se sigue
- * con el siguiente.
+ *  - Factura fiscal (folio FA-) por los servicios "Legal" del socio — solo si
+ *    la guardería tiene TusFacturas configurado y el certificado ARCA
+ *    confirmado; si no, se saltea con log y los pendientes siguen visibles
+ *    en /ventas (sin deuda fantasma en cuenta corriente).
+ *  - Comprobante interno (código CA-, espeja FM/FL/FA) por los servicios
+ *    "Interno" — no pasa por ARCA, corre para cualquier guardería.
+ *
+ * Los cargos en cuenta corriente los crea la propia emisión, dentro de su
+ * transacción, vinculados al comprobante.
+ *
+ * Transición: los cargos legacy que quedaron en cuenta corriente sin
+ * comprobante (generados por el cron viejo) se incluyen en la misma emisión
+ * hasta drenar el pool. La idempotencia es intrínseca: un contrato facturado
+ * este período deja de aparecer como pendiente (anti-join + índices únicos de
+ * la mig 0133), así que re-correr el cron el mismo día no duplica nada.
+ *
+ * Defaults de formato: copia tipo/condición/medio de pago de la última
+ * factura fiscal del socio; si no tiene, "cuenta_corriente" y débito
+ * automático si hay token Payway activo ("efectivo" si no).
+ *
+ * Errores: si la emisión falla para un socio, se loguea y se sigue con el
+ * siguiente.
  */
 
-import { and, count, desc, eq, gte, inArray, lte, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import {
@@ -28,14 +41,16 @@ import {
   paywayTokens,
   profiles,
 } from '@/lib/db/schema';
-import { crearFacturaCore } from '@/app/actions/facturacion';
+import { crearComprobanteInternoCore, crearFacturaCore } from '@/app/actions/facturacion';
 import { derivarTipoFactura } from '@/lib/derivar-tipo-factura';
+import { agruparPorSocio, listarPendientesFacturar } from '@/lib/pendientes-facturar';
 import { getCargosSaldadosFifo } from '@/lib/reconciliar-cuenta';
 
 type AutoEmisionResult = {
   emitted: number;
+  emittedInternos: number;
   skippedSinPendientes: number;
-  skippedYaEmitidaHoy: number;
+  skippedSinCreds: number;
   failed: { socioId: string; error: string }[];
 };
 
@@ -64,33 +79,42 @@ function endOfMonth(d: Date): Date {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0));
 }
 
-function startOfDay(d: Date): Date {
-  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
-}
-
 export async function runAutoEmision(
   guarderiaIds: string[],
   now: Date = new Date(),
 ): Promise<AutoEmisionResult> {
   const result: AutoEmisionResult = {
     emitted: 0,
+    emittedInternos: 0,
     skippedSinPendientes: 0,
-    skippedYaEmitidaHoy: 0,
+    skippedSinCreds: 0,
     failed: [],
   };
 
   if (guarderiaIds.length === 0) return result;
 
-  const inicioHoy = startOfDay(now);
-  const finHoy = addDays(inicioHoy, 1);
-
   for (const guarderiaId of guarderiaIds) {
     const [guardRow] = await db
-      .select({ condicionIva: guarderias.condicionIva })
+      .select({
+        condicionIva: guarderias.condicionIva,
+        puntoDeVenta: guarderias.puntoDeVenta,
+        tusfacturasApikey: guarderias.tusfacturasApikey,
+        tusfacturasApitoken: guarderias.tusfacturasApitoken,
+        tusfacturasUsertoken: guarderias.tusfacturasUsertoken,
+        certificadoAfipOk: guarderias.certificadoAfipOk,
+      })
       .from(guarderias)
       .where(eq(guarderias.id, guarderiaId))
       .limit(1);
     const guardCondicionIva = guardRow?.condicionIva ?? null;
+    const fiscalHabilitado = Boolean(
+      guardRow &&
+      guardRow.puntoDeVenta != null &&
+      guardRow.tusfacturasApikey &&
+      guardRow.tusfacturasApitoken &&
+      guardRow.tusfacturasUsertoken &&
+      guardRow.certificadoAfipOk,
+    );
 
     const sociosRows = await db
       .select({
@@ -109,138 +133,176 @@ export async function runAutoEmision(
           eq(memberships.rol, 'socio'),
         ),
       );
+    const socioInfo = new Map(sociosRows.map((s) => [s.socioId, s]));
+    if (socioInfo.size === 0) continue;
 
-    for (const { socioId, condicionIva, condicionIvaPersonal, facturaFiscal } of sociosRows) {
-      // Condición frente al IVA efectiva según el modo de facturación.
-      const socioCondicionIva = facturaFiscal ? condicionIvaPersonal : condicionIva;
-      // 1. Idempotencia: si ya hay factura creada hoy, skip.
-      const [yaHoy] = await db
-        .select({ n: count() })
-        .from(facturacion)
-        .where(
-          and(
-            eq(facturacion.guarderiaId, guarderiaId),
-            eq(facturacion.socioId, socioId),
-            gte(facturacion.emision, inicioHoy),
-            lte(facturacion.emision, finHoy),
-          ),
-        );
+    // Pendientes computados desde los contratos vigentes.
+    const computados = await listarPendientesFacturar(guarderiaId, { now });
+    const porSocio = agruparPorSocio(computados);
 
-      if ((yaHoy?.n ?? 0) > 0) {
-        result.skippedYaEmitidaHoy++;
-        continue;
-      }
-
-      // 2. Movimientos pendientes con debe > 0 (los pagos a cuenta tienen
-      //    haber > 0 / debe = 0; no se facturan). createInvoiceAction se
-      //    encarga de marcar los movimientos como 'facturado' al linkearlos,
-      //    así que filtrar por estado='no_pagado' alcanza.
-      const pendientes = await db
-        .select({ id: movimientosCuentaCorriente.id })
-        .from(movimientosCuentaCorriente)
-        .where(
-          and(
-            eq(movimientosCuentaCorriente.socioId, socioId),
-            eq(movimientosCuentaCorriente.estado, 'no_pagado'),
-            sql`${movimientosCuentaCorriente.debe} > 0`,
-            // Excluir cargos que ya tienen comprobante interno (no van por TusFacturas).
-            eq(movimientosCuentaCorriente.comprobanteInterno, false),
-          ),
-        );
-
-      // Red de seguridad: no facturar cargos que el pool de haberes ya cubre
-      // (FIFO), aunque sigan en estado 'no_pagado'. Si un pago neto no marcó el
-      // cargo (flujos viejos, o una reconciliación que falló), sin esto la
-      // auto-emisión re-facturaría plata ya cobrada → deuda fantasma. Decide
-      // solo qué NO facturar; no muta estados. Ver project_facturacion_refactura_pagos.
-      const saldados = await getCargosSaldadosFifo(socioId);
-      const aFacturar = pendientes.filter((p) => !saldados.has(p.id));
-
-      if (aFacturar.length === 0) {
-        result.skippedSinPendientes++;
-        continue;
-      }
-
-      // 3. Copiar formato de la última FACTURA FISCAL (factura_a/b/c), si tiene
-      //    una. `facturacion` guarda en la misma tabla recibos y comprobantes
-      //    internos (RB-/RC-), que no tienen condicionVenta/medioPago propios
-      //    — si no se filtra por tipo, "la última" puede ser un recibo y
-      //    copiaría esos campos vacíos a la próxima factura fiscal real. Si es
-      //    la primera factura fiscal de este socio (ya no es requisito tener
-      //    una previa), condicionVenta/medioPago no tienen de dónde copiarse:
-      //    se completan con un default razonable — "cuenta_corriente" (es
-      //    deuda todavía no cobrada) y el medio de pago que el socio tenga
-      //    configurado (débito automático de Payway si tiene token activo,
-      //    "efectivo" si no — mismo default que usa el alta manual).
-      const [ultima] = await db
-        .select({
-          tipoFactura: facturacion.tipoFactura,
-          condicionVenta: facturacion.condicionVenta,
-          medioPago: facturacion.medioPago,
-        })
-        .from(facturacion)
-        .where(
-          and(
-            eq(facturacion.guarderiaId, guarderiaId),
-            eq(facturacion.socioId, socioId),
-            inArray(facturacion.tipoFactura, TIPOS_FISCALES),
-          ),
-        )
-        .orderBy(desc(facturacion.emision))
-        .limit(1);
-
-      const fechaFactura = ymd(now);
-      const venc = ymd(addDays(now, VENCIMIENTO_DIAS_DEFAULT));
-      const desde = ymd(startOfMonth(now));
-      const hasta = ymd(endOfMonth(now));
-
-      const derivado = derivarTipoFactura(guardCondicionIva, socioCondicionIva);
-      const tipoFactura =
-        derivado ??
-        (ultima?.tipoFactura as 'factura_a' | 'factura_b' | 'factura_c' | undefined) ??
-        'factura_b';
-
-      let condicionVenta = ultima?.condicionVenta;
-      let medioPago = ultima?.medioPago;
-      if (!ultima) {
-        const [tokenActivo] = await db
-          .select({ id: paywayTokens.id })
-          .from(paywayTokens)
-          .where(and(eq(paywayTokens.socioId, socioId), eq(paywayTokens.activo, true)))
-          .limit(1);
-        condicionVenta = 'cuenta_corriente';
-        medioPago = tokenActivo ? 'debito_automatico' : 'efectivo';
-      }
-
-      const r = await crearFacturaCore(
-        {
-          guarderiaId,
-          socioId,
-          tipoFactura,
-          condicionVenta: condicionVenta as never,
-          medioPago: medioPago as never,
-          estado: 'pendiente',
-          descripcion: `Facturación mensual ${fechaFactura}`,
-          fecha: fechaFactura,
-          vencimiento: venc,
-          desde,
-          hasta,
-          movimientoIds: aFacturar.map((p) => p.id),
-        },
-        { folioPrefix: 'FA' },
+    // Legacy (transición): cargos en cuenta corriente sin comprobante.
+    const legacyRows = await db
+      .select({
+        id: movimientosCuentaCorriente.id,
+        socioId: movimientosCuentaCorriente.socioId,
+        comprobanteInterno: movimientosCuentaCorriente.comprobanteInterno,
+      })
+      .from(movimientosCuentaCorriente)
+      .where(
+        and(
+          inArray(movimientosCuentaCorriente.socioId, [...socioInfo.keys()]),
+          eq(movimientosCuentaCorriente.estado, 'no_pagado'),
+          sql`${movimientosCuentaCorriente.debe} > 0`,
+        ),
       );
+    const legacyFiscalPorSocio = new Map<string, string[]>();
+    const legacyInternoPorSocio = new Map<string, string[]>();
+    for (const m of legacyRows) {
+      const mapa = m.comprobanteInterno ? legacyInternoPorSocio : legacyFiscalPorSocio;
+      if (!mapa.has(m.socioId)) mapa.set(m.socioId, []);
+      mapa.get(m.socioId)!.push(m.id);
+    }
 
-      if (r.error) {
-        console.error('[auto-facturacion] error en socio', {
-          guarderiaId,
-          socioId,
-          error: r.error,
-        });
-        result.failed.push({ socioId, error: r.error });
-        continue;
+    const socioIds = new Set<string>([
+      ...porSocio.keys(),
+      ...legacyFiscalPorSocio.keys(),
+      ...legacyInternoPorSocio.keys(),
+    ]);
+
+    for (const socioId of socioIds) {
+      const info = socioInfo.get(socioId);
+      if (!info) continue;
+
+      const items = porSocio.get(socioId) ?? [];
+      const fiscalKeys = items.filter((i) => !i.comprobanteInterno).map((i) => i.key);
+      const internoKeys = items.filter((i) => i.comprobanteInterno).map((i) => i.key);
+      const legacyInterno = legacyInternoPorSocio.get(socioId) ?? [];
+
+      // Red de seguridad legacy: no facturar cargos que el pool de haberes ya
+      // cubre (FIFO), aunque sigan 'no_pagado'. Sin esto se re-facturaría
+      // plata ya cobrada. Ver project_facturacion_refactura_pagos.
+      let legacyFiscal = legacyFiscalPorSocio.get(socioId) ?? [];
+      if (legacyFiscal.length > 0) {
+        const saldados = await getCargosSaldadosFifo(socioId);
+        legacyFiscal = legacyFiscal.filter((id) => !saldados.has(id));
       }
 
-      result.emitted++;
+      let intentoAlgo = false;
+
+      // ── Fiscal (FA-) ──────────────────────────────────────────────────────
+      if (fiscalKeys.length > 0 || legacyFiscal.length > 0) {
+        if (!fiscalHabilitado) {
+          // Sin creds o certificado: los pendientes quedan como cómputo
+          // visible en /ventas, sin deuda fantasma. No se retro-facturan
+          // períodos salteados al configurarse (paridad con el modelo viejo).
+          console.warn(
+            '[auto-facturacion] fiscal salteado: guardería sin TusFacturas/certificado',
+            {
+              guarderiaId,
+              socioId,
+            },
+          );
+          result.skippedSinCreds++;
+        } else {
+          intentoAlgo = true;
+          const socioCondicionIva = info.facturaFiscal
+            ? info.condicionIvaPersonal
+            : info.condicionIva;
+
+          const [ultima] = await db
+            .select({
+              tipoFactura: facturacion.tipoFactura,
+              condicionVenta: facturacion.condicionVenta,
+              medioPago: facturacion.medioPago,
+            })
+            .from(facturacion)
+            .where(
+              and(
+                eq(facturacion.guarderiaId, guarderiaId),
+                eq(facturacion.socioId, socioId),
+                inArray(facturacion.tipoFactura, TIPOS_FISCALES),
+              ),
+            )
+            .orderBy(desc(facturacion.emision))
+            .limit(1);
+
+          const derivado = derivarTipoFactura(guardCondicionIva, socioCondicionIva);
+          const tipoFactura =
+            derivado ??
+            (ultima?.tipoFactura as 'factura_a' | 'factura_b' | 'factura_c' | undefined) ??
+            'factura_b';
+
+          let condicionVenta = ultima?.condicionVenta;
+          let medioPago = ultima?.medioPago;
+          if (!ultima) {
+            const [tokenActivo] = await db
+              .select({ id: paywayTokens.id })
+              .from(paywayTokens)
+              .where(and(eq(paywayTokens.socioId, socioId), eq(paywayTokens.activo, true)))
+              .limit(1);
+            condicionVenta = 'cuenta_corriente';
+            medioPago = tokenActivo ? 'debito_automatico' : 'efectivo';
+          }
+
+          const r = await crearFacturaCore(
+            {
+              guarderiaId,
+              socioId,
+              tipoFactura,
+              condicionVenta: condicionVenta as never,
+              medioPago: medioPago as never,
+              estado: 'pendiente',
+              descripcion: `Facturación mensual ${ymd(now)}`,
+              fecha: ymd(now),
+              vencimiento: ymd(addDays(now, VENCIMIENTO_DIAS_DEFAULT)),
+              desde: ymd(startOfMonth(now)),
+              hasta: ymd(endOfMonth(now)),
+              itemKeys: fiscalKeys,
+              movimientoIds: legacyFiscal,
+            },
+            { folioPrefix: 'FA' },
+          );
+
+          if (r.error) {
+            console.error('[auto-facturacion] error fiscal en socio', {
+              guarderiaId,
+              socioId,
+              error: r.error,
+            });
+            result.failed.push({ socioId, error: r.error });
+          } else {
+            result.emitted++;
+          }
+        }
+      }
+
+      // ── Interno (CA-) ─────────────────────────────────────────────────────
+      if (internoKeys.length > 0 || legacyInterno.length > 0) {
+        intentoAlgo = true;
+        const r = await crearComprobanteInternoCore(
+          {
+            socioId,
+            itemKeys: internoKeys,
+            movimientoIds: legacyInterno,
+            fecha: ymd(now),
+            guarderiaId,
+          },
+          'CA',
+        );
+
+        if (r.error) {
+          console.error('[auto-facturacion] error interno en socio', {
+            guarderiaId,
+            socioId,
+            error: r.error,
+          });
+          result.failed.push({ socioId, error: r.error });
+        } else {
+          result.emittedInternos++;
+        }
+      }
+
+      if (!intentoAlgo) result.skippedSinPendientes++;
     }
   }
 

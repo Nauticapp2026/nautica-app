@@ -2,26 +2,24 @@ import { NextResponse } from 'next/server';
 
 import { runAjustesProgramados } from '@/lib/ajustes-programados';
 import { runAutoEmision } from '@/lib/auto-facturacion';
-import {
-  guarderiasQueFacturanHoy,
-  runMonthlyGeneracionServiciosRecurrentes,
-  runMonthlyGeneration,
-} from '@/lib/movimientos-mensuales';
+import { guarderiasQueFacturanHoy } from '@/lib/movimientos-mensuales';
 import { runPaywayCharges } from '@/lib/payway-cobros';
 
 // Invocado diariamente por Vercel Cron (ver vercel.json: 0 5 * * *).
-// Para cada guardería cuyo `diaFacturacion === hoy`:
-//   1. Genera el movimiento mensual de cada cargo con tarifa Fija que el
-//      socio ya tenga contratado — vía "Asignar espacio" o vía "Cargar
-//      Servicio" (Cuota social, Membresía, Expensas, Servicio extra, o
-//      incluso Espacio de guarda cargado a mano). Las tarifas Variables no
-//      se repiten solas.
-//   2. Auto-emite factura para cada socio con pendientes que ya tenga
-//      al menos una factura emitida (regla: primera factura es manual).
-//   3. Cobra por Payway (débito automático) a los socios con token activo.
-// Los pasos 2 y 3 corren sobre TODAS las guarderías que facturan hoy
-// (`guarderiasQueFacturanHoy`), no solo las que tienen espacios ocupados:
-// el día de cobro es de la guardería, no del espacio.
+// Modelo "los cargos nacen al emitir": ya no hay un paso que genere cargos
+// en cuenta corriente. Para cada guardería cuyo `diaFacturacion === hoy`:
+//   1. Auto-emite por socio la factura fiscal (FA-) por los servicios
+//      "Legal" y el comprobante interno (CA-) por los "Interno", computados
+//      en vivo desde los contratos vigentes; los cargos en cuenta corriente
+//      nacen dentro de la transacción de cada emisión.
+//   2. Cobra por Payway (débito automático) a los socios con token activo —
+//      corre después de la emisión, así el débito del día incluye lo recién
+//      facturado.
+// Ambos pasos corren sobre TODAS las guarderías que facturan hoy
+// (`guarderiasQueFacturanHoy`): el día de cobro es de la guardería.
+// La idempotencia es intrínseca (un contrato facturado este período deja de
+// aparecer como pendiente), así que re-correr el cron el mismo día no
+// duplica comprobantes.
 // Vercel Cron envía `Authorization: Bearer <CRON_SECRET>` si CRON_SECRET
 // está configurado en el proyecto.
 export async function GET(req: Request): Promise<Response> {
@@ -36,22 +34,15 @@ export async function GET(req: Request): Promise<Response> {
   try {
     const now = new Date();
     // 0. Aplicar ajustes de tarifa programados cuya fecha llegó (antes de
-    //    generar movimientos y facturar, para que el precio nuevo ya rija).
+    //    facturar, para que el precio nuevo ya rija en la emisión).
     const ajustesProgramados = await runAjustesProgramados(now);
-    // 1. Generar movimientos mensuales: espacios ocupados con tarifa Fija, y
-    //    servicios recurrentes (no-espacio) con tarifa Fija ya contratados.
-    const movs = await runMonthlyGeneration(now);
-    const movsServicios = await runMonthlyGeneracionServiciosRecurrentes(now);
-    // 2 y 3. Emisión y cobro sobre TODAS las guarderías que facturan hoy
-    //        (no solo las que tienen espacios ocupados).
+    // 1 y 2. Emisión (fiscal + interna) y cobro.
     const guarderiaIds = await guarderiasQueFacturanHoy(now);
     const facturas = await runAutoEmision(guarderiaIds, now);
     const cobros = await runPaywayCharges(guarderiaIds);
     return NextResponse.json({
       ok: true,
       ajustesProgramados,
-      movimientos: movs,
-      movimientosServicios: movsServicios,
       guarderiaIds,
       facturas,
       cobros,

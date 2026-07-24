@@ -29,14 +29,13 @@ import {
   emitirNotaCreditoAction,
   emitirNotaCreditoInternaAction,
   emitirNotaLibreAction,
-  getSocioPendientesAction,
-  getSocioPendientesInternoAction,
+  getPendientesEmisionAction,
   markInvoicePaidAction,
   obtenerPdfFacturaAction,
   reenviarFacturaRechazadaAction,
   type BatchResult,
   type ComprobanteInternoLoteResult,
-  type MovimientoPendiente,
+  type PendienteEmision,
 } from '@/app/actions/facturacion';
 import { MOTIVO_NOTA_LABEL, type MotivoNota } from '@/app/actions/nota-constants';
 import { toast } from 'sonner';
@@ -96,6 +95,9 @@ type LoteMovimiento = {
   debe: string | null;
   servicioNombre: string | null;
   tipoServicio: string | null;
+  // null = cargo legacy de cuenta corriente; seteado = ítem computado desde
+  // el contrato vigente (modelo "los cargos nacen al emitir").
+  itemKey: PendienteEmision['itemKey'];
 };
 
 type SocioInterno = {
@@ -232,6 +234,17 @@ function fmtMoney(value: string | number | null): string {
 }
 
 const fmtDate = formatArgentinaDate;
+
+// Etiqueta secundaria de una fila de la lista de emisión: los ítems
+// computados desde contratos vigentes se describen por su origen; los cargos
+// legacy de cuenta corriente muestran su fecha, como siempre.
+function etiquetaPendiente(m: PendienteEmision): string {
+  if (!m.itemKey) return `En cuenta corriente${m.fecha ? ` · ${fmtDate(m.fecha)}` : ''}`;
+  if (m.origen === 'baja') return 'Cobro por baja anticipada';
+  if (m.esVariable) return 'Servicio variable';
+  if (m.esProporcional) return 'Proporcional del mes';
+  return 'Servicio contratado';
+}
 
 // Formatea una fecha-calendario "YYYY-MM-DD" (columna `date`, sin hora) como
 // "DD/MM/YYYY" sin pasar por new Date()/TZ — evita el corrimiento de un día
@@ -385,7 +398,7 @@ function NuevaFacturaModal({
     desde: firstOfMonthIso(),
     hasta: lastOfMonthIso(),
   });
-  const [movimientos, setMovimientos] = useState<MovimientoPendiente[]>([]);
+  const [movimientos, setMovimientos] = useState<PendienteEmision[]>([]);
   const [selectedMovs, setSelectedMovs] = useState<Set<string>>(() => new Set());
   const [loadingMovs, setLoadingMovs] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -404,12 +417,12 @@ function NuevaFacturaModal({
     setError(null);
     if (!socioId) return;
     setLoadingMovs(true);
-    getSocioPendientesAction(socioId)
+    getPendientesEmisionAction(socioId, 'fiscal')
       .then((res) => {
         if (res.error) {
           setError(res.error);
         } else {
-          const movs = res.movimientos ?? [];
+          const movs = res.pendientes ?? [];
           setMovimientos(movs);
           setSelectedMovs(new Set(movs.map((m) => m.id)));
         }
@@ -482,6 +495,7 @@ function NuevaFacturaModal({
     setError(null);
     setSuccess(null);
     startTransition(async () => {
+      const seleccion = movimientos.filter((m) => selectedMovs.has(m.id));
       const res = await createInvoiceAction({
         socioId: form.socioId,
         tipoFactura: form.tipoFactura as never,
@@ -493,7 +507,8 @@ function NuevaFacturaModal({
         vencimiento: form.vencimiento,
         desde: form.desde,
         hasta: form.hasta,
-        movimientoIds: Array.from(selectedMovs),
+        itemKeys: seleccion.filter((m) => m.itemKey).map((m) => m.itemKey!),
+        movimientoIds: seleccion.filter((m) => !m.itemKey).map((m) => m.id),
       });
       if (res.error) {
         setError(res.error);
@@ -584,7 +599,7 @@ function NuevaFacturaModal({
                 </p>
               ) : movimientos.length === 0 ? (
                 <p className="px-4 py-6 text-center text-sm text-gray-400">
-                  Este socio no tiene movimientos pendientes.
+                  Este socio no tiene servicios pendientes de facturar.
                 </p>
               ) : (
                 <div className="max-h-60 overflow-y-auto">
@@ -603,7 +618,7 @@ function NuevaFacturaModal({
                         <p className="truncate font-medium" style={{ color: '#101828' }}>
                           {m.concepto ?? 'Servicio'}
                         </p>
-                        <p className="text-xs text-gray-400">{fmtDate(m.fecha)}</p>
+                        <p className="text-xs text-gray-400">{etiquetaPendiente(m)}</p>
                       </div>
                       <p className="text-sm font-medium" style={{ color: '#175861' }}>
                         {fmtMoney(m.debe)}
@@ -783,7 +798,7 @@ function ComprobanteInternoManualModal({
   const [query, setQuery] = useState('');
   const [socioId, setSocioId] = useState('');
   const [fecha, setFecha] = useState(todayIso);
-  const [movimientos, setMovimientos] = useState<MovimientoPendiente[]>([]);
+  const [movimientos, setMovimientos] = useState<PendienteEmision[]>([]);
   const [selectedMovs, setSelectedMovs] = useState<Set<string>>(() => new Set());
   const [loadingMovs, setLoadingMovs] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -804,12 +819,12 @@ function ComprobanteInternoManualModal({
     setError(null);
     setStep('detalle');
     setLoadingMovs(true);
-    getSocioPendientesInternoAction(id)
+    getPendientesEmisionAction(id, 'interno')
       .then((res) => {
         if (res.error) {
           setError(res.error);
         } else {
-          const movs = res.movimientos ?? [];
+          const movs = res.pendientes ?? [];
           setMovimientos(movs);
           setSelectedMovs(new Set(movs.map((m) => m.id)));
         }
@@ -868,10 +883,12 @@ function ComprobanteInternoManualModal({
     setError(null);
     setSuccess(null);
     startTransition(async () => {
+      const seleccion = movimientos.filter((m) => selectedMovs.has(m.id));
       const res = await crearComprobanteInternoAction({
         socioId,
         fecha,
-        movimientoIds: Array.from(selectedMovs),
+        itemKeys: seleccion.filter((m) => m.itemKey).map((m) => m.itemKey!),
+        movimientoIds: seleccion.filter((m) => !m.itemKey).map((m) => m.id),
       });
       if (res.error) {
         setError(res.error);
@@ -965,7 +982,7 @@ function ComprobanteInternoManualModal({
               <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
                 <div>
                   <p className="text-sm font-semibold" style={{ color: '#101828' }}>
-                    Cargos internos pendientes
+                    Servicios internos a emitir
                   </p>
                   <p className="text-xs text-gray-400">
                     {loadingMovs
@@ -990,7 +1007,7 @@ function ComprobanteInternoManualModal({
                 </p>
               ) : movimientos.length === 0 ? (
                 <p className="px-4 py-6 text-center text-sm text-gray-400">
-                  Este socio no tiene cargos internos pendientes.
+                  Este socio no tiene servicios internos pendientes de emitir.
                 </p>
               ) : (
                 <div className="max-h-60 overflow-y-auto">
@@ -1009,7 +1026,7 @@ function ComprobanteInternoManualModal({
                         <p className="truncate font-medium" style={{ color: '#101828' }}>
                           {m.concepto ?? 'Servicio'}
                         </p>
-                        <p className="text-xs text-gray-400">{fmtDate(m.fecha)}</p>
+                        <p className="text-xs text-gray-400">{etiquetaPendiente(m)}</p>
                       </div>
                       <p className="text-sm font-medium" style={{ color: '#175861' }}>
                         {fmtMoney(m.debe)}
@@ -1236,11 +1253,15 @@ function LoteModal({
     setResult(null);
     startTransition(async () => {
       const socioMovimientos = elegibles
-        .map((s) => ({
-          socioId: s.id,
-          movimientoIds: s.movsFiltrados.filter((m) => isMovSel(s.id, m.id)).map((m) => m.id),
-        }))
-        .filter((s) => s.movimientoIds.length > 0);
+        .map((s) => {
+          const sel = s.movsFiltrados.filter((m) => isMovSel(s.id, m.id));
+          return {
+            socioId: s.id,
+            itemKeys: sel.filter((m) => m.itemKey).map((m) => m.itemKey!),
+            movimientoIds: sel.filter((m) => !m.itemKey).map((m) => m.id),
+          };
+        })
+        .filter((s) => s.movimientoIds.length > 0 || s.itemKeys.length > 0);
 
       const res = await createBatchInvoicesAction({
         socioMovimientos,
@@ -1621,11 +1642,15 @@ function ComprobanteInternoLoteModal({
     setResult(null);
     startTransition(async () => {
       const socioMovimientos = sociosInterno
-        .map((s) => ({
-          socioId: s.id,
-          movimientoIds: s.movimientos.filter((m) => isMovSel(s.id, m.id)).map((m) => m.id),
-        }))
-        .filter((s) => s.movimientoIds.length > 0);
+        .map((s) => {
+          const sel = s.movimientos.filter((m) => isMovSel(s.id, m.id));
+          return {
+            socioId: s.id,
+            itemKeys: sel.filter((m) => m.itemKey).map((m) => m.itemKey!),
+            movimientoIds: sel.filter((m) => !m.itemKey).map((m) => m.id),
+          };
+        })
+        .filter((s) => s.movimientoIds.length > 0 || s.itemKeys.length > 0);
 
       const res = await crearComprobanteInternoLoteAction({ fecha, socioMovimientos });
       if (res.error) setError(res.error);

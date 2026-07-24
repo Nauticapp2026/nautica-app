@@ -21,12 +21,14 @@ async function nextNumeroOperacion(tx: Tx, guarderiaId: string): Promise<number>
 }
 
 /**
- * true si (socioId, servicioId) tiene un contrato Vigente hoy.
+ * true si (socioId, servicioId) tiene un contrato Vigente hoy que bloquea
+ * volver a contratar el mismo servicio.
  *
- * Tarifas Variable: se facturan una sola vez y el cron cierra el contrato al
- * cobrarlo (fechaBaja = día del cobro). Un contrato Variable con fechaBaja
- * seteada ya no cuenta como vigente — no bloquea volver a contratar el mismo
- * servicio (ej: 3 lavados en el mes = 3 contratos distintos).
+ * Tarifas Variable: nunca bloquean. Cada contratación es una fila one-shot
+ * independiente (3 lavados en el mes = 3 contratos distintos); con el modelo
+ * "los cargos nacen al emitir" el contrato queda abierto hasta la próxima
+ * emisión, y aun abierto no debe impedir re-contratar — el índice único
+ * one-shot de la mig 0133 garantiza un solo cobro por contrato.
  */
 export async function hayContratoVigente(
   guarderiaId: string,
@@ -43,10 +45,8 @@ export async function hayContratoVigente(
         eq(socioServicios.guarderiaId, guarderiaId),
         eq(socioServicios.socioId, socioId),
         eq(socioServicios.servicioId, servicioId),
-        or(
-          isNull(socioServicios.fechaBaja),
-          and(gte(socioServicios.fechaBaja, hoy), ne(servicios.tipoCobro, 'variable')),
-        ),
+        ne(servicios.tipoCobro, 'variable'),
+        or(isNull(socioServicios.fechaBaja), gte(socioServicios.fechaBaja, hoy)),
       ),
     )
     .limit(1);

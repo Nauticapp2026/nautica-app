@@ -3,18 +3,19 @@
 import { revalidatePath } from 'next/cache';
 import { db } from '@/lib/db';
 import {
+  cargosPendientes,
   documentos,
   embarcaciones,
   memberships,
-  movimientosCuentaCorriente,
   profiles,
+  servicios,
   socioServicios,
   socioServiciosCancelados,
 } from '@/lib/db/schema';
+import { precioConIva } from '@/lib/iva';
 import { getActiveMarina } from '@/lib/auth/session';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { translateInviteError } from '@/lib/auth/errors';
-import { fechaCalendariaArg } from '@/lib/dates';
 import { and, eq, max } from 'drizzle-orm';
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
@@ -602,8 +603,12 @@ export async function updateSocioServicioAction(input: unknown): Promise<{ error
         socioId: socioServicios.socioId,
         servicioId: socioServicios.servicioId,
         fechaBaja: socioServicios.fechaBaja,
+        servicioPrecio: servicios.precio,
+        servicioAlicuotaIva: servicios.alicuotaIva,
+        servicioNombre: servicios.nombre,
       })
       .from(socioServicios)
+      .innerJoin(servicios, eq(servicios.id, socioServicios.servicioId))
       .where(and(eq(socioServicios.id, id), eq(socioServicios.guarderiaId, guarderiaId)))
       .limit(1);
     if (!current) return { error: 'Servicio contratado no encontrado.' };
@@ -637,14 +642,35 @@ export async function updateSocioServicioAction(input: unknown): Promise<{ error
         .onConflictDoNothing();
 
       if (cobro) {
-        await db.insert(movimientosCuentaCorriente).values({
+        // Modelo "los cargos nacen al emitir": el cobro por baja ya no va
+        // directo a cuenta corriente — queda como ítem pendiente de facturar
+        // y entra al próximo comprobante del socio (manual o automático).
+        // El monto se valida server-side: numérico, > 0 y con techo en el
+        // precio de un mes completo del tarifario (con IVA si es fiscal).
+        const monto = Number.parseFloat(cobro.monto);
+        const precioNeto = current.servicioPrecio != null ? Number(current.servicioPrecio) : 0;
+        const alicuota =
+          current.servicioAlicuotaIva != null ? Number(current.servicioAlicuotaIva) : 0;
+        const techo = comprobanteInterno ? precioNeto : precioConIva(precioNeto, alicuota);
+        if (!Number.isFinite(monto) || monto <= 0) {
+          return { error: 'El monto del cobro por baja debe ser mayor a 0.' };
+        }
+        if (techo > 0 && monto > techo + 0.01) {
+          return {
+            error: 'El cobro por baja no puede superar el precio de un mes completo del servicio.',
+          };
+        }
+
+        await db.insert(cargosPendientes).values({
+          guarderiaId,
           socioId: current.socioId,
           servicioId: current.servicioId,
-          concepto: cobro.concepto || 'Cobro por baja de servicio',
-          tipo: 'otro',
-          debe: cobro.monto,
-          fecha: fechaCalendariaArg(fechaBaja!),
-          estado: 'no_pagado',
+          socioServicioId: current.id,
+          origen: 'baja_anticipada',
+          concepto: cobro.concepto?.trim() || `Cobro por baja de ${current.servicioNombre}`,
+          importe: monto.toFixed(2),
+          alicuotaIva: current.servicioAlicuotaIva,
+          comprobanteInterno,
           createdBy: ctx.profile.id,
         });
       }

@@ -1165,6 +1165,16 @@ export const movimientosCuentaCorriente = pgTable(
     // true = el cargo se documentó con un comprobante INTERNO (no fiscal) al
     // cargar el servicio → se excluye de la facturación automática y manual.
     comprobanteInterno: boolean('comprobante_interno').notNull().default(false),
+    // Contrato (socio_servicios) que originó el cargo y período facturado
+    // (primer día del mes; NULL en one-shots: variables, baja anticipada,
+    // notas, cobranzas). Mig 0133: índices únicos parciales sobre
+    // (socio_servicio_id, periodo), (socio_servicio_id) one-shot y
+    // (espacio_id, socio_id, periodo) garantizan a nivel físico que un mismo
+    // contrato/espacio no se facture dos veces el mismo período.
+    socioServicioId: uuid('socio_servicio_id').references((): AnyPgColumn => socioServicios.id, {
+      onDelete: 'set null',
+    }),
+    periodo: date('periodo'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
@@ -1176,6 +1186,7 @@ export const movimientosCuentaCorriente = pgTable(
     // "movimientos del socio ordenados por fecha" (detalle de socio, morosos).
     index('movimientos_socio_estado_idx').on(t.socioId, t.estado),
     index('movimientos_socio_fecha_idx').on(t.socioId, t.fecha),
+    index('movimientos_cc_socio_servicio_idx').on(t.socioServicioId),
   ],
 );
 
@@ -1673,6 +1684,41 @@ export const socioServicios = pgTable(
     ),
     index('socio_servicios_vigencia_idx').on(t.socioId, t.fechaInicio, t.fechaBaja),
   ],
+);
+
+// Ítems one-shot "pendientes de facturar" con monto custom, no derivable del
+// tarifario (hoy el único origen es el cobro por baja anticipada). Nacen
+// pendientes (movimiento_id NULL); la emisión del próximo comprobante del
+// socio los consume seteando movimiento_id dentro de la misma transacción.
+// El admin puede descartarlos antes de emitir con anulado = true.
+export const cargosPendientes = pgTable(
+  'cargos_pendientes',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    guarderiaId: uuid('guarderia_id')
+      .notNull()
+      .references(() => guarderias.id, { onDelete: 'cascade' }),
+    socioId: uuid('socio_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    servicioId: uuid('servicio_id').references(() => servicios.id, { onDelete: 'set null' }),
+    socioServicioId: uuid('socio_servicio_id').references(() => socioServicios.id, {
+      onDelete: 'set null',
+    }),
+    origen: text('origen').notNull(), // CHECK en DB: 'baja_anticipada'
+    concepto: text('concepto').notNull(),
+    importe: numeric('importe', { precision: 12, scale: 2 }).notNull(),
+    alicuotaIva: numeric('alicuota_iva', { precision: 5, scale: 2 }),
+    comprobanteInterno: boolean('comprobante_interno').notNull().default(false),
+    movimientoId: uuid('movimiento_id').references(() => movimientosCuentaCorriente.id, {
+      onDelete: 'set null',
+    }),
+    anulado: boolean('anulado').notNull().default(false),
+    createdBy: uuid('created_by').references(() => profiles.id, { onDelete: 'set null' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [index('cargos_pendientes_pendientes_idx').on(t.guarderiaId, t.socioId)],
 );
 
 // Tabla genérica key/value para settings globales de la plataforma. Hoy guarda

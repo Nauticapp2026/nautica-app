@@ -203,12 +203,12 @@ Lista los servicios que el socio tiene contratados. Es un **contrato**, no un hi
 
 1. Hacé clic en el ícono de **lápiz** de la fila del servicio.
 2. En el modal podés modificar: **Fecha de inicio**, **Fecha de baja**, **Detalle del servicio** y el tipo de **Comprobante** (Interno / Fiscal).
-3. Si es la **primera vez** que le ponés fecha de baja a ese contrato, aparece un bloque adicional: un checkbox **"Cobrar por esta baja"** con el monto sugerido según la **política de baja anticipada** configurada en la tarifa (mes completo o proporcional al uso) — podés editar ese monto antes de guardar. Si lo tildás, se genera un cargo nuevo en la Cuenta Corriente por ese importe. Si no lo tildás (o si solo estás editando una baja ya cargada antes), no se genera ningún cargo.
+3. Si es la **primera vez** que le ponés fecha de baja a ese contrato, aparece un bloque adicional: un checkbox **"Cobrar por esta baja"** con el monto sugerido según la **política de baja anticipada** configurada en la tarifa (mes completo o proporcional al uso) — podés editar ese monto antes de guardar (con techo en el precio de un mes completo). Si lo tildás, el cobro queda **pendiente de facturar** y se incluye en el **próximo comprobante** que se le emita al socio (manual o automático) — recién ahí aparece en la Cuenta Corriente. Si no lo tildás (o si solo estás editando una baja ya cargada antes), no se genera ningún cobro.
 4. Hacé clic en **Guardar**.
 
 **Servicio de guarda (espacio):** ponerle fecha de baja a un servicio de guarda **detiene el cargo mensual automático** de ahí en más. El espacio **sigue asignado** (la embarcación queda en su lugar); si querés **liberar el lugar** para otro socio, hacelo desde la sección **Espacios**. Si más adelante le volvés a asignar ese espacio al socio, la baja se limpia sola y vuelve a facturarse.
 
-> **Recordá:** el único cargo que se genera **automáticamente cada mes** es el del **espacio de guarda**. Los demás servicios Fijos (cuota social, extras, etc.) empiezan a repetirse solos recién a partir del primer cargo fiscal que les cargues con **Cargar Servicio**; los servicios Variables no se repiten nunca solos.
+> **Recordá:** contratar un servicio o asignar un espacio **no genera deuda por sí solo**. La deuda nace recién cuando se **emite el comprobante** (factura o comprobante interno), que toma los servicios vigentes del socio: los Fijos cada mes, los Variables una sola vez, y el proporcional de los días restantes si el servicio arrancó a mitad de mes.
 
 > La baja no borra datos: el historial de movimientos anteriores del servicio se conserva. Para reactivar un servicio que no es de guarda, volvé a cargarlo mediante Cargar Servicio.
 
@@ -622,7 +622,7 @@ Las tarjetas superiores muestran:
 
 1. Hacé clic en **Nuevo comprobante** → **Facturación manual**.
 2. Buscá y seleccioná el **socio** en el campo Cliente — el buscador filtra por nombre, número de socio o embarcación (mismo buscador que usás en Cobranzas).
-3. El sistema muestra automáticamente los **conceptos pendientes** del socio (movimientos sin facturar). Marcá los que querés incluir. Podés usar **Todos** o **Ninguno** para seleccionar rápido.
+3. El sistema muestra automáticamente los **servicios a facturar** del socio: los servicios vigentes del período (mensualidades, proporcionales, variables, cobros por baja) que todavía no tienen comprobante. Marcá los que querés incluir — lo que destildes queda pendiente para la próxima emisión. Podés usar **Todos** o **Ninguno** para seleccionar rápido.
 4. Completá los campos:
    - **Tipo de comprobante** — se determina automáticamente según la condición IVA del club y del socio (campo de solo lectura):
      - Club Monotributo → siempre **Factura C**.
@@ -651,11 +651,11 @@ Emití facturas para múltiples socios al mismo tiempo.
 
 El tipo de comprobante se determina automáticamente para cada socio según la condición IVA del club y de cada socio individualmente (igual que en la factura individual). La condición de venta es siempre **Contado**.
 
-> La facturación mensual automática corre el día del mes que configuraste en **Mi perfil → Información general** (campo "Día de facturación"). Solo aplica a socios que ya tuvieron al menos una factura emitida.
+> La facturación mensual automática corre el día del mes que configuraste en **Mi perfil → Información general** (campo "Día de facturación"). Ese día el sistema emite solo, para cada socio, la **factura fiscal** por sus servicios "Fiscal" **y el comprobante interno** por sus servicios "Interno" (identificador **CA-NNNNNN**).
 
-**¿Qué conceptos entran en la factura automática?** La factura incluye **todos los cargos pendientes** del socio: la mensualidad que el sistema genera ese día **más cualquier consumo cargado durante el mes que siga pendiente**. No entran los pagos ni saldos a favor, ni los cargos que ya estaban facturados (no se duplican), **ni los cargos con comprobante interno** (esos nunca se facturan). Importante: como todo consumo fiscal cargado desde **Cargar Servicio** queda pendiente, cada consumo no cobrado antes del día de facturación se va a incluir en la factura mensual del socio.
+**¿Qué conceptos entran en la factura automática?** Todos los **servicios vigentes** del socio pendientes de facturar: la mensualidad de cada servicio Fijo contratado (espacio de guarda incluido), el proporcional de los que arrancaron a mitad de mes, los Variables sin cobrar y los cobros por baja anticipada. Los servicios marcados **Interno** no entran en la factura fiscal — salen por su propio comprobante interno automático. No se duplica nada: lo que ya tiene comprobante de este período no se vuelve a incluir.
 
-> **Qué se genera solo cada mes.** Toda tarifa marcada **Fija** se cobra mensual automático — no solo Espacio de guarda: también Cuota social, Membresía, Expensas ordinarias/extraordinarias y Servicio extra. Para Espacio de guarda alcanza con tener el espacio asignado. Para el resto, la recurrencia arranca sola apenas le cargás el primer cargo fiscal con **Cargar Servicio**; de ahí en más se repite todos los meses hasta que lo canceles desde **Servicios Contratados**. Las tarifas **Variables** (se cobran según el metraje) nunca se repiten solas — se cobran una vez y listo; para volver a cobrarlas hay que cargarlas a mano de nuevo.
+> **Qué se cobra solo cada mes.** Toda tarifa marcada **Fija** se cobra mensual automático — no solo Espacio de guarda: también Cuota social, Membresía, Expensas ordinarias/extraordinarias y Servicio extra. Para Espacio de guarda alcanza con tener el espacio asignado con tarifa; para el resto, con tener el servicio contratado (**Cargar Servicio**). La recurrencia se corta cuando lo cancelás desde **Servicios Contratados**. Las tarifas **Variables** nunca se repiten solas — se cobran una vez y el contrato se cierra; para volver a cobrarlas hay que cargarlas de nuevo.
 
 ### Comprobantes internos
 
@@ -663,14 +663,15 @@ Los comprobantes internos son documentos propios del club, sin intervención de 
 
 **Paso 1 — marcar un cargo como Interno:**
 
-Al **Cargar Servicio** (pestaña Servicios Contratados de un socio) eligiendo **Interno** en vez de Fiscal, el cargo queda excluido de toda facturación por ARCA (automática y manual) y pendiente de comprobante.
+Al **Cargar Servicio** (pestaña Servicios Contratados de un socio) eligiendo **Interno** en vez de Fiscal, el servicio queda excluido de toda facturación por ARCA (automática y manual).
 
 **Paso 2 — emitir el comprobante:**
 
-Los cargos Interno pendientes no generan nada por sí solos: hay que consolidarlos en un comprobante desde **Ventas → Nuevo comprobante**:
+Los servicios Interno se consolidan en un comprobante desde **Ventas → Nuevo comprobante**, o los emite solo el sistema el día de facturación:
 
-- **Comprobante interno manual** — elegís un socio, el sistema te muestra sus cargos Interno pendientes en una lista para tildar (igual que Facturación manual), y emitís un solo comprobante con todos los que selecciones. Numeración **CM-NNNNNN**.
-- **Comprobante interno por lote** — igual, pero para todos los socios con cargos Interno pendientes a la vez; genera un comprobante por socio. Numeración **CL-NNNNNN**.
+- **Comprobante interno manual** — elegís un socio, el sistema te muestra sus servicios Interno pendientes en una lista para tildar (igual que Facturación manual), y emitís un solo comprobante con todos los que selecciones. Numeración **CM-NNNNNN**.
+- **Comprobante interno por lote** — igual, pero para todos los socios con servicios Interno pendientes a la vez; genera un comprobante por socio. Numeración **CL-NNNNNN**.
+- **Automático** — el día de facturación del club, el sistema emite solo un comprobante interno por socio con sus servicios Interno del período. Numeración **CA-NNNNNN**.
 
 El comprobante generado muestra fecha de emisión, descripción del o los servicios incluidos, precio y datos del cliente — como una factura, pero sin validez fiscal.
 

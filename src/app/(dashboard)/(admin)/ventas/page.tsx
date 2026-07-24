@@ -15,6 +15,7 @@ import {
   socioServicios,
 } from '@/lib/db/schema';
 import { identidadFacturacion } from '@/lib/facturacion/identidad';
+import { claveItem, listarPendientesFacturar } from '@/lib/pendientes-facturar';
 import { getCargosSaldadosFifo } from '@/lib/reconciliar-cuenta';
 
 import { VentasClient } from './ventas-client';
@@ -66,49 +67,74 @@ async function resolverNumeroOperacionPorFactura(
       id: movimientosCuentaCorriente.id,
       socioId: movimientosCuentaCorriente.socioId,
       servicioId: movimientosCuentaCorriente.servicioId,
+      socioServicioId: movimientosCuentaCorriente.socioServicioId,
       fecha: movimientosCuentaCorriente.fecha,
     })
     .from(movimientosCuentaCorriente)
     .where(inArray(movimientosCuentaCorriente.id, movimientoIds));
   const movById = new Map(movs.map((m) => [m.id, m]));
 
+  // Camino exacto (modelo "los cargos nacen al emitir"): el movimiento lleva
+  // el id del contrato que lo originó.
+  const contratoIds = [
+    ...new Set(movs.map((m) => m.socioServicioId).filter((x): x is string => !!x)),
+  ];
+  const numeroPorContrato = new Map<string, number>();
+  if (contratoIds.length > 0) {
+    const rows = await db
+      .select({ id: socioServicios.id, numeroOperacion: socioServicios.numeroOperacion })
+      .from(socioServicios)
+      .where(inArray(socioServicios.id, contratoIds));
+    for (const r of rows) numeroPorContrato.set(r.id, r.numeroOperacion);
+  }
+
   const socioIds = [...new Set(movs.map((m) => m.socioId))];
   const servicioIds = [...new Set(movs.map((m) => m.servicioId).filter((x): x is string => !!x))];
-  if (socioIds.length === 0 || servicioIds.length === 0) return resultado;
 
-  const scRows = await db
-    .select({
-      socioId: socioServicios.socioId,
-      servicioId: socioServicios.servicioId,
-      fechaInicio: socioServicios.fechaInicio,
-      fechaBaja: socioServicios.fechaBaja,
-      numeroOperacion: socioServicios.numeroOperacion,
-    })
-    .from(socioServicios)
-    .where(
-      and(
-        inArray(socioServicios.socioId, socioIds),
-        inArray(socioServicios.servicioId, servicioIds),
-      ),
-    );
+  const scRows =
+    socioIds.length > 0 && servicioIds.length > 0
+      ? await db
+          .select({
+            socioId: socioServicios.socioId,
+            servicioId: socioServicios.servicioId,
+            fechaInicio: socioServicios.fechaInicio,
+            fechaBaja: socioServicios.fechaBaja,
+            numeroOperacion: socioServicios.numeroOperacion,
+          })
+          .from(socioServicios)
+          .where(
+            and(
+              inArray(socioServicios.socioId, socioIds),
+              inArray(socioServicios.servicioId, servicioIds),
+            ),
+          )
+      : [];
 
   // Por (facturacionId) → set de números de operación encontrados.
   const porFactura = new Map<string, Set<number>>();
   for (const l of links) {
     const facturaId = itemToFactura.get(l.facturacionItemId);
     const mov = movById.get(l.movimientoId);
-    if (!facturaId || !mov || !mov.servicioId || !mov.fecha) continue;
-    const fechaYmd = mov.fecha.toISOString().slice(0, 10);
-    const sc = scRows.find(
-      (r) =>
-        r.socioId === mov.socioId &&
-        r.servicioId === mov.servicioId &&
-        r.fechaInicio <= fechaYmd &&
-        (!r.fechaBaja || r.fechaBaja >= fechaYmd),
-    );
-    if (!sc) continue;
+    if (!facturaId || !mov) continue;
+
+    // Exacto si el movimiento trae su contrato; best-effort por vigencia para
+    // los movimientos pre-refactor.
+    let numeroOperacion: number | undefined;
+    if (mov.socioServicioId) {
+      numeroOperacion = numeroPorContrato.get(mov.socioServicioId);
+    } else if (mov.servicioId && mov.fecha) {
+      const fechaYmd = mov.fecha.toISOString().slice(0, 10);
+      numeroOperacion = scRows.find(
+        (r) =>
+          r.socioId === mov.socioId &&
+          r.servicioId === mov.servicioId &&
+          r.fechaInicio <= fechaYmd &&
+          (!r.fechaBaja || r.fechaBaja >= fechaYmd),
+      )?.numeroOperacion;
+    }
+    if (numeroOperacion == null) continue;
     if (!porFactura.has(facturaId)) porFactura.set(facturaId, new Set());
-    porFactura.get(facturaId)!.add(sc.numeroOperacion);
+    porFactura.get(facturaId)!.add(numeroOperacion);
   }
 
   for (const [facturaId, nums] of porFactura) {
@@ -332,6 +358,11 @@ export default async function VentasPage() {
   // batchear en paralelo con la query que le da el input).
   const numeroOperacionPorFactura = await resolverNumeroOperacionPorFactura(lista.map((f) => f.id));
 
+  // Pendientes de facturar computados desde los contratos vigentes (modelo
+  // "los cargos nacen al emitir") — alimentan los lotes junto con los cargos
+  // legacy que quedaron en cuenta corriente sin comprobante.
+  const pendientesComputados = await listarPendientesFacturar(gId);
+
   const entreEmisor = guarderiaInfo?.razonSocial?.trim() || guarderiaInfo?.nombre || '—';
   const centroEmisor =
     guarderiaInfo?.puntoDeVenta != null ? String(guarderiaInfo.puntoDeVenta) : '—';
@@ -406,16 +437,30 @@ export default async function VentasPage() {
     (m) => !saldadosPorSocio.get(m.socioId)?.has(m.id),
   );
 
-  const movsBySocio = new Map<
-    string,
-    {
-      id: string;
-      concepto: string | null;
-      debe: string | null;
-      servicioNombre: string | null;
-      tipoServicio: string | null;
-    }[]
-  >();
+  type FilaLote = {
+    id: string;
+    concepto: string | null;
+    debe: string | null;
+    servicioNombre: string | null;
+    tipoServicio: string | null;
+    itemKey: import('@/lib/pendientes-facturar').ItemPendienteKey | null;
+  };
+
+  const movsBySocio = new Map<string, FilaLote[]>();
+  // Primero los ítems computados (servicios vigentes del período)…
+  for (const item of pendientesComputados) {
+    if (item.comprobanteInterno) continue;
+    if (!movsBySocio.has(item.socioId)) movsBySocio.set(item.socioId, []);
+    movsBySocio.get(item.socioId)!.push({
+      id: claveItem(item.key),
+      concepto: item.concepto,
+      debe: item.importe.toFixed(2),
+      servicioNombre: null,
+      tipoServicio: item.servicioTipo,
+      itemKey: item.key,
+    });
+  }
+  // …después los cargos legacy de cuenta corriente sin comprobante.
   for (const m of movsPendientesFiltrados) {
     if (!movsBySocio.has(m.socioId)) movsBySocio.set(m.socioId, []);
     movsBySocio.get(m.socioId)!.push({
@@ -424,6 +469,7 @@ export default async function VentasPage() {
       debe: m.debe,
       servicioNombre: m.servicioNombre,
       tipoServicio: m.tipoServicio,
+      itemKey: null,
     });
   }
 
@@ -457,16 +503,19 @@ export default async function VentasPage() {
   });
 
   // Cargos "Interno" pendientes, agrupados por socio (para Comprobante interno por lote).
-  const movsInternoBySocio = new Map<
-    string,
-    {
-      id: string;
-      concepto: string | null;
-      debe: string | null;
-      servicioNombre: string | null;
-      tipoServicio: string | null;
-    }[]
-  >();
+  const movsInternoBySocio = new Map<string, FilaLote[]>();
+  for (const item of pendientesComputados) {
+    if (!item.comprobanteInterno) continue;
+    if (!movsInternoBySocio.has(item.socioId)) movsInternoBySocio.set(item.socioId, []);
+    movsInternoBySocio.get(item.socioId)!.push({
+      id: claveItem(item.key),
+      concepto: item.concepto,
+      debe: item.importe.toFixed(2),
+      servicioNombre: null,
+      tipoServicio: item.servicioTipo,
+      itemKey: item.key,
+    });
+  }
   for (const m of movsPendientesInternoList) {
     if (!movsInternoBySocio.has(m.socioId)) movsInternoBySocio.set(m.socioId, []);
     movsInternoBySocio.get(m.socioId)!.push({
@@ -475,6 +524,7 @@ export default async function VentasPage() {
       debe: m.debe,
       servicioNombre: m.servicioNombre,
       tipoServicio: m.tipoServicio,
+      itemKey: null,
     });
   }
   const sociosInterno = socios

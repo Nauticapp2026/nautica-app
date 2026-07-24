@@ -21,8 +21,6 @@ import {
 } from '@/lib/db/schema';
 import { getActiveMarina } from '@/lib/auth/session';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { calcularProporcionalMes, ensureMonthlyMovimiento } from '@/lib/movimientos-mensuales';
-import { precioConIva } from '@/lib/iva';
 import { todayArg } from '@/lib/dates';
 import { cerrarContratoAbierto, crearSocioServicio } from '@/lib/socio-servicios';
 
@@ -314,7 +312,6 @@ export async function updateEspacioAction(input: UpdateEspacioInput): Promise<{ 
   // Validar que el servicio pertenezca a la guardería.
   let tarifaPrecio: string | null = null;
   let servicioNombre: string | null = null;
-  let servicioPrecioNum = 0;
   if (input.servicioId) {
     const [s] = await db
       .select({
@@ -345,8 +342,6 @@ export async function updateEspacioAction(input: UpdateEspacioInput): Promise<{ 
     }
     tarifaPrecio = s.precio ?? null;
     servicioNombre = s.nombre;
-    servicioPrecioNum =
-      s.precio != null ? precioConIva(Number(s.precio), Number(s.alicuotaIva ?? 0)) : 0;
   }
 
   // Día de cobro mensual: arranca cuando se asigna o se cambia el ocupante.
@@ -413,27 +408,15 @@ export async function updateEspacioAction(input: UpdateEspacioInput): Promise<{ 
     });
   }
 
-  // Si hay ocupante + servicio, garantizamos el movimiento mensual del mes
-  // corriente. La base del proporcional es la mayor entre `fechaAsignacion`
-  // y el inicio del mes corriente: si el socio entró al espacio este mes,
-  // se cobra desde ese día (aunque la tarifa se haya cargado más tarde);
-  // si entró en un mes anterior, se cobra el mes corriente completo (no
-  // hay retroactivo de meses pasados).
+  // Si hay ocupante + servicio, dejamos el contrato al día. Modelo "los
+  // cargos nacen al emitir": acá NO se crea ningún movimiento en cuenta
+  // corriente — el proporcional del mes (con base en la fecha de asignación)
+  // lo computa listarPendientesFacturar y se cobra al emitir el próximo
+  // comprobante (manual o automático).
   if (input.ocupanteId && input.servicioId && servicioNombre) {
     try {
-      const now = new Date();
-      const inicioMes = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0));
-      const fechaBase =
-        nuevaFechaAsignacion && nuevaFechaAsignacion > inicioMes ? nuevaFechaAsignacion : inicioMes;
-      const { importe, diasRestantes, diasMes, esProporcional } = calcularProporcionalMes(
-        servicioPrecioNum,
-        fechaBase,
-      );
-      const concepto = esProporcional
-        ? `${servicioNombre} (proporcional ${diasRestantes}/${diasMes} días)`
-        : servicioNombre;
-      // Re-contratar: si el servicio estaba cancelado para este socio, limpiar la
-      // cancelación para que el cron vuelva a generar el cargo mensual.
+      // Re-contratar: si el servicio estaba cancelado para este socio, limpiar
+      // la cancelación para que vuelva a computarse como pendiente.
       await db
         .delete(socioServiciosCancelados)
         .where(
@@ -442,13 +425,6 @@ export async function updateEspacioAction(input: UpdateEspacioInput): Promise<{ 
             eq(socioServiciosCancelados.servicioId, input.servicioId),
           ),
         );
-      await ensureMonthlyMovimiento({
-        socioId: input.ocupanteId,
-        espacioId: input.id,
-        servicioId: input.servicioId,
-        precio: importe,
-        concepto,
-      });
       // Solo abrimos un contrato nuevo si algo cambió: si el ocupante y el
       // servicio son los mismos que antes, ya existe una fila vigente y no
       // hay que duplicarla.
@@ -465,8 +441,8 @@ export async function updateEspacioAction(input: UpdateEspacioInput): Promise<{ 
         );
       }
     } catch (err) {
-      // No bloqueamos el save del espacio si falla el movimiento.
-      console.error('[ensureMonthlyMovimiento] error', err);
+      // No bloqueamos el save del espacio si falla el registro del contrato.
+      console.error('[updateEspacioAction contrato] error', err);
     }
   }
 
@@ -556,18 +532,17 @@ export async function assignEspacioToSocioAction(input: {
     }
   }
 
-  // Si el espacio tiene tarifa ACTIVA, generamos el movimiento mensual
-  // proporcional de este mes. Si todavía no tiene tarifa, o la tarifa está
-  // pausada/inactiva, no se genera cargo (igual que "sin tarifa configurada"):
-  // se asigna el espacio igual y el movimiento arranca cuando la tarifa
-  // vuelva a estar activa o se cargue una nueva.
+  // Si el espacio tiene tarifa ACTIVA y vigente, registramos el contrato en
+  // Servicios Contratados. Modelo "los cargos nacen al emitir": acá NO se
+  // crea ningún movimiento en cuenta corriente — el proporcional del mes lo
+  // computa listarPendientesFacturar y se cobra al emitir el próximo
+  // comprobante (manual o automático). Si la tarifa está pausada/inactiva,
+  // se asigna el espacio igual y el pendiente aparece cuando la tarifa
+  // vuelva a estar activa.
   if (espacio.servicioId) {
     try {
       const [servicio] = await db
         .select({
-          nombre: servicios.nombre,
-          precio: servicios.precio,
-          alicuotaIva: servicios.alicuotaIva,
           estado: servicios.estado,
           vigenciaDesde: servicios.vigenciaDesde,
           vigenciaHasta: servicios.vigenciaHasta,
@@ -579,15 +554,6 @@ export async function assignEspacioToSocioAction(input: {
       const vigente =
         !!servicio && servicio.vigenciaDesde <= hoyStr && servicio.vigenciaHasta >= hoyStr;
       if (servicio && servicio.estado === 'activo' && vigente) {
-        const servicioPrecioNum =
-          servicio.precio != null
-            ? precioConIva(Number(servicio.precio), Number(servicio.alicuotaIva ?? 0))
-            : 0;
-        const { importe, diasRestantes, diasMes, esProporcional } =
-          calcularProporcionalMes(servicioPrecioNum);
-        const concepto = esProporcional
-          ? `${servicio.nombre} (proporcional ${diasRestantes}/${diasMes} días)`
-          : servicio.nombre;
         // Re-contratar: limpiar la cancelación previa de este (socio, servicio).
         await db
           .delete(socioServiciosCancelados)
@@ -597,13 +563,6 @@ export async function assignEspacioToSocioAction(input: {
               eq(socioServiciosCancelados.servicioId, espacio.servicioId),
             ),
           );
-        await ensureMonthlyMovimiento({
-          socioId: input.socioId,
-          espacioId: input.espacioId,
-          servicioId: espacio.servicioId,
-          precio: importe,
-          concepto,
-        });
         await db.transaction((tx) =>
           crearSocioServicio(tx, {
             guarderiaId,
@@ -616,7 +575,7 @@ export async function assignEspacioToSocioAction(input: {
         );
       }
     } catch (err) {
-      console.error('[assignEspacioToSocioAction] ensureMonthlyMovimiento error', err);
+      console.error('[assignEspacioToSocioAction] contrato error', err);
     }
   }
 

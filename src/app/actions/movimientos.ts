@@ -4,7 +4,6 @@ import { revalidatePath } from 'next/cache';
 import { db } from '@/lib/db';
 import { memberships, movimientosCuentaCorriente } from '@/lib/db/schema';
 import { getActiveMarina } from '@/lib/auth/session';
-import { fechaCalendariaArg } from '@/lib/dates';
 import { and, eq } from 'drizzle-orm';
 
 function isAdmin(ctx: NonNullable<Awaited<ReturnType<typeof getActiveMarina>>>): boolean {
@@ -14,47 +13,6 @@ function isAdmin(ctx: NonNullable<Awaited<ReturnType<typeof getActiveMarina>>>):
     ctx.activeMembership.rol === 'administrativo' ||
     ctx.activeMembership.rol === 'contable'
   );
-}
-
-export type AddMovimientoData = {
-  socioId: string;
-  servicioId: string;
-  concepto: string;
-  monto: string;
-  fecha: string;
-  estado?: 'no_pagado' | 'pagado';
-  formaDePago?: string;
-  datosPago?: Record<string, unknown>;
-};
-
-export async function addMovimientoAction(data: AddMovimientoData): Promise<{ error?: string }> {
-  const ctx = await getActiveMarina();
-  if (!ctx) return { error: 'No autenticado' };
-
-  const estado = data.estado ?? 'no_pagado';
-
-  try {
-    await db.insert(movimientosCuentaCorriente).values({
-      socioId: data.socioId,
-      servicioId: data.servicioId || null,
-      concepto: data.concepto.trim() || null,
-      tipo: 'otro',
-      estado,
-      debe: data.monto || '0',
-      fecha: data.fecha ? fechaCalendariaArg(data.fecha) : new Date(),
-      createdBy: ctx.user.id,
-      ...(estado === 'pagado' && data.formaDePago
-        ? {
-            formaDePago: data.formaDePago as never,
-            datosPago: data.datosPago ?? null,
-          }
-        : {}),
-    });
-    revalidatePath(`/usuarios/${data.socioId}`);
-    return {};
-  } catch {
-    return { error: 'Error al agregar el movimiento.' };
-  }
 }
 
 // Anular un pago a cuenta. Admin only. Solo se puede borrar movimientos
