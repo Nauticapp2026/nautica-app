@@ -473,6 +473,9 @@ export const memberships = pgTable(
     // fiscal, condicionIva). El nombre de la columna quedó histórico; NO indica
     // "factura fiscal sí/no". Default false = se factura con Datos Impositivos.
     facturaFiscal: boolean('factura_fiscal').notNull().default(false),
+    // Tilde "Comprobante interno" (Datos Impositivos del socio): default del
+    // toggle Interno/Fiscal al cargarle un servicio. Mig 0132.
+    comprobanteInterno: boolean('comprobante_interno').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },

@@ -42,6 +42,7 @@ import { toast } from 'sonner';
 import {
   deleteSocioAction,
   deleteSocioDocumentoAction,
+  toggleComprobanteInternoAction,
   toggleFacturaFiscalAction,
   updateNumeroSocioAction,
   updateSocioAction,
@@ -90,6 +91,9 @@ type SocioData = {
   membershipStatus: 'active' | 'suspended' | 'removed' | 'inactivo' | null;
   numeroSocio: number | null;
   facturaFiscal: boolean;
+  // Tilde "Comprobante interno" (Datos Impositivos): default del toggle
+  // Interno/Fiscal en Cargar Servicio.
+  comprobanteInterno: boolean;
 };
 
 type Embarcacion = {
@@ -512,19 +516,25 @@ function AgregarServicioModal({
   socioId,
   socioNombre,
   servicios,
+  comprobanteInternoDefault,
 }: {
   open: boolean;
   onClose: () => void;
   socioId: string;
   socioNombre: string;
   servicios: Servicio[];
+  // Tilde "Comprobante interno" de Datos Impositivos del socio: define con
+  // qué opción arranca el toggle Interno/Fiscal.
+  comprobanteInternoDefault: boolean;
 }) {
   const router = useRouter();
   const [servicioId, setServicioId] = useState('');
   const [concepto, setConcepto] = useState('');
   const [fechaInicio, setFechaInicio] = useState(todayISODate);
   const [fechaBaja, setFechaBaja] = useState('');
-  const [comprobante, setComprobante] = useState<'interno' | 'fiscal'>('interno');
+  const [comprobante, setComprobante] = useState<'interno' | 'fiscal'>(
+    comprobanteInternoDefault ? 'interno' : 'fiscal',
+  );
   const [cantidadDias, setCantidadDias] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState(false);
@@ -542,7 +552,7 @@ function AgregarServicioModal({
     setConcepto('');
     setFechaInicio(todayISODate());
     setFechaBaja('');
-    setComprobante('interno');
+    setComprobante(comprobanteInternoDefault ? 'interno' : 'fiscal');
     setCantidadDias('');
     setError(null);
     setResult(false);
@@ -1864,11 +1874,15 @@ export function SocioDetail({
   return (
     <div className="p-4 md:p-8">
       <AgregarServicioModal
+        // key: si cambia el tilde de Datos Impositivos, remonta el modal para
+        // que el toggle Interno/Fiscal arranque con el default nuevo.
+        key={socio.comprobanteInterno ? 'ci-interno' : 'ci-fiscal'}
         open={modalServicioOpen}
         onClose={() => setModalServicioOpen(false)}
         socioId={socio.id}
         socioNombre={nombre}
         servicios={servicios}
+        comprobanteInternoDefault={socio.comprobanteInterno}
       />
 
       {/* Back */}
@@ -2897,6 +2911,7 @@ function ImpositivosTab({
 }) {
   const router = useRouter();
   const [facturaFiscal, setFacturaFiscal] = useState(socio.facturaFiscal);
+  const [comprobanteInterno, setComprobanteInterno] = useState(socio.comprobanteInterno);
   const [isToggling, startToggle] = useTransition();
 
   const inputCls =
@@ -2912,6 +2927,24 @@ function ImpositivosTab({
       } else {
         toast.success(
           checked ? 'Facturará con datos personales' : 'Facturará con datos impositivos',
+        );
+        router.refresh();
+      }
+    });
+  }
+
+  function handleToggleComprobanteInterno(checked: boolean) {
+    setComprobanteInterno(checked);
+    startToggle(async () => {
+      const res = await toggleComprobanteInternoAction(socio.id, checked);
+      if (res?.error) {
+        toast.error(res.error);
+        setComprobanteInterno(!checked);
+      } else {
+        toast.success(
+          checked
+            ? 'Los servicios nuevos arrancan como Interno'
+            : 'Los servicios nuevos arrancan como Fiscal (ARCA)',
         );
         router.refresh();
       }
@@ -2936,6 +2969,26 @@ function ImpositivosTab({
           checked={facturaFiscal}
           disabled={isToggling}
           onChange={(e) => handleToggleFactura(e.target.checked)}
+          className="h-4 w-4 cursor-pointer accent-[#175861] disabled:cursor-not-allowed"
+        />
+      </div>
+
+      {/* Check comprobante interno */}
+      <div className="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
+        <div>
+          <p className="text-sm font-semibold" style={{ color: '#101828' }}>
+            Comprobante interno
+          </p>
+          <p className="text-xs text-gray-500">
+            Activado: al cargarle un servicio, el modal arranca en Interno (no va por ARCA).
+            Desactivado: arranca en Fiscal (ARCA). Se puede cambiar en cada carga.
+          </p>
+        </div>
+        <input
+          type="checkbox"
+          checked={comprobanteInterno}
+          disabled={isToggling}
+          onChange={(e) => handleToggleComprobanteInterno(e.target.checked)}
           className="h-4 w-4 cursor-pointer accent-[#175861] disabled:cursor-not-allowed"
         />
       </div>

@@ -201,6 +201,9 @@ function CrearSocioModal({ open, onClose }: { open: boolean; onClose: () => void
   // true = facturar con datos personales (Generales); false = con Datos Impositivos.
   // Default false: por defecto se factura con los Datos Impositivos.
   const [facturaFiscal, setFacturaFiscal] = useState(false);
+  // Tilde "Comprobante interno": default del toggle Interno/Fiscal al
+  // cargarle servicios a este socio. Default false = Fiscal (ARCA).
+  const [comprobanteInterno, setComprobanteInterno] = useState(false);
   const [esloraUnidad, setEsloraUnidad] = useState<'m' | 'ft'>('m');
   const [astilleroSel, setAstilleroSel] = useState('');
   const [adjuntos, setAdjuntos] = useState<AdjuntoInput[]>([]);
@@ -276,6 +279,7 @@ function CrearSocioModal({ open, onClose }: { open: boolean; onClose: () => void
         ...form,
         esloraM: esloraFinal,
         facturaFiscal,
+        comprobanteInterno,
       });
       if (res.error) {
         setError(res.error);
@@ -482,6 +486,18 @@ function CrearSocioModal({ open, onClose }: { open: boolean; onClose: () => void
                   </label>
                 }
               />
+              <label className="flex cursor-pointer items-center gap-1.5">
+                <input
+                  type="checkbox"
+                  checked={comprobanteInterno}
+                  onChange={(e) => setComprobanteInterno(e.target.checked)}
+                  className="h-3.5 w-3.5 cursor-pointer accent-[#175861]"
+                />
+                <span className="text-xs text-gray-500">
+                  Comprobante interno — los servicios que se le carguen arrancan como Interno (no
+                  van por ARCA)
+                </span>
+              </label>
               {facturaFiscal ? (
                 <p className="text-xs text-gray-500">
                   Se facturará con los datos personales (Generales). Completá la condición frente al

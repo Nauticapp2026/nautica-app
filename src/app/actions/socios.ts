@@ -52,6 +52,8 @@ export type CreateSocioData = {
   modelo: string;
   esloraM: string;
   facturaFiscal: boolean;
+  // Default del toggle Interno/Fiscal al cargarle servicios (Datos Impositivos).
+  comprobanteInterno: boolean;
 };
 
 export type SocioResult = { error?: string; socioId?: string };
@@ -172,6 +174,7 @@ export async function createSocioAction(data: CreateSocioData): Promise<SocioRes
       status: 'active',
       numeroSocio: numSocio,
       facturaFiscal: data.facturaFiscal,
+      comprobanteInterno: data.comprobanteInterno,
     });
 
     // 4. Create embarcación if provided
@@ -666,6 +669,30 @@ export async function updateSocioServicioAction(input: unknown): Promise<{ error
 }
 
 // ─── Toggle facturaFiscal ────────────────────────────────────────────────────
+
+// Tilde "Comprobante interno" (Datos Impositivos): default del toggle
+// Interno/Fiscal al cargar un servicio a este socio.
+export async function toggleComprobanteInternoAction(socioId: string, value: boolean) {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+  const guarderiaId = ctx.activeMembership.guarderiaId;
+  try {
+    await db
+      .update(memberships)
+      .set({ comprobanteInterno: value })
+      .where(
+        and(
+          eq(memberships.userId, socioId),
+          eq(memberships.guarderiaId, guarderiaId),
+          eq(memberships.rol, 'socio'),
+        ),
+      );
+    revalidatePath(`/usuarios/${socioId}`);
+    return {};
+  } catch {
+    return { error: 'Error al actualizar.' };
+  }
+}
 
 export async function toggleFacturaFiscalAction(socioId: string, value: boolean) {
   const ctx = await getActiveMarina();
