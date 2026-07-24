@@ -3143,11 +3143,14 @@ function ServiciosContratadosTab({
   const [editingSC, setEditingSC] = useState<ServicioContratado | null>(null);
 
   const hoy = todayISODate();
+  // Estados posibles: Vigente / Concluido (Variable ya facturada) / Dado de
+  // baja. Un contrato con fecha de inicio a futuro también se muestra
+  // Vigente — ya está contratado, solo que factura desde esa fecha.
   function esVigente(sc: ServicioContratado): boolean {
-    // Variable se factura una sola vez: el cron le pone fechaBaja al cobrarlo
-    // y pasa a No vigente en el momento, sin esperar a que termine el día.
+    // Variable se factura una sola vez: al emitirse queda con fechaBaja y
+    // deja de estar vigente en el momento, sin esperar a que termine el día.
     if (sc.servicioTipoCobro === 'variable' && sc.fechaBaja) return false;
-    return sc.fechaInicio <= hoy && (!sc.fechaBaja || sc.fechaBaja >= hoy);
+    return !sc.fechaBaja || sc.fechaBaja >= hoy;
   }
 
   const filas = [...serviciosContratados].sort((a, b) =>
@@ -3266,22 +3269,15 @@ function ServiciosContratadosTab({
                           <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
                             Vigente
                           </span>
-                        ) : sc.fechaBaja && sc.fechaBaja <= hoy ? (
-                          sc.servicioTipoCobro === 'variable' && sc.tieneCargo ? (
-                            // Variable que se cerró sola al facturarse: terminó
-                            // su ciclo, no es una baja del admin.
-                            <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
-                              Concluido
-                            </span>
-                          ) : (
-                            <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-600">
-                              Dado de baja
-                            </span>
-                          )
+                        ) : sc.servicioTipoCobro === 'variable' && sc.tieneCargo ? (
+                          // Variable que se cerró sola al facturarse: terminó
+                          // su ciclo, no es una baja del admin.
+                          <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+                            Concluido
+                          </span>
                         ) : (
-                          // Todavía no arrancó (fecha de inicio futura).
-                          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
-                            No vigente
+                          <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-600">
+                            Dado de baja
                           </span>
                         )}
                       </td>
