@@ -3263,8 +3263,14 @@ function ServiciosContratadosTab({
                           <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
                             Vigente
                           </span>
-                        ) : (
+                        ) : sc.fechaBaja && sc.fechaBaja <= hoy ? (
+                          // Baja cumplida (incluye Variables cerradas al emitirse).
                           <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-600">
+                            Dado de baja
+                          </span>
+                        ) : (
+                          // Todavía no arrancó (fecha de inicio futura).
+                          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
                             No vigente
                           </span>
                         )}
