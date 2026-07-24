@@ -341,6 +341,22 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
       .orderBy(desc(socioServicios.fechaAsignacion)),
   ]);
 
+  // Contratos que ya tienen al menos un cargo emitido (modelo "los cargos
+  // nacen al emitir": el movimiento lleva socio_servicio_id). Permite
+  // distinguir en la UI "Concluido" (Variable ya facturada, se cerró sola)
+  // de "Dado de baja" (baja manual del admin).
+  const contratoIdsSC = serviciosContratadosList.map((s) => s.id);
+  const contratosConCargo = new Set<string>();
+  if (contratoIdsSC.length > 0) {
+    const conCargo = await db
+      .select({ socioServicioId: movimientosCuentaCorriente.socioServicioId })
+      .from(movimientosCuentaCorriente)
+      .where(inArray(movimientosCuentaCorriente.socioServicioId, contratoIdsSC));
+    for (const r of conCargo) {
+      if (r.socioServicioId) contratosConCargo.add(r.socioServicioId);
+    }
+  }
+
   // Para cada movimiento facturado, traer el código de la factura. Lo
   // hacemos en una query separada para no duplicar filas con el JOIN M:N
   // (facturacion_item_movimientos puede tener varios matches por movimiento).
@@ -583,6 +599,7 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
         concepto: s.concepto,
         comprobanteInterno: s.comprobanteInterno,
         cantidadDias: s.cantidadDias,
+        tieneCargo: contratosConCargo.has(s.id),
       }))}
       navegantes={navegantesList.map((n) => ({
         ...n,

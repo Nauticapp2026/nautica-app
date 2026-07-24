@@ -172,6 +172,9 @@ type ServicioContratado = {
   comprobanteInterno: boolean;
   // Solo para contratos de tarifa Variable diaria: días contratados.
   cantidadDias: number | null;
+  // true = el contrato ya tiene al menos un cargo emitido. Distingue
+  // "Concluido" (Variable facturada, se cerró sola) de "Dado de baja".
+  tieneCargo: boolean;
 };
 
 type Navegante = {
@@ -3264,10 +3267,17 @@ function ServiciosContratadosTab({
                             Vigente
                           </span>
                         ) : sc.fechaBaja && sc.fechaBaja <= hoy ? (
-                          // Baja cumplida (incluye Variables cerradas al emitirse).
-                          <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-600">
-                            Dado de baja
-                          </span>
+                          sc.servicioTipoCobro === 'variable' && sc.tieneCargo ? (
+                            // Variable que se cerró sola al facturarse: terminó
+                            // su ciclo, no es una baja del admin.
+                            <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+                              Concluido
+                            </span>
+                          ) : (
+                            <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-600">
+                              Dado de baja
+                            </span>
+                          )
                         ) : (
                           // Todavía no arrancó (fecha de inicio futura).
                           <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
