@@ -127,9 +127,14 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
         servicioAlicuotaIva: serviciosTable.alicuotaIva,
         plazoPagoDias: serviciosTable.plazoPagoDias,
         comprobanteInterno: movimientosCuentaCorriente.comprobanteInterno,
+        // Nº de operación del Servicio Contratado que originó el cargo
+        // (movimientos.socio_servicio_id, modelo "los cargos nacen al
+        // emitir"). Null en pagos, notas y cargos pre-refactor.
+        numeroOperacion: socioServicios.numeroOperacion,
       })
       .from(movimientosCuentaCorriente)
       .leftJoin(serviciosTable, eq(serviciosTable.id, movimientosCuentaCorriente.servicioId))
+      .leftJoin(socioServicios, eq(socioServicios.id, movimientosCuentaCorriente.socioServicioId))
       .where(eq(movimientosCuentaCorriente.socioId, id))
       // Desempate por created_at: si varios movimientos comparten la misma fecha
       // (típico al cargar varios el mismo día), sin este segundo criterio el orden

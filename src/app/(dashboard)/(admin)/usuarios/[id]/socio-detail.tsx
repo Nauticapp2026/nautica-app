@@ -138,6 +138,9 @@ type Movimiento = {
   // true si este movimiento ES el asiento de una NC ya aplicada arriba —
   // no debe sumar al pool genérico de cobertura (ver calcularSaldoYEstado).
   esMovimientoNc: boolean;
+  // Nº de operación del Servicio Contratado que originó el cargo. Null en
+  // pagos, notas y cargos anteriores al modelo "los cargos nacen al emitir".
+  numeroOperacion: number | null;
 };
 
 type Servicio = {
@@ -2429,6 +2432,7 @@ export function SocioDetail({
                       </th>
                       <th className="px-4 py-3">Tipo de comprobante</th>
                       <th className="px-4 py-3">Nº Comprobante</th>
+                      <th className="px-4 py-3">Nº de operación</th>
                       <th className="px-4 py-3">Detalle</th>
                       <th className="px-4 py-3">Vencimiento</th>
                       <th className="px-4 py-3">Situación</th>
@@ -2452,7 +2456,7 @@ export function SocioDetail({
                         return (
                           <tr>
                             <td
-                              colSpan={10}
+                              colSpan={11}
                               className="px-4 py-8 text-center text-sm text-gray-400"
                             >
                               No hay movimientos que coincidan con los filtros.
@@ -2504,6 +2508,11 @@ export function SocioDetail({
                                   </a>
                                 )}
                               </div>
+                            </td>
+                            <td className="px-4 py-3 text-gray-500">
+                              {m.numeroOperacion != null
+                                ? String(m.numeroOperacion).padStart(6, '0')
+                                : '—'}
                             </td>
                             <td className="px-4 py-3 font-medium" style={{ color: '#175861' }}>
                               {detalle}

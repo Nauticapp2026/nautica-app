@@ -71,11 +71,31 @@ export function buscarRankeado<T>(items: T[], query: string, opts: OpcionesBusqu
 }
 
 // Caso común: buscador de socios por nombre, nº de socio o embarcación.
+// Si el shape trae además razón social, CUIT, DNI o dirección (los buscadores
+// de comprobantes en Ventas), también matchea contra esos campos — CUIT/DNI
+// tanto con guiones como pelados.
 export function buscarSocios<
-  T extends { nombre: string; numeroSocio: number | null; embarcaciones: string[] },
+  T extends {
+    nombre: string;
+    numeroSocio: number | null;
+    embarcaciones: string[];
+    razonSocial?: string | null;
+    cuit?: string | null;
+    numeroDocumento?: string | null;
+    direccion?: string | null;
+  },
 >(socios: T[], query: string): T[] {
   return buscarRankeado(socios, query, {
-    textos: (s) => [s.nombre, ...s.embarcaciones],
+    textos: (s) => [
+      s.nombre,
+      s.razonSocial,
+      s.direccion,
+      s.cuit,
+      s.cuit?.replace(/[-\s.]/g, ''),
+      s.numeroDocumento,
+      s.numeroDocumento?.replace(/[-\s.]/g, ''),
+      ...s.embarcaciones,
+    ],
     numero: (s) => s.numeroSocio,
   });
 }

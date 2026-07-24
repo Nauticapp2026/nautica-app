@@ -236,7 +236,7 @@ export async function savePuntoVentaAction(data: SavePuntoVentaData): Promise<{ 
   if (!isAdmin(ctx)) return { error: 'Solo administradores pueden editar la configuración.' };
 
   if (!Number.isInteger(data.puntoDeVenta) || data.puntoDeVenta <= 0) {
-    return { error: 'El número de referencia debe ser un número entero positivo.' };
+    return { error: 'El centro emisor debe ser un número entero positivo.' };
   }
   if (!data.razonSocial.trim()) return { error: 'La razón social es obligatoria.' };
   if (!data.cuit.trim()) return { error: 'El CUIT es obligatorio.' };

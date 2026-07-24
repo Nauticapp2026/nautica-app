@@ -111,6 +111,8 @@ type Socio = {
   id: string;
   nombre: string;
   email: string;
+  razonSocial: string | null;
+  direccion: string | null;
   numeroDocumento: string;
   tipoDocumento: string | null;
   cuit: string | null;
@@ -184,6 +186,18 @@ const TIPO_FACTURA_OPTS = [
   { value: 'factura_a', label: 'Factura A (Responsable Inscripto)' },
 ];
 
+// Tipos de factura que el club puede emitir según SU condición frente al
+// IVA: un club Monotributo solo emite C; un club Responsable Inscripto
+// emite A o B (a quién le corresponde cada una lo sugiere
+// derivarTipoFactura según la condición del socio, pero el admin puede
+// elegir entre las válidas).
+function tiposFacturaEmisibles(guarderiaCondicionIva: string | null) {
+  if (guarderiaCondicionIva === 'responsable_inscripto') {
+    return TIPO_FACTURA_OPTS.filter((o) => o.value !== 'factura_c');
+  }
+  return TIPO_FACTURA_OPTS.filter((o) => o.value === 'factura_c');
+}
+
 function derivarTipoFactura(
   guarderiaCondicion: string | null,
   socioCondicion: string | null,
@@ -217,8 +231,11 @@ const ESTADO_BADGE: Record<string, string> = {
   vencida: 'bg-red-50 text-red-700',
 };
 
+// El valor 'pagada' del enum en DB se muestra como "Cobrada" en toda la
+// pantalla de Ventas (pedido 2026-07-24) — mismo criterio que "Cobrado" en
+// la cuenta corriente del socio.
 const ESTADO_LABEL: Record<string, string> = {
-  pagada: 'Pagada',
+  pagada: 'Cobrada',
   pendiente: 'Pendiente',
   vencida: 'Vencida',
 };
@@ -234,6 +251,25 @@ function fmtMoney(value: string | number | null): string {
 }
 
 const fmtDate = formatArgentinaDate;
+
+// Detalle del socio en UNA línea para los buscadores de comprobantes:
+// nº de socio, razón social, CUIT/DNI, dirección y embarcaciones.
+function detalleSocioRenglon(s: Socio): string {
+  const doc = s.cuit?.trim()
+    ? `CUIT ${s.cuit}`
+    : s.numeroDocumento
+      ? `${s.tipoDocumento?.toUpperCase() ?? 'DNI'} ${s.numeroDocumento}`
+      : null;
+  return [
+    s.numeroSocio != null ? `#${s.numeroSocio}` : null,
+    s.razonSocial?.trim() && s.razonSocial.trim() !== s.nombre ? s.razonSocial.trim() : null,
+    doc,
+    s.direccion?.trim() || null,
+    s.embarcaciones.length > 0 ? s.embarcaciones.join(', ') : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+}
 
 // Etiqueta secundaria de una fila de la lista de emisión: los ítems
 // computados desde contratos vigentes se describen por su origen; los cargos
@@ -330,7 +366,7 @@ function SocioCombobox({
       <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400" />
       <input
         className={`${inputCls} pl-9`}
-        placeholder="Buscar por nombre, Nº de socio o embarcación..."
+        placeholder="Buscar por nombre, razón social, CUIT/DNI, Nº de socio, dirección o embarcación..."
         value={open ? query : (seleccionado?.nombre ?? '')}
         onFocus={() => {
           setOpen(true);
@@ -351,18 +387,12 @@ function SocioCombobox({
                 type="button"
                 key={s.id}
                 onClick={() => select(s.id)}
-                className="flex w-full flex-col items-start px-3 py-2 text-left text-sm hover:bg-gray-50"
+                className="flex w-full items-baseline gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50"
               >
-                <span className="font-medium" style={{ color: '#101828' }}>
+                <span className="shrink-0 font-medium" style={{ color: '#101828' }}>
                   {s.nombre}
                 </span>
-                {(s.numeroSocio != null || s.embarcaciones.length > 0) && (
-                  <span className="text-xs text-gray-400">
-                    {s.numeroSocio != null ? `Socio #${s.numeroSocio}` : ''}
-                    {s.numeroSocio != null && s.embarcaciones.length > 0 ? ' · ' : ''}
-                    {s.embarcaciones.join(', ')}
-                  </span>
-                )}
+                <span className="truncate text-xs text-gray-400">{detalleSocioRenglon(s)}</span>
               </button>
             ))
           )}
@@ -635,14 +665,16 @@ function NuevaFacturaModal({
               <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
                 Tipo de comprobante
               </label>
-              <input
-                className={`${inputCls} cursor-not-allowed bg-gray-50 text-gray-700`}
-                value={
-                  TIPO_FACTURA_OPTS.find((o) => o.value === form.tipoFactura)?.label ??
-                  form.tipoFactura
-                }
-                readOnly
-              />
+              {/* Elegible entre los tipos válidos según la condición IVA del
+                  club; al elegir socio se preselecciona el sugerido según la
+                  condición del socio. */}
+              <select className={inputCls} value={form.tipoFactura} onChange={set('tipoFactura')}>
+                {tiposFacturaEmisibles(guarderiaCondicionIva).map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
@@ -936,7 +968,7 @@ function ComprobanteInternoManualModal({
                 <input
                   autoFocus
                   className={`${inputCls} pl-9`}
-                  placeholder="Buscar por nombre, nº de socio o embarcación…"
+                  placeholder="Buscar por nombre, razón social, CUIT/DNI, Nº de socio, dirección o embarcación…"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                 />
@@ -949,12 +981,13 @@ function ComprobanteInternoManualModal({
                     <button
                       key={s.id}
                       onClick={() => handleSelectSocio(s.id)}
-                      className="flex w-full flex-col items-start px-4 py-3 text-left transition hover:bg-gray-50"
+                      className="flex w-full items-baseline gap-2 px-4 py-3 text-left transition hover:bg-gray-50"
                     >
-                      <span className="text-sm font-medium text-[#101828]">{s.nombre}</span>
-                      <span className="text-xs text-gray-400">
-                        {s.numeroSocio != null ? `Socio #${s.numeroSocio}` : 'Sin nº'}
-                        {s.embarcaciones.length > 0 ? ` · ${s.embarcaciones.join(', ')}` : ''}
+                      <span className="shrink-0 text-sm font-medium text-[#101828]">
+                        {s.nombre}
+                      </span>
+                      <span className="truncate text-xs text-gray-400">
+                        {detalleSocioRenglon(s)}
                       </span>
                     </button>
                   ))
@@ -1903,7 +1936,7 @@ function MarcarPagadaModal({
         <div className="flex items-start justify-between p-6 pb-4">
           <div>
             <h2 className="text-lg font-bold" style={{ color: '#101828' }}>
-              Marcar como pagada
+              Marcar como cobrada
             </h2>
             <p className="mt-0.5 text-sm" style={{ color: '#669E9D' }}>
               Factura {factura.codigo ?? factura.id.slice(0, 8)}
@@ -2403,10 +2436,25 @@ function NotaCreditoInternaModal({
 // una seleccionada, con `key={factura.id}` — así el estado se inicializa de
 // nuevo (precargado) en cada apertura, sin necesitar un efecto que copie
 // props a state.
-function ReenviarFacturaModal({ onClose, factura }: { onClose: () => void; factura: Factura }) {
+function ReenviarFacturaModal({
+  onClose,
+  factura,
+  guarderiaCondicionIva,
+}: {
+  onClose: () => void;
+  factura: Factura;
+  guarderiaCondicionIva: string | null;
+}) {
   const router = useRouter();
   const hoy = new Date().toISOString().slice(0, 10);
-  const [tipoFactura, setTipoFactura] = useState(factura.tipoFactura ?? 'factura_c');
+  // Si el tipo original no es emisible por la condición IVA actual del club
+  // (ej. cambió de Monotributo a RI), arrancar en el primero válido.
+  const opcionesTipo = tiposFacturaEmisibles(guarderiaCondicionIva);
+  const [tipoFactura, setTipoFactura] = useState(
+    opcionesTipo.some((o) => o.value === factura.tipoFactura)
+      ? (factura.tipoFactura ?? opcionesTipo[0].value)
+      : opcionesTipo[0].value,
+  );
   const [condicionVenta, setCondicionVenta] = useState(factura.condicionVenta ?? 'contado');
   const [medioPago, setMedioPago] = useState(factura.medioPago ?? 'efectivo');
   const [descripcion, setDescripcion] = useState(factura.descripcion ?? '');
@@ -2523,7 +2571,7 @@ function ReenviarFacturaModal({ onClose, factura }: { onClose: () => void; factu
                   value={tipoFactura}
                   onChange={(e) => setTipoFactura(e.target.value)}
                 >
-                  {TIPO_FACTURA_OPTS.map((o) => (
+                  {opcionesTipo.map((o) => (
                     <option key={o.value} value={o.value}>
                       {o.label}
                     </option>
@@ -3295,6 +3343,7 @@ export function VentasClient({
           key={reenviarFactura.id}
           onClose={() => setReenviarFactura(null)}
           factura={reenviarFactura}
+          guarderiaCondicionIva={guarderiaCondicionIva}
         />
       )}
       <NotaLibreModal
@@ -3396,7 +3445,7 @@ export function VentasClient({
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <KpiCard value={String(kpis.pendientes)} label="Pendientes de cobro" />
-        <KpiCard value={String(kpis.pagadasMes)} label="Pagadas este mes" />
+        <KpiCard value={String(kpis.pagadasMes)} label="Cobradas este mes" />
         <KpiCard value={String(kpis.vencidas)} label="Vencidas" />
         <KpiCard value={fmtMoney(kpis.totalFacturado)} label="Total facturado" />
       </div>
@@ -3468,7 +3517,7 @@ export function VentasClient({
                   >
                     <option value="">Todos los estados</option>
                     <option value="pendiente">Pendiente</option>
-                    <option value="pagada">Pagada</option>
+                    <option value="pagada">Cobrada</option>
                     <option value="vencida">Vencida</option>
                   </select>
                   <select
@@ -3691,7 +3740,7 @@ export function VentasClient({
                                 <button
                                   onClick={() => setPagarFactura(f)}
                                   disabled={f.estado === 'pagada'}
-                                  title="Marcar como pagada"
+                                  title="Marcar como cobrada"
                                   className="rounded-[6px] p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-[#175861] disabled:opacity-30 disabled:hover:bg-transparent"
                                 >
                                   <Edit3 className="h-4 w-4" />

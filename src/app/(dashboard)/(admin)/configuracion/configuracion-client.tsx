@@ -1491,7 +1491,7 @@ function PuntoVentaTab({ initial }: { initial: PuntoVentaData }) {
   const onSubmit = () => {
     setFeedback(null);
     if (!data.puntoDeVenta || data.puntoDeVenta <= 0) {
-      setFeedback({ type: 'error', msg: 'Ingresá un número de referencia válido.' });
+      setFeedback({ type: 'error', msg: 'Ingresá un centro emisor válido.' });
       return;
     }
     if (!data.razonSocial.trim()) {
@@ -1521,7 +1521,7 @@ function PuntoVentaTab({ initial }: { initial: PuntoVentaData }) {
           type: 'success',
           msg: yaConfigurado
             ? 'Datos actualizados en TusFacturas.'
-            : 'Número de referencia sincronizado con TusFacturas.',
+            : 'Centro emisor sincronizado con TusFacturas.',
         });
     });
   };
@@ -1537,14 +1537,14 @@ function PuntoVentaTab({ initial }: { initial: PuntoVentaData }) {
 
       {yaConfigurado && (
         <div className="mb-6 rounded-[10px] border border-[#CAE6E4] bg-[#ECFDF3] px-4 py-3 text-sm text-[#175861]">
-          El número de referencia no se puede cambiar una vez creado. Podés actualizar el resto de
-          los datos impositivos.
+          El centro emisor no se puede cambiar una vez creado. Podés actualizar el resto de los
+          datos impositivos.
         </div>
       )}
 
       {!yaConfigurado && (
         <div className="mb-6 rounded-[10px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          <strong>Antes de continuar:</strong> el número de referencia tiene que estar dado de alta
+          <strong>Antes de continuar:</strong> el centro emisor tiene que estar dado de alta
           previamente en ARCA (Servicios → Administrador de Relaciones → POS de Facturación
           Electrónica). Si no existe en ARCA, las facturas van a ser rechazadas al emitirlas.
         </div>
@@ -1552,7 +1552,7 @@ function PuntoVentaTab({ initial }: { initial: PuntoVentaData }) {
 
       <div className="space-y-4">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <Field label="Nº de referencia" required>
+          <Field label="Centro emisor" required>
             <input
               className={`${inputCls} ${yaConfigurado ? 'bg-gray-50 text-gray-500' : ''}`}
               type="number"
