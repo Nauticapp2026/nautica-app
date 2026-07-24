@@ -2,9 +2,16 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { translateAuthError, translateInviteError } from '@/lib/auth/errors';
+import { translateAuthError } from '@/lib/auth/errors';
 import { db } from '@/lib/db';
-import { guarderias, memberships, horariosDia, profiles } from '@/lib/db/schema';
+import {
+  equipoInvitacionesPendientes,
+  guarderias,
+  memberships,
+  horariosDia,
+  profiles,
+} from '@/lib/db/schema';
+import { enviarInvitacionEquipo } from '@/lib/equipo-invitaciones';
 import { geocodeAddress } from '@/lib/geocoding';
 import { recordPlanChange } from '@/lib/pricing/plan-historial';
 import { eq } from 'drizzle-orm';
@@ -261,9 +268,11 @@ export async function updateFeaturesStep(
 }
 
 // Step 4 — invitar miembros del equipo (opcional)
-// Por cada miembro recibimos nombre/apellido/email/rol/telefono/sede y los
-// creamos como profile + membership en la guardería. El usuario recibe mail
-// de invitación para definir su contraseña (mismo patrón que createMiembroEquipoAction).
+// Por cada miembro recibimos nombre/apellido/email/rol/telefono/sede.
+// Si la guardería ya está activa, se crea profile + membership y sale el mail
+// de invitación al momento. Si todavía está pendiente de alta por NauticApp,
+// la invitación queda encolada en equipo_invitaciones_pendientes y se envía
+// recién cuando el super admin activa la guardería.
 const TEAM_ROLES = [
   'super_admin',
   'administrador_general',
@@ -294,11 +303,15 @@ export async function inviteTeamMembersStep(
   guarderiaId: string,
   miembros: TeamMemberInput[],
 ): Promise<ActionResult & { creados?: number; errores?: string[] }> {
-  const admin = createAdminClient();
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
-  if (!appUrl) throw new Error('NEXT_PUBLIC_APP_URL no configurado');
   const errores: string[] = [];
   let creados = 0;
+
+  const [guarderiaRow] = await db
+    .select({ activa: guarderias.activa })
+    .from(guarderias)
+    .where(eq(guarderias.id, guarderiaId))
+    .limit(1);
+  const guarderiaActiva = guarderiaRow?.activa === true;
 
   for (const m of miembros) {
     const email = m.email.trim().toLowerCase();
@@ -313,56 +326,44 @@ export async function inviteTeamMembersStep(
       continue;
     }
 
-    const { data: inviteData, error: inviteError } = await admin.auth.admin.inviteUserByEmail(
+    const miembro = {
+      nombre,
+      apellido,
       email,
-      { redirectTo: `${appUrl}/auth/callback?next=/crear-cuenta` },
-    );
+      rol: m.rol as TeamRol,
+      telefono: m.telefono.trim() || null,
+      sede: m.sede.trim() || null,
+    };
 
-    if (inviteError) {
-      console.error('[inviteTeamMembersStep] inviteError', email, inviteError);
-      errores.push(`${email}: ${translateInviteError(inviteError.message)}`);
+    if (!guarderiaActiva) {
+      try {
+        await db
+          .insert(equipoInvitacionesPendientes)
+          .values({ guarderiaId, ...miembro })
+          .onConflictDoUpdate({
+            target: [equipoInvitacionesPendientes.guarderiaId, equipoInvitacionesPendientes.email],
+            set: {
+              nombre,
+              apellido,
+              rol: miembro.rol,
+              telefono: miembro.telefono,
+              sede: miembro.sede,
+            },
+          });
+        creados++;
+      } catch (err) {
+        console.error('[inviteTeamMembersStep] queue error', email, err);
+        errores.push(`${email}: ${err instanceof Error ? err.message : 'Error desconocido'}`);
+      }
       continue;
     }
 
-    const profileId = inviteData.user.id;
-
-    try {
-      await db
-        .insert(profiles)
-        .values({
-          id: profileId,
-          email,
-          nombre,
-          apellido,
-          telefono: m.telefono.trim() || null,
-          sede: m.sede.trim() || null,
-        })
-        .onConflictDoUpdate({
-          target: profiles.id,
-          set: {
-            email,
-            nombre,
-            apellido,
-            telefono: m.telefono.trim() || null,
-            sede: m.sede.trim() || null,
-          },
-        });
-
-      await db
-        .insert(memberships)
-        .values({
-          userId: profileId,
-          guarderiaId,
-          rol: m.rol as TeamRol,
-          status: 'active',
-        })
-        .onConflictDoNothing();
-
-      creados++;
-    } catch (err) {
-      console.error('[inviteTeamMembersStep] DB error', email, err);
-      errores.push(`${email}: ${err instanceof Error ? err.message : 'Error desconocido'}`);
+    const err = await enviarInvitacionEquipo(guarderiaId, miembro);
+    if (err) {
+      errores.push(`${email}: ${err}`);
+      continue;
     }
+    creados++;
   }
 
   return { creados, errores: errores.length > 0 ? errores : undefined };

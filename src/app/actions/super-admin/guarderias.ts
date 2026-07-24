@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { db } from '@/lib/db';
 import { guarderias } from '@/lib/db/schema';
 import { requireSuperAdmin } from '@/lib/auth/session';
+import { despacharInvitacionesPendientes } from '@/lib/equipo-invitaciones';
 
 const uuidSchema = z.string().uuid('ID inválido.');
 
@@ -44,6 +45,16 @@ export async function setGuarderiaActivaAction(
     .update(guarderias)
     .set({ activa: parsed.data.activa, updatedAt: new Date() })
     .where(eq(guarderias.id, parsed.data.guarderiaId));
+
+  // Al dar de alta la guardería salen los mails de invitación al equipo que
+  // quedaron encolados durante el onboarding. Los que fallan quedan en la
+  // cola y se reintentan si se vuelve a activar.
+  if (parsed.data.activa) {
+    const { enviadas, errores } = await despacharInvitacionesPendientes(parsed.data.guarderiaId);
+    if (errores.length > 0) {
+      console.error('[setGuarderiaActivaAction] invitaciones con error', { enviadas, errores });
+    }
+  }
 
   revalidatePath('/super-admin/guarderias');
   return {};

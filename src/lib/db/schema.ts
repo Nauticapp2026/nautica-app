@@ -535,6 +535,28 @@ export const invitations = pgTable(
   ],
 );
 
+// Invitaciones de equipo cargadas durante el onboarding mientras la guardería
+// sigue pendiente de alta (guarderias.activa = false). El mail de invitación
+// NO se envía en ese momento: queda encolado acá y se despacha cuando el
+// super admin activa la guardería (setGuarderiaActivaAction). Mig 0131.
+export const equipoInvitacionesPendientes = pgTable(
+  'equipo_invitaciones_pendientes',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    guarderiaId: uuid('guarderia_id')
+      .notNull()
+      .references(() => guarderias.id, { onDelete: 'cascade' }),
+    nombre: text('nombre').notNull(),
+    apellido: text('apellido').notNull().default(''),
+    email: text('email').notNull(),
+    rol: rolEnum('rol').notNull(),
+    telefono: text('telefono'),
+    sede: text('sede'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex('equipo_inv_pendientes_guarderia_email_idx').on(t.guarderiaId, t.email)],
+);
+
 // =============================================================================
 // JERARQUÍA DE ESPACIOS: Guarderia → Areas → Naves → Lados → Pisos → Espacios
 //                                         ↘ Marinas (peines/docks)
