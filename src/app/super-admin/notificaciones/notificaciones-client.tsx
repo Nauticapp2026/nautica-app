@@ -23,6 +23,7 @@ import {
   deletePlatformNotificacionAction,
   type PlatformNotificacionInput,
 } from '@/app/actions/super-admin/notificaciones';
+import { normalizarBusqueda } from '@/lib/buscador';
 import { formatArgentinaDate } from '@/lib/dates';
 import { EmptyState } from '@/components/shared/empty-state';
 
@@ -103,13 +104,13 @@ export function PlatformNotificacionesClient({
   }, [notificaciones]);
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = normalizarBusqueda(query.trim());
     if (!q) return notificaciones;
     return notificaciones.filter(
       (n) =>
-        n.titulo.toLowerCase().includes(q) ||
-        n.cuerpo.toLowerCase().includes(q) ||
-        AUDIENCIA_LABELS[n.audiencia].toLowerCase().includes(q),
+        normalizarBusqueda(n.titulo).includes(q) ||
+        normalizarBusqueda(n.cuerpo).includes(q) ||
+        normalizarBusqueda(AUDIENCIA_LABELS[n.audiencia]).includes(q),
     );
   }, [notificaciones, query]);
 

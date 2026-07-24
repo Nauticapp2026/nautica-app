@@ -22,6 +22,7 @@ import {
   uploadPlatformPublicidadImagenAction,
   type PlatformPublicidadInput,
 } from '@/app/actions/super-admin/publicidades';
+import { normalizarBusqueda } from '@/lib/buscador';
 import { formatArgentinaDate } from '@/lib/dates';
 import { ImagesUploader } from '@/components/shared/images-uploader';
 import { EmptyState } from '@/components/shared/empty-state';
@@ -110,10 +111,11 @@ export function PlatformPublicidadesClient({
   }, [publicidades]);
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = normalizarBusqueda(query.trim());
     if (!q) return publicidades;
     return publicidades.filter(
-      (p) => p.titulo.toLowerCase().includes(q) || (p.texto ?? '').toLowerCase().includes(q),
+      (p) =>
+        normalizarBusqueda(p.titulo).includes(q) || normalizarBusqueda(p.texto ?? '').includes(q),
     );
   }, [publicidades, query]);
 

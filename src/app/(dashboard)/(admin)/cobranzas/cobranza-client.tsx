@@ -11,6 +11,7 @@ import {
   montoToNumberStr,
   sanitizeMontoInput,
 } from '@/components/shared/forma-pago';
+import { buscarSocios } from '@/lib/buscador';
 import { formatArgentinaDate } from '@/lib/dates';
 import {
   getComprobantesPendientesAction,
@@ -90,18 +91,7 @@ function NuevaCobranzaModal({ socios, onClose }: { socios: SocioOption[]; onClos
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const sociosFiltrados = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return socios.slice(0, 50);
-    return socios
-      .filter((s) => {
-        if (s.nombre.toLowerCase().includes(q)) return true;
-        if (s.numeroSocio != null && String(s.numeroSocio).includes(q)) return true;
-        if (s.embarcaciones.some((e) => e.toLowerCase().includes(q))) return true;
-        return false;
-      })
-      .slice(0, 50);
-  }, [socios, query]);
+  const sociosFiltrados = useMemo(() => buscarSocios(socios, query).slice(0, 50), [socios, query]);
 
   const totalSeleccionado = useMemo(
     () =>

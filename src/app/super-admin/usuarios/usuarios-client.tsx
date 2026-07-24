@@ -3,6 +3,7 @@
 import { useState, useTransition, useMemo } from 'react';
 import { Trash2, X, ShieldCheck, Shield } from 'lucide-react';
 
+import { buscarRankeado } from '@/lib/buscador';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
@@ -62,14 +63,13 @@ export function UsuariosClient({ usuarios, actorId, versionVigente }: Props) {
   const [query, setQuery] = useState('');
   const [globalError, setGlobalError] = useState<string | null>(null);
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return usuarios;
-    return usuarios.filter((u) => {
-      const fullName = `${u.nombre ?? ''} ${u.apellido ?? ''}`.toLowerCase();
-      return u.email.toLowerCase().includes(q) || fullName.includes(q);
-    });
-  }, [usuarios, query]);
+  const filtered = useMemo(
+    () =>
+      buscarRankeado(usuarios, query, {
+        textos: (u) => [`${u.nombre ?? ''} ${u.apellido ?? ''}`.trim(), u.email],
+      }),
+    [usuarios, query],
+  );
 
   return (
     <div className="space-y-4">

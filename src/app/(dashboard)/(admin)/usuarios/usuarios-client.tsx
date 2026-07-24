@@ -22,6 +22,7 @@ import {
   X,
 } from 'lucide-react';
 import { createSocioAction, uploadSocioDocumentoAction } from '@/app/actions/socios';
+import { normalizarBusqueda } from '@/lib/buscador';
 import { formatArgentinaDate } from '@/lib/dates';
 import { EmptyState } from '@/components/shared/empty-state';
 import { Pagination } from '@/components/shared/pagination';
@@ -853,11 +854,11 @@ export function UsuariosClient({
   }
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = normalizarBusqueda(search.trim());
     let base = q
       ? socios.filter((s) => {
-          const nombre = `${s.nombre ?? ''} ${s.apellido ?? ''}`.toLowerCase();
-          return nombre.includes(q) || s.email.toLowerCase().includes(q);
+          const nombre = normalizarBusqueda(`${s.nombre ?? ''} ${s.apellido ?? ''}`);
+          return nombre.includes(q) || normalizarBusqueda(s.email).includes(q);
         })
       : socios.slice();
 
@@ -874,15 +875,15 @@ export function UsuariosClient({
         (s.numeroSocio != null ? String(s.numeroSocio) : '').includes(fNum),
       );
     }
-    const fNom = colNombre.trim().toLowerCase();
+    const fNom = normalizarBusqueda(colNombre.trim());
     if (fNom) {
       base = base.filter((s) =>
-        `${s.nombre ?? ''} ${s.apellido ?? ''}`.toLowerCase().includes(fNom),
+        normalizarBusqueda(`${s.nombre ?? ''} ${s.apellido ?? ''}`).includes(fNom),
       );
     }
-    const fEmb = colEmbarcacion.trim().toLowerCase();
+    const fEmb = normalizarBusqueda(colEmbarcacion.trim());
     if (fEmb) {
-      base = base.filter((s) => (s.embarcacion ?? '').toLowerCase().includes(fEmb));
+      base = base.filter((s) => normalizarBusqueda(s.embarcacion ?? '').includes(fEmb));
     }
 
     if (!sortKey) return base;

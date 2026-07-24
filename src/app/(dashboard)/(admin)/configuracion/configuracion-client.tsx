@@ -40,6 +40,7 @@ import {
   type UpdateGuarderiaGeneralData,
   type UpdateMiembroEquipoData,
 } from '@/app/actions/configuracion';
+import { normalizarBusqueda } from '@/lib/buscador';
 import { EmptyState } from '@/components/shared/empty-state';
 import { ImagesUploader } from '@/components/shared/images-uploader';
 
@@ -511,12 +512,12 @@ function EquipoTab({
   const [deleteTarget, setDeleteTarget] = useState<MiembroEquipo | null>(null);
 
   const filtered = useMemo(() => {
-    const nq = filterNombre.trim().toLowerCase();
-    const eq = filterEmail.trim().toLowerCase();
+    const nq = normalizarBusqueda(filterNombre.trim());
+    const eq = normalizarBusqueda(filterEmail.trim());
     return miembros.filter((m) => {
-      const fullName = `${m.nombre ?? ''} ${m.apellido ?? ''}`.toLowerCase();
+      const fullName = normalizarBusqueda(`${m.nombre ?? ''} ${m.apellido ?? ''}`);
       if (nq && !fullName.includes(nq)) return false;
-      if (eq && !m.email.toLowerCase().includes(eq)) return false;
+      if (eq && !normalizarBusqueda(m.email).includes(eq)) return false;
       if (filterRol && m.rol !== filterRol) return false;
       return true;
     });

@@ -22,6 +22,7 @@ import {
   uploadPlatformComunicacionImagenAction,
   type PlatformComunicacionInput,
 } from '@/app/actions/super-admin/comunicaciones';
+import { normalizarBusqueda } from '@/lib/buscador';
 import { formatArgentinaDate } from '@/lib/dates';
 import { ImagesUploader } from '@/components/shared/images-uploader';
 import { EmptyState } from '@/components/shared/empty-state';
@@ -87,10 +88,11 @@ export function PlatformComunicacionesClient({
   }, [comunicaciones]);
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = normalizarBusqueda(query.trim());
     if (!q) return comunicaciones;
     return comunicaciones.filter(
-      (c) => c.titulo.toLowerCase().includes(q) || (c.texto ?? '').toLowerCase().includes(q),
+      (c) =>
+        normalizarBusqueda(c.titulo).includes(q) || normalizarBusqueda(c.texto ?? '').includes(q),
     );
   }, [comunicaciones, query]);
 

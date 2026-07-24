@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { CreditCard, RefreshCw } from 'lucide-react';
 
 import { reintentarCobroPaywayAction } from '@/app/actions/payway';
+import { normalizarBusqueda } from '@/lib/buscador';
 import { formatArgentinaDate } from '@/lib/dates';
 import { EmptyState } from '@/components/shared/empty-state';
 
@@ -50,8 +51,8 @@ export function PaywayCobrosList({ cobros }: { cobros: CobroPayway[] }) {
   const filtrados = useMemo(() => {
     return cobros.filter((c) => {
       if (search.trim()) {
-        const q = search.toLowerCase();
-        if (!c.socioNombre.toLowerCase().includes(q)) return false;
+        const q = normalizarBusqueda(search);
+        if (!normalizarBusqueda(c.socioNombre).includes(q)) return false;
       }
       if (filterEstado && c.estado !== filterEstado) return false;
       return true;

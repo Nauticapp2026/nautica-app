@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from 'react';
 import { ChevronDown, ChevronRight, Trash2 } from 'lucide-react';
 
+import { buscarRankeado } from '@/lib/buscador';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
@@ -56,14 +57,13 @@ export function GuarderiasClient({ guarderias }: { guarderias: GuarderiaRow[] })
   const [query, setQuery] = useState('');
   const [globalError, setGlobalError] = useState<string | null>(null);
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return guarderias;
-    return guarderias.filter((g) => {
-      const haystack = `${g.nombre} ${g.slug} ${g.ciudad ?? ''} ${g.provincia ?? ''}`.toLowerCase();
-      return haystack.includes(q);
-    });
-  }, [guarderias, query]);
+  const filtered = useMemo(
+    () =>
+      buscarRankeado(guarderias, query, {
+        textos: (g) => [g.nombre, g.slug, g.ciudad, g.provincia],
+      }),
+    [guarderias, query],
+  );
 
   return (
     <div className="space-y-4">
