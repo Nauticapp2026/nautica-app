@@ -27,6 +27,7 @@ import {
 } from '@/app/actions/onboarding';
 import { aceptarTerminosAction } from '@/app/actions/terminos';
 import { MarkdownView } from '@/components/shared/markdown-view';
+import { PasswordChecks, PasswordInput } from '@/components/shared/password-input';
 import { toast } from 'sonner';
 import { Check, Trash2, Plus, ChevronRight } from 'lucide-react';
 
@@ -292,13 +293,16 @@ function Step1({
           />
         </Field>
         <Field label="Contraseña" required>
-          <Input
+          <PasswordInput
             className={inputCls}
-            type="password"
             placeholder="Mínimo 8 caracteres"
             value={data.password}
             onChange={(e) => onChange('password', e.target.value)}
+            autoComplete="new-password"
           />
+          <div className="mt-1.5">
+            <PasswordChecks password={data.password} />
+          </div>
         </Field>
         <div className="flex items-start gap-3">
           <Checkbox

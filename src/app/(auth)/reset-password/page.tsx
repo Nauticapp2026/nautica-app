@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState, useTransition } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Logo } from '@/components/shared/logo';
+import { PasswordChecks, PasswordInput } from '@/components/shared/password-input';
 import { createClient } from '@/lib/supabase/client';
 
 const inputCls =
@@ -142,8 +143,7 @@ function ResetPasswordForm() {
         <label className="text-sm font-semibold" style={{ color: '#101828' }}>
           Nueva contraseña
         </label>
-        <input
-          type="password"
+        <PasswordInput
           placeholder="••••••••"
           required
           minLength={8}
@@ -158,8 +158,7 @@ function ResetPasswordForm() {
         <label className="text-sm font-semibold" style={{ color: '#101828' }}>
           Confirmar contraseña
         </label>
-        <input
-          type="password"
+        <PasswordInput
           placeholder="••••••••"
           required
           minLength={8}
@@ -169,6 +168,8 @@ function ResetPasswordForm() {
           autoComplete="new-password"
         />
       </div>
+
+      <PasswordChecks password={password} confirm={confirm} />
 
       {formError && <p className="text-sm text-red-500">{formError}</p>}
 

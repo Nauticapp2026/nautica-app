@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { CheckCircle, Smartphone } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { getPostSignupAccess } from '@/app/actions/auth';
+import { PasswordChecks, PasswordInput } from '@/components/shared/password-input';
 
 const inputCls =
   'h-12 w-full rounded-[10px] border border-gray-200 bg-white px-4 text-sm text-[#101828] focus:border-[#175861] focus:outline-none focus:ring-1 focus:ring-[#175861]';
@@ -30,15 +31,15 @@ export default function CrearCuentaPage() {
     }
   }, [done]);
 
-  const isValid = password.length >= 6 && password === confirm;
+  const isValid = password.length >= 8 && password === confirm;
 
   async function handleSubmit() {
     if (password !== confirm) {
       setError('Las contraseñas no coinciden.');
       return;
     }
-    if (password.length < 6) {
-      setError('La contraseña debe tener al menos 6 caracteres.');
+    if (password.length < 8) {
+      setError('La contraseña debe tener al menos 8 caracteres.');
       return;
     }
     setError('');
@@ -130,26 +131,28 @@ export default function CrearCuentaPage() {
           <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
             Nueva contraseña
           </label>
-          <input
-            type="password"
+          <PasswordInput
             className={inputCls}
-            placeholder="Mínimo 6 caracteres"
+            placeholder="Mínimo 8 caracteres"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            autoComplete="new-password"
           />
         </div>
         <div>
           <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
             Confirmar contraseña
           </label>
-          <input
-            type="password"
+          <PasswordInput
             className={inputCls}
             placeholder="Repetí la contraseña"
             value={confirm}
             onChange={(e) => setConfirm(e.target.value)}
+            autoComplete="new-password"
           />
         </div>
+
+        <PasswordChecks password={password} confirm={confirm} />
 
         {error && <p className="text-sm text-red-600">{error}</p>}
 

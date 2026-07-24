@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState, useTransition } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { PasswordChecks, PasswordInput } from '@/components/shared/password-input';
 
 // Página puente entre el mail de confirmación/recovery de Supabase y la app mobile.
 //
@@ -128,8 +129,7 @@ function RecoveryForm({
       <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
         <div className="flex flex-col gap-1.5">
           <label className="text-xs font-semibold text-[#101828]">Nueva contraseña</label>
-          <input
-            type="password"
+          <PasswordInput
             className={inputCls}
             placeholder="Mínimo 8 caracteres"
             value={password}
@@ -140,8 +140,7 @@ function RecoveryForm({
         </div>
         <div className="flex flex-col gap-1.5">
           <label className="text-xs font-semibold text-[#101828]">Confirmá la contraseña</label>
-          <input
-            type="password"
+          <PasswordInput
             className={inputCls}
             placeholder="Repetí la contraseña"
             value={confirm}
@@ -150,6 +149,8 @@ function RecoveryForm({
             required
           />
         </div>
+
+        <PasswordChecks password={password} confirm={confirm} />
 
         {error && (
           <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">

@@ -13,6 +13,7 @@ const loginSchema = z.object({
 
 const signupSchema = loginSchema.extend({
   fullName: z.string().min(2, 'Nombre requerido'),
+  password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres'),
 });
 
 export type ActionResult = { error?: string; fieldErrors?: Record<string, string[]> };

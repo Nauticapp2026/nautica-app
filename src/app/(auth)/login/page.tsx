@@ -4,6 +4,7 @@ import { useActionState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { login, type ActionResult } from '@/app/actions/auth';
+import { PasswordInput } from '@/components/shared/password-input';
 
 const inputCls =
   'w-full rounded-[10px] border border-gray-200 px-4 py-3 text-sm outline-none transition focus:border-[#175861] focus:ring-1 focus:ring-[#175861]';
@@ -38,13 +39,7 @@ export default function LoginPage() {
           <label className="text-sm font-semibold" style={{ color: '#101828' }}>
             Contraseña
           </label>
-          <input
-            name="password"
-            type="password"
-            placeholder="••••••••"
-            required
-            className={inputCls}
-          />
+          <PasswordInput name="password" placeholder="••••••••" required className={inputCls} />
           {state?.fieldErrors?.password && (
             <p className="text-sm text-red-500">{state.fieldErrors.password[0]}</p>
           )}

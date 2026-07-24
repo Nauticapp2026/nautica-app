@@ -1,15 +1,17 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useState } from 'react';
 import Link from 'next/link';
 import { signup, type ActionResult } from '@/app/actions/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PasswordChecks, PasswordInput } from '@/components/shared/password-input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default function SignupPage() {
   const [state, formAction, pending] = useActionState<ActionResult | null, FormData>(signup, null);
+  const [password, setPassword] = useState('');
 
   const success = state && !state.error && !state.fieldErrors;
 
@@ -48,7 +50,16 @@ export default function SignupPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="password">Contraseña</Label>
-                <Input id="password" name="password" type="password" required />
+                <PasswordInput
+                  id="password"
+                  name="password"
+                  required
+                  autoComplete="new-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="border-input focus-visible:border-ring focus-visible:ring-ring/50 h-9 w-full rounded-md border bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none focus-visible:ring-[3px] md:text-sm"
+                />
+                <PasswordChecks password={password} />
                 {state?.fieldErrors?.password && (
                   <p className="text-destructive text-sm">{state.fieldErrors.password[0]}</p>
                 )}
