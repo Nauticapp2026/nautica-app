@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import Image from 'next/image';
 
+import { DownloadAppButton } from './download-app-button';
+
 export function Hero() {
   return (
     <section className="relative isolate overflow-hidden bg-[#0e3d44] text-white">
@@ -24,13 +26,7 @@ export function Hero() {
           >
             Registrá tu club
           </Link>
-          <Link
-            href="#"
-            aria-disabled
-            className="cursor-not-allowed rounded-lg bg-[#669E9D] px-6 py-3 text-sm font-bold text-white opacity-90 transition hover:bg-[#588a89]"
-          >
-            Descargar app
-          </Link>
+          <DownloadAppButton className="rounded-lg bg-[#669E9D] px-6 py-3 text-sm font-bold text-white transition hover:bg-[#588a89]" />
         </div>
       </div>
     </section>

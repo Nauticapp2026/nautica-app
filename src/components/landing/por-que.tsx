@@ -1,5 +1,6 @@
-import Link from 'next/link';
 import Image from 'next/image';
+
+import { DownloadAppButton } from './download-app-button';
 
 const benefits = [
   'Solución 100% integrada y escalable.',
@@ -22,13 +23,7 @@ export function PorQue() {
               <li key={b}>{b}</li>
             ))}
           </ul>
-          <Link
-            href="#"
-            aria-disabled
-            className="mt-10 inline-flex cursor-not-allowed rounded-lg bg-[#175861] px-6 py-3 text-sm font-bold text-white transition hover:bg-[#124a52]"
-          >
-            Descargar app
-          </Link>
+          <DownloadAppButton className="mt-10 inline-flex rounded-lg bg-[#175861] px-6 py-3 text-sm font-bold text-white transition hover:bg-[#124a52]" />
         </div>
 
         <div className="relative aspect-[5/6] w-full overflow-hidden md:order-last">

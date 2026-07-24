@@ -7,7 +7,7 @@ const columns = [
     links: [
       { label: 'Características', href: '#caracteristicas' },
       { label: 'Módulos', href: '#modulos' },
-      { label: 'Servicios', href: '#ecosistema' },
+      // { label: 'Servicios', href: '#ecosistema' }, // oculto momentáneamente junto con la sección
     ],
   },
   {

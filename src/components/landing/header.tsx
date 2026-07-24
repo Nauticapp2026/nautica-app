@@ -4,7 +4,7 @@ import Image from 'next/image';
 const navLinks = [
   { href: '#caracteristicas', label: 'Características' },
   { href: '#modulos', label: 'Módulos' },
-  { href: '#ecosistema', label: 'Servicios' },
+  // { href: '#ecosistema', label: 'Servicios' }, // oculto momentáneamente junto con la sección
 ];
 
 export function Header() {

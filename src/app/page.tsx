@@ -5,7 +5,7 @@ import { Hero } from '@/components/landing/hero';
 import { ComoFunciona } from '@/components/landing/como-funciona';
 import { GestionFeatures } from '@/components/landing/gestion-features';
 import { Navega } from '@/components/landing/navega';
-import { Ecosistema } from '@/components/landing/ecosistema';
+// import { Ecosistema } from '@/components/landing/ecosistema'; // oculto momentáneamente
 import { Pricing } from '@/components/landing/pricing';
 import { PorQue } from '@/components/landing/por-que';
 import { Footer } from '@/components/landing/footer';
@@ -22,7 +22,7 @@ export default async function Home() {
         <ComoFunciona />
         <GestionFeatures />
         <Navega />
-        <Ecosistema />
+        {/* <Ecosistema /> — oculto momentáneamente (Ecosistema Nautishop + Sumá tu negocio) */}
         <Pricing />
         <PorQue />
       </main>

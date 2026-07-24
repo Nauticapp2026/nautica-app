@@ -22,7 +22,7 @@ export function ComoFunciona() {
           <FlowCard
             iconSrc="/landing/como-funciona/2.png"
             title="El socio usa la App"
-            description="Informa su salida, accede con QR al club, invita gente, recibe notificaciones, consulta el clima y mareas, gestiona su embarcación y compra mediante Nautishop."
+            description="Informa su salida, accede con QR al club, invita gente, recibe notificaciones, consulta el clima y mareas y gestiona su embarcación."
           />
         </div>
       </div>
