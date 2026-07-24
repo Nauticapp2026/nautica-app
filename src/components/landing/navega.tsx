@@ -1,14 +1,10 @@
 import Image from 'next/image';
-import { Sailboat } from 'lucide-react';
+import { FileText } from 'lucide-react';
 
 const cards = [
   { src: '/landing/navega/1.png', label: 'Clima, mareas y sudestadas en tiempo real' },
   { src: '/landing/navega/2.png', label: 'Navegación segura con avisos y alertas' },
-  {
-    icon: Sailboat,
-    label:
-      'Amarras y camas libres. Encontrá disponibilidad en los clubes náuticos adheridos a NauticApp.',
-  },
+  { icon: FileText, label: 'Toda la documentación de tu barco en un solo lugar' },
   { src: '/landing/navega/4.png', label: 'Contactos de emergencia y asistencia' },
 ];
 
@@ -27,7 +23,11 @@ export function Navega() {
             >
               <div className="relative mx-auto mt-2 size-12">
                 {Icon ? (
-                  <Icon className="size-12 text-[#175861]" strokeWidth={1.5} />
+                  // Mismo estilo que los PNG de las otras tarjetas: círculo teal
+                  // sólido con el ícono de línea en blanco.
+                  <div className="flex size-12 items-center justify-center rounded-full bg-[#175861]">
+                    <Icon className="size-6 text-white" strokeWidth={2} />
+                  </div>
                 ) : (
                   src && <Image src={src} alt="" fill sizes="48px" className="object-contain" />
                 )}
