@@ -167,7 +167,9 @@ export async function listarPendientesFacturar(
   // Fuente de verdad: la tabla `espacios` (hay asignaciones legacy sin fila
   // espejo en socio_servicios). Left join a la fila espejo abierta para
   // heredar contratoId / canal interno / concepto — arregla de paso el bug
-  // del cron viejo que nunca propagaba comprobanteInterno a espacios.
+  // del cron viejo que nunca propagaba comprobanteInterno a espacios. Si no
+  // hay fila espejo (asignaciones legacy), el canal cae al tilde
+  // "Comprobante interno" del socio (memberships, mig 0132).
   const filasEspacios = await dbx
     .select({
       espacioId: espacios.id,
@@ -179,6 +181,7 @@ export async function listarPendientesFacturar(
       servicioPrecio: servicios.precio,
       servicioAlicuotaIva: servicios.alicuotaIva,
       tipoCobro: servicios.tipoCobro,
+      socioTildeInterno: memberships.comprobanteInterno,
       contratoId: socioServicios.id,
       contratoConcepto: socioServicios.concepto,
       contratoInterno: socioServicios.comprobanteInterno,
@@ -434,14 +437,21 @@ export async function listarPendientesFacturar(
   }
 
   // ── Armar ítems: espacios ────────────────────────────────────────────────
+  // Dedup: si el mismo (socio, servicio) ya entró por un contrato sin espacio
+  // (la misma tarifa cargada a mano con "Cargar Servicio"), el ítem del
+  // espacio se omite para no ofrecer el mismo servicio dos veces. El contrato
+  // explícito manda — es donde el admin eligió el canal Interno/Fiscal.
+  const cubiertoPorContrato = new Set(items.map((i) => `${i.socioId}:${i.servicioId}`));
+
   for (const f of filasEspacios) {
     if (!f.socioId || !f.servicioId) continue;
     if (canceladosSet.has(`${f.socioId}:${f.servicioId}`)) continue;
+    if (cubiertoPorContrato.has(`${f.socioId}:${f.servicioId}`)) continue;
 
     const pair = `${f.espacioId}:${f.socioId}`;
     const precioNeto = f.servicioPrecio != null ? Number(f.servicioPrecio) : 0;
     const alicuotaIva = f.servicioAlicuotaIva != null ? Number(f.servicioAlicuotaIva) : 0;
-    const interno = f.contratoInterno ?? false;
+    const interno = f.contratoInterno ?? f.socioTildeInterno ?? false;
     const conceptoBase = f.contratoConcepto ?? f.servicioNombre;
     const importeMes = importeFinal(precioNeto, alicuotaIva, interno);
     const primerCiclo = !espacioPairConCargo.has(pair);

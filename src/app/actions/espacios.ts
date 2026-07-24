@@ -278,9 +278,13 @@ export async function updateEspacioAction(input: UpdateEspacioInput): Promise<{ 
   if (!current) return { error: 'Espacio no encontrado.' };
 
   // Validar que el ocupante (si se asocia) sea miembro de la guardería.
+  // El tilde "Comprobante interno" del socio define el canal del contrato
+  // espejo que se crea al asignar (Interno/Fiscal), editable después desde
+  // Servicios Contratados.
+  let ocupanteTildeInterno = false;
   if (input.ocupanteId) {
     const [m] = await db
-      .select({ id: memberships.id })
+      .select({ id: memberships.id, comprobanteInterno: memberships.comprobanteInterno })
       .from(memberships)
       .where(
         and(
@@ -291,6 +295,7 @@ export async function updateEspacioAction(input: UpdateEspacioInput): Promise<{ 
       )
       .limit(1);
     if (!m) return { error: 'El cliente seleccionado no es miembro de esta guardería.' };
+    ocupanteTildeInterno = m.comprobanteInterno ?? false;
   }
 
   // Validar que la embarcación pertenezca al ocupante si se proveen ambos.
@@ -436,6 +441,7 @@ export async function updateEspacioAction(input: UpdateEspacioInput): Promise<{ 
             servicioId: input.servicioId!,
             espacioId: input.id,
             fechaInicio: todayArg(),
+            comprobanteInterno: ocupanteTildeInterno,
             createdBy: ctx.profile.id,
           }),
         );
@@ -469,7 +475,7 @@ export async function assignEspacioToSocioAction(input: {
   const guarderiaId = ctx.activeMembership.guarderiaId;
 
   const [socio] = await db
-    .select({ id: memberships.id })
+    .select({ id: memberships.id, comprobanteInterno: memberships.comprobanteInterno })
     .from(memberships)
     .where(
       and(
@@ -480,6 +486,7 @@ export async function assignEspacioToSocioAction(input: {
     )
     .limit(1);
   if (!socio) return { error: 'El socio no es miembro de esta guardería.' };
+  const socioTildeInterno = socio.comprobanteInterno ?? false;
 
   const [espacio] = await db
     .select({
@@ -570,6 +577,7 @@ export async function assignEspacioToSocioAction(input: {
             servicioId: espacio.servicioId!,
             espacioId: input.espacioId,
             fechaInicio: todayArg(),
+            comprobanteInterno: socioTildeInterno,
             createdBy: ctx.profile.id,
           }),
         );
