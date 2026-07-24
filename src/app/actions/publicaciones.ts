@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { and, count as sqlCount, eq, gte } from 'drizzle-orm';
+import { and, count as sqlCount, eq } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import { publicaciones } from '@/lib/db/schema';
@@ -128,18 +128,14 @@ export async function createPublicacionAction(
     return { error: 'Tu plan no incluye publicaciones. Actualizá a Premium o Elite.' };
   }
 
-  const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-
   const [{ total }] = await db
     .select({ total: sqlCount() })
     .from(publicaciones)
-    .where(
-      and(eq(publicaciones.guarderiaId, guarderiaId), gte(publicaciones.createdAt, startOfMonth)),
-    );
+    .where(eq(publicaciones.guarderiaId, guarderiaId));
 
   if (Number(total) >= limit) {
     return {
-      error: `Alcanzaste el límite de ${limit} publicación${limit > 1 ? 'es' : ''} por mes de tu plan.`,
+      error: `Alcanzaste el límite de ${limit} publicación${limit > 1 ? 'es' : ''} de tu plan. Eliminá una para poder crear otra.`,
     };
   }
 

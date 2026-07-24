@@ -153,7 +153,7 @@ export function PublicacionesClient({ items, plan, limit, used }: Props) {
             Amarras y camas publicadas en la app
             {limit > 0 && (
               <span className="ml-2 text-xs font-medium text-gray-400">
-                {used}/{limit} este mes
+                {used}/{limit} publicaciones
               </span>
             )}
           </p>
