@@ -25,6 +25,7 @@ import { crearSocioServicio, hayContratoVigente } from '@/lib/socio-servicios';
 import { MOTIVO_NOTA_LABEL, type MotivoNota } from './nota-constants';
 import { CATEGORIA_SERVICIO_LABEL } from './categoria-constants';
 import {
+  consultarComprobante,
   crearFactura,
   toTusFecha,
   type TusFacturasCliente,
@@ -40,6 +41,7 @@ import {
   FORMA_PAGO_LABEL,
   NC_TIPO_FACTURA,
   ND_TIPO_FACTURA,
+  TIPO_DB_API,
   TIPO_DOC_API,
   TIPO_FACTURA_API,
   TIPO_NC_API,
@@ -1062,6 +1064,68 @@ export async function getSocioPendientesAction(
   };
 }
 
+// ─── Action: link fresco del PDF de un comprobante ARCA ─────────────────────
+// El `archivo` que guardamos al emitir es una URL temporal de TusFacturas:
+// al tiempo vence y su página muestra "no se ha encontrado información
+// asociada a tu búsqueda". Este action consulta el comprobante en TusFacturas
+// (no consume requests del plan) y devuelve un link recién generado.
+
+export async function obtenerPdfFacturaAction(
+  facturaId: string,
+): Promise<{ error?: string; url?: string }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+  const gId = ctx.activeMembership.guarderiaId;
+
+  const [f] = await db
+    .select({
+      codigo: facturacion.codigo,
+      tipoFactura: facturacion.tipoFactura,
+    })
+    .from(facturacion)
+    .where(and(eq(facturacion.id, facturaId), eq(facturacion.guarderiaId, gId)))
+    .limit(1);
+  if (!f) return { error: 'Comprobante no encontrado.' };
+
+  const tipoApi = TIPO_DB_API[f.tipoFactura ?? ''];
+  if (!tipoApi) return { error: 'Este comprobante no es fiscal — no tiene PDF de ARCA.' };
+  // codigo = comprobante_nro de TusFacturas, formato "PPPPP-NNNNNNNN".
+  const [pv, nro] = (f.codigo ?? '').split('-');
+  if (!pv || !nro) {
+    return { error: 'Este comprobante no tiene número de ARCA (puede haber quedado rechazado).' };
+  }
+
+  const credsData = await cargarCredsGuarderia(gId);
+  if (!credsData) return { error: 'Faltan las credenciales de TusFacturas de la guardería.' };
+
+  try {
+    const rta = await consultarComprobante(
+      {
+        tipo: tipoApi,
+        punto_venta: String(parseInt(pv, 10)),
+        numero: String(parseInt(nro, 10)),
+      },
+      credsData.creds,
+    );
+    if (!rta.comprobante_pdf_url) {
+      return { error: 'TusFacturas no devolvió el PDF de este comprobante.' };
+    }
+
+    // Refrescar el link guardado, así queda el más nuevo disponible.
+    await db
+      .update(facturacion)
+      .set({ archivo: rta.comprobante_pdf_url })
+      .where(eq(facturacion.id, facturaId));
+
+    return { url: rta.comprobante_pdf_url };
+  } catch (err) {
+    console.error('[obtenerPdfFacturaAction]', facturaId, err);
+    return {
+      error: err instanceof Error ? err.message : 'No se pudo obtener el PDF del comprobante.',
+    };
+  }
+}
+
 // ─── Action: marcar factura como pagada ────────────────────────────────────
 
 export async function markInvoicePaidAction(
@@ -1535,6 +1599,8 @@ export async function enviarReciboPorMailAction(
     importeFmt,
     comprobantes,
     formaPago: row.medioPago ? (FORMA_PAGO_LABEL[row.medioPago] ?? row.medioPago) : null,
+    // "Recibo" solo para Cobranzas (RC-); CM-/CL-/RB- son Comprobante interno.
+    esComprobanteInterno: !row.codigo?.startsWith('RC-'),
   });
 
   const res = await sendEmail({ to: destino, subject, html });

@@ -9,9 +9,11 @@ import { enviarReciboPorMailAction } from '@/app/actions/facturacion';
 export function EnviarReciboMailButton({
   reciboId,
   socioEmail,
+  tipoDocumento = 'Recibo',
 }: {
   reciboId: string;
   socioEmail: string | null;
+  tipoDocumento?: string;
 }) {
   const [isPending, startTransition] = useTransition();
 
@@ -22,7 +24,7 @@ export function EnviarReciboMailButton({
         toast.error(res.error);
         return;
       }
-      toast.success(`Recibo enviado a ${res.email}`);
+      toast.success(`${tipoDocumento} enviado a ${res.email}`);
     });
   }
 

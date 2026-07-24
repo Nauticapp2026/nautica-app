@@ -39,6 +39,20 @@ export const ND_TIPO_FACTURA: Record<string, string> = {
   factura_c: 'nota_debito_c',
 };
 
+// Cualquier tipo_factura fiscal guardado en DB → label de TusFacturas.
+// Usado por la consulta de comprobantes (regenerar el link del PDF).
+export const TIPO_DB_API: Record<string, string> = {
+  factura_a: 'FACTURA A',
+  factura_b: 'FACTURA B',
+  factura_c: 'FACTURA C',
+  nota_credito_a: 'NOTA DE CREDITO A',
+  nota_credito_b: 'NOTA DE CREDITO B',
+  nota_credito_c: 'NOTA DE CREDITO C',
+  nota_debito_a: 'NOTA DE DEBITO A',
+  nota_debito_b: 'NOTA DE DEBITO B',
+  nota_debito_c: 'NOTA DE DEBITO C',
+};
+
 // tipo_documento (db) → tusfacturas documento_tipo
 export const TIPO_DOC_API: Record<string, string> = {
   dni: 'DNI',

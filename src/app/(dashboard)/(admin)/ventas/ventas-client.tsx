@@ -32,6 +32,7 @@ import {
   getSocioPendientesAction,
   getSocioPendientesInternoAction,
   markInvoicePaidAction,
+  obtenerPdfFacturaAction,
   reenviarFacturaRechazadaAction,
   type BatchResult,
   type ComprobanteInternoLoteResult,
@@ -39,6 +40,7 @@ import {
 } from '@/app/actions/facturacion';
 import { MOTIVO_NOTA_LABEL, type MotivoNota } from '@/app/actions/nota-constants';
 import { toast } from 'sonner';
+import { buscarSocios, normalizarBusqueda } from '@/lib/buscador';
 import { formatArgentinaDate } from '@/lib/dates';
 import { EmptyState } from '@/components/shared/empty-state';
 import { Pagination } from '@/components/shared/pagination';
@@ -302,16 +304,7 @@ function SocioCombobox({
     return () => document.removeEventListener('mousedown', onClickOutside);
   }, []);
 
-  const filtrados = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return socios;
-    return socios.filter((s) => {
-      if (s.nombre.toLowerCase().includes(q)) return true;
-      if (s.numeroSocio != null && String(s.numeroSocio).includes(q)) return true;
-      if (s.embarcaciones.some((e) => e.toLowerCase().includes(q))) return true;
-      return false;
-    });
-  }, [socios, query]);
+  const filtrados = useMemo(() => buscarSocios(socios, query), [socios, query]);
 
   function select(socioId: string) {
     onChange(socioId);
@@ -802,18 +795,7 @@ function ComprobanteInternoManualModal({
     [socios, socioId],
   );
 
-  const sociosFiltrados = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return socios.slice(0, 50);
-    return socios
-      .filter((s) => {
-        if (s.nombre.toLowerCase().includes(q)) return true;
-        if (s.numeroSocio != null && String(s.numeroSocio).includes(q)) return true;
-        if (s.embarcaciones.some((e) => e.toLowerCase().includes(q))) return true;
-        return false;
-      })
-      .slice(0, 50);
-  }, [socios, query]);
+  const sociosFiltrados = useMemo(() => buscarSocios(socios, query).slice(0, 50), [socios, query]);
 
   function handleSelectSocio(id: string) {
     setSocioId(id);
@@ -3061,14 +3043,14 @@ export function VentasClient({
       .filter((f) => f.tipoFactura !== 'recibo')
       .filter((f) => {
         if (search.trim()) {
-          const q = search.toLowerCase();
+          const q = normalizarBusqueda(search);
           const tipo = TIPO_FACTURA_LABEL[f.tipoFactura ?? ''] ?? f.tipoFactura ?? '';
           const ok =
-            (f.codigo ?? '').toLowerCase().includes(q) ||
-            (f.folioLocal ?? '').toLowerCase().includes(q) ||
-            tipo.toLowerCase().includes(q) ||
-            f.socioNombre.toLowerCase().includes(q) ||
-            (f.descripcion ?? '').toLowerCase().includes(q);
+            normalizarBusqueda(f.codigo ?? '').includes(q) ||
+            normalizarBusqueda(f.folioLocal ?? '').includes(q) ||
+            normalizarBusqueda(tipo).includes(q) ||
+            normalizarBusqueda(f.socioNombre).includes(q) ||
+            normalizarBusqueda(f.descripcion ?? '').includes(q);
           if (!ok) return false;
         }
         if (filterEstado && f.estado !== filterEstado) return false;
@@ -3108,6 +3090,22 @@ export function VentasClient({
     [facturas, selectedNc],
   );
 
+  // El link de PDF que devuelve TusFacturas al emitir es temporal y vence
+  // (su página muestra "no se ha encontrado información..."). Pedimos uno
+  // fresco en cada click. La pestaña se abre ANTES del await para que el
+  // bloqueador de popups no la frene.
+  async function abrirPdfFactura(f: Factura) {
+    const win = window.open('about:blank', '_blank');
+    const res = await obtenerPdfFacturaAction(f.id);
+    if (res.error || !res.url) {
+      win?.close();
+      toast.error(res.error ?? 'No se pudo obtener el PDF.');
+      return;
+    }
+    if (win) win.location.href = res.url;
+    else window.open(res.url, '_blank');
+  }
+
   function toggleNc(id: string) {
     setSelectedNc((prev) => {
       const next = new Set(prev);
@@ -3130,11 +3128,11 @@ export function VentasClient({
       .filter((f) => f.tipoFactura === 'recibo' || f.tipoFactura === 'nota_credito_interna')
       .filter((f) => {
         if (search.trim()) {
-          const q = search.toLowerCase();
+          const q = normalizarBusqueda(search);
           const ok =
-            (f.codigo ?? '').toLowerCase().includes(q) ||
-            f.socioNombre.toLowerCase().includes(q) ||
-            (f.descripcion ?? '').toLowerCase().includes(q);
+            normalizarBusqueda(f.codigo ?? '').includes(q) ||
+            normalizarBusqueda(f.socioNombre).includes(q) ||
+            normalizarBusqueda(f.descripcion ?? '').includes(q);
           if (!ok) return false;
         }
         if (filterDesde && f.emision && f.emision < filterDesde) return false;
@@ -3673,45 +3671,22 @@ export function VentasClient({
                                 >
                                   <Edit3 className="h-4 w-4" />
                                 </button>
-                                {f.archivo ? (
-                                  <a
-                                    href={f.archivo}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    title="Ver PDF"
-                                    className="rounded-[6px] p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-[#175861]"
-                                  >
-                                    <Send className="h-4 w-4" />
-                                  </a>
-                                ) : (
-                                  <button
-                                    disabled
-                                    title="PDF no disponible"
-                                    className="rounded-[6px] p-1.5 text-gray-400 opacity-30"
-                                  >
-                                    <Send className="h-4 w-4" />
-                                  </button>
-                                )}
-                                {f.archivo ? (
-                                  <a
-                                    href={f.archivo}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    download
-                                    title="Descargar"
-                                    className="rounded-[6px] p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-[#175861]"
-                                  >
-                                    <Download className="h-4 w-4" />
-                                  </a>
-                                ) : (
-                                  <button
-                                    disabled
-                                    title="PDF no disponible"
-                                    className="rounded-[6px] p-1.5 text-gray-400 opacity-30"
-                                  >
-                                    <Download className="h-4 w-4" />
-                                  </button>
-                                )}
+                                <button
+                                  onClick={() => abrirPdfFactura(f)}
+                                  disabled={!f.codigo}
+                                  title={f.codigo ? 'Ver PDF' : 'PDF no disponible'}
+                                  className="rounded-[6px] p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-[#175861] disabled:opacity-30 disabled:hover:bg-transparent"
+                                >
+                                  <Send className="h-4 w-4" />
+                                </button>
+                                <button
+                                  onClick={() => abrirPdfFactura(f)}
+                                  disabled={!f.codigo}
+                                  title={f.codigo ? 'Descargar PDF' : 'PDF no disponible'}
+                                  className="rounded-[6px] p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-[#175861] disabled:opacity-30 disabled:hover:bg-transparent"
+                                >
+                                  <Download className="h-4 w-4" />
+                                </button>
                                 {f.rechazada &&
                                 (f.tipoFactura === 'factura_a' ||
                                   f.tipoFactura === 'factura_b' ||

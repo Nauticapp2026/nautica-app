@@ -21,17 +21,24 @@ export type ReciboEmailParams = {
   importeFmt: string; // ya formateado $X
   comprobantes: string[]; // ej. ["Factura B 0001-00000012"]
   formaPago: string | null;
+  // true para CM-/CL-/RB- (documentan cargos, no un pago): el documento se
+  // titula "Comprobante interno" — "Recibo" queda reservado para Cobranzas (RC-).
+  esComprobanteInterno?: boolean;
 };
 
 export function reciboEmail(p: ReciboEmailParams): { subject: string; html: string } {
-  const subject = `Recibo ${p.numero} — ${p.clubNombre}`;
+  const tituloDoc = p.esComprobanteInterno ? 'Comprobante interno' : 'Recibo';
+  const subject = `${tituloDoc} ${p.numero} — ${p.clubNombre}`;
 
   const concepto =
     p.comprobantes.length > 0 ? p.comprobantes.map((c) => esc(c)).join('<br/>') : 'Pago a cuenta';
 
   const filas = [
-    ['Recibí de', esc(p.recibiDe)],
-    ['La suma de', `<strong>${esc(p.importeFmt)}</strong>`],
+    [p.esComprobanteInterno ? 'Socio' : 'Recibí de', esc(p.recibiDe)],
+    [
+      p.esComprobanteInterno ? 'Por un importe de' : 'La suma de',
+      `<strong>${esc(p.importeFmt)}</strong>`,
+    ],
     ['En concepto de', concepto],
     ...(p.formaPago ? [['Forma de pago', esc(p.formaPago)]] : []),
   ]
@@ -64,7 +71,7 @@ export function reciboEmail(p: ReciboEmailParams): { subject: string; html: stri
               </tr></table>
             </td>
             <td style="text-align:right;vertical-align:top;">
-              <p style="margin:0;font-size:20px;font-weight:800;letter-spacing:1px;color:#101828;">RECIBO</p>
+              <p style="margin:0;font-size:20px;font-weight:800;letter-spacing:1px;color:#101828;">${tituloDoc.toUpperCase()}</p>
               <p style="margin:4px 0 0 0;font-size:13px;color:#667085;">Nro: ${esc(p.numero)}</p>
               <p style="margin:0;font-size:13px;color:#667085;">Fecha: ${esc(p.fecha)}</p>
             </td>

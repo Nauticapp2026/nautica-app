@@ -18,7 +18,7 @@ const TIPO_COMPROBANTE_LABEL: Record<string, string> = {
   factura_a: 'Factura A',
   factura_b: 'Factura B',
   factura_c: 'Factura C',
-  recibo: 'Recibo interno',
+  recibo: 'Comprobante interno',
   nota_credito_a: 'Nota de crédito A',
   nota_credito_b: 'Nota de crédito B',
   nota_credito_c: 'Nota de crédito C',
@@ -103,6 +103,15 @@ export default async function ReciboPage({ params }: { params: Promise<{ id: str
     notFound();
   }
   const esNotaCreditoInterna = row.tipoFactura === 'nota_credito_interna';
+  // "Recibo" queda reservado para Cobranzas (RC-). El resto de los documentos
+  // internos (CM-/CL-/RB-) documentan cargos, no un pago: son "Comprobante
+  // interno".
+  const esReciboCobranza = row.codigo?.startsWith('RC-') ?? false;
+  const titulo = esNotaCreditoInterna
+    ? 'NOTA DE CRÉDITO INTERNA'
+    : esReciboCobranza
+      ? 'RECIBO'
+      : 'COMPROBANTE INTERNO';
 
   const socioNombre = [row.socioNombre, row.socioApellido].filter(Boolean).join(' ') || '—';
   const socioDoc = row.socioCuit
@@ -223,7 +232,11 @@ export default async function ReciboPage({ params }: { params: Promise<{ id: str
             ← Volver a Ventas
           </a>
           <div className="flex items-center gap-2">
-            <EnviarReciboMailButton reciboId={row.id} socioEmail={row.socioEmail} />
+            <EnviarReciboMailButton
+              reciboId={row.id}
+              socioEmail={row.socioEmail}
+              tipoDocumento={esReciboCobranza ? 'Recibo' : 'Comprobante interno'}
+            />
             <PrintButton />
           </div>
         </div>
@@ -252,9 +265,7 @@ export default async function ReciboPage({ params }: { params: Promise<{ id: str
               </div>
             </div>
             <div className="text-right">
-              <p className="text-2xl font-extrabold tracking-wide text-gray-900">
-                {esNotaCreditoInterna ? 'NOTA DE CRÉDITO INTERNA' : 'RECIBO'}
-              </p>
+              <p className="text-2xl font-extrabold tracking-wide text-gray-900">{titulo}</p>
               <p className="mt-1 text-sm text-gray-500">Nro: {row.codigo}</p>
               <p className="text-sm text-gray-500">Fecha: {fmtDate(row.emision)}</p>
             </div>
@@ -272,7 +283,7 @@ export default async function ReciboPage({ params }: { params: Promise<{ id: str
             )}
             <div className="grid grid-cols-[140px_1fr] gap-2 text-sm">
               <span className="font-semibold text-gray-500">
-                {esNotaCreditoInterna ? 'Emitida a:' : 'Recibí de:'}
+                {esNotaCreditoInterna ? 'Emitida a:' : esReciboCobranza ? 'Recibí de:' : 'Socio:'}
               </span>
               <span className="text-gray-900">
                 {socioNombre}
@@ -281,7 +292,7 @@ export default async function ReciboPage({ params }: { params: Promise<{ id: str
             </div>
             <div className="grid grid-cols-[140px_1fr] gap-2 text-sm">
               <span className="font-semibold text-gray-500">
-                {esNotaCreditoInterna ? 'Por un importe de:' : 'La suma de:'}
+                {esReciboCobranza ? 'La suma de:' : 'Por un importe de:'}
               </span>
               <span className="text-lg font-bold text-gray-900">{fmtMoney(row.importe)}</span>
             </div>

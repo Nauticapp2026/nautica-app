@@ -148,6 +148,47 @@ export async function crearFactura(
   return data;
 }
 
+// ─── Consulta de comprobante ────────────────────────────────────────────────
+
+export type TusFacturasConsultaResponse = {
+  error: 'S' | 'N';
+  errores?: string[];
+  rta?: string;
+  comprobante_pdf_url?: string;
+  comprobante_ticket_url?: string;
+  [key: string]: unknown;
+};
+
+/**
+ * Consulta un comprobante ya emitido. La usamos para regenerar el link del
+ * PDF: la `comprobante_pdf_url` que devuelve la emisión es una URL TEMPORAL
+ * (según la FAQ oficial) — cuando vence, la página de TusFacturas muestra
+ * "no se ha encontrado información asociada a tu búsqueda". Según la doc,
+ * esta consulta no contabiliza como request de la suscripción.
+ */
+export async function consultarComprobante(
+  input: { tipo: string; punto_venta: string; numero: string },
+  creds: TusFacturasCredentials = getCredentialsFromEnv(),
+): Promise<TusFacturasConsultaResponse> {
+  const res = await fetch(`${TUSFACTURAS_BASE}/facturacion/consulta`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...creds, comprobante: { operacion: 'V', ...input } }),
+    cache: 'no-store',
+  });
+
+  if (!res.ok) {
+    throw new Error(`tusfacturas HTTP ${res.status}`);
+  }
+
+  const data = (await res.json()) as TusFacturasConsultaResponse;
+  if (data.error === 'S') {
+    const msg = data.errores?.join(' · ') ?? data.rta ?? 'Error al consultar el comprobante';
+    throw new Error(msg);
+  }
+  return data;
+}
+
 // ─── Punto de venta (administrar) ───────────────────────────────────────────
 
 export type TusFacturasPuntoVentaInput = {
