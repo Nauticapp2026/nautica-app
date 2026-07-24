@@ -357,9 +357,11 @@ async function ensureMonthlyMovimientoServicio(params: {
 
 /**
  * Análoga a `ensureMonthlyMovimientoServicio` pero para tarifas Variable:
- * el cargo es único, para siempre — no hay ventana de tiempo, alcanza con
- * que exista CUALQUIER movimiento previo para el (socio, servicio) para no
- * volver a cobrarlo.
+ * el cargo es único POR CONTRATO — si ya existe un movimiento del (socio,
+ * servicio) creado después de `contratadoEn` (la fecha de alta del contrato),
+ * no se vuelve a cobrar. Un contrato nuevo del mismo servicio (re-contratar
+ * un lavado, por ejemplo) sí genera su propio cargo, porque los movimientos
+ * anteriores son previos a su alta.
  */
 async function ensureOnceMovimientoServicio(params: {
   socioId: string;
@@ -367,6 +369,7 @@ async function ensureOnceMovimientoServicio(params: {
   precio: number;
   concepto: string;
   comprobanteInterno: boolean;
+  contratadoEn: Date;
   now?: Date;
 }): Promise<string | null> {
   const now = params.now ?? new Date();
@@ -379,6 +382,7 @@ async function ensureOnceMovimientoServicio(params: {
         eq(movimientosCuentaCorriente.socioId, params.socioId),
         eq(movimientosCuentaCorriente.servicioId, params.servicioId),
         isNull(movimientosCuentaCorriente.espacioId),
+        gte(movimientosCuentaCorriente.fecha, params.contratadoEn),
       ),
     )
     .limit(1);
@@ -434,6 +438,9 @@ export async function runMonthlyGeneracionServiciosRecurrentes(
 
   const contratos = await db
     .select({
+      contratoId: socioServicios.id,
+      fechaAsignacion: socioServicios.fechaAsignacion,
+      fechaBaja: socioServicios.fechaBaja,
       socioId: socioServicios.socioId,
       servicioId: socioServicios.servicioId,
       concepto: socioServicios.concepto,
@@ -502,23 +509,42 @@ export async function runMonthlyGeneracionServiciosRecurrentes(
 
     const precioNeto = c.servicioPrecio != null ? Number(c.servicioPrecio) : 0;
     const alicuotaIva = c.servicioAlicuotaIva != null ? Number(c.servicioAlicuotaIva) : 0;
-    const precio = precioConIva(precioNeto, alicuotaIva);
+    // Contratos Interno no pasan por ARCA: se cobra el precio base del
+    // tarifario tal cual, sin sumarle IVA. Solo los fiscales suman IVA.
+    const precio = c.comprobanteInterno ? precioNeto : precioConIva(precioNeto, alicuotaIva);
     const concepto = c.concepto ?? c.servicioNombre;
 
     if (c.tipoCobro === 'variable') {
       // Tarifa Variable diaria: el precio del tarifario es por día y el
       // contrato guarda cuántos días se contrataron — el cargo único es
-      // (precio neto × días) + IVA. Sin días (tarifa mensual o contratos
-      // viejos), se cobra el precio tal cual, como siempre.
+      // (precio neto × días), con IVA solo si es fiscal. Sin días (tarifa
+      // mensual o contratos viejos), se cobra el precio tal cual, como siempre.
       const dias = c.tarifaVariable === 'diaria' ? c.cantidadDias : null;
       const res = await ensureOnceMovimientoServicio({
         socioId: c.socioId,
         servicioId: c.servicioId,
-        precio: dias != null ? precioConIva(precioNeto * dias, alicuotaIva) : precio,
+        precio:
+          dias != null
+            ? c.comprobanteInterno
+              ? precioNeto * dias
+              : precioConIva(precioNeto * dias, alicuotaIva)
+            : precio,
         concepto: dias != null ? `${concepto} (${dias} ${dias === 1 ? 'día' : 'días'})` : concepto,
         comprobanteInterno: c.comprobanteInterno,
+        contratadoEn: c.fechaAsignacion,
         now,
       });
+      // Variable se factura UNA sola vez y el contrato se cierra al cobrarlo:
+      // pasa a No vigente al instante y el socio puede volver a contratar el
+      // mismo servicio (3 lavados en el mes = 3 contratos). También cierra
+      // contratos viejos que ya se cobraron y quedaron abiertos (res null con
+      // movimiento previo) — se marcan de baja sin generar cargo nuevo.
+      if (c.fechaBaja !== todayStr) {
+        await db
+          .update(socioServicios)
+          .set({ fechaBaja: todayStr })
+          .where(eq(socioServicios.id, c.contratoId));
+      }
       if (res) created++;
       else skipped++;
       continue;

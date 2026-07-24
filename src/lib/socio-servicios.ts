@@ -1,7 +1,7 @@
-import { and, count, eq, gte, isNull, or } from 'drizzle-orm';
+import { and, count, eq, gte, isNull, ne, or } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
-import { socioServicios, socioServiciosCancelados } from '@/lib/db/schema';
+import { servicios, socioServicios, socioServiciosCancelados } from '@/lib/db/schema';
 import { todayArg } from '@/lib/dates';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -20,7 +20,14 @@ async function nextNumeroOperacion(tx: Tx, guarderiaId: string): Promise<number>
   return Number(n) + 1;
 }
 
-/** true si (socioId, servicioId) tiene un contrato Vigente hoy. */
+/**
+ * true si (socioId, servicioId) tiene un contrato Vigente hoy.
+ *
+ * Tarifas Variable: se facturan una sola vez y el cron cierra el contrato al
+ * cobrarlo (fechaBaja = día del cobro). Un contrato Variable con fechaBaja
+ * seteada ya no cuenta como vigente — no bloquea volver a contratar el mismo
+ * servicio (ej: 3 lavados en el mes = 3 contratos distintos).
+ */
 export async function hayContratoVigente(
   guarderiaId: string,
   socioId: string,
@@ -30,12 +37,16 @@ export async function hayContratoVigente(
   const [row] = await db
     .select({ id: socioServicios.id })
     .from(socioServicios)
+    .innerJoin(servicios, eq(servicios.id, socioServicios.servicioId))
     .where(
       and(
         eq(socioServicios.guarderiaId, guarderiaId),
         eq(socioServicios.socioId, socioId),
         eq(socioServicios.servicioId, servicioId),
-        or(isNull(socioServicios.fechaBaja), gte(socioServicios.fechaBaja, hoy)),
+        or(
+          isNull(socioServicios.fechaBaja),
+          and(gte(socioServicios.fechaBaja, hoy), ne(servicios.tipoCobro, 'variable')),
+        ),
       ),
     )
     .limit(1);

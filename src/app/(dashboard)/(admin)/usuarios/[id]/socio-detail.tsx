@@ -54,6 +54,7 @@ import {
   eliminarTarjetaSocioAction,
   type GuardarTarjetaData,
 } from '@/app/actions/payway';
+import { buscarRankeado } from '@/lib/buscador';
 import { formatArgentinaDate, formatArgentinaDateTime, formatNaiveDateTime } from '@/lib/dates';
 import { precioConIva, precioSinIva } from '@/lib/iva';
 import { ASTILLEROS } from '../astilleros';
@@ -400,10 +401,14 @@ function ServicioCombobox({
   servicios,
   value,
   onChange,
+  interno = false,
 }: {
   servicios: Servicio[];
   value: string;
   onChange: (servicioId: string) => void;
+  // Contratos Interno se cobran a precio base, sin IVA — el precio mostrado
+  // acompaña.
+  interno?: boolean;
 }) {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
@@ -421,15 +426,20 @@ function ServicioCombobox({
     return () => document.removeEventListener('mousedown', onClickOutside);
   }, []);
 
+  function precioMostrar(s: Servicio): number {
+    const neto = parseFloat(s.precio ?? '0');
+    return interno ? neto : precioConIva(neto, parseFloat(s.alicuotaIva ?? '0'));
+  }
+
   function labelDe(s: Servicio): string {
     if (!s.precio) return s.nombre;
-    const precio = fmt(precioConIva(parseFloat(s.precio), parseFloat(s.alicuotaIva ?? '0')));
-    return `${s.nombre} — ${precio}${esTarifaDiaria(s) ? ' por día' : ''}`;
+    return `${s.nombre} — ${fmt(precioMostrar(s))}${esTarifaDiaria(s) ? ' por día' : ''}`;
   }
 
   const grupos = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const filtrados = q ? servicios.filter((s) => s.nombre.toLowerCase().includes(q)) : servicios;
+    const filtrados = buscarRankeado(servicios, query, {
+      textos: (s) => [s.nombre, CATEGORIA_SERVICIO_LABEL[s.tipo]],
+    });
     const map = new Map<string, Servicio[]>();
     for (const s of filtrados) {
       if (!map.has(s.tipo)) map.set(s.tipo, []);
@@ -481,7 +491,7 @@ function ServicioCombobox({
                     <span style={{ color: '#101828' }}>{s.nombre}</span>
                     {s.precio && (
                       <span className="text-xs text-gray-400">
-                        {fmt(precioConIva(parseFloat(s.precio), parseFloat(s.alicuotaIva ?? '0')))}
+                        {fmt(precioMostrar(s))}
                         {esTarifaDiaria(s) ? ' por día' : ''}
                       </span>
                     )}
@@ -588,10 +598,9 @@ function AgregarServicioModal({
             <div className="flex items-start gap-3 rounded-[10px] bg-teal-50 p-4">
               <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-teal-600" />
               <div>
-                <p className="font-semibold text-teal-900">Servicio contratado</p>
+                <p className="font-semibold text-teal-900">Listo, el servicio quedó asignado</p>
                 <p className="text-sm text-teal-700">
-                  Todavía no aparece en la cuenta corriente — va a impactar recién cuando
-                  corresponda facturarlo.
+                  El comprobante se genera desde Ventas cuando corresponda facturarlo.
                 </p>
               </div>
             </div>
@@ -614,6 +623,7 @@ function AgregarServicioModal({
                   servicios={servicios}
                   value={servicioId}
                   onChange={setServicioId}
+                  interno={comprobante === 'interno'}
                 />
               </div>
 
@@ -653,7 +663,6 @@ function AgregarServicioModal({
                   </label>
                   <input
                     type="date"
-                    min={fechaInicio}
                     className={inputCls}
                     value={fechaBaja}
                     onChange={(e) => setFechaBaja(e.target.value)}
@@ -681,10 +690,12 @@ function AgregarServicioModal({
                   <p className="mt-1.5 text-xs text-gray-400">
                     {diasValidos && seleccionado?.precio
                       ? `Total a cobrar: ${fmt(
-                          precioConIva(
-                            parseFloat(seleccionado.precio) * diasNum,
-                            parseFloat(seleccionado.alicuotaIva ?? '0'),
-                          ),
+                          comprobante === 'interno'
+                            ? parseFloat(seleccionado.precio) * diasNum
+                            : precioConIva(
+                                parseFloat(seleccionado.precio) * diasNum,
+                                parseFloat(seleccionado.alicuotaIva ?? '0'),
+                              ),
                         )} (tarifa diaria × ${diasNum} ${diasNum === 1 ? 'día' : 'días'})`
                       : 'Esta tarifa es por día: se cobra el precio del tarifario multiplicado por los días que indiques.'}
                   </p>
@@ -3077,6 +3088,9 @@ function ServiciosContratadosTab({
 
   const hoy = todayISODate();
   function esVigente(sc: ServicioContratado): boolean {
+    // Variable se factura una sola vez: el cron le pone fechaBaja al cobrarlo
+    // y pasa a No vigente en el momento, sin esperar a que termine el día.
+    if (sc.servicioTipoCobro === 'variable' && sc.fechaBaja) return false;
     return sc.fechaInicio <= hoy && (!sc.fechaBaja || sc.fechaBaja >= hoy);
   }
 
@@ -3128,6 +3142,8 @@ function ServiciosContratadosTab({
               <tr className="border-b border-gray-100 text-left text-xs font-semibold text-gray-400 uppercase">
                 <th className="pr-4 pb-2">Concepto</th>
                 <th className="pr-4 pb-2">Categoría</th>
+                <th className="pr-4 pb-2">Facturación</th>
+                <th className="pr-4 pb-2">Cobro</th>
                 <th className="pr-4 pb-2">Fecha de asignación</th>
                 <th className="pr-4 pb-2">Nº de operación</th>
                 <th className="pr-4 pb-2">Estado</th>
@@ -3143,11 +3159,29 @@ function ServiciosContratadosTab({
                   <Fragment key={sc.id}>
                     <tr className="border-b border-gray-50 last:border-0">
                       <td className="py-3 pr-4">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <span className="font-medium" style={{ color: '#101828' }}>
-                            {sc.servicioNombre}
-                          </span>
-                          {sc.servicioTipoCobro && (
+                        <span className="font-medium" style={{ color: '#101828' }}>
+                          {sc.servicioNombre}
+                        </span>
+                      </td>
+                      <td className="py-3 pr-4 text-gray-600">
+                        {sc.servicioTipo
+                          ? (CATEGORIA_SERVICIO_LABEL[sc.servicioTipo] ?? sc.servicioTipo)
+                          : '—'}
+                      </td>
+                      <td className="py-3 pr-4">
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                            sc.comprobanteInterno
+                              ? 'bg-gray-100 text-gray-600'
+                              : 'bg-[#EFF8F7] text-[#175861]'
+                          }`}
+                        >
+                          {sc.comprobanteInterno ? 'Interno' : 'Legal'}
+                        </span>
+                      </td>
+                      <td className="py-3 pr-4">
+                        {sc.servicioTipoCobro ? (
+                          <div className="flex items-center gap-1.5">
                             <span
                               className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
                                 sc.servicioTipoCobro === 'fijo'
@@ -3157,18 +3191,15 @@ function ServiciosContratadosTab({
                             >
                               {sc.servicioTipoCobro === 'fijo' ? 'Fijo' : 'Variable'}
                             </span>
-                          )}
-                          {sc.cantidadDias != null && (
-                            <span className="text-xs text-gray-400">
-                              {sc.cantidadDias} {sc.cantidadDias === 1 ? 'día' : 'días'}
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="py-3 pr-4 text-gray-600">
-                        {sc.servicioTipo
-                          ? (CATEGORIA_SERVICIO_LABEL[sc.servicioTipo] ?? sc.servicioTipo)
-                          : '—'}
+                            {sc.cantidadDias != null && (
+                              <span className="text-xs text-gray-400">
+                                {sc.cantidadDias} {sc.cantidadDias === 1 ? 'día' : 'días'}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-gray-400">—</span>
+                        )}
                       </td>
                       <td className="py-3 pr-4 text-gray-600">{fmtDate(sc.fechaAsignacion)}</td>
                       <td className="py-3 pr-4 text-gray-600">
@@ -3278,9 +3309,12 @@ function EditServicioContratadoModal({
     .filter((m) => m.fecha)
     .sort((a, b) => (b.fecha! > a.fecha! ? 1 : -1))[0];
   const ultimoMonto = ultimoMov ? parseFloat(ultimoMov.debe ?? '0') || 0 : 0;
+  // Interno se cobra a precio base sin IVA; fiscal, con IVA.
   const precioCompleto =
     sc.servicioPrecio != null
-      ? precioConIva(Number(sc.servicioPrecio), Number(sc.servicioAlicuotaIva ?? 0))
+      ? sc.comprobanteInterno
+        ? Number(sc.servicioPrecio)
+        : precioConIva(Number(sc.servicioPrecio), Number(sc.servicioAlicuotaIva ?? 0))
       : 0;
   const proporcional = calcularProporcional(
     ultimoMonto || precioCompleto,
@@ -3357,12 +3391,14 @@ function EditServicioContratadoModal({
             </label>
             <input
               type="date"
-              min={fechaInicio}
               className={inputCls}
               value={fechaBaja}
               onChange={(e) => setFechaBaja(e.target.value)}
             />
-            <p className="mt-1 text-xs text-gray-400">Vacío = sigue vigente.</p>
+            <p className="mt-1 text-xs text-gray-400">
+              Vacío = sigue vigente. Puede ser una fecha pasada (baja retroactiva), mientras no sea
+              anterior a la fecha de inicio.
+            </p>
           </div>
 
           <div>
