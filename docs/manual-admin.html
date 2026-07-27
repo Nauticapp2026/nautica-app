@@ -366,10 +366,10 @@
 <ol><li>Confirmá. El sistema muestra: <em>"Servicio contratado. Todavía no aparece en la cuenta corriente — va a impactar recién cuando corresponda facturarlo."</em></li></ol>
 <p><strong>Editar un servicio contratado:</strong></p>
 
-<ol><li>Hacé clic en el ícono de <strong>lápiz</strong> de la fila del servicio.</li><li>En el modal podés modificar: <strong>Fecha de inicio</strong>, <strong>Fecha de baja</strong>, <strong>Detalle del servicio</strong> y el tipo de <strong>Comprobante</strong> (Interno / Fiscal).</li><li>Si es la <strong>primera vez</strong> que le ponés fecha de baja a ese contrato, aparece un bloque adicional: un checkbox <strong>"Cobrar por esta baja"</strong> con el monto sugerido según la <strong>política de baja anticipada</strong> configurada en la tarifa (mes completo o proporcional al uso) — podés editar ese monto antes de guardar. Si lo tildás, se genera un cargo nuevo en la Cuenta Corriente por ese importe. Si no lo tildás (o si solo estás editando una baja ya cargada antes), no se genera ningún cargo.</li><li>Hacé clic en <strong>Guardar</strong>.</li></ol>
+<ol><li>Hacé clic en el ícono de <strong>lápiz</strong> de la fila del servicio.</li><li>En el modal podés modificar: <strong>Fecha de inicio</strong>, <strong>Fecha de baja</strong>, <strong>Detalle del servicio</strong> y el tipo de <strong>Comprobante</strong> (Interno / Fiscal).</li><li>Si es la <strong>primera vez</strong> que le ponés fecha de baja a ese contrato, aparece un bloque adicional: un checkbox <strong>"Cobrar por esta baja"</strong> con el monto sugerido según la <strong>política de baja anticipada</strong> configurada en la tarifa (mes completo o proporcional al uso) — podés editar ese monto antes de guardar (con techo en el precio de un mes completo). Si lo tildás, el cobro queda <strong>pendiente de facturar</strong> y se incluye en el <strong>próximo comprobante</strong> que se le emita al socio (manual o automático) — recién ahí aparece en la Cuenta Corriente. Si no lo tildás (o si solo estás editando una baja ya cargada antes), no se genera ningún cobro.</li><li>Hacé clic en <strong>Guardar</strong>.</li></ol>
 <p><strong>Servicio de guarda (espacio):</strong> ponerle fecha de baja a un servicio de guarda <strong>detiene el cargo mensual automático</strong> de ahí en más. El espacio <strong>sigue asignado</strong> (la embarcación queda en su lugar); si querés <strong>liberar el lugar</strong> para otro socio, hacelo desde la sección <strong>Espacios</strong>. Si más adelante le volvés a asignar ese espacio al socio, la baja se limpia sola y vuelve a facturarse.</p>
 
-<blockquote><strong>Recordá:</strong> el único cargo que se genera <strong>automáticamente cada mes</strong> es el del <strong>espacio de guarda</strong>. Los demás servicios Fijos (cuota social, extras, etc.) empiezan a repetirse solos recién a partir del primer cargo fiscal que les cargues con <strong>Cargar Servicio</strong>; los servicios Variables no se repiten nunca solos.</blockquote>
+<blockquote><strong>Recordá:</strong> contratar un servicio o asignar un espacio <strong>no genera deuda por sí solo</strong>. La deuda nace recién cuando se <strong>emite el comprobante</strong> (factura o comprobante interno), que toma los servicios vigentes del socio: los Fijos cada mes, los Variables una sola vez, y el proporcional de los días restantes si el servicio arrancó a mitad de mes.</blockquote>
 
 <blockquote>La baja no borra datos: el historial de movimientos anteriores del servicio se conserva. Para reactivar un servicio que no es de guarda, volvé a cargarlo mediante Cargar Servicio.</blockquote>
 
@@ -668,10 +668,11 @@
 <ul><li><strong>Pendientes de cobro</strong> — <strong>cantidad</strong> de facturas sin cobrar.</li><li><strong>Pagadas este mes</strong> — <strong>cantidad</strong> de facturas cobradas en el mes.</li><li><strong>Vencidas</strong> — cantidad de facturas que superaron su fecha de vencimiento sin cobro.</li><li><strong>Total facturado</strong> — monto acumulado histórico.</li></ul>
 <h3>Emitir una factura individual</h3>
 
-<ol><li>Hacé clic en <strong>Nuevo comprobante</strong> → <strong>Facturación manual</strong>.</li><li>Buscá y seleccioná el <strong>socio</strong> en el campo Cliente — el buscador filtra por nombre, número de socio o embarcación (mismo buscador que usás en Cobranzas).</li><li>El sistema muestra automáticamente los <strong>conceptos pendientes</strong> del socio (movimientos sin facturar). Marcá los que querés incluir. Podés usar <strong>Todos</strong> o <strong>Ninguno</strong> para seleccionar rápido.</li><li>Completá los campos:</li></ol>   - <strong>Tipo de comprobante</strong> — se determina automáticamente según la condición IVA del club y del socio (campo de solo lectura):
+<ol><li>Hacé clic en <strong>Nuevo comprobante</strong> → <strong>Facturación manual</strong>.</li><li>Buscá y seleccioná el <strong>socio</strong> en el campo Cliente — el buscador filtra por nombre, número de socio o embarcación (mismo buscador que usás en Cobranzas).</li><li>El sistema muestra automáticamente los <strong>servicios a facturar</strong> del socio: los servicios vigentes del período (mensualidades, proporcionales, variables, cobros por baja) que todavía no tienen comprobante. Marcá los que querés incluir — lo que destildes queda pendiente para la próxima emisión. Podés usar <strong>Todos</strong> o <strong>Ninguno</strong> para seleccionar rápido.</li><li>Completá los campos:</li></ol>   - <strong>Tipo de comprobante</strong> — se determina automáticamente según la condición IVA del club y del socio (campo de solo lectura):
 <p>- Club Monotributo → siempre <strong>Factura C</strong>.</p>
 <p>- Club Responsable Inscripto + Socio Responsable Inscripto → <strong>Factura A</strong>.</p>
 <p>- Club Responsable Inscripto + cualquier otra condición → <strong>Factura B</strong>.</p>
+<p>- <strong>Centro emisor</strong> — por qué punto de venta de ARCA sale el comprobante. Este campo <strong>solo aparece si el club tiene más de un centro emisor</strong> configurado (ver "Centros emisores" en Mi perfil → Datos Impositivos); viene preseleccionado en el principal. Con un solo centro, todo sale automáticamente por ese.</p>
 <p>- <strong>Condición de venta</strong>: Contado, Cuenta corriente, 30 / 60 / 90 días.</p>
 <p>- <strong>Forma de pago</strong>: Efectivo, Transferencia, Tarjeta de crédito, Mercado Pago, etc.</p>
 <p>- <strong>Estado</strong> del comprobante: Pendiente, Pagada o Vencida.</p>
@@ -691,11 +692,13 @@
 <ol><li>Revisá el resumen y confirmá.</li></ol>
 <p>El tipo de comprobante se determina automáticamente para cada socio según la condición IVA del club y de cada socio individualmente (igual que en la factura individual). La condición de venta es siempre <strong>Contado</strong>.</p>
 
-<blockquote>La facturación mensual automática corre el día del mes que configuraste en <strong>Mi perfil → Información general</strong> (campo "Día de facturación"). Solo aplica a socios que ya tuvieron al menos una factura emitida.</blockquote>
+<blockquote>La facturación por lote y la facturación mensual automática salen siempre por el <strong>centro emisor principal</strong> del club — el punto de venta se elige a mano solo en la Facturación manual.</blockquote>
 
-<p><strong>¿Qué conceptos entran en la factura automática?</strong> La factura incluye <strong>todos los cargos pendientes</strong> del socio: la mensualidad que el sistema genera ese día <strong>más cualquier consumo cargado durante el mes que siga pendiente</strong>. No entran los pagos ni saldos a favor, ni los cargos que ya estaban facturados (no se duplican), <strong>ni los cargos con comprobante interno</strong> (esos nunca se facturan). Importante: como todo consumo fiscal cargado desde <strong>Cargar Servicio</strong> queda pendiente, cada consumo no cobrado antes del día de facturación se va a incluir en la factura mensual del socio.</p>
+<blockquote>La facturación mensual automática corre el día del mes que configuraste en <strong>Mi perfil → Información general</strong> (campo "Día de facturación"). Ese día el sistema emite solo, para cada socio, la <strong>factura fiscal</strong> por sus servicios "Fiscal" <strong>y el comprobante interno</strong> por sus servicios "Interno" (identificador <strong>CA-NNNNNN</strong>).</blockquote>
 
-<blockquote><strong>Qué se genera solo cada mes.</strong> Toda tarifa marcada <strong>Fija</strong> se cobra mensual automático — no solo Espacio de guarda: también Cuota social, Membresía, Expensas ordinarias/extraordinarias y Servicio extra. Para Espacio de guarda alcanza con tener el espacio asignado. Para el resto, la recurrencia arranca sola apenas le cargás el primer cargo fiscal con <strong>Cargar Servicio</strong>; de ahí en más se repite todos los meses hasta que lo canceles desde <strong>Servicios Contratados</strong>. Las tarifas <strong>Variables</strong> (se cobran según el metraje) nunca se repiten solas — se cobran una vez y listo; para volver a cobrarlas hay que cargarlas a mano de nuevo.</blockquote>
+<p><strong>¿Qué conceptos entran en la factura automática?</strong> Todos los <strong>servicios vigentes</strong> del socio pendientes de facturar: la mensualidad de cada servicio Fijo contratado (espacio de guarda incluido), el proporcional de los que arrancaron a mitad de mes, los Variables sin cobrar y los cobros por baja anticipada. Los servicios marcados <strong>Interno</strong> no entran en la factura fiscal — salen por su propio comprobante interno automático. No se duplica nada: lo que ya tiene comprobante de este período no se vuelve a incluir.</p>
+
+<blockquote><strong>Qué se cobra solo cada mes.</strong> Toda tarifa marcada <strong>Fija</strong> se cobra mensual automático — no solo Espacio de guarda: también Cuota social, Membresía, Expensas ordinarias/extraordinarias y Servicio extra. Para Espacio de guarda alcanza con tener el espacio asignado con tarifa; para el resto, con tener el servicio contratado (<strong>Cargar Servicio</strong>). La recurrencia se corta cuando lo cancelás desde <strong>Servicios Contratados</strong>. Las tarifas <strong>Variables</strong> nunca se repiten solas — se cobran una vez y el contrato se cierra; para volver a cobrarlas hay que cargarlas de nuevo.</blockquote>
 
 <h3>Comprobantes internos</h3>
 
@@ -703,13 +706,13 @@
 
 <p><strong>Paso 1 — marcar un cargo como Interno:</strong></p>
 
-<p>Al <strong>Cargar Servicio</strong> (pestaña Servicios Contratados de un socio) eligiendo <strong>Interno</strong> en vez de Fiscal, el cargo queda excluido de toda facturación por ARCA (automática y manual) y pendiente de comprobante.</p>
+<p>Al <strong>Cargar Servicio</strong> (pestaña Servicios Contratados de un socio) eligiendo <strong>Interno</strong> en vez de Fiscal, el servicio queda excluido de toda facturación por ARCA (automática y manual).</p>
 
 <p><strong>Paso 2 — emitir el comprobante:</strong></p>
 
-<p>Los cargos Interno pendientes no generan nada por sí solos: hay que consolidarlos en un comprobante desde <strong>Ventas → Nuevo comprobante</strong>:</p>
+<p>Los servicios Interno se consolidan en un comprobante desde <strong>Ventas → Nuevo comprobante</strong>, o los emite solo el sistema el día de facturación:</p>
 
-<ul><li><strong>Comprobante interno manual</strong> — elegís un socio, el sistema te muestra sus cargos Interno pendientes en una lista para tildar (igual que Facturación manual), y emitís un solo comprobante con todos los que selecciones. Numeración <strong>CM-NNNNNN</strong>.</li><li><strong>Comprobante interno por lote</strong> — igual, pero para todos los socios con cargos Interno pendientes a la vez; genera un comprobante por socio. Numeración <strong>CL-NNNNNN</strong>.</li></ul>
+<ul><li><strong>Comprobante interno manual</strong> — elegís un socio, el sistema te muestra sus servicios Interno pendientes en una lista para tildar (igual que Facturación manual), y emitís un solo comprobante con todos los que selecciones. Numeración <strong>CM-NNNNNN</strong>.</li><li><strong>Comprobante interno por lote</strong> — igual, pero para todos los socios con servicios Interno pendientes a la vez; genera un comprobante por socio. Numeración <strong>CL-NNNNNN</strong>.</li><li><strong>Automático</strong> — el día de facturación del club, el sistema emite solo un comprobante interno por socio con sus servicios Interno del período. Numeración <strong>CA-NNNNNN</strong>.</li></ul>
 <p>El comprobante generado muestra fecha de emisión, descripción del o los servicios incluidos, precio y datos del cliente — como una factura, pero sin validez fiscal.</p>
 
 <p>Todos aparecen en <strong>Ventas → tab Comprobantes internos</strong> y quedan disponibles para imprimir o enviar por mail.</p>
@@ -730,6 +733,8 @@
 <p>- <strong>Devolución de servicio</strong> — igual que descuento parcial, con un motivo descriptivo diferente.</p>
 <ol><li>Confirmá.</li></ol>
 <blockquote>El botón solo aparece en facturas tipo A, B o C que ya tienen <strong>CAE</strong> asignado. El CAE es el código que ARCA emite al autorizar una factura — sin él la factura no es válida fiscalmente ni puede tener nota de crédito asociada.</blockquote>
+
+<blockquote>La nota de crédito o débito sobre un comprobante emitido sale siempre por el <strong>mismo punto de venta</strong> que la factura original (así las asocia ARCA) — no hay que elegir centro emisor. Lo mismo aplica al <strong>Reenviar</strong> una factura rechazada: se reintenta por el punto de venta del intento original.</blockquote>
 
 <h3>Emitir notas de crédito en lote</h3>
 
@@ -812,6 +817,7 @@
 <p>- <strong>Tarifa diaria</strong> — el precio que cargás es <strong>por día</strong>. Al cargarle el servicio a un socio, el sistema pide la <strong>cantidad de días</strong> y cobra precio × días.</p>
 
 <p>> <strong>Importante:</strong> el campo "Cantidad de días" solo existe en <strong>Cargar Servicio</strong> (ficha del socio → Servicios Contratados). Si creás una tarifa de categoría "Espacio de guarda" que sea Variable con tarifa diaria y la asignás desde <strong>Espacios → Asignar espacio</strong>, ahí no se piden los días y se cobraría el precio de un solo día. Para tarifas diarias, usá siempre <strong>Cargar Servicio</strong>.</p>
+
 <ol><li>Ingresá el <strong>Precio (sin IVA)</strong> y la <strong>Alícuota de IVA</strong>: <strong>Exento / No gravado</strong>, <strong>10,5 %</strong> o <strong>21 %</strong>. El sistema suma el IVA automáticamente para calcular lo que se le cobra al socio.</li><li>Configurá el <strong>Plazo de pago</strong> (días) y la <strong>Vigencia</strong>:</li></ol>   - El <strong>Plazo de pago</strong> (Contado, 5, 10, 15, 20 o 30 días) define la <strong>fecha de vencimiento</strong> de los cargos de esa tarifa en la Cuenta Corriente del socio: vencimiento = fecha de la factura + el plazo elegido.
 <p>- <strong>Vigencia desde</strong> — fecha a partir de la cual la tarifa está activa.</p>
 <p>- <strong>Vencimiento</strong> — fecha hasta la que aplica.</p>
@@ -877,7 +883,7 @@
 <p>- <strong>Condición Ingresos Brutos</strong> <em>(opcional)</em></p>
 <p>- <strong>Fecha de inicio de actividades</strong> <em>(requerida)</em></p>
 <ol><li>Hacé clic en <strong>Guardar cambios</strong>.</li></ol>
-<p>Una vez creado, el <strong>número de Punto de Venta no se puede cambiar</strong>. El resto de los datos (razón social, CUIT, condición IVA, fecha de inicio) son editables: modificalos y hacé clic en <strong>Guardar cambios</strong> cuando necesites actualizarlos.</p>
+<p>Una vez creado, el <strong>número de Punto de Venta no se puede cambiar</strong> (identifica el POS en ARCA). El resto de los datos (razón social, CUIT, condición IVA, fecha de inicio) son editables: modificalos y hacé clic en <strong>Guardar cambios</strong> cuando necesites actualizarlos. Este primer punto de venta queda registrado como tu <strong>Centro emisor principal</strong>.</p>
 
 <blockquote>Si el POS ya tiene facturas emitidas, TusFacturas puede bloquear la edición del CUIT y la condición frente al IVA. En ese caso el sistema mostrará el mensaje de error devuelto por TusFacturas.</blockquote>
 
@@ -887,6 +893,21 @@
 
 <ol><li>Hacé clic en <strong>Solicitar certificado ARCA</strong>. TusFacturas va a enviar las instrucciones al mail del administrador de la cuenta de TusFacturas.</li><li>Instalá el certificado en el portal de ARCA siguiendo las instrucciones recibidas.</li><li>Volvé al panel y hacé clic en <strong>Confirmar instalación</strong> para habilitar la emisión.</li></ol>
 <blockquote>Hasta que no confirmes la instalación del certificado, el botón "Nuevo comprobante" aparece deshabilitado.</blockquote>
+
+<p><em>Centros emisores (varios puntos de venta):</em></p>
+
+<p>Si tu club factura desde <strong>más de un punto de venta</strong> de ARCA (por ejemplo, dos sucursales), podés cargarlos todos en la sección <strong>Centros emisores</strong>, debajo del formulario de datos impositivos:</p>
+
+<ol><li>Hacé clic en <strong>Agregar centro emisor</strong>.</li><li>Completá:</li></ol>   - <strong>Nombre</strong> <em>(requerido)</em> — cómo lo querés ver en los listados (ej. "Sucursal río").
+<p>- <strong>Número de punto de venta</strong> <em>(requerido)</em> — igual que el primero, debe existir previamente en ARCA (Servicios → Administrador de Relaciones → POS de Facturación Electrónica).</p>
+<ol><li>Hacé clic en <strong>Agregar</strong>. Los datos impositivos (razón social, CUIT, condición IVA) se reusan de los ya cargados — todos los centros emisores del club comparten el mismo CUIT, por lo que también comparten el certificado ARCA.</li></ol>
+<p>Sobre cada centro de la lista podés:</p>
+
+<ul><li><strong>Renombrarlo</strong> (ícono de lápiz) — el número no se puede cambiar.</li><li><strong>Hacer principal</strong> — el centro <strong>principal</strong> es el que usa la <strong>facturación mensual automática</strong>, la <strong>facturación por lote</strong> y todo flujo que no elige punto de venta a mano.</li></ul>
+<p>Cómo se comporta la emisión con varios centros:</p>
+
+<ul><li>En <strong>Facturación manual</strong> (y en las NC/ND "sin comprobante de origen") aparece el dropdown <strong>Centro emisor</strong> para elegir por cuál sale, preseleccionado en el principal. Con un solo centro el dropdown no se muestra.</li><li>Las <strong>NC/ND sobre un comprobante emitido</strong>, el <strong>Reenviar</strong> de rechazadas y la descarga de <strong>PDF</strong> usan siempre el punto de venta del comprobante original.</li><li>En la tabla de Ventas, la columna <strong>Centro emisor</strong> muestra el punto de venta real de cada comprobante.</li></ul>
+<blockquote>Los centros emisores no se pueden eliminar desde el panel (solo renombrar y cambiar el principal): borrar un punto de venta con comprobantes emitidos afectaría la trazabilidad fiscal. Si necesitás dar de baja uno, contactá a soporte.</blockquote>
 
 <h3>Pestaña: Equipo</h3>
 

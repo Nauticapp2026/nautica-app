@@ -628,6 +628,7 @@ Las tarjetas superiores muestran:
      - Club Monotributo → siempre **Factura C**.
      - Club Responsable Inscripto + Socio Responsable Inscripto → **Factura A**.
      - Club Responsable Inscripto + cualquier otra condición → **Factura B**.
+   - **Centro emisor** — por qué punto de venta de ARCA sale el comprobante. Este campo **solo aparece si el club tiene más de un centro emisor** configurado (ver "Centros emisores" en Mi perfil → Datos Impositivos); viene preseleccionado en el principal. Con un solo centro, todo sale automáticamente por ese.
    - **Condición de venta**: Contado, Cuenta corriente, 30 / 60 / 90 días.
    - **Forma de pago**: Efectivo, Transferencia, Tarjeta de crédito, Mercado Pago, etc.
    - **Estado** del comprobante: Pendiente, Pagada o Vencida.
@@ -650,6 +651,8 @@ Emití facturas para múltiples socios al mismo tiempo.
 3. Revisá el resumen y confirmá.
 
 El tipo de comprobante se determina automáticamente para cada socio según la condición IVA del club y de cada socio individualmente (igual que en la factura individual). La condición de venta es siempre **Contado**.
+
+> La facturación por lote y la facturación mensual automática salen siempre por el **centro emisor principal** del club — el punto de venta se elige a mano solo en la Facturación manual.
 
 > La facturación mensual automática corre el día del mes que configuraste en **Mi perfil → Información general** (campo "Día de facturación"). Ese día el sistema emite solo, para cada socio, la **factura fiscal** por sus servicios "Fiscal" **y el comprobante interno** por sus servicios "Interno" (identificador **CA-NNNNNN**).
 
@@ -701,6 +704,8 @@ Si necesitás anular parcial o totalmente una factura ya emitida, podés emitir 
 4. Confirmá.
 
 > El botón solo aparece en facturas tipo A, B o C que ya tienen **CAE** asignado. El CAE es el código que ARCA emite al autorizar una factura — sin él la factura no es válida fiscalmente ni puede tener nota de crédito asociada.
+
+> La nota de crédito o débito sobre un comprobante emitido sale siempre por el **mismo punto de venta** que la factura original (así las asocia ARCA) — no hay que elegir centro emisor. Lo mismo aplica al **Reenviar** una factura rechazada: se reintenta por el punto de venta del intento original.
 
 ### Emitir notas de crédito en lote
 
@@ -897,7 +902,7 @@ _Paso 1 — Configurar el Punto de Venta:_
    - **Fecha de inicio de actividades** _(requerida)_
 2. Hacé clic en **Guardar cambios**.
 
-Una vez creado, el **número de Punto de Venta no se puede cambiar**. El resto de los datos (razón social, CUIT, condición IVA, fecha de inicio) son editables: modificalos y hacé clic en **Guardar cambios** cuando necesites actualizarlos.
+Una vez creado, el **número de Punto de Venta no se puede cambiar** (identifica el POS en ARCA). El resto de los datos (razón social, CUIT, condición IVA, fecha de inicio) son editables: modificalos y hacé clic en **Guardar cambios** cuando necesites actualizarlos. Este primer punto de venta queda registrado como tu **Centro emisor principal**.
 
 > Si el POS ya tiene facturas emitidas, TusFacturas puede bloquear la edición del CUIT y la condición frente al IVA. En ese caso el sistema mostrará el mensaje de error devuelto por TusFacturas.
 
@@ -910,6 +915,29 @@ El certificado permite que el sistema emita facturas directamente a ARCA en nomb
 3. Volvé al panel y hacé clic en **Confirmar instalación** para habilitar la emisión.
 
 > Hasta que no confirmes la instalación del certificado, el botón "Nuevo comprobante" aparece deshabilitado.
+
+_Centros emisores (varios puntos de venta):_
+
+Si tu club factura desde **más de un punto de venta** de ARCA (por ejemplo, dos sucursales), podés cargarlos todos en la sección **Centros emisores**, debajo del formulario de datos impositivos:
+
+1. Hacé clic en **Agregar centro emisor**.
+2. Completá:
+   - **Nombre** _(requerido)_ — cómo lo querés ver en los listados (ej. "Sucursal río").
+   - **Número de punto de venta** _(requerido)_ — igual que el primero, debe existir previamente en ARCA (Servicios → Administrador de Relaciones → POS de Facturación Electrónica).
+3. Hacé clic en **Agregar**. Los datos impositivos (razón social, CUIT, condición IVA) se reusan de los ya cargados — todos los centros emisores del club comparten el mismo CUIT, por lo que también comparten el certificado ARCA.
+
+Sobre cada centro de la lista podés:
+
+- **Renombrarlo** (ícono de lápiz) — el número no se puede cambiar.
+- **Hacer principal** — el centro **principal** es el que usa la **facturación mensual automática**, la **facturación por lote** y todo flujo que no elige punto de venta a mano.
+
+Cómo se comporta la emisión con varios centros:
+
+- En **Facturación manual** (y en las NC/ND "sin comprobante de origen") aparece el dropdown **Centro emisor** para elegir por cuál sale, preseleccionado en el principal. Con un solo centro el dropdown no se muestra.
+- Las **NC/ND sobre un comprobante emitido**, el **Reenviar** de rechazadas y la descarga de **PDF** usan siempre el punto de venta del comprobante original.
+- En la tabla de Ventas, la columna **Centro emisor** muestra el punto de venta real de cada comprobante.
+
+> Los centros emisores no se pueden eliminar desde el panel (solo renombrar y cambiar el principal): borrar un punto de venta con comprobantes emitidos afectaría la trazabilidad fiscal. Si necesitás dar de baja uno, contactá a soporte.
 
 ### Pestaña: Equipo
 
