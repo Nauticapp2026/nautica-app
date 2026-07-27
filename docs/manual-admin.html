@@ -339,6 +339,8 @@
 <ul><li><strong>Desactivado</strong> (valor por defecto): se factura con los <strong>Datos Impositivos</strong> (razón social, CUIT, dirección fiscal y condición frente al IVA de esta pestaña).</li><li><strong>Activado</strong>: se factura con los <strong>datos personales</strong> del socio (nombre y apellido, tipo y número de documento, dirección y condición frente al IVA cargados en la pestaña <strong>Generales</strong>).</li></ul>
 <blockquote><strong>Importante:</strong> todos los socios activos aparecen en los flujos de facturación (individual y lote). Este checkbox ya <strong>no</strong> controla si el socio aparece o no en el módulo: solo elige el conjunto de datos con el que se emite.</blockquote>
 
+<p><strong>Comprobante interno</strong> — checkbox de esta pestaña. Define el valor <strong>por defecto</strong> del campo Comprobante al <strong>Cargar Servicio</strong> a este socio: tildado, los servicios nuevos arrancan como <strong>Interno</strong>; destildado, como <strong>Fiscal (ARCA)</strong>. Es solo el default — en cada carga se puede cambiar.</p>
+
 <blockquote><strong>Campos requeridos para poder emitir factura ARCA al socio:</strong></blockquote>
 <p>></p>
 <blockquote>Según el modo elegido, el receptor del comprobante necesita: <strong>razón social / nombre</strong>, <strong>documento</strong> (CUIT para Responsable Inscripto o Monotributo —11 dígitos sin guiones—; DNI válido para Consumidor Final), <strong>condición frente al IVA</strong> (determina si es comprobante A, B o C) y <strong>dirección</strong>.</blockquote>
@@ -355,7 +357,9 @@
 
 <h4>Pestaña Servicios Contratados</h4>
 
-<p>Lista los servicios que el socio tiene contratados. Es un <strong>contrato</strong>, no un historial de cargos: cada fila muestra el servicio, un badge <strong>Fijo</strong> o <strong>Variable</strong> según su tarifa, la fecha de inicio y (si tiene) la fecha de baja.</p>
+<p>Lista los servicios que el socio tiene contratados. Es un <strong>contrato</strong>, no un historial de cargos: cada servicio ocupa su propia fila, con su categoría, un badge <strong>Fijo</strong> o <strong>Variable</strong> según su tarifa, el tipo de comprobante (<strong>Interno / Fiscal</strong>), el precio con y sin IVA, la fecha de inicio, la fecha de baja (si tiene) y su <strong>estado</strong>:</p>
+
+<ul><li><strong>Vigente</strong> — el contrato está activo y se sigue facturando.</li><li><strong>Concluido</strong> — servicio <strong>Variable</strong> que ya se facturó: los Variables se cobran una sola vez y el contrato se cierra solo. Para volver a cobrarlo, cargalo de nuevo.</li><li><strong>Dado de baja</strong> — la fecha de baja ya se cumplió.</li></ul>
 
 <p><strong>Cargar un servicio nuevo no genera ningún cargo en el momento.</strong> Solo registra el contrato; el cargo real lo va a generar la facturación (mensual para los servicios Fijos, una vez para los Variables) cuando corresponda.</p>
 
@@ -724,15 +728,22 @@
 <ol><li>En el tab <strong>Comprobantes internos</strong>, en la fila del comprobante CM-/CL- que querés anular, hacé clic en el ícono de flecha curva (↩) — <strong>"Emitir Nota de Crédito interna"</strong>.</li><li>Elegí el motivo: <strong>Anulación total</strong>, <strong>Descuento parcial</strong> o <strong>Devolución de servicio</strong>.</li><li>Si no es anulación total, ingresá el <strong>importe a acreditar</strong> (no puede superar el importe original). La <strong>descripción</strong> es opcional — si la dejás vacía, el sistema arma una automática.</li><li>Confirmá. Se numera con su propia serie <strong>NCI-NNNNNN</strong> y se ve/imprime desde el mismo visor que el resto de los comprobantes.</li></ol>
 <blockquote>En la Cuenta Corriente del socio, el cargo cubierto por una Nota de Crédito interna se muestra igual que una NC fiscal: <strong>Anulado (NC)</strong>.</blockquote>
 
-<h3>Emitir una nota de crédito</h3>
+<h3>Emitir una nota de crédito o débito</h3>
 
-<p>Si necesitás anular parcial o totalmente una factura ya emitida, podés emitir una nota de crédito:</p>
+<p>Si necesitás anular parcial o totalmente una factura ya emitida (nota de crédito) o cargarle un importe adicional (nota de débito), tenés dos caminos:</p>
 
-<ol><li>Andá a <strong>Ventas</strong> en el menú lateral → tab <strong>Comprobantes ARCA</strong>.</li><li>Encontrá la factura original en la tabla y hacé clic en el ícono de flecha curva (↩) al final de la fila.</li><li>Seleccioná el motivo:</li></ol>   - <strong>Anulación total</strong> — anula la factura completa; el importe se toma automáticamente.
+<p><strong>Camino 1 — desde la fila de la factura:</strong></p>
+
+<ol><li>Andá a <strong>Ventas</strong> en el menú lateral → tab <strong>Comprobantes ARCA</strong>.</li><li>Encontrá la factura original en la tabla y hacé clic en el ícono de flecha curva (↩) al final de la fila — "Emitir Nota de Crédito o Débito".</li><li>Elegí <strong>NC</strong> o <strong>ND</strong> y seleccioná el motivo:</li></ol>   - <strong>Anulación total</strong> <em>(solo NC)</em> — anula la factura completa; el importe se toma automáticamente.
 <p>- <strong>Descuento parcial</strong> — acreditá un monto parcial; ingresás el importe manualmente.</p>
 <p>- <strong>Devolución de servicio</strong> — igual que descuento parcial, con un motivo descriptivo diferente.</p>
 <ol><li>Confirmá.</li></ol>
-<blockquote>El botón solo aparece en facturas tipo A, B o C que ya tienen <strong>CAE</strong> asignado. El CAE es el código que ARCA emite al autorizar una factura — sin él la factura no es válida fiscalmente ni puede tener nota de crédito asociada.</blockquote>
+<p><strong>Camino 2 — desde Nuevo comprobante:</strong></p>
+
+<p>En <strong>Nuevo comprobante → Facturación manual</strong>, el campo <strong>Tipo de comprobante</strong> también ofrece <strong>Nota de crédito</strong> y <strong>Nota de débito</strong>. Al elegir una, el formulario cambia al de la nota, con dos variantes:</p>
+
+<ul><li><strong>Sobre un comprobante emitido</strong> — elegís entre las facturas fiscales con CAE del socio; equivale al camino 1.</li><li><strong>Sin comprobante de origen</strong> — una NC/ND "libre", sin factura asociada (por ejemplo, una bonificación comercial nueva). El tipo (A/B/C) se deriva de la condición IVA del club y del socio, y el importe es siempre manual.</li></ul>
+<blockquote>El botón de la fila solo aparece en facturas tipo A, B o C que ya tienen <strong>CAE</strong> asignado. El CAE es el código que ARCA emite al autorizar una factura — sin él la factura no es válida fiscalmente ni puede tener nota de crédito asociada. En la <strong>nota de débito</strong> el importe es siempre manual (no existe "anulación total": completarlo automáticamente duplicaría el cobro al socio).</blockquote>
 
 <blockquote>La nota de crédito o débito sobre un comprobante emitido sale siempre por el <strong>mismo punto de venta</strong> que la factura original (así las asocia ARCA) — no hay que elegir centro emisor. Lo mismo aplica al <strong>Reenviar</strong> una factura rechazada: se reintenta por el punto de venta del intento original.</blockquote>
 
@@ -825,7 +836,10 @@
 <ol><li>Si el servicio es <strong>Fijo</strong>, opcionalmente tildá <strong>"Establecer política de baja anticipada"</strong>. Al tildarlo aparecen dos opciones (queda seleccionada "proporcional" por defecto, podés cambiarla):</li></ol>   - <strong>Cobrar mes completo.</strong>
 <p>- <strong>Cobrar días proporcionales de uso.</strong></p>
 
-<p>Esta política es la que se usa después para sugerir el monto cuando alguien da de baja el servicio desde la ficha de un socio (ver "Editar un servicio contratado" en la sección Socios). Para tarifas <strong>Variables</strong> este campo no aplica y no se muestra.</p>
+<p>Esta política actúa en dos momentos:</p>
+
+<ul><li><strong>Al dar de baja</strong> el servicio desde la ficha de un socio: sugiere el monto del cobro por baja (ver "Editar un servicio contratado" en la sección Socios).</li><li><strong>Al alta</strong>, si elegiste <strong>mes completo</strong>: un servicio que arranca a mitad de mes se cobra el <strong>mes entero</strong> en su primer ciclo, sin proporcional. Con la política proporcional (o sin política configurada), el primer mes se cobra <strong>proporcional</strong> a los días desde la fecha de inicio.</li></ul>
+<p>Para tarifas <strong>Variables</strong> este campo no aplica y no se muestra.</p>
 
 <ol><li>Hacé clic en <strong>Guardar tarifa</strong>.</li></ol>
 <h3>Editar una tarifa</h3>

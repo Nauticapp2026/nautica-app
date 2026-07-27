@@ -167,6 +167,8 @@ El **email de facturación** es la dirección a la que se envía el comprobante.
 
 > **Importante:** todos los socios activos aparecen en los flujos de facturación (individual y lote). Este checkbox ya **no** controla si el socio aparece o no en el módulo: solo elige el conjunto de datos con el que se emite.
 
+**Comprobante interno** — checkbox de esta pestaña. Define el valor **por defecto** del campo Comprobante al **Cargar Servicio** a este socio: tildado, los servicios nuevos arrancan como **Interno**; destildado, como **Fiscal (ARCA)**. Es solo el default — en cada carga se puede cambiar.
+
 > **Campos requeridos para poder emitir factura ARCA al socio:**
 >
 > Según el modo elegido, el receptor del comprobante necesita: **razón social / nombre**, **documento** (CUIT para Responsable Inscripto o Monotributo —11 dígitos sin guiones—; DNI válido para Consumidor Final), **condición frente al IVA** (determina si es comprobante A, B o C) y **dirección**.
@@ -184,7 +186,11 @@ Cada embarcación tiene su **propio espacio asignado**. Dentro de la tarjeta de 
 
 #### Pestaña Servicios Contratados
 
-Lista los servicios que el socio tiene contratados. Es un **contrato**, no un historial de cargos: cada fila muestra el servicio, un badge **Fijo** o **Variable** según su tarifa, la fecha de inicio y (si tiene) la fecha de baja.
+Lista los servicios que el socio tiene contratados. Es un **contrato**, no un historial de cargos: cada servicio ocupa su propia fila, con su categoría, un badge **Fijo** o **Variable** según su tarifa, el tipo de comprobante (**Interno / Fiscal**), el precio con y sin IVA, la fecha de inicio, la fecha de baja (si tiene) y su **estado**:
+
+- **Vigente** — el contrato está activo y se sigue facturando.
+- **Concluido** — servicio **Variable** que ya se facturó: los Variables se cobran una sola vez y el contrato se cierra solo. Para volver a cobrarlo, cargalo de nuevo.
+- **Dado de baja** — la fecha de baja ya se cumplió.
 
 **Cargar un servicio nuevo no genera ningún cargo en el momento.** Solo registra el contrato; el cargo real lo va a generar la facturación (mensual para los servicios Fijos, una vez para los Variables) cuando corresponda.
 
@@ -691,19 +697,28 @@ Si necesitás anular un comprobante interno (CM- o CL-) ya emitido, hay una Nota
 
 > En la Cuenta Corriente del socio, el cargo cubierto por una Nota de Crédito interna se muestra igual que una NC fiscal: **Anulado (NC)**.
 
-### Emitir una nota de crédito
+### Emitir una nota de crédito o débito
 
-Si necesitás anular parcial o totalmente una factura ya emitida, podés emitir una nota de crédito:
+Si necesitás anular parcial o totalmente una factura ya emitida (nota de crédito) o cargarle un importe adicional (nota de débito), tenés dos caminos:
+
+**Camino 1 — desde la fila de la factura:**
 
 1. Andá a **Ventas** en el menú lateral → tab **Comprobantes ARCA**.
-2. Encontrá la factura original en la tabla y hacé clic en el ícono de flecha curva (↩) al final de la fila.
-3. Seleccioná el motivo:
-   - **Anulación total** — anula la factura completa; el importe se toma automáticamente.
+2. Encontrá la factura original en la tabla y hacé clic en el ícono de flecha curva (↩) al final de la fila — "Emitir Nota de Crédito o Débito".
+3. Elegí **NC** o **ND** y seleccioná el motivo:
+   - **Anulación total** _(solo NC)_ — anula la factura completa; el importe se toma automáticamente.
    - **Descuento parcial** — acreditá un monto parcial; ingresás el importe manualmente.
    - **Devolución de servicio** — igual que descuento parcial, con un motivo descriptivo diferente.
 4. Confirmá.
 
-> El botón solo aparece en facturas tipo A, B o C que ya tienen **CAE** asignado. El CAE es el código que ARCA emite al autorizar una factura — sin él la factura no es válida fiscalmente ni puede tener nota de crédito asociada.
+**Camino 2 — desde Nuevo comprobante:**
+
+En **Nuevo comprobante → Facturación manual**, el campo **Tipo de comprobante** también ofrece **Nota de crédito** y **Nota de débito**. Al elegir una, el formulario cambia al de la nota, con dos variantes:
+
+- **Sobre un comprobante emitido** — elegís entre las facturas fiscales con CAE del socio; equivale al camino 1.
+- **Sin comprobante de origen** — una NC/ND "libre", sin factura asociada (por ejemplo, una bonificación comercial nueva). El tipo (A/B/C) se deriva de la condición IVA del club y del socio, y el importe es siempre manual.
+
+> El botón de la fila solo aparece en facturas tipo A, B o C que ya tienen **CAE** asignado. El CAE es el código que ARCA emite al autorizar una factura — sin él la factura no es válida fiscalmente ni puede tener nota de crédito asociada. En la **nota de débito** el importe es siempre manual (no existe "anulación total": completarlo automáticamente duplicaría el cobro al socio).
 
 > La nota de crédito o débito sobre un comprobante emitido sale siempre por el **mismo punto de venta** que la factura original (así las asocia ARCA) — no hay que elegir centro emisor. Lo mismo aplica al **Reenviar** una factura rechazada: se reintenta por el punto de venta del intento original.
 
@@ -828,7 +843,11 @@ Cada tarifa muestra su concepto, un badge **Fijo** o **Variable** (fijo = precio
    - **Cobrar mes completo.**
    - **Cobrar días proporcionales de uso.**
 
-   Esta política es la que se usa después para sugerir el monto cuando alguien da de baja el servicio desde la ficha de un socio (ver "Editar un servicio contratado" en la sección Socios). Para tarifas **Variables** este campo no aplica y no se muestra.
+   Esta política actúa en dos momentos:
+   - **Al dar de baja** el servicio desde la ficha de un socio: sugiere el monto del cobro por baja (ver "Editar un servicio contratado" en la sección Socios).
+   - **Al alta**, si elegiste **mes completo**: un servicio que arranca a mitad de mes se cobra el **mes entero** en su primer ciclo, sin proporcional. Con la política proporcional (o sin política configurada), el primer mes se cobra **proporcional** a los días desde la fecha de inicio.
+
+   Para tarifas **Variables** este campo no aplica y no se muestra.
 
 7. Hacé clic en **Guardar tarifa**.
 
