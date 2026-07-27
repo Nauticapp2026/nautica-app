@@ -3331,23 +3331,24 @@ function ServiciosContratadosTab({
 
 // Calcula el proporcional en base al último monto REAL cobrado a este socio
 // por este servicio (no el precio vigente del tarifario, que puede haber
-// cambiado desde la última vez que se le cobró) y a los días transcurridos
-// desde ese último cobro. Se limita a como máximo un mes completo, para no
-// arrastrar meses atrasados que no se cobraron por otro motivo.
+// cambiado desde la última vez que se le cobró) y a los días usados del MES
+// DONDE CAE LA FECHA DE BAJA: del día 1 de ese mes (o de la fecha de inicio,
+// si el servicio arrancó ese mismo mes) hasta la baja inclusive.
 function calcularProporcional(
   ultimoMonto: number,
-  ultimaFecha: string | null,
+  fechaBaja: string,
+  fechaInicio: string | null,
 ): { monto: number; diasUsados: number; diasMes: number } {
-  const hoy = new Date();
-  const diasMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0).getDate();
-  let diasUsados = diasMes;
-  if (ultimaFecha) {
-    const msPorDia = 1000 * 60 * 60 * 24;
-    const diasDesdeUltimoCobro = Math.round(
-      (hoy.getTime() - new Date(ultimaFecha).getTime()) / msPorDia,
-    );
-    diasUsados = Math.min(diasMes, Math.max(0, diasDesdeUltimoCobro));
+  const baja = new Date(`${fechaBaja}T00:00:00`);
+  const diasMes = new Date(baja.getFullYear(), baja.getMonth() + 1, 0).getDate();
+  let desde = 1;
+  if (fechaInicio) {
+    const inicio = new Date(`${fechaInicio}T00:00:00`);
+    if (inicio.getFullYear() === baja.getFullYear() && inicio.getMonth() === baja.getMonth()) {
+      desde = inicio.getDate();
+    }
   }
+  const diasUsados = Math.max(0, baja.getDate() - desde + 1);
   const monto = Math.round((diasUsados / diasMes) * ultimoMonto * 100) / 100;
   return { monto, diasUsados, diasMes };
 }
@@ -3390,10 +3391,9 @@ function EditServicioContratadoModal({
         ? Number(sc.servicioPrecio)
         : precioConIva(Number(sc.servicioPrecio), Number(sc.servicioAlicuotaIva ?? 0))
       : 0;
-  const proporcional = calcularProporcional(
-    ultimoMonto || precioCompleto,
-    ultimoMov?.fecha ?? null,
-  );
+  const proporcional = fechaBaja
+    ? calcularProporcional(ultimoMonto || precioCompleto, fechaBaja, fechaInicio || null)
+    : { monto: precioCompleto, diasUsados: 0, diasMes: 0 };
   const esMesCompleto = sc.servicioPoliticaBajaAnticipada === 'mes_completo';
   const montoSugerido = esMesCompleto ? precioCompleto : proporcional.monto;
   const montoFinal = montoOverride !== null ? parseFloat(montoOverride) || 0 : montoSugerido;
@@ -3467,7 +3467,12 @@ function EditServicioContratadoModal({
               type="date"
               className={inputCls}
               value={fechaBaja}
-              onChange={(e) => setFechaBaja(e.target.value)}
+              onChange={(e) => {
+                setFechaBaja(e.target.value);
+                // El sugerido depende de la fecha de baja: al cambiarla se
+                // descarta el monto tipeado a mano para recalcular.
+                setMontoOverride(null);
+              }}
             />
             <p className="mt-1 text-xs text-gray-400">
               Vacío = sigue vigente. Puede ser una fecha pasada (baja retroactiva), mientras no sea
@@ -3526,7 +3531,11 @@ function EditServicioContratadoModal({
                   onChange={(e) => setCobrar(e.target.checked)}
                 />
                 Cobrar por esta baja — política:{' '}
-                <strong>{esMesCompleto ? 'mes completo' : 'proporcional'}</strong>
+                <strong>
+                  {esMesCompleto
+                    ? 'mes completo'
+                    : `proporcional (${proporcional.diasUsados}/${proporcional.diasMes} días)`}
+                </strong>
               </label>
               {cobrar && (
                 <>
