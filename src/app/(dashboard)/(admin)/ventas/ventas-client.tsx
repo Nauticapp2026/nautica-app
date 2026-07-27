@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
@@ -51,7 +51,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
-// â”€â”€â”€ Tipos â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Tipos ──────────────────────────────────────────────────────────────────
 
 type Factura = {
   id: string;
@@ -95,7 +95,7 @@ type LoteMovimiento = {
   debe: string | null;
   servicioNombre: string | null;
   tipoServicio: string | null;
-  // null = cargo legacy de cuenta corriente; seteado = Ã­tem computado desde
+  // null = cargo legacy de cuenta corriente; seteado = ítem computado desde
   // el contrato vigente (modelo "los cargos nacen al emitir").
   itemKey: PendienteEmision['itemKey'];
 };
@@ -127,7 +127,7 @@ type Socio = {
   movimientos: LoteMovimiento[];
 };
 
-// CondiciÃ³n frente al IVA efectiva del socio segÃºn el modo de facturaciÃ³n:
+// Condición frente al IVA efectiva del socio según el modo de facturación:
 // si factura con datos personales, la de Generales; si no, la fiscal.
 function condicionIvaEfectiva(
   socio: Pick<Socio, 'facturaFiscal' | 'condicionIva' | 'condicionIvaPersonal'>,
@@ -137,7 +137,7 @@ function condicionIvaEfectiva(
 
 // Documento que realmente se manda a facturar (ver identidadFacturacion en
 // actions/facturacion.ts): con datos personales es el DNI; con datos
-// impositivos es el CUIT si estÃ¡ cargado, si no cae al DNI.
+// impositivos es el CUIT si está cargado, si no cae al DNI.
 function numeroDocumentoEfectivo(
   socio: Pick<Socio, 'facturaFiscal' | 'numeroDocumento' | 'cuit'>,
 ): string {
@@ -152,7 +152,7 @@ type Kpis = {
   totalFacturado: string;
 };
 
-// â”€â”€â”€ Constantes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Constantes ─────────────────────────────────────────────────────────────
 
 const TIPO_FACTURA_LABEL: Record<string, string> = {
   factura_a: 'A',
@@ -165,10 +165,10 @@ const TIPO_FACTURA_LABEL: Record<string, string> = {
   nota_credito_interna: 'NC interna',
 };
 
-// 'recibo' agrupa RC- (cobranza), CM-/CL- (comprobante interno) y RB- â€” todos
-// documentos sin validez fiscal en sÃ­ mismos, pero un RC- puede estar
+// 'recibo' agrupa RC- (cobranza), CM-/CL- (comprobante interno) y RB- — todos
+// documentos sin validez fiscal en sí mismos, pero un RC- puede estar
 // cobrando una factura fiscal. `tipoRecibo` (columna propia, se computa al
-// registrar la cobranza) dice de quÃ© tipo era la deuda que cancela; sin ese
+// registrar la cobranza) dice de qué tipo era la deuda que cancela; sin ese
 // dato (CM-/CL-, que solo consolidan cargos Interno) es siempre interno.
 function tipoComprobanteLabel(f: {
   tipoFactura: string | null;
@@ -177,7 +177,7 @@ function tipoComprobanteLabel(f: {
   if (f.tipoFactura === 'recibo') {
     return f.tipoRecibo === 'fiscal' ? 'Recibo fiscal' : 'Recibo interno';
   }
-  return TIPO_FACTURA_LABEL[f.tipoFactura ?? ''] ?? f.tipoFactura ?? 'â€”';
+  return TIPO_FACTURA_LABEL[f.tipoFactura ?? ''] ?? f.tipoFactura ?? '—';
 }
 
 const TIPO_FACTURA_OPTS = [
@@ -186,11 +186,11 @@ const TIPO_FACTURA_OPTS = [
   { value: 'factura_a', label: 'Factura A (Responsable Inscripto)' },
 ];
 
-// Tipos de factura que el club puede emitir segÃºn SU condiciÃ³n frente al
+// Tipos de factura que el club puede emitir según SU condición frente al
 // IVA: un club Monotributo solo emite C; un club Responsable Inscripto
-// emite A o B (a quiÃ©n le corresponde cada una lo sugiere
-// derivarTipoFactura segÃºn la condiciÃ³n del socio, pero el admin puede
-// elegir entre las vÃ¡lidas).
+// emite A o B (a quién le corresponde cada una lo sugiere
+// derivarTipoFactura según la condición del socio, pero el admin puede
+// elegir entre las válidas).
 function tiposFacturaEmisibles(guarderiaCondicionIva: string | null) {
   if (guarderiaCondicionIva === 'responsable_inscripto') {
     return TIPO_FACTURA_OPTS.filter((o) => o.value !== 'factura_c');
@@ -210,16 +210,16 @@ function derivarTipoFactura(
 const CONDICION_VENTA_OPTS = [
   { value: 'contado', label: 'Contado' },
   { value: 'cuenta_corriente', label: 'Cuenta corriente' },
-  { value: 'dias_30', label: '30 dÃ­as' },
-  { value: 'dias_60', label: '60 dÃ­as' },
-  { value: 'dias_90', label: '90 dÃ­as' },
+  { value: 'dias_30', label: '30 días' },
+  { value: 'dias_60', label: '60 días' },
+  { value: 'dias_90', label: '90 días' },
 ];
 
 const MEDIO_PAGO_OPTS = [
   { value: 'efectivo', label: 'Efectivo' },
-  { value: 'tarjeta_credito', label: 'Tarjeta de crÃ©dito' },
-  { value: 'tarjeta_debito', label: 'Tarjeta de dÃ©bito' },
-  { value: 'debito_automatico', label: 'DÃ©bito automÃ¡tico' },
+  { value: 'tarjeta_credito', label: 'Tarjeta de crédito' },
+  { value: 'tarjeta_debito', label: 'Tarjeta de débito' },
+  { value: 'debito_automatico', label: 'Débito automático' },
   { value: 'transferencia', label: 'Transferencia' },
   { value: 'cheque', label: 'Cheque' },
   { value: 'mercado_pago', label: 'Mercado Pago' },
@@ -232,7 +232,7 @@ const ESTADO_BADGE: Record<string, string> = {
 };
 
 // El valor 'pagada' del enum en DB se muestra como "Cobrada" en toda la
-// pantalla de Ventas (pedido 2026-07-24) â€” mismo criterio que "Cobrado" en
+// pantalla de Ventas (pedido 2026-07-24) — mismo criterio que "Cobrado" en
 // la cuenta corriente del socio.
 const ESTADO_LABEL: Record<string, string> = {
   pagada: 'Cobrada',
@@ -243,7 +243,7 @@ const ESTADO_LABEL: Record<string, string> = {
 const inputCls =
   'h-11 w-full rounded-[10px] border border-gray-200 bg-white px-4 text-sm text-[#101828] focus:border-[#175861] focus:outline-none focus:ring-1 focus:ring-[#175861]';
 
-// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Helpers ────────────────────────────────────────────────────────────────
 
 function fmtMoney(value: string | number | null): string {
   const n = typeof value === 'string' ? parseFloat(value || '0') : (value ?? 0);
@@ -252,8 +252,8 @@ function fmtMoney(value: string | number | null): string {
 
 const fmtDate = formatArgentinaDate;
 
-// Detalle del socio en UNA lÃ­nea para los buscadores de comprobantes:
-// nÂº de socio, razÃ³n social, CUIT/DNI, direcciÃ³n y embarcaciones.
+// Detalle del socio en UNA línea para los buscadores de comprobantes:
+// nº de socio, razón social, CUIT/DNI, dirección y embarcaciones.
 function detalleSocioRenglon(s: Socio): string {
   const doc = s.cuit?.trim()
     ? `CUIT ${s.cuit}`
@@ -268,14 +268,14 @@ function detalleSocioRenglon(s: Socio): string {
     s.embarcaciones.length > 0 ? s.embarcaciones.join(', ') : null,
   ]
     .filter(Boolean)
-    .join(' Â· ');
+    .join(' · ');
 }
 
-// Etiqueta secundaria de una fila de la lista de emisiÃ³n: los Ã­tems
+// Etiqueta secundaria de una fila de la lista de emisión: los ítems
 // computados desde contratos vigentes se describen por su origen; los cargos
 // legacy de cuenta corriente muestran su fecha, como siempre.
 function etiquetaPendiente(m: PendienteEmision): string {
-  if (!m.itemKey) return `En cuenta corriente${m.fecha ? ` Â· ${fmtDate(m.fecha)}` : ''}`;
+  if (!m.itemKey) return `En cuenta corriente${m.fecha ? ` · ${fmtDate(m.fecha)}` : ''}`;
   if (m.origen === 'baja') return 'Cobro por baja anticipada';
   if (m.esVariable) return 'Servicio variable';
   if (m.esProporcional) return 'Proporcional del mes';
@@ -283,8 +283,8 @@ function etiquetaPendiente(m: PendienteEmision): string {
 }
 
 // Formatea una fecha-calendario "YYYY-MM-DD" (columna `date`, sin hora) como
-// "DD/MM/YYYY" sin pasar por new Date()/TZ â€” evita el corrimiento de un dÃ­a
-// que darÃ­a tratarla como timestamp UTC.
+// "DD/MM/YYYY" sin pasar por new Date()/TZ — evita el corrimiento de un día
+// que daría tratarla como timestamp UTC.
 function fmtYmd(ymd: string): string {
   const [y, m, d] = ymd.split('-');
   return `${d}/${m}/${y}`;
@@ -311,7 +311,7 @@ function lastOfMonthIso(): string {
   return `${y}-${String(m).padStart(2, '0')}-${String(last).padStart(2, '0')}`;
 }
 
-// â”€â”€â”€ KPI Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── KPI Card ───────────────────────────────────────────────────────────────
 
 function KpiCard({ value, label }: { value: string; label: string }) {
   return (
@@ -326,7 +326,7 @@ function KpiCard({ value, label }: { value: string; label: string }) {
   );
 }
 
-// â”€â”€â”€ Combobox: buscar socio â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Combobox: buscar socio ─────────────────────────────────────────────────
 
 function SocioCombobox({
   socios,
@@ -366,7 +366,7 @@ function SocioCombobox({
       <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400" />
       <input
         className={`${inputCls} pl-9`}
-        placeholder="Buscar por nombre, razÃ³n social, CUIT/DNI, NÂº de socio, direcciÃ³n o embarcaciÃ³n..."
+        placeholder="Buscar por nombre, razón social, CUIT/DNI, Nº de socio, dirección o embarcación..."
         value={open ? query : (seleccionado?.nombre ?? '')}
         onFocus={() => {
           setOpen(true);
@@ -402,7 +402,7 @@ function SocioCombobox({
   );
 }
 
-// â”€â”€â”€ Modal: Nuevo comprobante â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Modal: Nuevo comprobante ───────────────────────────────────────────────
 
 function NuevaFacturaModal({
   open,
@@ -418,7 +418,7 @@ function NuevaFacturaModal({
   facturas: Factura[];
 }) {
   const router = useRouter();
-  // Notas de crÃ©dito/dÃ©bito integradas al mismo modal: si el Tipo de
+  // Notas de crédito/débito integradas al mismo modal: si el Tipo de
   // comprobante elegido es NC/ND, el formulario cambia al de la nota
   // (relacionada a un comprobante emitido, o libre sin comprobante de origen).
   const [modoNota, setModoNota] = useState<{ esNc: boolean } | null>(null);
@@ -484,15 +484,15 @@ function NuevaFacturaModal({
     [movimientos, selectedMovs],
   );
   // Mismo criterio que alicuotaPara() en facturacion.ts: Factura C
-  // (Monotributo) no discrimina IVA, A/B sÃ­, siempre al 21%.
+  // (Monotributo) no discrimina IVA, A/B sí, siempre al 21%.
   const alicuotaSeleccionada = form.tipoFactura === 'factura_c' ? 0 : 21;
   const netoSeleccionado =
     alicuotaSeleccionada > 0
       ? totalSeleccionado / (1 + alicuotaSeleccionada / 100)
       : totalSeleccionado;
 
-  // â”€â”€ Derivados del modo nota â”€â”€
-  // Elegibles para NC/ND relacionada: mismas condiciones que el botÃ³n de la
+  // ── Derivados del modo nota ──
+  // Elegibles para NC/ND relacionada: mismas condiciones que el botón de la
   // fila de la tabla (factura fiscal A/B/C con CAE), del socio elegido.
   const facturasDelSocio = useMemo(
     () =>
@@ -509,7 +509,7 @@ function NuevaFacturaModal({
     [facturas, form.socioId],
   );
   const notaFacturaSel = facturasDelSocio.find((f) => f.id === notaFacturaId) ?? null;
-  // "AnulaciÃ³n total" solo tiene sentido para NC relacionada a un comprobante.
+  // "Anulación total" solo tiene sentido para NC relacionada a un comprobante.
   const notaMotivoOpts = useMemo(
     () =>
       modoNota && modoNota.esNc && notaRelacionada
@@ -633,7 +633,7 @@ function NuevaFacturaModal({
         setError(res.error);
       } else {
         setSuccess(
-          `Comprobante emitido ${res.comprobanteNro ?? ''}${res.folioLocal ? ` Â· ${res.folioLocal}` : ''}`,
+          `Comprobante emitido ${res.comprobanteNro ?? ''}${res.folioLocal ? ` · ${res.folioLocal}` : ''}`,
         );
         setTimeout(() => {
           handleClose();
@@ -654,7 +654,7 @@ function NuevaFacturaModal({
               Nuevo comprobante
             </h2>
             <p className="mt-0.5 text-sm" style={{ color: '#669E9D' }}>
-              EmitÃ­ un comprobante tomando los movimientos pendientes del socio
+              Emití un comprobante tomando los movimientos pendientes del socio
             </p>
           </div>
           <button
@@ -723,7 +723,7 @@ function NuevaFacturaModal({
                     className="mb-1.5 block text-xs font-semibold"
                     style={{ color: '#101828' }}
                   >
-                    NÃºmero documento (DNI / CUIT / CUIL)
+                    Número documento (DNI / CUIT / CUIL)
                   </label>
                   <input
                     className={`${inputCls} cursor-not-allowed bg-gray-50 text-gray-500`}
@@ -745,7 +745,7 @@ function NuevaFacturaModal({
                       <p className="text-xs text-gray-400">
                         {loadingMovs
                           ? 'Cargando...'
-                          : `${selectedMovs.size} de ${movimientos.length} seleccionados â€” Total ${fmtMoney(totalSeleccionado)}`}
+                          : `${selectedMovs.size} de ${movimientos.length} seleccionados — Total ${fmtMoney(totalSeleccionado)}`}
                       </p>
                     </div>
                     {movimientos.length > 0 && (
@@ -804,9 +804,9 @@ function NuevaFacturaModal({
                   >
                     Tipo de comprobante
                   </label>
-                  {/* Elegible entre los tipos vÃ¡lidos segÃºn la condiciÃ³n IVA del
-                  club; al elegir socio se preselecciona el sugerido segÃºn la
-                  condiciÃ³n del socio. NC/ND cambian el formulario al de la
+                  {/* Elegible entre los tipos válidos según la condición IVA del
+                  club; al elegir socio se preselecciona el sugerido según la
+                  condición del socio. NC/ND cambian el formulario al de la
                   nota (relacionada o sin comprobante de origen). */}
                   <select
                     className={inputCls}
@@ -832,8 +832,8 @@ function NuevaFacturaModal({
                         {o.label}
                       </option>
                     ))}
-                    <option value="nota_credito">Nota de crÃ©dito</option>
-                    <option value="nota_debito">Nota de dÃ©bito</option>
+                    <option value="nota_credito">Nota de crédito</option>
+                    <option value="nota_debito">Nota de débito</option>
                   </select>
                 </div>
                 {!modoNota && (
@@ -842,7 +842,7 @@ function NuevaFacturaModal({
                       className="mb-1.5 block text-xs font-semibold"
                       style={{ color: '#101828' }}
                     >
-                      CondiciÃ³n de venta*
+                      Condición de venta*
                     </label>
                     <select
                       className={inputCls}
@@ -904,7 +904,7 @@ function NuevaFacturaModal({
                       </div>
                       {!form.socioId ? (
                         <p className="px-4 py-6 text-center text-sm text-gray-400">
-                          ElegÃ­ un socio para ver sus comprobantes.
+                          Elegí un socio para ver sus comprobantes.
                         </p>
                       ) : facturasDelSocio.length === 0 ? (
                         <p className="px-4 py-6 text-center text-sm text-gray-400">
@@ -974,7 +974,7 @@ function NuevaFacturaModal({
                         Importe {modoNota.esNc ? 'a acreditar' : 'a debitar'}
                         {notaRelacionada && notaFacturaSel && (
                           <span className="ml-1 font-normal text-gray-400">
-                            (mÃ¡x. {fmtMoney(notaFacturaSel.importe)})
+                            (máx. {fmtMoney(notaFacturaSel.importe)})
                           </span>
                         )}
                       </label>
@@ -992,12 +992,12 @@ function NuevaFacturaModal({
 
               <div>
                 <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
-                  DescripciÃ³n <span className="font-normal text-gray-400">(opcional)</span>
+                  Descripción <span className="font-normal text-gray-400">(opcional)</span>
                 </label>
                 <input
                   className={inputCls}
                   placeholder={
-                    modoNota ? 'Se auto-genera si se deja vacÃ­o' : 'Detalle del comprobante'
+                    modoNota ? 'Se auto-genera si se deja vacío' : 'Detalle del comprobante'
                   }
                   value={form.descripcion}
                   onChange={set('descripcion')}
@@ -1059,7 +1059,7 @@ function NuevaFacturaModal({
                         className="mb-1.5 block text-xs font-semibold"
                         style={{ color: '#101828' }}
                       >
-                        PerÃ­odo desde*
+                        Período desde*
                       </label>
                       <input
                         type="date"
@@ -1073,7 +1073,7 @@ function NuevaFacturaModal({
                         className="mb-1.5 block text-xs font-semibold"
                         style={{ color: '#101828' }}
                       >
-                        PerÃ­odo hasta*
+                        Período hasta*
                       </label>
                       <input
                         type="date"
@@ -1150,7 +1150,7 @@ function NuevaFacturaModal({
   );
 }
 
-// â”€â”€â”€ Modal: Comprobante interno manual â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Modal: Comprobante interno manual ─────────────────────────────────────
 
 function ComprobanteInternoManualModal({
   open,
@@ -1163,7 +1163,7 @@ function ComprobanteInternoManualModal({
 }) {
   const router = useRouter();
   // Mismo flujo por pasos que "Nueva cobranza": primero elegir el socio en una
-  // lista amplia con buscador, despuÃ©s la fecha y los cargos a consolidar.
+  // lista amplia con buscador, después la fecha y los cargos a consolidar.
   const [step, setStep] = useState<'socio' | 'detalle'>('socio');
   const [query, setQuery] = useState('');
   const [socioId, setSocioId] = useState('');
@@ -1284,7 +1284,7 @@ function ComprobanteInternoManualModal({
             </h2>
             <p className="mt-0.5 text-sm" style={{ color: '#669E9D' }}>
               {step === 'socio'
-                ? 'ElegÃ­ el socio para consolidar sus cargos Interno pendientes'
+                ? 'Elegí el socio para consolidar sus cargos Interno pendientes'
                 : `Socio: ${socioNombre}`}
             </p>
           </div>
@@ -1298,7 +1298,7 @@ function ComprobanteInternoManualModal({
         <div className="border-t border-gray-200" />
 
         <div className="flex-1 space-y-4 overflow-y-auto p-6">
-          {/* Paso 1: elegir socio â€” mismo diseÃ±o que "Nueva cobranza". */}
+          {/* Paso 1: elegir socio — mismo diseño que "Nueva cobranza". */}
           {step === 'socio' && (
             <>
               <div className="relative">
@@ -1306,7 +1306,7 @@ function ComprobanteInternoManualModal({
                 <input
                   autoFocus
                   className={`${inputCls} pl-9`}
-                  placeholder="Buscar por nombre, razÃ³n social, CUIT/DNI, NÂº de socio, direcciÃ³n o embarcaciÃ³nâ€¦"
+                  placeholder="Buscar por nombre, razón social, CUIT/DNI, Nº de socio, dirección o embarcación…"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                 />
@@ -1358,7 +1358,7 @@ function ComprobanteInternoManualModal({
                   <p className="text-xs text-gray-400">
                     {loadingMovs
                       ? 'Cargando...'
-                      : `${selectedMovs.size} de ${movimientos.length} seleccionados â€” Total ${fmtMoney(totalSeleccionado)}`}
+                      : `${selectedMovs.size} de ${movimientos.length} seleccionados — Total ${fmtMoney(totalSeleccionado)}`}
                   </p>
                 </div>
                 {movimientos.length > 0 && (
@@ -1448,7 +1448,7 @@ function ComprobanteInternoManualModal({
                   onClick={volverASocio}
                   className="flex-1 rounded-[10px] border border-[#d1d5dc] bg-white py-2.5 text-sm font-medium text-[#364153] transition hover:bg-gray-50"
                 >
-                  AtrÃ¡s
+                  Atrás
                 </button>
                 <button
                   onClick={handleSubmit}
@@ -1467,12 +1467,12 @@ function ComprobanteInternoManualModal({
   );
 }
 
-// â”€â”€â”€ Modal: Factura en lote â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Modal: Factura en lote ─────────────────────────────────────────────────
 
 const CONCEPTO_OPTS: { value: string; label: string }[] = [
   { value: 'espacio_guarda', label: 'Espacio de guarda' },
   { value: 'cuota_social', label: 'Cuota social' },
-  { value: 'membresia', label: 'MembresÃ­a' },
+  { value: 'membresia', label: 'Membresía' },
   { value: 'expensas_ordinarias', label: 'Expensas ordinarias' },
   { value: 'expensas_extraordinarias', label: 'Expensas extraordinarias' },
   { value: 'servicio_extra', label: 'Servicios extra' },
@@ -1495,7 +1495,7 @@ function LoteModal({
   });
   // null = todos los conceptos; set = solo esos
   const [filterTipos, setFilterTipos] = useState<Set<string> | null>(null);
-  // deselected: movimientos que el usuario desmarcÃ³ explÃ­citamente (por defecto todo estÃ¡ seleccionado)
+  // deselected: movimientos que el usuario desmarcó explícitamente (por defecto todo está seleccionado)
   const [deselected, setDeselected] = useState<Map<string, Set<string>>>(() => new Map());
   const [expandedSocios, setExpandedSocios] = useState<Set<string>>(() => new Set());
   const [error, setError] = useState<string | null>(null);
@@ -1617,7 +1617,7 @@ function LoteModal({
 
   function handleSubmit() {
     if (sociosConSel === 0) {
-      setError('SeleccionÃ¡ al menos un movimiento para emitir.');
+      setError('Seleccioná al menos un movimiento para emitir.');
       return;
     }
     setError(null);
@@ -1658,7 +1658,7 @@ function LoteModal({
               Factura en lote
             </h2>
             <p className="mt-0.5 text-sm" style={{ color: '#669E9D' }}>
-              EmitÃ­ un comprobante por cada socio con movimientos pendientes
+              Emití un comprobante por cada socio con movimientos pendientes
             </p>
           </div>
           <button
@@ -1745,7 +1745,7 @@ function LoteModal({
                       Socios con pendientes ({elegibles.length})
                     </p>
                     <p className="text-xs text-gray-400">
-                      Seleccionados: {sociosConSel} â€” Total: {fmtMoney(totalSeleccionado)}
+                      Seleccionados: {sociosConSel} — Total: {fmtMoney(totalSeleccionado)}
                     </p>
                   </div>
                   {elegibles.length > 0 && (
@@ -1869,7 +1869,7 @@ function LoteModal({
                       const socio = socios.find((s) => s.id === f.socioId);
                       return (
                         <li key={f.socioId}>
-                          â€¢ {socio?.nombre ?? f.socioId}: {f.error}
+                          • {socio?.nombre ?? f.socioId}: {f.error}
                         </li>
                       );
                     })}
@@ -1907,7 +1907,7 @@ function LoteModal({
   );
 }
 
-// â”€â”€â”€ Modal: Comprobante interno por lote â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Modal: Comprobante interno por lote ────────────────────────────────────
 
 function ComprobanteInternoLoteModal({
   open,
@@ -1920,7 +1920,7 @@ function ComprobanteInternoLoteModal({
 }) {
   const router = useRouter();
   const [fecha, setFecha] = useState(todayIso);
-  // deselected: movimientos que el usuario desmarcÃ³ explÃ­citamente (por defecto todo estÃ¡ seleccionado)
+  // deselected: movimientos que el usuario desmarcó explícitamente (por defecto todo está seleccionado)
   const [deselected, setDeselected] = useState<Map<string, Set<string>>>(() => new Map());
   const [expandedSocios, setExpandedSocios] = useState<Set<string>>(() => new Set());
   const [error, setError] = useState<string | null>(null);
@@ -2006,7 +2006,7 @@ function ComprobanteInternoLoteModal({
 
   function handleSubmit() {
     if (sociosConSel === 0) {
-      setError('SeleccionÃ¡ al menos un cargo para emitir.');
+      setError('Seleccioná al menos un cargo para emitir.');
       return;
     }
     setError(null);
@@ -2043,7 +2043,7 @@ function ComprobanteInternoLoteModal({
               Comprobante interno por lote
             </h2>
             <p className="mt-0.5 text-sm" style={{ color: '#669E9D' }}>
-              EmitÃ­ un comprobante interno por cada socio con cargos Interno pendientes
+              Emití un comprobante interno por cada socio con cargos Interno pendientes
             </p>
           </div>
           <button
@@ -2077,7 +2077,7 @@ function ComprobanteInternoLoteModal({
                       Socios con cargos internos ({sociosInterno.length})
                     </p>
                     <p className="text-xs text-gray-400">
-                      Seleccionados: {sociosConSel} â€” Total: {fmtMoney(totalSeleccionado)}
+                      Seleccionados: {sociosConSel} — Total: {fmtMoney(totalSeleccionado)}
                     </p>
                   </div>
                   {sociosInterno.length > 0 && (
@@ -2199,7 +2199,7 @@ function ComprobanteInternoLoteModal({
                       const socio = sociosInterno.find((s) => s.id === f.socioId);
                       return (
                         <li key={f.socioId}>
-                          â€¢ {socio?.nombre ?? f.socioId}: {f.error}
+                          • {socio?.nombre ?? f.socioId}: {f.error}
                         </li>
                       );
                     })}
@@ -2237,7 +2237,7 @@ function ComprobanteInternoLoteModal({
   );
 }
 
-// â”€â”€â”€ Modal: marcar pagada â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Modal: marcar pagada ───────────────────────────────────────────────────
 
 function MarcarPagadaModal({
   open,
@@ -2329,15 +2329,15 @@ function MarcarPagadaModal({
   );
 }
 
-// â”€â”€â”€ Modal: nota de crÃ©dito â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Modal: nota de crédito ────────────────────────────────────────────────
 
 const MOTIVO_OPTS: { value: MotivoNota; label: string }[] = Object.entries(MOTIVO_NOTA_LABEL).map(
   ([value, label]) => ({ value: value as MotivoNota, label }),
 );
 
-// "AnulaciÃ³n total" auto-completa el importe = al de la factura original â€”
+// "Anulación total" auto-completa el importe = al de la factura original —
 // solo tiene sentido para NC asociada. En ND (y en el camino libre) no se
-// ofrece: no existe la nociÃ³n de "anular totalmente" cobrando de mÃ¡s.
+// ofrece: no existe la noción de "anular totalmente" cobrando de más.
 function motivoOptsPara(esNc: boolean) {
   return esNc ? MOTIVO_OPTS : MOTIVO_OPTS.filter((o) => o.value !== 'anulacion_total');
 }
@@ -2354,7 +2354,7 @@ function NcNdToggle({ esNc, onChange }: { esNc: boolean; onChange: (esNc: boolea
             : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
         }`}
       >
-        Nota de CrÃ©dito
+        Nota de Crédito
       </button>
       <button
         type="button"
@@ -2365,7 +2365,7 @@ function NcNdToggle({ esNc, onChange }: { esNc: boolean; onChange: (esNc: boolea
             : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
         }`}
       >
-        Nota de DÃ©bito
+        Nota de Débito
       </button>
     </div>
   );
@@ -2440,10 +2440,10 @@ function NotaCreditoModal({
         <div className="flex items-start justify-between p-6 pb-4">
           <div>
             <h2 className="text-[18px] font-bold" style={{ color: '#101828' }}>
-              Emitir {esNc ? 'Nota de CrÃ©dito' : 'Nota de DÃ©bito'}
+              Emitir {esNc ? 'Nota de Crédito' : 'Nota de Débito'}
             </h2>
             <p className="mt-0.5 text-sm" style={{ color: '#669E9D' }}>
-              Comprobante {factura.codigo ?? factura.id.slice(0, 8)} â€” {fmtMoney(factura.importe)}
+              Comprobante {factura.codigo ?? factura.id.slice(0, 8)} — {fmtMoney(factura.importe)}
             </p>
           </div>
           <button
@@ -2526,13 +2526,13 @@ function NotaCreditoModal({
                   >
                     Importe {esNc ? 'a acreditar' : 'a debitar'}
                     <span className="ml-1 font-normal text-gray-400">
-                      (mÃ¡x. {fmtMoney(factura.importe)})
+                      (máx. {fmtMoney(factura.importe)})
                     </span>
                   </label>
                   <input
                     className={inputCls}
                     inputMode="decimal"
-                    placeholder={`0,00 (mÃ¡x ${importeOriginal.toFixed(2)})`}
+                    placeholder={`0,00 (máx ${importeOriginal.toFixed(2)})`}
                     value={importe}
                     onChange={(e) => setImporte(e.target.value)}
                   />
@@ -2541,11 +2541,11 @@ function NotaCreditoModal({
 
               <div>
                 <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
-                  DescripciÃ³n (opcional)
+                  Descripción (opcional)
                 </label>
                 <input
                   className={inputCls}
-                  placeholder="Se auto-genera si se deja vacÃ­o"
+                  placeholder="Se auto-genera si se deja vacío"
                   value={descripcion}
                   onChange={(e) => setDescripcion(e.target.value)}
                 />
@@ -2584,10 +2584,10 @@ function NotaCreditoModal({
   );
 }
 
-// â”€â”€â”€ Modal: nota de crÃ©dito interna (sobre un Comprobante interno CM-/CL-) â”€â”€
+// ─── Modal: nota de crédito interna (sobre un Comprobante interno CM-/CL-) ──
 //
 // Mismo molde que NotaCreditoModal pero sin NcNdToggle (solo NC, no hay ND
-// interna) y sin nada de TusFacturas (no hay CAE ni PDF que descargar â€” el
+// interna) y sin nada de TusFacturas (no hay CAE ni PDF que descargar — el
 // comprobante se ve/imprime en /ventas/recibo/[id] como cualquier CM-/CL-).
 
 function NotaCreditoInternaModal({
@@ -2647,10 +2647,10 @@ function NotaCreditoInternaModal({
         <div className="flex items-start justify-between p-6 pb-4">
           <div>
             <h2 className="text-[18px] font-bold" style={{ color: '#101828' }}>
-              Emitir Nota de CrÃ©dito interna
+              Emitir Nota de Crédito interna
             </h2>
             <p className="mt-0.5 text-sm" style={{ color: '#669E9D' }}>
-              Comprobante {factura.codigo ?? factura.id.slice(0, 8)} â€” {fmtMoney(factura.importe)}
+              Comprobante {factura.codigo ?? factura.id.slice(0, 8)} — {fmtMoney(factura.importe)}
             </p>
           </div>
           <button
@@ -2710,13 +2710,13 @@ function NotaCreditoInternaModal({
                   >
                     Importe a acreditar
                     <span className="ml-1 font-normal text-gray-400">
-                      (mÃ¡x. {fmtMoney(factura.importe)})
+                      (máx. {fmtMoney(factura.importe)})
                     </span>
                   </label>
                   <input
                     className={inputCls}
                     inputMode="decimal"
-                    placeholder={`0,00 (mÃ¡x ${importeOriginal.toFixed(2)})`}
+                    placeholder={`0,00 (máx ${importeOriginal.toFixed(2)})`}
                     value={importe}
                     onChange={(e) => setImporte(e.target.value)}
                   />
@@ -2725,11 +2725,11 @@ function NotaCreditoInternaModal({
 
               <div>
                 <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
-                  DescripciÃ³n (opcional)
+                  Descripción (opcional)
                 </label>
                 <input
                   className={inputCls}
-                  placeholder="Se auto-genera si se deja vacÃ­o"
+                  placeholder="Se auto-genera si se deja vacío"
                   value={descripcion}
                   onChange={(e) => setDescripcion(e.target.value)}
                 />
@@ -2768,10 +2768,10 @@ function NotaCreditoInternaModal({
   );
 }
 
-// â”€â”€â”€ Modal: reenviar factura rechazada por ARCA â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Modal: reenviar factura rechazada por ARCA ────────────────────────────
 
-// Recibe `factura` no-nulable a propÃ³sito: el padre solo la monta cuando hay
-// una seleccionada, con `key={factura.id}` â€” asÃ­ el estado se inicializa de
+// Recibe `factura` no-nulable a propósito: el padre solo la monta cuando hay
+// una seleccionada, con `key={factura.id}` — así el estado se inicializa de
 // nuevo (precargado) en cada apertura, sin necesitar un efecto que copie
 // props a state.
 function ReenviarFacturaModal({
@@ -2785,8 +2785,8 @@ function ReenviarFacturaModal({
 }) {
   const router = useRouter();
   const hoy = new Date().toISOString().slice(0, 10);
-  // Si el tipo original no es emisible por la condiciÃ³n IVA actual del club
-  // (ej. cambiÃ³ de Monotributo a RI), arrancar en el primero vÃ¡lido.
+  // Si el tipo original no es emisible por la condición IVA actual del club
+  // (ej. cambió de Monotributo a RI), arrancar en el primero válido.
   const opcionesTipo = tiposFacturaEmisibles(guarderiaCondicionIva);
   const [tipoFactura, setTipoFactura] = useState(
     opcionesTipo.some((o) => o.value === factura.tipoFactura)
@@ -2923,7 +2923,7 @@ function ReenviarFacturaModal({
                     className="mb-1.5 block text-xs font-semibold"
                     style={{ color: '#101828' }}
                   >
-                    CondiciÃ³n de venta
+                    Condición de venta
                   </label>
                   <select
                     className={inputCls}
@@ -2960,19 +2960,19 @@ function ReenviarFacturaModal({
 
               <div>
                 <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
-                  DescripciÃ³n (opcional)
+                  Descripción (opcional)
                 </label>
                 <input
                   className={inputCls}
-                  placeholder="Se auto-genera si se deja vacÃ­o"
+                  placeholder="Se auto-genera si se deja vacío"
                   value={descripcion}
                   onChange={(e) => setDescripcion(e.target.value)}
                 />
               </div>
 
               <p className="text-xs text-gray-400">
-                Los cargos incluidos son los mismos del intento original â€” no se vuelven a elegir.
-                Si el error era del socio (CUIT, condiciÃ³n de IVA), corregilo en su perfil antes de
+                Los cargos incluidos son los mismos del intento original — no se vuelven a elegir.
+                Si el error era del socio (CUIT, condición de IVA), corregilo en su perfil antes de
                 reenviar.
               </p>
 
@@ -3009,7 +3009,7 @@ function ReenviarFacturaModal({
   );
 }
 
-// â”€â”€â”€ Modal: nota de crÃ©dito en lote (anulaciÃ³n total) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Modal: nota de crédito en lote (anulación total) ─────────────────────
 
 type LoteNcResultado = { codigo: string; ok: boolean; mensaje: string };
 
@@ -3038,7 +3038,7 @@ function LoteNotaCreditoModal({
     for (let i = 0; i < facturas.length; i++) {
       const f = facturas[i];
       setProgreso(i);
-      // Cada NC es una emisiÃ³n AFIP real â†’ secuencial. Si una falla, se sigue.
+      // Cada NC es una emisión AFIP real → secuencial. Si una falla, se sigue.
       const r = await emitirNotaCreditoAction({
         facturaOriginalId: f.id,
         motivo: 'anulacion_total',
@@ -3049,7 +3049,7 @@ function LoteNotaCreditoModal({
         ok: !r.error,
         mensaje:
           r.error ??
-          `NC ${r.comprobanteNro ?? 'emitida'}${r.folioLocal ? ` Â· ${r.folioLocal}` : ''}`,
+          `NC ${r.comprobanteNro ?? 'emitida'}${r.folioLocal ? ` · ${r.folioLocal}` : ''}`,
       });
     }
     setProgreso(facturas.length);
@@ -3059,7 +3059,7 @@ function LoteNotaCreditoModal({
   }
 
   function handleClose() {
-    if (running) return; // no cerrar a mitad de emisiÃ³n
+    if (running) return; // no cerrar a mitad de emisión
     setProgreso(0);
     setResultados(null);
     onClose();
@@ -3074,10 +3074,10 @@ function LoteNotaCreditoModal({
         <div className="flex items-start justify-between p-6 pb-4">
           <div>
             <h2 className="text-[18px] font-bold" style={{ color: '#101828' }}>
-              Anular en lote (Nota de CrÃ©dito)
+              Anular en lote (Nota de Crédito)
             </h2>
             <p className="mt-0.5 text-sm" style={{ color: '#669E9D' }}>
-              {facturas.length} comprobante{facturas.length === 1 ? '' : 's'} â€” Total{' '}
+              {facturas.length} comprobante{facturas.length === 1 ? '' : 's'} — Total{' '}
               {fmtMoney(total.toFixed(2))}
             </p>
           </div>
@@ -3097,8 +3097,8 @@ function LoteNotaCreditoModal({
               <div className="flex items-start gap-2 rounded-[10px] bg-amber-50 p-3 text-sm text-amber-800">
                 <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
                 <span>
-                  Se va a emitir una <strong>nota de crÃ©dito por el total</strong> de cada factura
-                  seleccionada (anulaciÃ³n total). Es una emisiÃ³n real a ARCA y revierte la cuenta
+                  Se va a emitir una <strong>nota de crédito por el total</strong> de cada factura
+                  seleccionada (anulación total). Es una emisión real a ARCA y revierte la cuenta
                   corriente del socio. No se puede deshacer.
                 </span>
               </div>
@@ -3106,7 +3106,7 @@ function LoteNotaCreditoModal({
                 {facturas.map((f) => (
                   <div key={f.id} className="flex justify-between text-sm">
                     <span className="text-gray-600">
-                      {f.codigo ?? f.id.slice(0, 8)} Â· {f.socioNombre}
+                      {f.codigo ?? f.id.slice(0, 8)} · {f.socioNombre}
                     </span>
                     <span className="font-medium text-gray-700">{fmtMoney(f.importe)}</span>
                   </div>
@@ -3118,7 +3118,7 @@ function LoteNotaCreditoModal({
           {running && (
             <div className="flex flex-col items-center gap-2 py-6">
               <p className="text-sm font-medium text-gray-700">
-                Emitiendo {Math.min(progreso + 1, facturas.length)} de {facturas.length}â€¦
+                Emitiendo {Math.min(progreso + 1, facturas.length)} de {facturas.length}…
               </p>
               <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100">
                 <div
@@ -3185,7 +3185,7 @@ function LoteNotaCreditoModal({
                 className="flex-1 rounded-[10px] py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
                 style={{ background: '#175861' }}
               >
-                {running ? 'Emitiendoâ€¦' : `Emitir ${facturas.length} NC`}
+                {running ? 'Emitiendo…' : `Emitir ${facturas.length} NC`}
               </button>
             </div>
           )}
@@ -3195,7 +3195,7 @@ function LoteNotaCreditoModal({
   );
 }
 
-// â”€â”€â”€ Componente principal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Componente principal ──────────────────────────────────────────────────
 
 export function VentasClient({
   facturas,
@@ -3228,7 +3228,7 @@ export function VentasClient({
   const [ncFactura, setNcFactura] = useState<Factura | null>(null);
   const [ncInternaComprobante, setNcInternaComprobante] = useState<Factura | null>(null);
   const [reenviarFactura, setReenviarFactura] = useState<Factura | null>(null);
-  // SelecciÃ³n para NC en lote (anulaciÃ³n total) sobre la tabla AFIP.
+  // Selección para NC en lote (anulación total) sobre la tabla AFIP.
   const [selectedNc, setSelectedNc] = useState<Set<string>>(() => new Set());
   const [loteNcOpen, setLoteNcOpen] = useState(false);
 
@@ -3238,7 +3238,7 @@ export function VentasClient({
   );
   const hasFiltrosRecibos = Boolean(search || filterDesde || filterHasta);
 
-  // Tabla AFIP/NC â€” excluye recibos
+  // Tabla AFIP/NC — excluye recibos
   const filtradosAfip = useMemo(() => {
     return facturas
       .filter((f) => f.tipoFactura !== 'recibo')
@@ -3267,7 +3267,7 @@ export function VentasClient({
       });
   }, [facturas, search, filterEstado, filterTipo, filterDesde, filterHasta]);
 
-  // NC en lote: una factura es elegible si es AFIP (A/B/C), tiene CAE y todavÃ­a
+  // NC en lote: una factura es elegible si es AFIP (A/B/C), tiene CAE y todavía
   // no tiene una NC asociada (otra factura cuyo facturaOriginalId la apunta).
   const facturasConNc = useMemo(
     () =>
@@ -3292,8 +3292,8 @@ export function VentasClient({
   );
 
   // El link de PDF que devuelve TusFacturas al emitir es temporal y vence
-  // (su pÃ¡gina muestra "no se ha encontrado informaciÃ³n..."). Pedimos uno
-  // fresco en cada click. La pestaÃ±a se abre ANTES del await para que el
+  // (su página muestra "no se ha encontrado información..."). Pedimos uno
+  // fresco en cada click. La pestaña se abre ANTES del await para que el
   // bloqueador de popups no la frene.
   async function abrirPdfFactura(f: Factura) {
     const win = window.open('about:blank', '_blank');
@@ -3322,8 +3322,8 @@ export function VentasClient({
     });
   }
 
-  // Tabla Recibos internos â€” incluye las NC internas (anulan un CM-/CL- de
-  // acÃ¡ mismo, tiene sentido verlas al lado de lo que referencian).
+  // Tabla Recibos internos — incluye las NC internas (anulan un CM-/CL- de
+  // acá mismo, tiene sentido verlas al lado de lo que referencian).
   const filtradosRecibos = useMemo(() => {
     return facturas
       .filter((f) => f.tipoFactura === 'recibo' || f.tipoFactura === 'nota_credito_interna')
@@ -3342,7 +3342,7 @@ export function VentasClient({
       });
   }, [facturas, search, filterDesde, filterHasta]);
 
-  // PaginaciÃ³n (10 por pÃ¡gina). Reset a la pÃ¡gina 1 al cambiar de tab o de
+  // Paginación (10 por página). Reset a la página 1 al cambiar de tab o de
   // filtros: ajuste de estado en render (key previa), no setState en useEffect.
   const PAGE_SIZE = 10;
   const [page, setPage] = useState(1);
@@ -3374,19 +3374,19 @@ export function VentasClient({
   }
 
   function exportarCSV() {
-    const BOM = 'ï»¿';
+    const BOM = '﻿';
     const esc = (v: string) => `"${v.replace(/"/g, '""')}"`;
     if (activeTab === 'afip') {
       const cols = [
-        'NÃºmero',
-        'FL NÂº',
+        'Número',
+        'FL Nº',
         'Tipo',
         'Cliente',
         'Fecha',
         'Vencimiento',
         'Total',
         'Estado',
-        'DescripciÃ³n',
+        'Descripción',
       ];
       const rows = filtradosAfip.map((f) =>
         [
@@ -3412,7 +3412,7 @@ export function VentasClient({
       a.click();
       URL.revokeObjectURL(url);
     } else {
-      const cols = ['NÃºmero', 'Tipo', 'Cliente', 'Fecha', 'Total', 'DescripciÃ³n'];
+      const cols = ['Número', 'Tipo', 'Cliente', 'Fecha', 'Total', 'Descripción'];
       const rows = filtradosRecibos.map((f) =>
         [
           f.codigo ?? '',
@@ -3487,7 +3487,7 @@ export function VentasClient({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="page-title">Ventas</h1>
-          <p className="page-subtitle mt-1">GestiÃ³n de comprobantes y cobros</p>
+          <p className="page-subtitle mt-1">Gestión de comprobantes y cobros</p>
         </div>
         <div className="flex shrink-0 flex-wrap gap-2">
           <DropdownMenu>
@@ -3506,23 +3506,23 @@ export function VentasClient({
                 disabled={!puedeFacturar}
                 title={
                   !puedeFacturar
-                    ? 'ConfigurÃ¡ los datos de facturaciÃ³n y confirmÃ¡ el certificado ARCA para poder facturar.'
+                    ? 'Configurá los datos de facturación y confirmá el certificado ARCA para poder facturar.'
                     : undefined
                 }
                 onSelect={() => setNuevaOpen(true)}
               >
-                FacturaciÃ³n manual
+                Facturación manual
               </DropdownMenuItem>
               <DropdownMenuItem
                 disabled={!puedeFacturar}
                 title={
                   !puedeFacturar
-                    ? 'ConfigurÃ¡ los datos de facturaciÃ³n y confirmÃ¡ el certificado ARCA para poder facturar.'
+                    ? 'Configurá los datos de facturación y confirmá el certificado ARCA para poder facturar.'
                     : undefined
                 }
                 onSelect={() => setLoteOpen(true)}
               >
-                FacturaciÃ³n por lote
+                Facturación por lote
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onSelect={() => setComprobanteInternoOpen(true)}>
@@ -3538,17 +3538,17 @@ export function VentasClient({
 
       {!puedeFacturar && (
         <div className="rounded-[10px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          <strong>EmisiÃ³n bloqueada.</strong>{' '}
+          <strong>Emisión bloqueada.</strong>{' '}
           {!posConfigurado ? (
             <>
-              AndÃ¡ a <strong>Mi perfil â†’ Datos Impositivos</strong> y completÃ¡ los datos del POS
+              Andá a <strong>Mi perfil → Datos Impositivos</strong> y completá los datos del POS
               antes de emitir facturas.
             </>
           ) : (
             <>
-              El certificado de enlace con ARCA todavÃ­a no estÃ¡ confirmado. AndÃ¡ a{' '}
-              <strong>Mi perfil â†’ Datos Impositivos</strong>, solicitÃ¡ el certificado y confirmÃ¡
-              la instalaciÃ³n.
+              El certificado de enlace con ARCA todavía no está confirmado. Andá a{' '}
+              <strong>Mi perfil → Datos Impositivos</strong>, solicitá el certificado y confirmá la
+              instalación.
             </>
           )}
         </div>
@@ -3600,12 +3600,12 @@ export function VentasClient({
       {(activeTab === 'afip' || activeTab === 'recibos') && (
         <div className="rounded-2xl border border-gray-200 bg-white">
           <div className="space-y-3 border-b border-gray-100 p-4">
-            {/* Fila 1: bÃºsqueda + exportar */}
+            {/* Fila 1: búsqueda + exportar */}
             <div className="flex gap-2">
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Buscar por nÃºmero, cliente o descripciÃ³n..."
+                placeholder="Buscar por número, cliente o descripción..."
                 className="h-10 flex-1 rounded-[10px] border border-gray-200 bg-white px-4 text-sm focus:border-[#175861] focus:ring-1 focus:ring-[#175861] focus:outline-none"
               />
               <button
@@ -3639,7 +3639,7 @@ export function VentasClient({
                   >
                     <option value="">Todos los tipos</option>
                     <option value="afip">Facturas ARCA</option>
-                    <option value="nc">Notas de CrÃ©dito</option>
+                    <option value="nc">Notas de Crédito</option>
                   </select>
                 </>
               )}
@@ -3675,7 +3675,7 @@ export function VentasClient({
                 text={
                   hasFiltrosAfip
                     ? 'No se encontraron comprobantes con ese criterio.'
-                    : 'TodavÃ­a no hay comprobantes ARCA emitidos.'
+                    : 'Todavía no hay comprobantes ARCA emitidos.'
                 }
               />
             ) : (
@@ -3699,7 +3699,7 @@ export function VentasClient({
                       onClick={() => setSelectedNc(new Set())}
                       className="text-sm text-gray-500 transition hover:text-gray-700"
                     >
-                      Limpiar selecciÃ³n
+                      Limpiar selección
                     </button>
                   </div>
                 )}
@@ -3720,23 +3720,23 @@ export function VentasClient({
                             onChange={toggleTodosNc}
                           />
                         </th>
-                        <th className="px-4 py-3">NÂº Op. SC</th>
+                        <th className="px-4 py-3">Nº Op. SC</th>
                         <th className="px-4 py-3">Fecha</th>
                         <th className="px-4 py-3">Tipo comprobante</th>
                         <th className="px-4 py-3">Letra</th>
-                        <th className="px-4 py-3">NÃºmero</th>
-                        <th className="px-4 py-3">NÂº Socio</th>
-                        <th className="px-4 py-3">RazÃ³n social</th>
+                        <th className="px-4 py-3">Número</th>
+                        <th className="px-4 py-3">Nº Socio</th>
+                        <th className="px-4 py-3">Razón social</th>
                         <th className="px-4 py-3">CUIT/CUIL</th>
                         <th className="px-4 py-3">Vencimiento</th>
                         <th className="px-4 py-3">CAE</th>
                         <th className="px-4 py-3">Venc. CAE</th>
-                        <th className="px-4 py-3">PerÃ­odo</th>
+                        <th className="px-4 py-3">Período</th>
                         <th className="px-4 py-3 text-right">Neto</th>
                         <th className="px-4 py-3 text-right">Exento</th>
                         <th className="px-4 py-3 text-right">IVA</th>
                         <th className="px-4 py-3 text-right">Total</th>
-                        <th className="px-4 py-3 text-center">Estado envÃ­o</th>
+                        <th className="px-4 py-3 text-center">Estado envío</th>
                         <th className="px-4 py-3 text-center">Estado de cobro</th>
                         <th className="px-4 py-3">Ente emisor</th>
                         <th className="px-4 py-3">CUIT emisor</th>
@@ -3772,30 +3772,28 @@ export function VentasClient({
                             <td className="px-4 py-3 text-gray-500">{f.numeroOperacionSC}</td>
                             <td className="px-4 py-3 text-gray-500">{fmtDate(f.emision)}</td>
                             <td className="px-4 py-3 text-gray-500">
-                              {TIPO_FACTURA_LABEL[f.tipoFactura ?? ''] ?? 'â€”'}
+                              {TIPO_FACTURA_LABEL[f.tipoFactura ?? ''] ?? '—'}
                             </td>
                             <td className="px-4 py-3 text-gray-500">{f.letra}</td>
                             <td className="px-4 py-3 font-medium" style={{ color: '#101828' }}>
-                              {f.codigo ?? 'â€”'}
+                              {f.codigo ?? '—'}
                               {f.folioLocal && (
                                 <div className="text-xs font-normal text-gray-400">
                                   {f.folioLocal}
                                 </div>
                               )}
                             </td>
-                            <td className="px-4 py-3 text-gray-500">
-                              {f.socioNumeroSocio ?? 'â€”'}
-                            </td>
+                            <td className="px-4 py-3 text-gray-500">{f.socioNumeroSocio ?? '—'}</td>
                             <td className="px-4 py-3 font-medium" style={{ color: '#175861' }}>
                               {f.socioRazonSocial}
                             </td>
                             <td className="px-4 py-3 text-gray-500">{f.socioCuitDni}</td>
                             <td className="px-4 py-3 text-gray-500">{fmtDate(f.vencimiento)}</td>
                             <td className="px-4 py-3 font-mono text-xs text-gray-500">
-                              {f.cae ?? 'â€”'}
+                              {f.cae ?? '—'}
                             </td>
                             <td className="px-4 py-3 text-gray-500">
-                              {f.caeVencimiento ? fmtYmd(f.caeVencimiento) : 'â€”'}
+                              {f.caeVencimiento ? fmtYmd(f.caeVencimiento) : '—'}
                             </td>
                             <td className="px-4 py-3 text-xs text-gray-500">
                               {f.desde ? (
@@ -3804,17 +3802,17 @@ export function VentasClient({
                                   <div>Hasta {fmtDate(f.hasta)}</div>
                                 </div>
                               ) : (
-                                'â€”'
+                                '—'
                               )}
                             </td>
                             <td className="px-4 py-3 text-right text-gray-500">
-                              {f.montoNeto ? fmtMoney(f.montoNeto) : 'â€”'}
+                              {f.montoNeto ? fmtMoney(f.montoNeto) : '—'}
                             </td>
                             <td className="px-4 py-3 text-right text-gray-500">
-                              {f.montoExento ? fmtMoney(f.montoExento) : 'â€”'}
+                              {f.montoExento ? fmtMoney(f.montoExento) : '—'}
                             </td>
                             <td className="px-4 py-3 text-right text-gray-500">
-                              {f.montoIva ? fmtMoney(f.montoIva) : 'â€”'}
+                              {f.montoIva ? fmtMoney(f.montoIva) : '—'}
                             </td>
                             <td
                               className="px-4 py-3 text-right font-medium"
@@ -3893,7 +3891,7 @@ export function VentasClient({
                                 f.cae ? (
                                   <button
                                     onClick={() => setNcFactura(f)}
-                                    title="Emitir Nota de CrÃ©dito o DÃ©bito"
+                                    title="Emitir Nota de Crédito o Débito"
                                     className="rounded-[6px] p-1.5 text-gray-400 transition hover:bg-amber-50 hover:text-amber-600"
                                   >
                                     <CornerDownLeft className="h-4 w-4" />
@@ -3922,7 +3920,7 @@ export function VentasClient({
               text={
                 hasFiltrosRecibos
                   ? 'No se encontraron comprobantes con ese criterio.'
-                  : 'TodavÃ­a no hay comprobantes internos emitidos.'
+                  : 'Todavía no hay comprobantes internos emitidos.'
               }
             />
           ) : (
@@ -3931,11 +3929,11 @@ export function VentasClient({
                 <table className="w-full min-w-[1700px] text-sm">
                   <thead>
                     <tr className="bg-gray-50 text-left text-xs font-semibold text-gray-500">
-                      <th className="px-4 py-3">NÃºmero</th>
+                      <th className="px-4 py-3">Número</th>
                       <th className="px-4 py-3">Tipo</th>
-                      <th className="px-4 py-3">NÂº Op. SC</th>
-                      <th className="px-4 py-3">NÂº Socio</th>
-                      <th className="px-4 py-3">RazÃ³n social</th>
+                      <th className="px-4 py-3">Nº Op. SC</th>
+                      <th className="px-4 py-3">Nº Socio</th>
+                      <th className="px-4 py-3">Razón social</th>
                       <th className="px-4 py-3">CUIT/CUIL</th>
                       <th className="px-4 py-3">Fecha</th>
                       <th className="px-4 py-3 text-right">Neto</th>
@@ -3955,24 +3953,24 @@ export function VentasClient({
                         className="border-t border-gray-100 transition hover:bg-gray-50/50"
                       >
                         <td className="px-4 py-3 font-medium" style={{ color: '#101828' }}>
-                          {f.codigo ?? 'â€”'}
+                          {f.codigo ?? '—'}
                         </td>
                         <td className="px-4 py-3 text-gray-500">{tipoComprobanteLabel(f)}</td>
                         <td className="px-4 py-3 text-gray-500">{f.numeroOperacionSC}</td>
-                        <td className="px-4 py-3 text-gray-500">{f.socioNumeroSocio ?? 'â€”'}</td>
+                        <td className="px-4 py-3 text-gray-500">{f.socioNumeroSocio ?? '—'}</td>
                         <td className="px-4 py-3 font-medium" style={{ color: '#175861' }}>
                           {f.socioRazonSocial}
                         </td>
                         <td className="px-4 py-3 text-gray-500">{f.socioCuitDni}</td>
                         <td className="px-4 py-3 text-gray-500">{fmtDate(f.emision)}</td>
                         <td className="px-4 py-3 text-right text-gray-500">
-                          {f.montoNeto ? fmtMoney(f.montoNeto) : 'â€”'}
+                          {f.montoNeto ? fmtMoney(f.montoNeto) : '—'}
                         </td>
                         <td className="px-4 py-3 text-right text-gray-500">
-                          {f.montoExento ? fmtMoney(f.montoExento) : 'â€”'}
+                          {f.montoExento ? fmtMoney(f.montoExento) : '—'}
                         </td>
                         <td className="px-4 py-3 text-right text-gray-500">
-                          {f.montoIva ? fmtMoney(f.montoIva) : 'â€”'}
+                          {f.montoIva ? fmtMoney(f.montoIva) : '—'}
                         </td>
                         <td
                           className="px-4 py-3 text-right font-medium"
@@ -3989,7 +3987,7 @@ export function VentasClient({
                               <button
                                 type="button"
                                 onClick={() => setNcInternaComprobante(f)}
-                                title="Emitir Nota de CrÃ©dito interna"
+                                title="Emitir Nota de Crédito interna"
                                 className="rounded-[6px] p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-[#175861]"
                               >
                                 <CornerDownLeft className="h-4 w-4" />
