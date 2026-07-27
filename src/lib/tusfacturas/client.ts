@@ -154,8 +154,13 @@ export type TusFacturasConsultaResponse = {
   error: 'S' | 'N';
   errores?: string[];
   rta?: string;
-  comprobante_pdf_url?: string;
-  comprobante_ticket_url?: string;
+  // OJO: a diferencia de la emisión (que trae comprobante_pdf_url en la raíz),
+  // la consulta devuelve los datos anidados dentro de `comprobante`.
+  comprobante?: {
+    comprobante_pdf_url?: string;
+    comprobante_ticket_url?: string;
+    [key: string]: unknown;
+  };
   [key: string]: unknown;
 };
 

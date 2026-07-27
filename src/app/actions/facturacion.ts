@@ -1410,17 +1410,18 @@ export async function obtenerPdfFacturaAction(
       },
       credsData.creds,
     );
-    if (!rta.comprobante_pdf_url) {
+    // La consulta anida los datos dentro de `comprobante` (la emisión los trae
+    // en la raíz — por eso el fallback).
+    const pdfUrl =
+      rta.comprobante?.comprobante_pdf_url ?? (rta.comprobante_pdf_url as string | undefined);
+    if (!pdfUrl) {
       return { error: 'TusFacturas no devolvió el PDF de este comprobante.' };
     }
 
     // Refrescar el link guardado, así queda el más nuevo disponible.
-    await db
-      .update(facturacion)
-      .set({ archivo: rta.comprobante_pdf_url })
-      .where(eq(facturacion.id, facturaId));
+    await db.update(facturacion).set({ archivo: pdfUrl }).where(eq(facturacion.id, facturaId));
 
-    return { url: rta.comprobante_pdf_url };
+    return { url: pdfUrl };
   } catch (err) {
     console.error('[obtenerPdfFacturaAction]', facturaId, err);
     return {
