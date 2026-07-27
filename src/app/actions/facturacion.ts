@@ -10,6 +10,7 @@ import {
   facturacion,
   facturacionItemMovimientos,
   facturacionItems,
+  guarderiaCentrosEmisores,
   guarderias,
   memberships,
   movimientosCuentaCorriente,
@@ -113,6 +114,8 @@ export type CreateInvoiceData = {
   movimientoIds?: string[];
   /** Línea libre si no hay movimientos. */
   items?: { descripcion: string; cantidad: number; importeUnitario: number }[];
+  /** Centro emisor (punto de venta) por el que sale. Default: el principal. */
+  centroEmisorId?: string | null;
 };
 
 export type CreateBatchInvoiceData = {
@@ -549,35 +552,18 @@ export async function crearFacturaCore(
   const validacionSocio = validarDocumentoSocio(socio);
   if (validacionSocio) return { error: validacionSocio };
 
-  // 1.b Traer POS + creds propias de la guardería.
+  // 1.b Traer el centro emisor (el elegido o el principal) + sus creds.
   // SIN fallback a env vars: las env vars son las creds master de NauticaApp y
   // solo se usan para dar de alta el POS. Facturar con ellas haría que la
   // factura saliera a nombre de NauticaApp, no de la guardería.
-  const [guarderia] = await db
-    .select({
-      puntoDeVenta: guarderias.puntoDeVenta,
-      rubro: guarderias.rubro,
-      tusfacturasApikey: guarderias.tusfacturasApikey,
-      tusfacturasApitoken: guarderias.tusfacturasApitoken,
-      tusfacturasUsertoken: guarderias.tusfacturasUsertoken,
-      certificadoAfipOk: guarderias.certificadoAfipOk,
-    })
-    .from(guarderias)
-    .where(eq(guarderias.id, gId))
-    .limit(1);
-
-  if (
-    !guarderia ||
-    guarderia.puntoDeVenta == null ||
-    !guarderia.tusfacturasApikey ||
-    !guarderia.tusfacturasApitoken ||
-    !guarderia.tusfacturasUsertoken
-  ) {
+  const credsInfo = await cargarCredsGuarderia(gId, { centroEmisorId: data.centroEmisorId });
+  if (!credsInfo) {
     return {
       error:
         'Esta guardería todavía no tiene los datos impositivos configurados. Andá a Mi perfil → Datos Impositivos y completá los datos antes de facturar.',
     };
   }
+  const { guarderia, centro, creds: credsOverride } = credsInfo;
 
   if (!guarderia.certificadoAfipOk) {
     return {
@@ -586,13 +572,8 @@ export async function crearFacturaCore(
     };
   }
 
-  const puntoVenta = String(guarderia.puntoDeVenta);
+  const puntoVenta = String(centro.puntoDeVenta);
   const rubroGuarderia = guarderia.rubro ?? 'Servicios náuticos';
-  const credsOverride: TusFacturasCredentials = {
-    apikey: guarderia.tusfacturasApikey,
-    apitoken: guarderia.tusfacturasApitoken,
-    usertoken: guarderia.tusfacturasUsertoken,
-  };
 
   // 2. Reservar (TX1): materializar los ítems computados, tomar los cargos
   // legacy, e insertar la factura con sentinel + items + links — todo en una
@@ -734,6 +715,7 @@ export async function crearFacturaCore(
         hasta: fechaCalendariaArg(data.hasta),
         vencimiento: fechaCalendariaArg(data.vencimiento),
         externalReference: facturaId,
+        centroEmisorId: centro.id,
         rechazada: true,
         motivoError: SENTINEL_EMISION,
       });
@@ -897,6 +879,7 @@ export async function reenviarFacturaRechazadaAction(
       rechazada: facturacion.rechazada,
       desde: facturacion.desde,
       hasta: facturacion.hasta,
+      centroEmisorId: facturacion.centroEmisorId,
     })
     .from(facturacion)
     .where(and(eq(facturacion.id, facturaId), eq(facturacion.guarderiaId, gId)))
@@ -979,37 +962,18 @@ export async function reenviarFacturaRechazadaAction(
   const validacionSocio = validarDocumentoSocio(socio);
   if (validacionSocio) return { error: validacionSocio };
 
-  const [guarderia] = await db
-    .select({
-      puntoDeVenta: guarderias.puntoDeVenta,
-      rubro: guarderias.rubro,
-      tusfacturasApikey: guarderias.tusfacturasApikey,
-      tusfacturasApitoken: guarderias.tusfacturasApitoken,
-      tusfacturasUsertoken: guarderias.tusfacturasUsertoken,
-      certificadoAfipOk: guarderias.certificadoAfipOk,
-    })
-    .from(guarderias)
-    .where(eq(guarderias.id, gId))
-    .limit(1);
-
-  if (
-    !guarderia ||
-    guarderia.puntoDeVenta == null ||
-    !guarderia.tusfacturasApikey ||
-    !guarderia.tusfacturasApitoken ||
-    !guarderia.tusfacturasUsertoken
-  ) {
+  // Mismo centro emisor con el que se intentó la emisión original; si la
+  // rechazada es anterior a la existencia de centros emisores, el principal.
+  const credsInfo = await cargarCredsGuarderia(gId, {
+    centroEmisorId: rechazada.centroEmisorId,
+  });
+  if (!credsInfo) {
     return { error: 'Esta guardería todavía no tiene los datos impositivos configurados.' };
   }
+  const { guarderia, centro, creds: credsOverride } = credsInfo;
   if (!guarderia.certificadoAfipOk) {
     return { error: 'El certificado de enlace con ARCA todavía no está confirmado.' };
   }
-
-  const credsOverride: TusFacturasCredentials = {
-    apikey: guarderia.tusfacturasApikey,
-    apitoken: guarderia.tusfacturasApitoken,
-    usertoken: guarderia.tusfacturasUsertoken,
-  };
 
   const cliente = buildCliente({ ...socio, condicionVenta: data.condicionVenta });
   const comprobante: TusFacturasComprobante = {
@@ -1019,7 +983,7 @@ export async function reenviarFacturaRechazadaAction(
     idioma: 1,
     external_reference: facturaId,
     operacion: 'V',
-    punto_venta: String(guarderia.puntoDeVenta),
+    punto_venta: String(centro.puntoDeVenta),
     moneda: 'PES',
     cotizacion: 1,
     periodo_facturado_desde: toTusFecha(rechazada.desde ?? fechaCalendariaArg(data.fecha)),
@@ -1076,6 +1040,8 @@ export async function reenviarFacturaRechazadaAction(
       montoIva: montos.montoIva.toFixed(2),
       emision: fechaCalendariaArg(data.fecha),
       vencimiento: fechaCalendariaArg(data.vencimiento),
+      // Rechazadas anteriores a los centros emisores no lo tenían registrado.
+      centroEmisorId: centro.id,
       rechazada: false,
       motivoError: null,
       updatedAt: new Date(),
@@ -1398,7 +1364,10 @@ export async function obtenerPdfFacturaAction(
     return { error: 'Este comprobante no tiene número de ARCA (puede haber quedado rechazado).' };
   }
 
-  const credsData = await cargarCredsGuarderia(gId);
+  // Creds del centro emisor que emitió este comprobante (el POS va en el
+  // prefijo del codigo) — con varios centros, las del principal no sirven
+  // para consultar un comprobante de otro POS.
+  const credsData = await cargarCredsGuarderia(gId, { puntoVenta: parseInt(pv, 10) });
   if (!credsData) return { error: 'Faltan las credenciales de TusFacturas de la guardería.' };
 
   try {
@@ -2036,36 +2005,68 @@ async function cargarSocioParaFacturar(gId: string, socioId: string) {
   return socio ?? null;
 }
 
-async function cargarCredsGuarderia(gId: string) {
+/**
+ * Datos fiscales de la guardería + el centro emisor (punto de venta) a usar
+ * en una emisión, con sus credenciales de TusFacturas.
+ *
+ * - Sin opts → el centro emisor principal.
+ * - `centroEmisorId` → ese centro, validando que pertenezca a la guardería.
+ * - `puntoVenta` → por número de POS (para NC/ND o PDF de un comprobante ya
+ *   emitido, cuyo POS viene en el prefijo del `codigo`).
+ */
+async function cargarCredsGuarderia(
+  gId: string,
+  opts?: { centroEmisorId?: string | null; puntoVenta?: number | null },
+) {
   const [guarderia] = await db
     .select({
-      puntoDeVenta: guarderias.puntoDeVenta,
       cuit: guarderias.cuit,
       rubro: guarderias.rubro,
       condicionIva: guarderias.condicionIva,
-      tusfacturasApikey: guarderias.tusfacturasApikey,
-      tusfacturasApitoken: guarderias.tusfacturasApitoken,
-      tusfacturasUsertoken: guarderias.tusfacturasUsertoken,
+      certificadoAfipOk: guarderias.certificadoAfipOk,
     })
     .from(guarderias)
     .where(eq(guarderias.id, gId))
     .limit(1);
+  if (!guarderia) return null;
 
-  if (
-    !guarderia?.puntoDeVenta ||
-    !guarderia.tusfacturasApikey ||
-    !guarderia.tusfacturasApitoken ||
-    !guarderia.tusfacturasUsertoken
-  ) {
-    return null;
-  }
+  const filtroCentro = opts?.centroEmisorId
+    ? eq(guarderiaCentrosEmisores.id, opts.centroEmisorId)
+    : opts?.puntoVenta != null
+      ? eq(guarderiaCentrosEmisores.puntoDeVenta, opts.puntoVenta)
+      : eq(guarderiaCentrosEmisores.esPrincipal, true);
+
+  const [centro] = await db
+    .select({
+      id: guarderiaCentrosEmisores.id,
+      nombre: guarderiaCentrosEmisores.nombre,
+      puntoDeVenta: guarderiaCentrosEmisores.puntoDeVenta,
+      apikey: guarderiaCentrosEmisores.apikey,
+      apitoken: guarderiaCentrosEmisores.apitoken,
+      usertoken: guarderiaCentrosEmisores.usertoken,
+    })
+    .from(guarderiaCentrosEmisores)
+    .where(and(eq(guarderiaCentrosEmisores.guarderiaId, gId), filtroCentro))
+    .limit(1);
+
+  if (!centro?.apikey || !centro.apitoken || !centro.usertoken) return null;
 
   const creds: TusFacturasCredentials = {
-    apikey: guarderia.tusfacturasApikey,
-    apitoken: guarderia.tusfacturasApitoken,
-    usertoken: guarderia.tusfacturasUsertoken,
+    apikey: centro.apikey,
+    apitoken: centro.apitoken,
+    usertoken: centro.usertoken,
   };
-  return { guarderia, creds };
+  return {
+    guarderia: {
+      puntoDeVenta: centro.puntoDeVenta,
+      cuit: guarderia.cuit,
+      rubro: guarderia.rubro,
+      condicionIva: guarderia.condicionIva,
+      certificadoAfipOk: guarderia.certificadoAfipOk,
+    },
+    centro: { id: centro.id, nombre: centro.nombre, puntoDeVenta: centro.puntoDeVenta },
+    creds,
+  };
 }
 
 /**
@@ -2195,6 +2196,7 @@ export async function emitirNotaAsociadaAction(
       importe: facturacion.importe,
       socioId: facturacion.socioId,
       condicionVenta: facturacion.condicionVenta,
+      centroEmisorId: facturacion.centroEmisorId,
     })
     .from(facturacion)
     .where(and(eq(facturacion.id, data.facturaOriginalId), eq(facturacion.guarderiaId, gId)))
@@ -2249,9 +2251,17 @@ export async function emitirNotaAsociadaAction(
   const socio = await cargarSocioParaFacturar(gId, original.socioId);
   if (!socio) return { error: 'No se encontró el socio de la factura original.' };
 
-  const credsInfo = await cargarCredsGuarderia(gId);
+  // La nota sale por el MISMO centro emisor que la factura original (ARCA la
+  // asocia por POS+número): se resuelve por el id registrado o, para
+  // facturas anteriores a los centros emisores, por el prefijo del codigo.
+  const credsInfo = await cargarCredsGuarderia(
+    gId,
+    original.centroEmisorId
+      ? { centroEmisorId: original.centroEmisorId }
+      : { puntoVenta: parseInt(puntoVentaStr, 10) },
+  );
   if (!credsInfo) return { error: 'Faltan datos de facturación de la guardería.' };
-  const { guarderia, creds } = credsInfo;
+  const { guarderia, centro, creds } = credsInfo;
 
   // 4. Construir payload
   const condVenta = (original.condicionVenta ?? 'contado') as CondicionVenta;
@@ -2313,6 +2323,7 @@ export async function emitirNotaAsociadaAction(
         emision: new Date(),
         externalReference: notaId,
         facturaOriginalId: data.facturaOriginalId,
+        centroEmisorId: centro.id,
         rechazada: true,
         motivoError,
       });
@@ -2346,6 +2357,7 @@ export async function emitirNotaAsociadaAction(
       emision: new Date(),
       externalReference: notaId,
       facturaOriginalId: data.facturaOriginalId,
+      centroEmisorId: centro.id,
     });
 
     const movimientoId = await registrarMovimientoNota({
@@ -2517,6 +2529,8 @@ export type EmitirNotaLibreData = {
   motivo: MotivoNota;
   importe: number;
   descripcion?: string;
+  /** Centro emisor (punto de venta) por el que sale. Default: el principal. */
+  centroEmisorId?: string | null;
 };
 
 export async function emitirNotaLibreAction(data: EmitirNotaLibreData): Promise<EmitirNotaResult> {
@@ -2533,9 +2547,9 @@ export async function emitirNotaLibreAction(data: EmitirNotaLibreData): Promise<
   const socio = await cargarSocioParaFacturar(gId, data.socioId);
   if (!socio) return { error: 'El socio no pertenece a esta guardería.' };
 
-  const credsInfo = await cargarCredsGuarderia(gId);
+  const credsInfo = await cargarCredsGuarderia(gId, { centroEmisorId: data.centroEmisorId });
   if (!credsInfo) return { error: 'Faltan datos de facturación de la guardería.' };
-  const { guarderia, creds } = credsInfo;
+  const { guarderia, centro, creds } = credsInfo;
 
   // Sin factura original de la cual copiar el tipo: se deriva igual que al
   // crear una factura manual, según condición de IVA de guardería + socio.
@@ -2585,6 +2599,7 @@ export async function emitirNotaLibreAction(data: EmitirNotaLibreData): Promise<
         montoIva: montos.montoIva.toFixed(2),
         emision: new Date(),
         externalReference: notaId,
+        centroEmisorId: centro.id,
         rechazada: true,
         motivoError,
       });
@@ -2616,6 +2631,7 @@ export async function emitirNotaLibreAction(data: EmitirNotaLibreData): Promise<
       montoIva: montos.montoIva.toFixed(2),
       emision: new Date(),
       externalReference: notaId,
+      centroEmisorId: centro.id,
     });
 
     const movimientoId = await registrarMovimientoNota({

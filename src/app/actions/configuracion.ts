@@ -4,7 +4,13 @@ import { revalidatePath } from 'next/cache';
 import { and, eq } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
-import { guarderias, horariosDia, memberships, profiles } from '@/lib/db/schema';
+import {
+  guarderiaCentrosEmisores,
+  guarderias,
+  horariosDia,
+  memberships,
+  profiles,
+} from '@/lib/db/schema';
 import { getActiveMarina } from '@/lib/auth/session';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { translateInviteError } from '@/lib/auth/errors';
@@ -250,10 +256,6 @@ export async function savePuntoVentaAction(data: SavePuntoVentaData): Promise<{ 
       direccion: guarderias.direccion,
       email: guarderias.email,
       rubro: guarderias.rubro,
-      puntoDeVentaActual: guarderias.puntoDeVenta,
-      tusfacturasApikey: guarderias.tusfacturasApikey,
-      tusfacturasApitoken: guarderias.tusfacturasApitoken,
-      tusfacturasUsertoken: guarderias.tusfacturasUsertoken,
     })
     .from(guarderias)
     .where(eq(guarderias.id, guarderiaId))
@@ -266,16 +268,23 @@ export async function savePuntoVentaAction(data: SavePuntoVentaData): Promise<{ 
     };
   }
 
-  const esModificacion = guarderia.puntoDeVentaActual != null;
+  // El formulario de Datos Impositivos opera siempre sobre el centro emisor
+  // principal: primer alta lo crea; después modifica sus datos en TusFacturas.
+  const [principal] = await db
+    .select()
+    .from(guarderiaCentrosEmisores)
+    .where(
+      and(
+        eq(guarderiaCentrosEmisores.guarderiaId, guarderiaId),
+        eq(guarderiaCentrosEmisores.esPrincipal, true),
+      ),
+    )
+    .limit(1);
 
-  if (esModificacion) {
-    if (
-      !guarderia.tusfacturasApikey ||
-      !guarderia.tusfacturasApitoken ||
-      !guarderia.tusfacturasUsertoken
-    ) {
-      return { error: 'No se encontraron las credenciales del POS. Contactá a soporte.' };
-    }
+  const esModificacion = !!principal;
+
+  if (principal && (!principal.apikey || !principal.apitoken || !principal.usertoken)) {
+    return { error: 'No se encontraron las credenciales del POS. Contactá a soporte.' };
   }
 
   const ivaCode = CONDICION_IVA_API[data.condicionIva];
@@ -283,11 +292,11 @@ export async function savePuntoVentaAction(data: SavePuntoVentaData): Promise<{ 
 
   const webhookUrl = buildTusFacturasWebhookUrl();
 
-  const posCreds = esModificacion
+  const posCreds = principal
     ? {
-        apikey: guarderia.tusfacturasApikey!,
-        apitoken: guarderia.tusfacturasApitoken!,
-        usertoken: guarderia.tusfacturasUsertoken!,
+        apikey: principal.apikey!,
+        apitoken: principal.apitoken!,
+        usertoken: principal.usertoken!,
       }
     : undefined;
 
@@ -296,7 +305,7 @@ export async function savePuntoVentaAction(data: SavePuntoVentaData): Promise<{ 
     tusResponse = await administrarPuntoVenta(
       {
         operacion: esModificacion ? 'M' : 'A',
-        punto_venta: String(esModificacion ? guarderia.puntoDeVentaActual : data.puntoDeVenta),
+        punto_venta: String(principal ? principal.puntoDeVenta : data.puntoDeVenta),
         direccion: guarderia.direccion,
         razon_social: data.razonSocial.trim(),
         cuit: data.cuit.trim(),
@@ -321,10 +330,36 @@ export async function savePuntoVentaAction(data: SavePuntoVentaData): Promise<{ 
     };
   }
 
+  const credsDevueltas = {
+    ...(tusResponse.apikey != null && { apikey: String(tusResponse.apikey) }),
+    ...(tusResponse.apitoken != null && { apitoken: tusResponse.apitoken }),
+    ...(tusResponse.usertoken != null && { usertoken: tusResponse.usertoken }),
+  };
+
+  if (principal) {
+    if (Object.keys(credsDevueltas).length > 0) {
+      await db
+        .update(guarderiaCentrosEmisores)
+        .set({ ...credsDevueltas, updatedAt: new Date() })
+        .where(eq(guarderiaCentrosEmisores.id, principal.id));
+    }
+  } else {
+    await db.insert(guarderiaCentrosEmisores).values({
+      guarderiaId,
+      nombre: 'Centro emisor principal',
+      puntoDeVenta: data.puntoDeVenta,
+      esPrincipal: true,
+      ...credsDevueltas,
+    });
+  }
+
+  // Las columnas singulares de guarderias quedan espejando el principal (red
+  // de seguridad para lectores no migrados) + los datos impositivos del CUIT,
+  // que son de la guardería (los comparten todos sus centros emisores).
   await db
     .update(guarderias)
     .set({
-      ...(!esModificacion && { puntoDeVenta: data.puntoDeVenta }),
+      ...(esModificacion ? {} : { puntoDeVenta: data.puntoDeVenta }),
       razonSocial: data.razonSocial.trim(),
       cuit: data.cuit.trim(),
       condicionIva: data.condicionIva,
@@ -337,6 +372,208 @@ export async function savePuntoVentaAction(data: SavePuntoVentaData): Promise<{ 
       updatedAt: new Date(),
     })
     .where(eq(guarderias.id, guarderiaId));
+
+  revalidatePath('/configuracion');
+  return {};
+}
+
+// ─── Centros emisores adicionales ───────────────────────────────────────────
+
+export type AgregarCentroEmisorData = {
+  nombre: string;
+  puntoDeVenta: number;
+};
+
+/**
+ * Da de alta un centro emisor (punto de venta ARCA) adicional en TusFacturas
+ * y lo registra para esta guardería. Reusa los datos impositivos ya cargados
+ * (razón social, CUIT, condición IVA, fecha de inicio) — todos los centros
+ * emisores de una guardería comparten CUIT.
+ */
+export async function agregarCentroEmisorAction(
+  data: AgregarCentroEmisorData,
+): Promise<{ error?: string }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+  if (!isAdmin(ctx)) return { error: 'Solo administradores pueden editar la configuración.' };
+
+  const nombre = data.nombre.trim();
+  if (!nombre) return { error: 'Poné un nombre al centro emisor (ej. "Sucursal río").' };
+  if (!Number.isInteger(data.puntoDeVenta) || data.puntoDeVenta <= 0) {
+    return { error: 'El centro emisor debe ser un número entero positivo.' };
+  }
+
+  const guarderiaId = ctx.activeMembership.guarderiaId;
+
+  const [guarderia] = await db
+    .select({
+      direccion: guarderias.direccion,
+      email: guarderias.email,
+      razonSocial: guarderias.razonSocial,
+      cuit: guarderias.cuit,
+      condicionIva: guarderias.condicionIva,
+      condicionIibb: guarderias.condicionIibb,
+      fechaInicio: guarderias.fechaInicio,
+    })
+    .from(guarderias)
+    .where(eq(guarderias.id, guarderiaId))
+    .limit(1);
+
+  if (!guarderia) return { error: 'Guardería no encontrada.' };
+  if (
+    !guarderia.razonSocial?.trim() ||
+    !guarderia.cuit?.trim() ||
+    !guarderia.condicionIva ||
+    !guarderia.fechaInicio
+  ) {
+    return {
+      error:
+        'Primero completá los Datos Impositivos (razón social, CUIT, condición IVA y fecha de inicio) antes de agregar otro centro emisor.',
+    };
+  }
+
+  const [duplicado] = await db
+    .select({ id: guarderiaCentrosEmisores.id })
+    .from(guarderiaCentrosEmisores)
+    .where(
+      and(
+        eq(guarderiaCentrosEmisores.guarderiaId, guarderiaId),
+        eq(guarderiaCentrosEmisores.puntoDeVenta, data.puntoDeVenta),
+      ),
+    )
+    .limit(1);
+  if (duplicado) return { error: 'Ya existe un centro emisor con ese número.' };
+
+  const ivaCode = CONDICION_IVA_API[guarderia.condicionIva];
+  if (!ivaCode) return { error: 'No se pudo mapear la condición IVA de la guardería.' };
+
+  const webhookUrl = buildTusFacturasWebhookUrl();
+
+  // Alta con las creds master de NauticaApp (igual que el primer POS);
+  // TusFacturas devuelve credenciales propias del POS nuevo.
+  let tusResponse;
+  try {
+    tusResponse = await administrarPuntoVenta({
+      operacion: 'A',
+      punto_venta: String(data.puntoDeVenta),
+      direccion: guarderia.direccion ?? '',
+      razon_social: guarderia.razonSocial.trim(),
+      cuit: guarderia.cuit.trim(),
+      iva_condicion: ivaCode,
+      iva_emails: guarderia.email ?? '',
+      ...(guarderia.condicionIibb
+        ? { iibb: CONDICION_IIBB_LABEL[guarderia.condicionIibb as CondicionIibb] }
+        : {}),
+      fecha_inicio: toTusFecha(guarderia.fechaInicio),
+      factura_afip: 'S',
+      es_agente_retencion: 'N',
+      esta_activo: 'S',
+      // El predeterminado de TusFacturas sigue siendo el principal.
+      es_predeterminado: 'N',
+      conceptos_tipo: 'PS',
+      ...(webhookUrl ? { webhook: webhookUrl } : {}),
+    });
+  } catch (err) {
+    return {
+      error: err instanceof Error ? err.message : 'Error al sincronizar con TusFacturas.',
+    };
+  }
+
+  await db.insert(guarderiaCentrosEmisores).values({
+    guarderiaId,
+    nombre,
+    puntoDeVenta: data.puntoDeVenta,
+    esPrincipal: false,
+    ...(tusResponse.apikey != null && { apikey: String(tusResponse.apikey) }),
+    ...(tusResponse.apitoken != null && { apitoken: tusResponse.apitoken }),
+    ...(tusResponse.usertoken != null && { usertoken: tusResponse.usertoken }),
+  });
+
+  revalidatePath('/configuracion');
+  return {};
+}
+
+/**
+ * Marca un centro emisor como principal (el que usan el cron de auto-emisión
+ * y todo flujo que no elige a mano) y espeja sus datos en las columnas
+ * singulares de guarderias.
+ */
+export async function marcarCentroEmisorPrincipalAction(
+  centroEmisorId: string,
+): Promise<{ error?: string }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+  if (!isAdmin(ctx)) return { error: 'Solo administradores pueden editar la configuración.' };
+
+  const guarderiaId = ctx.activeMembership.guarderiaId;
+
+  const [centro] = await db
+    .select()
+    .from(guarderiaCentrosEmisores)
+    .where(
+      and(
+        eq(guarderiaCentrosEmisores.id, centroEmisorId),
+        eq(guarderiaCentrosEmisores.guarderiaId, guarderiaId),
+      ),
+    )
+    .limit(1);
+  if (!centro) return { error: 'Centro emisor no encontrado.' };
+  if (centro.esPrincipal) return {};
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(guarderiaCentrosEmisores)
+      .set({ esPrincipal: false, updatedAt: new Date() })
+      .where(
+        and(
+          eq(guarderiaCentrosEmisores.guarderiaId, guarderiaId),
+          eq(guarderiaCentrosEmisores.esPrincipal, true),
+        ),
+      );
+    await tx
+      .update(guarderiaCentrosEmisores)
+      .set({ esPrincipal: true, updatedAt: new Date() })
+      .where(eq(guarderiaCentrosEmisores.id, centro.id));
+    // Espejo del principal en guarderias (lectores no migrados).
+    await tx
+      .update(guarderias)
+      .set({
+        puntoDeVenta: centro.puntoDeVenta,
+        tusfacturasApikey: centro.apikey,
+        tusfacturasApitoken: centro.apitoken,
+        tusfacturasUsertoken: centro.usertoken,
+        updatedAt: new Date(),
+      })
+      .where(eq(guarderias.id, guarderiaId));
+  });
+
+  revalidatePath('/configuracion');
+  return {};
+}
+
+/** Renombra un centro emisor (solo el nombre visible — el número es fijo). */
+export async function renombrarCentroEmisorAction(
+  centroEmisorId: string,
+  nombre: string,
+): Promise<{ error?: string }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+  if (!isAdmin(ctx)) return { error: 'Solo administradores pueden editar la configuración.' };
+
+  const limpio = nombre.trim();
+  if (!limpio) return { error: 'El nombre no puede quedar vacío.' };
+
+  const result = await db
+    .update(guarderiaCentrosEmisores)
+    .set({ nombre: limpio, updatedAt: new Date() })
+    .where(
+      and(
+        eq(guarderiaCentrosEmisores.id, centroEmisorId),
+        eq(guarderiaCentrosEmisores.guarderiaId, ctx.activeMembership.guarderiaId),
+      ),
+    )
+    .returning({ id: guarderiaCentrosEmisores.id });
+  if (result.length === 0) return { error: 'Centro emisor no encontrado.' };
 
   revalidatePath('/configuracion');
   return {};
@@ -372,18 +609,24 @@ export async function solicitarCertificadoAfipAction(): Promise<{ error?: string
 
   const guarderiaId = ctx.activeMembership.guarderiaId;
 
+  // El certificado de enlace es por CUIT: se solicita con las creds del
+  // centro emisor principal y aplica a todos los POS de la guardería.
   const [g] = await db
     .select({
-      puntoDeVenta: guarderias.puntoDeVenta,
-      apikey: guarderias.tusfacturasApikey,
-      apitoken: guarderias.tusfacturasApitoken,
-      usertoken: guarderias.tusfacturasUsertoken,
+      apikey: guarderiaCentrosEmisores.apikey,
+      apitoken: guarderiaCentrosEmisores.apitoken,
+      usertoken: guarderiaCentrosEmisores.usertoken,
     })
-    .from(guarderias)
-    .where(eq(guarderias.id, guarderiaId))
+    .from(guarderiaCentrosEmisores)
+    .where(
+      and(
+        eq(guarderiaCentrosEmisores.guarderiaId, guarderiaId),
+        eq(guarderiaCentrosEmisores.esPrincipal, true),
+      ),
+    )
     .limit(1);
 
-  if (!g || g.puntoDeVenta == null || !g.apikey || !g.apitoken || !g.usertoken) {
+  if (!g || !g.apikey || !g.apitoken || !g.usertoken) {
     return {
       error: 'Primero configurá los datos de facturación (POS) antes de solicitar el certificado.',
     };

@@ -7,6 +7,7 @@ import {
   facturacion,
   facturacionItemMovimientos,
   facturacionItems,
+  guarderiaCentrosEmisores,
   guarderias,
   memberships,
   movimientosCuentaCorriente,
@@ -167,6 +168,7 @@ export default async function VentasPage() {
     movsPendientesList,
     movsPendientesInternoList,
     embarcacionesList,
+    centrosEmisoresList,
   ] = await Promise.all([
     db
       .select({ pendientesCount: count() })
@@ -221,6 +223,7 @@ export default async function VentasPage() {
         motivoError: facturacion.motivoError,
         condicionVenta: facturacion.condicionVenta,
         medioPago: facturacion.medioPago,
+        centroEmisorId: facturacion.centroEmisorId,
         socioNombre: profiles.nombre,
         socioApellido: profiles.apellido,
         socioEmail: profiles.email,
@@ -352,6 +355,19 @@ export default async function VentasPage() {
       .select({ profileId: embarcaciones.profileId, nombre: embarcaciones.nombre })
       .from(embarcaciones)
       .where(eq(embarcaciones.guarderiaId, gId)),
+
+    // Centros emisores (puntos de venta) del club, para el dropdown de
+    // "Nuevo comprobante" y la columna Centro emisor de la tabla.
+    db
+      .select({
+        id: guarderiaCentrosEmisores.id,
+        nombre: guarderiaCentrosEmisores.nombre,
+        puntoDeVenta: guarderiaCentrosEmisores.puntoDeVenta,
+        esPrincipal: guarderiaCentrosEmisores.esPrincipal,
+      })
+      .from(guarderiaCentrosEmisores)
+      .where(eq(guarderiaCentrosEmisores.guarderiaId, gId))
+      .orderBy(desc(guarderiaCentrosEmisores.esPrincipal), guarderiaCentrosEmisores.puntoDeVenta),
   ]);
 
   // Nº de operación del Servicio Contratado por factura — depende de los ids
@@ -365,9 +381,23 @@ export default async function VentasPage() {
   const pendientesComputados = await listarPendientesFacturar(gId);
 
   const entreEmisor = guarderiaInfo?.razonSocial?.trim() || guarderiaInfo?.nombre || '—';
-  const centroEmisor =
-    guarderiaInfo?.puntoDeVenta != null ? String(guarderiaInfo.puntoDeVenta) : '—';
   const entreEmisorCuit = guarderiaInfo?.cuit?.trim() || '—';
+
+  // Centro emisor por comprobante: del prefijo del codigo ARCA
+  // ("PPPPP-NNNNNNNN") si lo tiene, si no del centro registrado al emitir,
+  // y como último recurso el principal (comprobantes viejos).
+  const puntoVentaPorCentroId = new Map(centrosEmisoresList.map((c) => [c.id, c.puntoDeVenta]));
+  const centroEmisorDefault =
+    centrosEmisoresList.find((c) => c.esPrincipal)?.puntoDeVenta ??
+    guarderiaInfo?.puntoDeVenta ??
+    null;
+  const centroEmisorDe = (f: { codigo: string | null; centroEmisorId: string | null }): string => {
+    const pv = f.codigo?.match(/^(\d+)-\d+$/)?.[1];
+    if (pv) return String(parseInt(pv, 10));
+    const porId = f.centroEmisorId ? puntoVentaPorCentroId.get(f.centroEmisorId) : null;
+    if (porId != null) return String(porId);
+    return centroEmisorDefault != null ? String(centroEmisorDefault) : '—';
+  };
 
   const facturas = lista.map((f) => {
     const identidad = identidadFacturacion({
@@ -420,7 +450,7 @@ export default async function VentasPage() {
       numeroOperacionSC: numeroOperacionPorFactura.get(f.id) ?? '—',
       entreEmisor,
       entreEmisorCuit,
-      centroEmisor,
+      centroEmisor: centroEmisorDe(f),
     };
   });
 
@@ -539,7 +569,7 @@ export default async function VentasPage() {
     }))
     .filter((s) => s.movimientos.length > 0);
 
-  const posConfigurado = guarderiaInfo?.puntoDeVenta != null;
+  const posConfigurado = centrosEmisoresList.length > 0 || guarderiaInfo?.puntoDeVenta != null;
   const certificadoOk = guarderiaInfo?.certificadoAfipOk ?? false;
   const guarderiaCondicionIva = guarderiaInfo?.condicionIva ?? null;
 
@@ -557,6 +587,7 @@ export default async function VentasPage() {
       posConfigurado={posConfigurado}
       certificadoOk={certificadoOk}
       guarderiaCondicionIva={guarderiaCondicionIva}
+      centrosEmisores={centrosEmisoresList}
     />
   );
 }

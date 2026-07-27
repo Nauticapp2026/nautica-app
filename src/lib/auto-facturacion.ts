@@ -35,6 +35,7 @@ import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import {
   facturacion,
+  guarderiaCentrosEmisores,
   guarderias,
   memberships,
   movimientosCuentaCorriente,
@@ -97,22 +98,33 @@ export async function runAutoEmision(
     const [guardRow] = await db
       .select({
         condicionIva: guarderias.condicionIva,
-        puntoDeVenta: guarderias.puntoDeVenta,
-        tusfacturasApikey: guarderias.tusfacturasApikey,
-        tusfacturasApitoken: guarderias.tusfacturasApitoken,
-        tusfacturasUsertoken: guarderias.tusfacturasUsertoken,
         certificadoAfipOk: guarderias.certificadoAfipOk,
       })
       .from(guarderias)
       .where(eq(guarderias.id, guarderiaId))
       .limit(1);
+    // La auto-emisión siempre sale por el centro emisor principal (el
+    // dropdown de centro emisor es solo de la emisión manual).
+    const [centroPrincipal] = await db
+      .select({
+        apikey: guarderiaCentrosEmisores.apikey,
+        apitoken: guarderiaCentrosEmisores.apitoken,
+        usertoken: guarderiaCentrosEmisores.usertoken,
+      })
+      .from(guarderiaCentrosEmisores)
+      .where(
+        and(
+          eq(guarderiaCentrosEmisores.guarderiaId, guarderiaId),
+          eq(guarderiaCentrosEmisores.esPrincipal, true),
+        ),
+      )
+      .limit(1);
     const guardCondicionIva = guardRow?.condicionIva ?? null;
     const fiscalHabilitado = Boolean(
       guardRow &&
-      guardRow.puntoDeVenta != null &&
-      guardRow.tusfacturasApikey &&
-      guardRow.tusfacturasApitoken &&
-      guardRow.tusfacturasUsertoken &&
+      centroPrincipal?.apikey &&
+      centroPrincipal.apitoken &&
+      centroPrincipal.usertoken &&
       guardRow.certificadoAfipOk,
     );
 

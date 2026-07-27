@@ -1098,6 +1098,35 @@ export const notificaciones = pgTable('notificaciones', {
 // FACTURACIÓN & CUENTA CORRIENTE
 // =============================================================================
 
+// Centros emisores (puntos de venta ARCA) de cada guardería. Las columnas
+// singulares de `guarderias` (puntoDeVenta + tusfacturas*) quedan espejando
+// el principal como red de seguridad — el código lee siempre de acá.
+export const guarderiaCentrosEmisores = pgTable(
+  'guarderia_centros_emisores',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    guarderiaId: uuid('guarderia_id')
+      .notNull()
+      .references(() => guarderias.id, { onDelete: 'cascade' }),
+    nombre: text('nombre').notNull(),
+    // Número de POS en ARCA. No editable una vez creado.
+    puntoDeVenta: integer('punto_de_venta').notNull(),
+    // Credenciales propias del POS que devuelve TusFacturas al alta.
+    apikey: text('apikey'),
+    apitoken: text('apitoken'),
+    usertoken: text('usertoken'),
+    // El principal es el que usan el cron de auto-emisión y todo flujo que
+    // no elige centro emisor a mano. Único por guardería (índice parcial).
+    esPrincipal: boolean('es_principal').notNull().default(false),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index('guarderia_centros_emisores_guarderia_idx').on(t.guarderiaId),
+    unique('guarderia_centros_emisores_pv_unico').on(t.guarderiaId, t.puntoDeVenta),
+  ],
+);
+
 export const datosFacturacion = pgTable('datos_facturacion', {
   id: uuid('id').primaryKey().defaultRandom(),
   profileId: uuid('profile_id')
@@ -1244,6 +1273,11 @@ export const facturacion = pgTable(
     // Vencimiento del CAE que devuelve TusFacturas (no confundir con
     // `vencimiento`, que es la fecha límite de pago).
     caeVencimiento: date('cae_vencimiento'),
+    // Centro emisor (punto de venta) por el que salió — o intentó salir —
+    // este comprobante. Permite reenviar una rechazada por el mismo POS.
+    centroEmisorId: uuid('centro_emisor_id').references(() => guarderiaCentrosEmisores.id, {
+      onDelete: 'set null',
+    }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },

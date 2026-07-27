@@ -3,13 +3,21 @@ import { eq, and, asc, desc, inArray } from 'drizzle-orm';
 
 import { getActiveMarina } from '@/lib/auth/session';
 import { db } from '@/lib/db';
-import { guarderias, horariosDia, memberships, pricingPlans, profiles } from '@/lib/db/schema';
+import {
+  guarderiaCentrosEmisores,
+  guarderias,
+  horariosDia,
+  memberships,
+  pricingPlans,
+  profiles,
+} from '@/lib/db/schema';
 import { getAllPlanFeatures } from '@/lib/pricing/config';
 
 import type { GuarderiaFeatures } from '@/app/actions/configuracion';
 
 import {
   ConfiguracionClient,
+  type CentroEmisor,
   type InfoGeneralData,
   type MiembroEquipo,
   type PaywayData,
@@ -186,8 +194,25 @@ export default async function ConfiguracionPage({ searchParams }: Props) {
     privateKey: guarderia?.paywayPrivateKey ?? '',
   };
 
+  const centrosRows = await db
+    .select({
+      id: guarderiaCentrosEmisores.id,
+      nombre: guarderiaCentrosEmisores.nombre,
+      puntoDeVenta: guarderiaCentrosEmisores.puntoDeVenta,
+      esPrincipal: guarderiaCentrosEmisores.esPrincipal,
+    })
+    .from(guarderiaCentrosEmisores)
+    .where(eq(guarderiaCentrosEmisores.guarderiaId, guarderiaId))
+    .orderBy(
+      desc(guarderiaCentrosEmisores.esPrincipal),
+      asc(guarderiaCentrosEmisores.puntoDeVenta),
+    );
+
+  const centrosEmisores: CentroEmisor[] = centrosRows;
+  const principal = centrosRows.find((c) => c.esPrincipal) ?? null;
+
   const puntoVenta: PuntoVentaData = {
-    puntoDeVenta: guarderia?.puntoDeVenta ?? null,
+    puntoDeVenta: principal?.puntoDeVenta ?? guarderia?.puntoDeVenta ?? null,
     razonSocial: guarderia?.razonSocial ?? '',
     cuit: guarderia?.cuit ?? '',
     condicionIva: (guarderia?.condicionIva ?? 'monotributo') as PuntoVentaData['condicionIva'],
@@ -204,6 +229,7 @@ export default async function ConfiguracionPage({ searchParams }: Props) {
       currentUserId={ctx.profile.id}
       features={features}
       puntoVenta={puntoVenta}
+      centrosEmisores={centrosEmisores}
       payway={payway}
       planes={planes}
       currentPlan={(guarderia?.plan ?? 'esencial') as PlanInfo['slug']}

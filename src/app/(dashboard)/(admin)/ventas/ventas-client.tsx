@@ -89,6 +89,13 @@ type Factura = {
   centroEmisor: string;
 };
 
+type CentroEmisorOpt = {
+  id: string;
+  nombre: string;
+  puntoDeVenta: number;
+  esPrincipal: boolean;
+};
+
 type LoteMovimiento = {
   id: string;
   concepto: string | null;
@@ -410,14 +417,21 @@ function NuevaFacturaModal({
   socios,
   guarderiaCondicionIva,
   facturas,
+  centrosEmisores,
 }: {
   open: boolean;
   onClose: () => void;
   socios: Socio[];
   guarderiaCondicionIva: string | null;
   facturas: Factura[];
+  centrosEmisores: CentroEmisorOpt[];
 }) {
   const router = useRouter();
+  // Centro emisor (punto de venta) por el que sale el comprobante. Con un
+  // solo centro el dropdown ni se muestra y todo sale por el principal.
+  const centroPrincipalId =
+    centrosEmisores.find((c) => c.esPrincipal)?.id ?? centrosEmisores[0]?.id ?? '';
+  const [centroEmisorId, setCentroEmisorId] = useState(centroPrincipalId);
   // Notas de crédito/débito integradas al mismo modal: si el Tipo de
   // comprobante elegido es NC/ND, el formulario cambia al de la nota
   // (relacionada a un comprobante emitido, o libre sin comprobante de origen).
@@ -567,6 +581,7 @@ function NuevaFacturaModal({
     setForm((f) => ({ ...f, socioId: '' }));
     setMovimientos([]);
     setSelectedMovs(new Set());
+    setCentroEmisorId(centroPrincipalId);
     setModoNota(null);
     setNotaRelacionada(true);
     setNotaFacturaId('');
@@ -599,6 +614,7 @@ function NuevaFacturaModal({
               motivo: notaMotivo,
               importe: importeNum!,
               descripcion: form.descripcion || undefined,
+              centroEmisorId: centroEmisorId || undefined,
             });
         if (res.error) {
           setError(res.error);
@@ -628,6 +644,7 @@ function NuevaFacturaModal({
         hasta: form.hasta,
         itemKeys: seleccion.filter((m) => m.itemKey).map((m) => m.itemKey!),
         movimientoIds: seleccion.filter((m) => !m.itemKey).map((m) => m.id),
+        centroEmisorId: centroEmisorId || undefined,
       });
       if (res.error) {
         setError(res.error);
@@ -858,6 +875,31 @@ function NuevaFacturaModal({
                   </div>
                 )}
               </div>
+
+              {/* Centro emisor: solo si el club tiene más de un punto de venta.
+              Para NC/ND relacionadas no se elige — salen por el mismo POS que
+              el comprobante original. */}
+              {centrosEmisores.length > 1 && (!modoNota || !notaRelacionada) && (
+                <div>
+                  <label
+                    className="mb-1.5 block text-xs font-semibold"
+                    style={{ color: '#101828' }}
+                  >
+                    Centro emisor
+                  </label>
+                  <select
+                    className={inputCls}
+                    value={centroEmisorId}
+                    onChange={(e) => setCentroEmisorId(e.target.value)}
+                  >
+                    {centrosEmisores.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.nombre} — N.º {c.puntoDeVenta}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               {modoNota && (
                 <>
@@ -3205,6 +3247,7 @@ export function VentasClient({
   posConfigurado,
   certificadoOk,
   guarderiaCondicionIva,
+  centrosEmisores,
 }: {
   facturas: Factura[];
   socios: Socio[];
@@ -3213,6 +3256,7 @@ export function VentasClient({
   posConfigurado: boolean;
   certificadoOk: boolean;
   guarderiaCondicionIva: string | null;
+  centrosEmisores: CentroEmisorOpt[];
 }) {
   const [activeTab, setActiveTab] = useState<'afip' | 'recibos'>('afip');
   const [search, setSearch] = useState('');
@@ -3444,6 +3488,7 @@ export function VentasClient({
         socios={socios}
         guarderiaCondicionIva={guarderiaCondicionIva}
         facturas={facturas}
+        centrosEmisores={centrosEmisores}
       />
       <LoteModal open={loteOpen} onClose={() => setLoteOpen(false)} socios={socios} />
       <ComprobanteInternoManualModal

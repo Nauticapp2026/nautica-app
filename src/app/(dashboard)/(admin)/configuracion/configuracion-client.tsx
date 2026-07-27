@@ -19,10 +19,13 @@ import {
 import { toast } from 'sonner';
 
 import {
+  agregarCentroEmisorAction,
   confirmarCertificadoAfipAction,
   createMiembroEquipoAction,
   deletePaywayCredsAction,
   deleteMiembroEquipoAction,
+  marcarCentroEmisorPrincipalAction,
+  renombrarCentroEmisorAction,
   savePuntoVentaAction,
   savePaywayCredsAction,
   solicitarCertificadoAfipAction,
@@ -84,6 +87,13 @@ type CondicionIvaValue =
   | 'cliente_exterior'
   | 'iva_no_alcanzado'
   | 'proveedor_exterior';
+
+export type CentroEmisor = {
+  id: string;
+  nombre: string;
+  puntoDeVenta: number;
+  esPrincipal: boolean;
+};
 
 export type PuntoVentaData = {
   puntoDeVenta: number | null;
@@ -185,6 +195,7 @@ export function ConfiguracionClient({
   currentUserId,
   features,
   puntoVenta,
+  centrosEmisores,
   payway,
   planes,
   currentPlan,
@@ -197,6 +208,7 @@ export function ConfiguracionClient({
   currentUserId: string;
   features: GuarderiaFeatures;
   puntoVenta: PuntoVentaData;
+  centrosEmisores: CentroEmisor[];
   payway: PaywayData;
   planes: PlanInfo[];
   currentPlan: PlanSlug;
@@ -263,12 +275,14 @@ export function ConfiguracionClient({
           <InfoGeneralForm initial={infoGeneral} />
           {!showImpositivosTab && (
             <div className="mt-6">
-              <PuntoVentaTab initial={puntoVenta} />
+              <PuntoVentaTab initial={puntoVenta} centros={centrosEmisores} />
             </div>
           )}
         </>
       )}
-      {activeTab === 'impositivos' && <PuntoVentaTab initial={puntoVenta} />}
+      {activeTab === 'impositivos' && (
+        <PuntoVentaTab initial={puntoVenta} centros={centrosEmisores} />
+      )}
       {activeTab === 'equipo' && (
         <EquipoTab
           miembros={miembros}
@@ -1476,7 +1490,7 @@ function PlanCard({
   );
 }
 
-function PuntoVentaTab({ initial }: { initial: PuntoVentaData }) {
+function PuntoVentaTab({ initial, centros }: { initial: PuntoVentaData; centros: CentroEmisor[] }) {
   const [data, setData] = useState<PuntoVentaData>(initial);
   const [feedback, setFeedback] = useState<{ type: 'error' | 'success'; msg: string } | null>(null);
   const [pending, startTransition] = useTransition();
@@ -1537,8 +1551,9 @@ function PuntoVentaTab({ initial }: { initial: PuntoVentaData }) {
 
       {yaConfigurado && (
         <div className="mb-6 rounded-[10px] border border-[#CAE6E4] bg-[#ECFDF3] px-4 py-3 text-sm text-[#175861]">
-          El centro emisor no se puede cambiar una vez creado. Podés actualizar el resto de los
-          datos impositivos.
+          El número del centro emisor principal no se puede cambiar una vez creado. Podés actualizar
+          el resto de los datos impositivos y, si facturás desde más de un punto de venta, agregar
+          otros centros emisores más abajo.
         </div>
       )}
 
@@ -1653,6 +1668,8 @@ function PuntoVentaTab({ initial }: { initial: PuntoVentaData }) {
           </button>
         </div>
 
+        {yaConfigurado && <CentrosEmisoresSection centros={centros} />}
+
         {yaConfigurado && (
           <div className="mt-2 border-t border-gray-200 pt-6">
             <h3 className="mb-1 text-sm font-bold" style={{ color: '#101828' }}>
@@ -1667,6 +1684,208 @@ function PuntoVentaTab({ initial }: { initial: PuntoVentaData }) {
         )}
       </div>
     </section>
+  );
+}
+
+// Lista de centros emisores (puntos de venta ARCA) + alta de adicionales.
+// El principal es el que usan la auto-emisión mensual y todo flujo que no
+// elige centro emisor a mano; el resto queda disponible en el dropdown de
+// "Nuevo comprobante" en Ventas.
+function CentrosEmisoresSection({ centros }: { centros: CentroEmisor[] }) {
+  const router = useRouter();
+  const [showAlta, setShowAlta] = useState(false);
+  const [nombre, setNombre] = useState('');
+  const [numero, setNumero] = useState<number | null>(null);
+  const [editandoId, setEditandoId] = useState<string | null>(null);
+  const [editNombre, setEditNombre] = useState('');
+  const [pending, startTransition] = useTransition();
+
+  function handleAgregar() {
+    if (!nombre.trim()) {
+      toast.error('Poné un nombre al centro emisor (ej. "Sucursal río").');
+      return;
+    }
+    if (!numero || numero <= 0) {
+      toast.error('Ingresá un número de centro emisor válido.');
+      return;
+    }
+    startTransition(async () => {
+      const res = await agregarCentroEmisorAction({ nombre, puntoDeVenta: numero });
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+      toast.success('Centro emisor sincronizado con TusFacturas.');
+      setShowAlta(false);
+      setNombre('');
+      setNumero(null);
+      router.refresh();
+    });
+  }
+
+  function handlePrincipal(id: string) {
+    startTransition(async () => {
+      const res = await marcarCentroEmisorPrincipalAction(id);
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+      toast.success('Centro emisor principal actualizado.');
+      router.refresh();
+    });
+  }
+
+  function handleRenombrar(id: string) {
+    startTransition(async () => {
+      const res = await renombrarCentroEmisorAction(id, editNombre);
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+      toast.success('Nombre actualizado.');
+      setEditandoId(null);
+      router.refresh();
+    });
+  }
+
+  return (
+    <div className="mt-2 border-t border-gray-200 pt-6">
+      <div className="mb-3 flex items-center justify-between">
+        <div>
+          <h3 className="text-sm font-bold" style={{ color: '#101828' }}>
+            Centros emisores
+          </h3>
+          <p className="text-xs text-gray-500">
+            Si facturás desde más de un punto de venta de ARCA, agregalos acá. Al emitir un
+            comprobante vas a poder elegir por cuál sale; la facturación mensual automática usa
+            siempre el principal.
+          </p>
+        </div>
+        {!showAlta && (
+          <button
+            type="button"
+            onClick={() => setShowAlta(true)}
+            className="flex shrink-0 items-center gap-1.5 rounded-[10px] border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            <Plus className="h-4 w-4" />
+            Agregar centro emisor
+          </button>
+        )}
+      </div>
+
+      <div className="overflow-hidden rounded-[10px] border border-gray-200">
+        {centros.map((c, i) => (
+          <div
+            key={c.id}
+            className={`flex flex-wrap items-center gap-3 px-4 py-3 ${i > 0 ? 'border-t border-gray-100' : ''}`}
+          >
+            {editandoId === c.id ? (
+              <input
+                className="h-9 flex-1 rounded-[8px] border border-gray-200 px-3 text-sm"
+                value={editNombre}
+                autoFocus
+                onChange={(e) => setEditNombre(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleRenombrar(c.id);
+                  if (e.key === 'Escape') setEditandoId(null);
+                }}
+              />
+            ) : (
+              <p className="flex-1 truncate text-sm font-medium" style={{ color: '#101828' }}>
+                {c.nombre}
+              </p>
+            )}
+            <span className="text-xs text-gray-500">N.º {c.puntoDeVenta}</span>
+            {c.esPrincipal ? (
+              <span className="rounded-full bg-[#ECFDF3] px-2 py-0.5 text-xs font-semibold text-[#175861]">
+                Principal
+              </span>
+            ) : (
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => handlePrincipal(c.id)}
+                className="text-xs font-medium underline underline-offset-2 disabled:opacity-50"
+                style={{ color: '#175861' }}
+              >
+                Hacer principal
+              </button>
+            )}
+            {editandoId === c.id ? (
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => handleRenombrar(c.id)}
+                className="text-xs font-medium underline underline-offset-2 disabled:opacity-50"
+                style={{ color: '#175861' }}
+              >
+                Guardar
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setEditandoId(c.id);
+                  setEditNombre(c.nombre);
+                }}
+                className="rounded-[8px] p-1 text-gray-400 hover:bg-gray-100"
+                title="Renombrar"
+              >
+                <Edit3 className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {showAlta && (
+        <div className="mt-3 space-y-3 rounded-[10px] border border-gray-200 bg-gray-50 p-4">
+          <div className="rounded-[10px] border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+            El punto de venta tiene que estar dado de alta previamente en ARCA (Servicios →
+            Administrador de Relaciones → POS de Facturación Electrónica). Si no existe en ARCA, las
+            facturas emitidas por este centro van a ser rechazadas.
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Field label="Nombre" required>
+              <input
+                className={inputCls}
+                placeholder={'Ej. "Sucursal río"'}
+                value={nombre}
+                onChange={(e) => setNombre(e.target.value)}
+              />
+            </Field>
+            <Field label="Número de punto de venta" required>
+              <input
+                className={inputCls}
+                type="number"
+                min={1}
+                placeholder="2"
+                value={numero ?? ''}
+                onChange={(e) => setNumero(e.target.value ? Number(e.target.value) : null)}
+              />
+            </Field>
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={handleAgregar}
+              disabled={pending}
+              className="rounded-[10px] bg-[#175861] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#0f4249] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {pending ? 'Sincronizando…' : 'Agregar'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowAlta(false)}
+              disabled={pending}
+              className="rounded-[10px] border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
