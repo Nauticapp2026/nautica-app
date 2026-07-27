@@ -2084,6 +2084,8 @@ async function emitirNotaTusFacturas(params: {
   guarderia: { puntoDeVenta: number | null; rubro: string | null };
   creds: TusFacturasCredentials;
   asociado?: TusFacturasComprobanteAsociado;
+  /** Inicio del período facturado (formato TusFecha). Default: hoy. */
+  periodoDesde?: string;
 }) {
   const notaId = params.notaId;
   const hoy = toTusFecha(new Date());
@@ -2099,7 +2101,7 @@ async function emitirNotaTusFacturas(params: {
     punto_venta: String(params.guarderia.puntoDeVenta),
     moneda: 'PES',
     cotizacion: 1,
-    periodo_facturado_desde: hoy,
+    periodo_facturado_desde: params.periodoDesde ?? hoy,
     periodo_facturado_hasta: hoy,
     rubro: params.guarderia.rubro ?? 'Servicios náuticos',
     rubro_grupo_contable: process.env.TUSFACTURAS_RUBRO_GRUPO ?? 'Servicios',
@@ -2562,6 +2564,9 @@ export async function emitirNotaLibreAction(data: EmitirNotaLibreData): Promise<
       cliente,
       guarderia,
       creds,
+      // Sin comprobante de origen: el período facturado informado a ARCA
+      // cubre los últimos 30 días.
+      periodoDesde: toTusFecha(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)),
     }));
   } catch (err) {
     const motivoError =
