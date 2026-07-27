@@ -978,6 +978,10 @@ function TarifaModal({
                     />
                     Cobrar días proporcionales de uso.
                   </label>
+                  <p className="text-xs text-gray-500">
+                    Esta política también aplica cuando el servicio se contrata a mitad de mes: con
+                    &quot;mes completo&quot; el primer mes se cobra entero, sin proporcional.
+                  </p>
                 </div>
               )}
             </div>

@@ -138,6 +138,7 @@ export async function listarPendientesFacturar(
       servicioAlicuotaIva: servicios.alicuotaIva,
       tipoCobro: servicios.tipoCobro,
       tarifaVariable: servicios.tarifaVariable,
+      politicaBaja: servicios.politicaBajaAnticipada,
     })
     .from(socioServicios)
     .innerJoin(servicios, eq(servicios.id, socioServicios.servicioId))
@@ -181,6 +182,7 @@ export async function listarPendientesFacturar(
       servicioPrecio: servicios.precio,
       servicioAlicuotaIva: servicios.alicuotaIva,
       tipoCobro: servicios.tipoCobro,
+      politicaBaja: servicios.politicaBajaAnticipada,
       socioTildeInterno: memberships.comprobanteInterno,
       contratoId: socioServicios.id,
       contratoConcepto: socioServicios.concepto,
@@ -401,12 +403,18 @@ export async function listarPendientesFacturar(
     if (facturadoPorContrato.has(`${c.contratoId}:${periodoActual}`)) continue;
     if (legacyMensualServicio.has(`${c.socioId}:${c.servicioId}`)) continue;
 
-    // Primer ciclo iniciado este mes → proporcional desde fechaInicio.
+    // Primer ciclo iniciado este mes → proporcional desde fechaInicio, salvo
+    // que el tarifario diga 'mes_completo': esa política manda también en el
+    // alta, no solo en la baja anticipada.
     const inicioEnMesActual = c.fechaInicio.slice(0, 8) === periodoActual.slice(0, 8);
     let importe = importeFinal(precioNeto, alicuotaIva, c.comprobanteInterno);
     let concepto = conceptoBase;
     let esProporcional = false;
-    if (inicioEnMesActual && !contratosConCargo.has(c.contratoId)) {
+    if (
+      inicioEnMesActual &&
+      !contratosConCargo.has(c.contratoId) &&
+      c.politicaBaja !== 'mes_completo'
+    ) {
       const base = new Date(`${c.fechaInicio}T00:00:00Z`);
       const prop = calcularProporcionalMes(importe, base);
       if (prop.esProporcional) {
@@ -525,9 +533,13 @@ export async function listarPendientesFacturar(
 
     if (primerCiclo && alta && altaPeriodo != null) {
       if (altaPeriodo === periodoActual) {
-        // Asignado este mes → proporcional por los días restantes.
+        // Asignado este mes → proporcional por los días restantes, salvo
+        // política 'mes_completo' (cobra el mes entero desde el alta).
         if (!yaEsteMes) {
-          const prop = calcularProporcionalMes(importeMes, alta);
+          const prop =
+            f.politicaBaja === 'mes_completo'
+              ? { importe: importeMes, diasRestantes: 0, diasMes: 0, esProporcional: false }
+              : calcularProporcionalMes(importeMes, alta);
           pushEspacio({
             periodo: periodoActual,
             importe: prop.importe,
@@ -546,16 +558,27 @@ export async function listarPendientesFacturar(
         // de ese mes (que el modelo viejo cobraba al asignar) además del mes
         // corriente.
         if (!facturadoPorEspacio.has(`${pair}:${altaPeriodo}`)) {
-          const prop = calcularProporcionalMes(importeMes, alta);
-          if (prop.esProporcional) {
+          if (f.politicaBaja === 'mes_completo') {
             pushEspacio({
               periodo: altaPeriodo,
-              importe: prop.importe,
-              concepto: `${conceptoBase}${sufijoProporcional(prop.diasRestantes, prop.diasMes)}`,
-              esProporcional: true,
+              importe: importeMes,
+              concepto: conceptoBase,
+              esProporcional: false,
               tipoMovimiento: 'mensual',
               esVariable: false,
             });
+          } else {
+            const prop = calcularProporcionalMes(importeMes, alta);
+            if (prop.esProporcional) {
+              pushEspacio({
+                periodo: altaPeriodo,
+                importe: prop.importe,
+                concepto: `${conceptoBase}${sufijoProporcional(prop.diasRestantes, prop.diasMes)}`,
+                esProporcional: true,
+                tipoMovimiento: 'mensual',
+                esVariable: false,
+              });
+            }
           }
         }
       }
