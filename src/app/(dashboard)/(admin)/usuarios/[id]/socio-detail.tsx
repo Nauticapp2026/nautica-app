@@ -128,8 +128,9 @@ type Movimiento = {
   facturaTipo: string | null;
   facturaTipoRecibo: 'fiscal' | 'interno' | null;
   comprobanteInterno: boolean;
-  // Fecha de vencimiento (YYYY-MM-DD) = emisión de factura + plazo de pago de la
-  // tarifa. Null si el cargo no está facturado (o es comprobante interno).
+  // Fecha de vencimiento (YYYY-MM-DD): la guardada en la factura fiscal, o —
+  // para comprobantes internos, que no la guardan — emisión + plazo de pago
+  // de la tarifa. Null si el cargo no tiene comprobante.
   fechaVencimiento: string | null;
   // Cuánto de este cargo cubre puntualmente una Nota de Crédito de SU propia
   // factura (no una bolsa común) — ver src/lib/nc-cobertura.ts. Null si
@@ -376,16 +377,18 @@ const TIPO_COMPROBANTE_LABEL: Record<string, string> = {
   nota_credito_c: 'Nota de crédito C',
 };
 
-// 'recibo' agrupa RC- (cobranza), CM-/CL- (comprobante interno) y RB- —
-// ninguno tiene validez fiscal en sí mismo, pero un RC- puede estar cobrando
-// una factura fiscal. `facturaTipoRecibo` (solo se completa para RC-, al
-// registrar la cobranza) dice de qué tipo era la deuda que cancela; sin ese
-// dato es siempre interno (CM-/CL- solo consolidan cargos Interno).
+// 'recibo' agrupa RC- (cobranza), CM-/CL-/CA- (comprobante interno) y RB- —
+// ninguno tiene validez fiscal en sí mismo. "Recibo" queda reservado para
+// Cobranzas (RC-): `facturaTipoRecibo` (se completa al registrar la cobranza)
+// dice de qué tipo era la deuda que cancela. Todo el resto es "Comprobante
+// interno" — nunca "Recibo interno", que es otro documento.
 function tipoComprobanteLabel(m: {
   facturaTipo: string | null;
   facturaTipoRecibo: 'fiscal' | 'interno' | null;
+  facturaCodigo: string | null;
 }): string {
   if (m.facturaTipo === 'recibo') {
+    if (!m.facturaCodigo?.startsWith('RC-')) return 'Comprobante interno';
     return m.facturaTipoRecibo === 'fiscal' ? 'Recibo fiscal' : 'Recibo interno';
   }
   return TIPO_COMPROBANTE_LABEL[m.facturaTipo ?? ''] ?? m.facturaTipo ?? '—';

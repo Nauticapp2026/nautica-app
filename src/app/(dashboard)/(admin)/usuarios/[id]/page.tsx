@@ -369,10 +369,12 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
   const facturasPorMovimiento = new Map<
     string,
     {
+      facturacionId: string;
       codigo: string | null;
       archivo: string | null;
       tipo: string | null;
       tipoRecibo: 'fiscal' | 'interno' | null;
+      descripcion: string | null;
       emision: Date | null;
       vencimiento: Date | null;
     }
@@ -386,6 +388,7 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
         archivo: facturacion.archivo,
         tipoFactura: facturacion.tipoFactura,
         tipoRecibo: facturacion.tipoRecibo,
+        descripcion: facturacion.descripcion,
         emision: facturacion.emision,
         vencimiento: facturacion.vencimiento,
       })
@@ -398,6 +401,7 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
       .where(inArray(facturacionItemMovimientos.movimientoId, movimientoIds));
     for (const r of rows) {
       facturasPorMovimiento.set(r.movimientoId, {
+        facturacionId: r.facturacionId,
         codigo: r.codigo,
         // Comprobantes internos (CM-/CL-) no tienen PDF externo: se ven/imprimen
         // en su página dedicada, igual que los recibos con vínculo directo.
@@ -405,6 +409,7 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
           r.archivo ?? (r.tipoFactura === 'recibo' ? `/ventas/recibo/${r.facturacionId}` : null),
         tipo: r.tipoFactura,
         tipoRecibo: r.tipoRecibo,
+        descripcion: r.descripcion,
         emision: r.emision,
         vencimiento: r.vencimiento,
       });
@@ -422,6 +427,7 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
         archivo: facturacion.archivo,
         tipoFactura: facturacion.tipoFactura,
         tipoRecibo: facturacion.tipoRecibo,
+        descripcion: facturacion.descripcion,
         emision: facturacion.emision,
         vencimiento: facturacion.vencimiento,
       })
@@ -430,14 +436,42 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
     for (const r of directas) {
       if (!r.movimientoId || facturasPorMovimiento.has(r.movimientoId)) continue;
       facturasPorMovimiento.set(r.movimientoId, {
+        facturacionId: r.id,
         codigo: r.codigo,
         // Sin PDF: el recibo interno se ve/imprime en su página dedicada.
         archivo: r.archivo ?? `/ventas/recibo/${r.id}`,
         tipo: r.tipoFactura,
         tipoRecibo: r.tipoRecibo,
+        descripcion: r.descripcion,
         emision: r.emision,
         vencimiento: r.vencimiento,
       });
+    }
+  }
+
+  // Una fila de cuenta corriente por comprobante: la emisión (manual, en lote,
+  // interna o del cron) crea UN movimiento por cargo/Servicio Contratado, todos
+  // vinculados a la misma factura. Para el socio eso es una sola venta, así que
+  // acá se consolidan en una fila (importes sumados, concepto de la factura).
+  // Los movimientos sin comprobante quedan uno por fila, como siempre. El orden
+  // desc se preserva: el grupo ocupa la posición de su miembro más nuevo (en la
+  // práctica los miembros son contiguos: nacen en la misma transacción).
+  type MovimientoRow = (typeof movimientosList)[number];
+  const filasCuentaCorriente: { base: MovimientoRow; miembros: MovimientoRow[] }[] = [];
+  const grupoPorFactura = new Map<string, { base: MovimientoRow; miembros: MovimientoRow[] }>();
+  for (const m of movimientosList) {
+    const facId = facturasPorMovimiento.get(m.id)?.facturacionId;
+    if (!facId) {
+      filasCuentaCorriente.push({ base: m, miembros: [m] });
+      continue;
+    }
+    const grupo = grupoPorFactura.get(facId);
+    if (grupo) {
+      grupo.miembros.push(m);
+    } else {
+      const nuevo = { base: m, miembros: [m] };
+      grupoPorFactura.set(facId, nuevo);
+      filasCuentaCorriente.push(nuevo);
     }
   }
 
@@ -557,33 +591,50 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
         espacioLabel: e.espacioId ? (espacioLabelMap.get(e.espacioId) ?? null) : null,
       }))}
       espaciosDisponibles={espaciosDisponiblesView}
-      movimientos={movimientosList.map((m) => {
-        const fac = facturasPorMovimiento.get(m.id);
-        // Fecha de vencimiento: si el cargo ya tiene una factura emitida,
-        // usamos el vencimiento REAL que quedó guardado en esa factura (el
-        // que se eligió al emitirla, no necesariamente el plazo por default
-        // de la tarifa). Solo para comprobante fiscal (no para recibos
-        // internos, que no tienen vencimiento). Si el cargo todavía no fue
-        // facturado, mostramos una estimación: emisión (hoy) + plazo de pago
-        // actual de la tarifa — puede no coincidir con lo que termine
-        // eligiéndose al facturar.
-        const emisionYmd = m.comprobanteInterno ? null : argYmd(fac?.emision);
-        const vencimientoFactura = m.comprobanteInterno ? null : argYmd(fac?.vencimiento);
-        const fechaVencimiento =
-          vencimientoFactura ??
-          (emisionYmd != null && m.plazoPagoDias != null
-            ? addDiasYmd(emisionYmd, m.plazoPagoDias)
-            : null);
+      movimientos={filasCuentaCorriente.map(({ base, miembros }) => {
+        const fac = facturasPorMovimiento.get(base.id);
+        const consolidado = miembros.length > 1;
+        const debe = miembros.reduce((t, x) => t + parseFloat(x.debe ?? '0'), 0);
+        const haber = miembros.reduce((t, x) => t + parseFloat(x.haber ?? '0'), 0);
+        const montoNc = miembros.reduce((t, x) => t + (montoNcPorMovimiento.get(x.id) ?? 0), 0);
+        // Estado consolidado: 'pagado' solo si TODOS los cargos del
+        // comprobante lo están; si no, manda el primero impago.
+        const estado = miembros.find((x) => x.estado !== 'pagado')?.estado ?? base.estado;
+        // Fecha de vencimiento: si el comprobante guardó un vencimiento REAL
+        // (fiscal, se elige al emitir), usamos ese. Los comprobantes internos
+        // no lo guardan: se estima como emisión + plazo de pago de la tarifa
+        // de cada servicio (si difieren entre los cargos consolidados, rige
+        // el que vence primero). Sin comprobante ni plazo queda vacía.
+        const emisionYmd = argYmd(fac?.emision);
+        const vencimientoFactura = argYmd(fac?.vencimiento);
+        let fechaVencimiento = vencimientoFactura;
+        if (fechaVencimiento == null && emisionYmd != null) {
+          const estimados = miembros
+            .filter((x) => x.plazoPagoDias != null)
+            .map((x) => addDiasYmd(emisionYmd, x.plazoPagoDias!));
+          fechaVencimiento = estimados.length > 0 ? estimados.sort()[0] : null;
+        }
         return {
-          ...m,
-          fecha: m.fecha?.toISOString() ?? null,
+          ...base,
+          debe: debe.toFixed(2),
+          haber: haber.toFixed(2),
+          estado,
+          // En filas consolidadas el detalle es el de la factura ("X (+2)"):
+          // listar un solo servicio del grupo sería engañoso.
+          concepto: consolidado
+            ? (fac?.descripcion ??
+              `${base.concepto ?? 'Varios servicios'} (+${miembros.length - 1})`)
+            : base.concepto,
+          servicioNombre: consolidado ? null : base.servicioNombre,
+          numeroOperacion: consolidado ? null : base.numeroOperacion,
+          fecha: base.fecha?.toISOString() ?? null,
           facturaCodigo: fac?.codigo ?? null,
           facturaArchivo: fac?.archivo ?? null,
           facturaTipo: fac?.tipo ?? null,
           facturaTipoRecibo: fac?.tipoRecibo ?? null,
           fechaVencimiento,
-          montoCubiertoNc: montoNcPorMovimiento.get(m.id)?.toFixed(2) ?? null,
-          esMovimientoNc: movimientosDeNc.has(m.id),
+          montoCubiertoNc: montoNc > 0 ? montoNc.toFixed(2) : null,
+          esMovimientoNc: miembros.some((x) => movimientosDeNc.has(x.id)),
         };
       })}
       servicios={serviciosList}
