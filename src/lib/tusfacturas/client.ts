@@ -90,6 +90,13 @@ export type TusFacturasComprobante = {
   };
   /** Solo para NC — referencia a la factura original */
   comprobantes_asociados?: TusFacturasComprobanteAsociado[];
+  /** Alternativa de ARCA para NC/ND sin comprobante puntual: se asocia un
+   *  rango de fechas (dd/mm/aaaa). Excluyente con comprobantes_asociados —
+   *  toda NC/ND debe llevar uno de los dos bloques. */
+  comprobantes_asociados_periodo?: {
+    fecha_desde: string;
+    fecha_hasta: string;
+  };
 };
 
 export type TusFacturasNuevaFacturaInput = {

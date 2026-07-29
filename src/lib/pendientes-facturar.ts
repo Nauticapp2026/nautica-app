@@ -55,6 +55,8 @@ export type ItemPendiente = {
   /** Importe final: con IVA si es fiscal, precio base si es interno. */
   importe: number;
   alicuotaIva: number | null;
+  /** Plazo de cobro (días) de la tarifa — para sugerir el vencimiento al emitir. */
+  plazoPagoDias: number | null;
   /** Categoría del servicio (espacio_guarda, cuota_social, …) para filtros de UI. */
   servicioTipo: string | null;
   comprobanteInterno: boolean;
@@ -136,6 +138,7 @@ export async function listarPendientesFacturar(
       servicioTipo: servicios.tipo,
       servicioPrecio: servicios.precio,
       servicioAlicuotaIva: servicios.alicuotaIva,
+      servicioPlazoPagoDias: servicios.plazoPagoDias,
       tipoCobro: servicios.tipoCobro,
       tarifaVariable: servicios.tarifaVariable,
       politicaBaja: servicios.politicaBajaAnticipada,
@@ -181,6 +184,7 @@ export async function listarPendientesFacturar(
       servicioTipo: servicios.tipo,
       servicioPrecio: servicios.precio,
       servicioAlicuotaIva: servicios.alicuotaIva,
+      servicioPlazoPagoDias: servicios.plazoPagoDias,
       tipoCobro: servicios.tipoCobro,
       politicaBaja: servicios.politicaBajaAnticipada,
       socioTildeInterno: memberships.comprobanteInterno,
@@ -388,6 +392,7 @@ export async function listarPendientesFacturar(
           dias != null ? `${conceptoBase} (${dias} ${dias === 1 ? 'día' : 'días'})` : conceptoBase,
         importe,
         alicuotaIva,
+        plazoPagoDias: c.servicioPlazoPagoDias,
         servicioTipo: c.servicioTipo,
         comprobanteInterno: c.comprobanteInterno,
         esProporcional: false,
@@ -434,6 +439,7 @@ export async function listarPendientesFacturar(
       concepto,
       importe,
       alicuotaIva,
+      plazoPagoDias: c.servicioPlazoPagoDias,
       servicioTipo: c.servicioTipo,
       comprobanteInterno: c.comprobanteInterno,
       esProporcional,
@@ -492,6 +498,7 @@ export async function listarPendientesFacturar(
         concepto: params.concepto,
         importe: params.importe,
         alicuotaIva,
+        plazoPagoDias: f.servicioPlazoPagoDias,
         servicioTipo: f.servicioTipo,
         comprobanteInterno: interno,
         esProporcional: params.esProporcional,
@@ -629,6 +636,7 @@ export async function listarPendientesFacturar(
       concepto: b.concepto,
       importe: Number(b.importe),
       alicuotaIva: b.alicuotaIva != null ? Number(b.alicuotaIva) : null,
+      plazoPagoDias: null,
       servicioTipo: null,
       comprobanteInterno: b.comprobanteInterno,
       esProporcional: false,

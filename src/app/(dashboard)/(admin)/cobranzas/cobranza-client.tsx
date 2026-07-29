@@ -36,7 +36,12 @@ const TIPO_COMPROBANTE_LABEL: Record<string, string> = {
   factura_a: 'Factura A',
   factura_b: 'Factura B',
   factura_c: 'Factura C',
-  recibo: 'Recibo interno',
+  nota_debito_a: 'Nota de débito A',
+  nota_debito_b: 'Nota de débito B',
+  nota_debito_c: 'Nota de débito C',
+  // Los pendientes de cobro con tipo 'recibo' son siempre CM-/CL-/CA- (un
+  // RC- nunca queda pendiente): el documento se llama "Comprobante interno".
+  recibo: 'Comprobante interno',
 };
 
 function fmtMoney(amount: number): string {
@@ -73,6 +78,11 @@ function NuevaCobranzaModal({ socios, onClose }: { socios: SocioOption[]; onClos
   const router = useRouter();
   const [step, setStep] = useState<Step>('socio');
 
+  // Qué va a cobrar el club: comprobantes fiscales (ARCA) o internos. Misma
+  // separación que las pestañas de Ventas — un recibo no puede mezclar los dos
+  // circuitos, así que se elige de entrada y la lista no los muestra juntos.
+  const [canal, setCanal] = useState<'fiscal' | 'interno'>('fiscal');
+
   // Paso socio
   const [query, setQuery] = useState('');
   const [socio, setSocio] = useState<SocioOption | null>(null);
@@ -93,12 +103,19 @@ function NuevaCobranzaModal({ socios, onClose }: { socios: SocioOption[]; onClos
 
   const sociosFiltrados = useMemo(() => buscarSocios(socios, query).slice(0, 50), [socios, query]);
 
+  // Solo los comprobantes del canal elegido: interno = CM-/CL-/CA- (tipo
+  // 'recibo'); fiscal = facturas A/B/C y notas de débito.
+  const comprobantesCanal = useMemo(
+    () => comprobantes.filter((c) => (c.tipoFactura === 'recibo') === (canal === 'interno')),
+    [comprobantes, canal],
+  );
+
   const totalSeleccionado = useMemo(
     () =>
-      comprobantes
+      comprobantesCanal
         .filter((c) => selected.has(c.id))
         .reduce((acc, c) => acc + parseFloat(c.importe ?? '0'), 0),
-    [comprobantes, selected],
+    [comprobantesCanal, selected],
   );
 
   const montoNum = parseFloat(montoToNumberStr(montoAPagar)) || 0;
@@ -139,7 +156,9 @@ function NuevaCobranzaModal({ socios, onClose }: { socios: SocioOption[]; onClos
 
   function toggleAll() {
     setSelected((prev) =>
-      prev.size === comprobantes.length ? new Set() : new Set(comprobantes.map((c) => c.id)),
+      prev.size === comprobantesCanal.length
+        ? new Set()
+        : new Set(comprobantesCanal.map((c) => c.id)),
     );
   }
 
@@ -208,9 +227,44 @@ function NuevaCobranzaModal({ socios, onClose }: { socios: SocioOption[]; onClos
         <div className="border-t border-gray-200" />
 
         <div className="flex-1 space-y-4 overflow-y-auto p-6">
-          {/* Paso 1: elegir socio */}
+          {/* Paso 1: tipo de cobranza + elegir socio */}
           {step === 'socio' && (
             <>
+              <div>
+                <p className="mb-2 text-xs font-semibold" style={{ color: '#101828' }}>
+                  ¿Qué tipo de comprobantes vas a cobrar?
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCanal('fiscal');
+                      setSelected(new Set());
+                    }}
+                    className={`rounded-[10px] border px-3 py-2.5 text-sm font-medium transition ${
+                      canal === 'fiscal'
+                        ? 'border-[#175861] bg-[#EFF8F7] text-[#175861]'
+                        : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >
+                    Comprobantes ARCA
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCanal('interno');
+                      setSelected(new Set());
+                    }}
+                    className={`rounded-[10px] border px-3 py-2.5 text-sm font-medium transition ${
+                      canal === 'interno'
+                        ? 'border-[#175861] bg-[#EFF8F7] text-[#175861]'
+                        : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >
+                    Comprobantes internos
+                  </button>
+                </div>
+              </div>
               <div className="relative">
                 <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400" />
                 <input
@@ -248,9 +302,10 @@ function NuevaCobranzaModal({ socios, onClose }: { socios: SocioOption[]; onClos
             <>
               {loadingComps ? (
                 <p className="py-8 text-center text-sm text-gray-400">Cargando comprobantes…</p>
-              ) : comprobantes.length === 0 ? (
+              ) : comprobantesCanal.length === 0 ? (
                 <p className="py-8 text-center text-sm text-gray-400">
-                  Este socio no tiene comprobantes pendientes de cobro.
+                  Este socio no tiene comprobantes {canal === 'interno' ? 'internos' : 'ARCA'}{' '}
+                  pendientes de cobro.
                 </p>
               ) : (
                 <>
@@ -259,16 +314,16 @@ function NuevaCobranzaModal({ socios, onClose }: { socios: SocioOption[]; onClos
                       onClick={toggleAll}
                       className="text-xs font-medium text-[#175861] hover:underline"
                     >
-                      {selected.size === comprobantes.length
+                      {selected.size === comprobantesCanal.length
                         ? 'Deseleccionar todos'
                         : 'Seleccionar todos'}
                     </button>
                     <span className="text-xs text-gray-400">
-                      {selected.size} de {comprobantes.length}
+                      {selected.size} de {comprobantesCanal.length}
                     </span>
                   </div>
                   <div className="divide-y divide-gray-100 rounded-[10px] border border-gray-200">
-                    {comprobantes.map((c) => (
+                    {comprobantesCanal.map((c) => (
                       <label
                         key={c.id}
                         className="flex cursor-pointer items-center gap-3 px-4 py-3 transition hover:bg-gray-50"
@@ -319,7 +374,7 @@ function NuevaCobranzaModal({ socios, onClose }: { socios: SocioOption[]; onClos
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <Field label="Monto a pagar">
+                <Field label="Monto a cobrar">
                   <input
                     className={inputCls}
                     inputMode="decimal"

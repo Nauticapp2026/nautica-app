@@ -102,6 +102,9 @@ type LoteMovimiento = {
   debe: string | null;
   servicioNombre: string | null;
   tipoServicio: string | null;
+  // Alícuota IVA de la tarifa (null en internos y cargos sin tarifa) — para
+  // el desglose Neto/IVA del lote.
+  alicuotaIva: number | null;
   // null = cargo legacy de cuenta corriente; seteado = ítem computado desde
   // el contrato vigente (modelo "los cargos nacen al emitir").
   itemKey: PendienteEmision['itemKey'];
@@ -172,16 +175,18 @@ const TIPO_FACTURA_LABEL: Record<string, string> = {
   nota_credito_interna: 'NC interna',
 };
 
-// 'recibo' agrupa RC- (cobranza), CM-/CL- (comprobante interno) y RB- — todos
-// documentos sin validez fiscal en sí mismos, pero un RC- puede estar
-// cobrando una factura fiscal. `tipoRecibo` (columna propia, se computa al
-// registrar la cobranza) dice de qué tipo era la deuda que cancela; sin ese
-// dato (CM-/CL-, que solo consolidan cargos Interno) es siempre interno.
+// 'recibo' agrupa RC- (cobranza), CM-/CL-/CA- (comprobante interno) y RB- —
+// todos documentos sin validez fiscal en sí mismos. "Recibo" queda reservado
+// para Cobranzas (RC-): `tipoRecibo` (columna propia, se computa al registrar
+// la cobranza) dice de qué tipo era la deuda que cancela. Todo el resto es
+// "Comprobante interno" — nunca "Recibo interno", que es otro documento.
 function tipoComprobanteLabel(f: {
   tipoFactura: string | null;
   tipoRecibo: 'fiscal' | 'interno' | null;
+  codigo: string | null;
 }): string {
   if (f.tipoFactura === 'recibo') {
+    if (!f.codigo?.startsWith('RC-')) return 'Comprobante interno';
     return f.tipoRecibo === 'fiscal' ? 'Recibo fiscal' : 'Recibo interno';
   }
   return TIPO_FACTURA_LABEL[f.tipoFactura ?? ''] ?? f.tipoFactura ?? '—';
@@ -210,7 +215,11 @@ function derivarTipoFactura(
   socioCondicion: string | null,
 ): string {
   if (guarderiaCondicion !== 'responsable_inscripto') return 'factura_c';
-  if (socioCondicion === 'responsable_inscripto') return 'factura_a';
+  // Socios RI y Monotributistas reciben Factura A (cuadro del cliente:
+  // a los monotributistas les corresponde A, no B).
+  if (socioCondicion === 'responsable_inscripto' || socioCondicion === 'monotributo') {
+    return 'factura_a';
+  }
   return 'factura_b';
 }
 
@@ -440,6 +449,12 @@ function NuevaFacturaModal({
   const [notaFacturaId, setNotaFacturaId] = useState('');
   const [notaMotivo, setNotaMotivo] = useState<MotivoNota>('bonificacion');
   const [notaImporte, setNotaImporte] = useState('');
+  // Solo para NC/ND "sin comprobante de origen": fecha de emisión y período
+  // asociado — ARCA exige que toda nota referencie un comprobante o un rango
+  // de fechas; sin origen puntual, va el rango (default: últimos 30 días).
+  const [notaFecha, setNotaFecha] = useState(todayIso());
+  const [notaPeriodoDesde, setNotaPeriodoDesde] = useState(addDays(todayIso(), -30));
+  const [notaPeriodoHasta, setNotaPeriodoHasta] = useState(todayIso());
   const [notaResult, setNotaResult] = useState<{
     comprobanteNro?: string;
     folioLocal?: string;
@@ -460,6 +475,9 @@ function NuevaFacturaModal({
   const [movimientos, setMovimientos] = useState<PendienteEmision[]>([]);
   const [selectedMovs, setSelectedMovs] = useState<Set<string>>(() => new Set());
   const [loadingMovs, setLoadingMovs] = useState(false);
+  // true apenas el admin toca el campo Vencimiento a mano: a partir de ahí
+  // dejamos de pisarlo con el sugerido por tarifario.
+  const [vencEditado, setVencEditado] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -473,6 +491,7 @@ function NuevaFacturaModal({
     setForm((f) => ({ ...f, socioId, tipoFactura }));
     setMovimientos([]);
     setSelectedMovs(new Set());
+    setVencEditado(false);
     setNotaFacturaId('');
     setError(null);
     if (!socioId) return;
@@ -497,17 +516,51 @@ function NuevaFacturaModal({
         .reduce((s, m) => s + parseFloat(m.debe || '0'), 0),
     [movimientos, selectedMovs],
   );
-  // Mismo criterio que alicuotaPara() en facturacion.ts: Factura C
-  // (Monotributo) no discrimina IVA, A/B sí, siempre al 21%.
-  const alicuotaSeleccionada = form.tipoFactura === 'factura_c' ? 0 : 21;
-  const netoSeleccionado =
-    alicuotaSeleccionada > 0
-      ? totalSeleccionado / (1 + alicuotaSeleccionada / 100)
-      : totalSeleccionado;
+  // Desglose Neto/IVA con la alícuota real de cada tarifa (fallback 21% para
+  // ítems sin tarifa — mismo criterio que alicuotaPara() en facturacion.ts).
+  // Factura C (club Monotributo) no lleva IVA: todo es bruto.
+  const netoSeleccionado = useMemo(() => {
+    if (form.tipoFactura === 'factura_c') return totalSeleccionado;
+    return movimientos
+      .filter((m) => selectedMovs.has(m.id))
+      .reduce((s, m) => {
+        const bruto = parseFloat(m.debe || '0');
+        const ali = m.alicuotaIva ?? 21;
+        return s + (ali > 0 ? bruto / (1 + ali / 100) : bruto);
+      }, 0);
+  }, [movimientos, selectedMovs, form.tipoFactura, totalSeleccionado]);
+  const ivaSeleccionado = totalSeleccionado - netoSeleccionado;
+
+  // Vencimiento sugerido "según tarifario": fecha de emisión + el menor Plazo
+  // de cobro de los servicios seleccionados (si difieren, rige el que vence
+  // primero — mismo criterio que la Cuenta Corriente). Sin plazos: +30 días,
+  // el default histórico. Se aplica hasta que el admin edite el campo a mano.
+  const vencimientoSugerido = useMemo(() => {
+    const plazos = movimientos
+      .filter((m) => selectedMovs.has(m.id) && m.plazoPagoDias != null)
+      .map((m) => m.plazoPagoDias!);
+    return addDays(form.fecha, plazos.length > 0 ? Math.min(...plazos) : 30);
+  }, [movimientos, selectedMovs, form.fecha]);
+  const vencimientoEfectivo = vencEditado ? form.vencimiento : vencimientoSugerido;
 
   // ── Derivados del modo nota ──
+  // Total ya acreditado por NC (no rechazadas) sobre cada comprobante: entre
+  // todas las NC de una factura no se puede acreditar más que su total.
+  const acreditadoNcPorFactura = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const f of facturas) {
+      if (!f.facturaOriginalId || f.rechazada) continue;
+      if (!f.tipoFactura?.startsWith('nota_credito')) continue;
+      map.set(
+        f.facturaOriginalId,
+        (map.get(f.facturaOriginalId) ?? 0) + parseFloat(f.importe ?? '0'),
+      );
+    }
+    return map;
+  }, [facturas]);
   // Elegibles para NC/ND relacionada: mismas condiciones que el botón de la
-  // fila de la tabla (factura fiscal A/B/C con CAE), del socio elegido.
+  // fila de la tabla (factura fiscal A/B/C con CAE), del socio elegido. Para
+  // NC se excluyen las ya acreditadas por completo.
   const facturasDelSocio = useMemo(
     () =>
       form.socioId
@@ -517,33 +570,54 @@ function NuevaFacturaModal({
               (f.tipoFactura === 'factura_a' ||
                 f.tipoFactura === 'factura_b' ||
                 f.tipoFactura === 'factura_c') &&
-              f.cae,
+              f.cae &&
+              (!modoNota?.esNc ||
+                parseFloat(f.importe ?? '0') - (acreditadoNcPorFactura.get(f.id) ?? 0) > 0.001),
           )
         : [],
-    [facturas, form.socioId],
+    [facturas, form.socioId, modoNota, acreditadoNcPorFactura],
   );
   const notaFacturaSel = facturasDelSocio.find((f) => f.id === notaFacturaId) ?? null;
-  // "Anulación total" solo tiene sentido para NC relacionada a un comprobante.
+  const notaAcreditadoSel = notaFacturaSel
+    ? (acreditadoNcPorFactura.get(notaFacturaSel.id) ?? 0)
+    : 0;
+  const notaDisponibleSel = notaFacturaSel
+    ? Math.max(0, parseFloat(notaFacturaSel.importe ?? '0') - notaAcreditadoSel)
+    : 0;
+  // "Anulación total" solo tiene sentido para NC relacionada a un comprobante
+  // que todavía no tenga NC parciales (si las tiene, el total ya no se puede
+  // acreditar entero — queda solo el camino parcial por lo disponible).
   const notaMotivoOpts = useMemo(
     () =>
-      modoNota && modoNota.esNc && notaRelacionada
+      modoNota && modoNota.esNc && notaRelacionada && notaAcreditadoSel <= 0.001
         ? MOTIVO_OPTS
         : MOTIVO_OPTS.filter((o) => o.value !== 'anulacion_total'),
-    [modoNota, notaRelacionada],
+    [modoNota, notaRelacionada, notaAcreditadoSel],
   );
-  const notaNeedsImporte = !(modoNota?.esNc && notaRelacionada && notaMotivo === 'anulacion_total');
+  // Si el motivo guardado quedó en "anulación total" pero la factura elegida
+  // ya tiene NC parciales, cae a parcial (derivado, sin efecto).
+  const notaMotivoEf: MotivoNota =
+    notaMotivo === 'anulacion_total' && notaAcreditadoSel > 0.001
+      ? 'descuento_parcial'
+      : notaMotivo;
+  const notaNeedsImporte = !(
+    modoNota?.esNc &&
+    notaRelacionada &&
+    notaMotivoEf === 'anulacion_total'
+  );
   const notaImporteNum = parseFloat(notaImporte.replace(',', '.'));
 
   const isValid = modoNota
     ? Boolean(
         form.socioId &&
         (!notaRelacionada || notaFacturaId) &&
+        (notaRelacionada || (notaFecha && notaPeriodoDesde && notaPeriodoHasta)) &&
         (!notaNeedsImporte || notaImporteNum > 0),
       )
     : Boolean(
         form.socioId &&
         form.fecha &&
-        form.vencimiento &&
+        vencimientoEfectivo &&
         form.desde &&
         form.hasta &&
         selectedMovs.size > 0 &&
@@ -581,12 +655,16 @@ function NuevaFacturaModal({
     setForm((f) => ({ ...f, socioId: '' }));
     setMovimientos([]);
     setSelectedMovs(new Set());
+    setVencEditado(false);
     setCentroEmisorId(centroPrincipalId);
     setModoNota(null);
     setNotaRelacionada(true);
     setNotaFacturaId('');
     setNotaMotivo('bonificacion');
     setNotaImporte('');
+    setNotaFecha(todayIso());
+    setNotaPeriodoDesde(addDays(todayIso(), -30));
+    setNotaPeriodoHasta(todayIso());
     setNotaResult(null);
     setError(null);
     setSuccess(null);
@@ -604,17 +682,20 @@ function NuevaFacturaModal({
           ? await emitirNotaAsociadaAction({
               facturaOriginalId: notaFacturaId,
               esNc,
-              motivo: notaMotivo,
+              motivo: notaMotivoEf,
               importe: importeNum,
               descripcion: form.descripcion || undefined,
             })
           : await emitirNotaLibreAction({
               socioId: form.socioId,
               esNc,
-              motivo: notaMotivo,
+              motivo: notaMotivoEf,
               importe: importeNum!,
               descripcion: form.descripcion || undefined,
               centroEmisorId: centroEmisorId || undefined,
+              fecha: notaFecha,
+              periodoDesde: notaPeriodoDesde,
+              periodoHasta: notaPeriodoHasta,
             });
         if (res.error) {
           setError(res.error);
@@ -639,7 +720,7 @@ function NuevaFacturaModal({
         estado: form.estado as never,
         descripcion: form.descripcion,
         fecha: form.fecha,
-        vencimiento: form.vencimiento,
+        vencimiento: vencimientoEfectivo,
         desde: form.desde,
         hasta: form.hasta,
         itemKeys: seleccion.filter((m) => m.itemKey).map((m) => m.itemKey!),
@@ -751,6 +832,130 @@ function NuevaFacturaModal({
                 </div>
               </div>
 
+              {!modoNota && (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <label
+                      className="mb-1.5 block text-xs font-semibold"
+                      style={{ color: '#101828' }}
+                    >
+                      Fecha*
+                    </label>
+                    <input
+                      type="date"
+                      className={inputCls}
+                      value={form.fecha}
+                      onChange={set('fecha')}
+                    />
+                  </div>
+                  <div>
+                    <label
+                      className="mb-1.5 block text-xs font-semibold"
+                      style={{ color: '#101828' }}
+                    >
+                      Vencimiento*{' '}
+                      <span className="font-normal text-gray-400">(según tarifario)</span>
+                    </label>
+                    <input
+                      type="date"
+                      className={inputCls}
+                      value={vencimientoEfectivo}
+                      onChange={(e) => {
+                        setVencEditado(true);
+                        setForm((f) => ({ ...f, vencimiento: e.target.value }));
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* NC/ND sin comprobante de origen: fecha de emisión propia,
+              mismo formato que la factura. */}
+              {modoNota && !notaRelacionada && (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <label
+                      className="mb-1.5 block text-xs font-semibold"
+                      style={{ color: '#101828' }}
+                    >
+                      Fecha*
+                    </label>
+                    <input
+                      type="date"
+                      className={inputCls}
+                      value={notaFecha}
+                      onChange={(e) => setNotaFecha(e.target.value)}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Centro emisor: solo si el club tiene más de un punto de venta.
+              Para NC/ND relacionadas no se elige — salen por el mismo POS que
+              el comprobante original. */}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {centrosEmisores.length > 1 && (!modoNota || !notaRelacionada) && (
+                  <div>
+                    <label
+                      className="mb-1.5 block text-xs font-semibold"
+                      style={{ color: '#101828' }}
+                    >
+                      Centro emisor
+                    </label>
+                    <select
+                      className={inputCls}
+                      value={centroEmisorId}
+                      onChange={(e) => setCentroEmisorId(e.target.value)}
+                    >
+                      {centrosEmisores.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.nombre} — N.º {c.puntoDeVenta}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                <div>
+                  <label
+                    className="mb-1.5 block text-xs font-semibold"
+                    style={{ color: '#101828' }}
+                  >
+                    Tipo de comprobante
+                  </label>
+                  {/* Elegible entre los tipos válidos según la condición IVA del
+                  club; al elegir socio se preselecciona el sugerido según la
+                  condición del socio. NC/ND cambian el formulario al de la
+                  nota (relacionada o sin comprobante de origen). */}
+                  <select
+                    className={inputCls}
+                    value={
+                      modoNota ? (modoNota.esNc ? 'nota_credito' : 'nota_debito') : form.tipoFactura
+                    }
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setError(null);
+                      if (v === 'nota_credito' || v === 'nota_debito') {
+                        const esNc = v === 'nota_credito';
+                        setModoNota({ esNc });
+                        setNotaMotivo(esNc && notaRelacionada ? 'anulacion_total' : 'bonificacion');
+                        setNotaImporte('');
+                      } else {
+                        setModoNota(null);
+                        setForm((f) => ({ ...f, tipoFactura: v }));
+                      }
+                    }}
+                  >
+                    {tiposFacturaEmisibles(guarderiaCondicionIva).map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                    <option value="nota_credito">Nota de crédito</option>
+                    <option value="nota_debito">Nota de débito</option>
+                  </select>
+                </div>
+              </div>
+
               {/* Checklist de movimientos pendientes */}
               {form.socioId && !modoNota && (
                 <div className="rounded-[10px] border border-gray-100 bg-white">
@@ -813,47 +1018,8 @@ function NuevaFacturaModal({
                 </div>
               )}
 
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div>
-                  <label
-                    className="mb-1.5 block text-xs font-semibold"
-                    style={{ color: '#101828' }}
-                  >
-                    Tipo de comprobante
-                  </label>
-                  {/* Elegible entre los tipos válidos según la condición IVA del
-                  club; al elegir socio se preselecciona el sugerido según la
-                  condición del socio. NC/ND cambian el formulario al de la
-                  nota (relacionada o sin comprobante de origen). */}
-                  <select
-                    className={inputCls}
-                    value={
-                      modoNota ? (modoNota.esNc ? 'nota_credito' : 'nota_debito') : form.tipoFactura
-                    }
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      setError(null);
-                      if (v === 'nota_credito' || v === 'nota_debito') {
-                        const esNc = v === 'nota_credito';
-                        setModoNota({ esNc });
-                        setNotaMotivo(esNc && notaRelacionada ? 'anulacion_total' : 'bonificacion');
-                        setNotaImporte('');
-                      } else {
-                        setModoNota(null);
-                        setForm((f) => ({ ...f, tipoFactura: v }));
-                      }
-                    }}
-                  >
-                    {tiposFacturaEmisibles(guarderiaCondicionIva).map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                    <option value="nota_credito">Nota de crédito</option>
-                    <option value="nota_debito">Nota de débito</option>
-                  </select>
-                </div>
-                {!modoNota && (
+              {!modoNota && (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div>
                     <label
                       className="mb-1.5 block text-xs font-semibold"
@@ -873,31 +1039,21 @@ function NuevaFacturaModal({
                       ))}
                     </select>
                   </div>
-                )}
-              </div>
-
-              {/* Centro emisor: solo si el club tiene más de un punto de venta.
-              Para NC/ND relacionadas no se elige — salen por el mismo POS que
-              el comprobante original. */}
-              {centrosEmisores.length > 1 && (!modoNota || !notaRelacionada) && (
-                <div>
-                  <label
-                    className="mb-1.5 block text-xs font-semibold"
-                    style={{ color: '#101828' }}
-                  >
-                    Centro emisor
-                  </label>
-                  <select
-                    className={inputCls}
-                    value={centroEmisorId}
-                    onChange={(e) => setCentroEmisorId(e.target.value)}
-                  >
-                    {centrosEmisores.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.nombre} — N.º {c.puntoDeVenta}
-                      </option>
-                    ))}
-                  </select>
+                  <div>
+                    <label
+                      className="mb-1.5 block text-xs font-semibold"
+                      style={{ color: '#101828' }}
+                    >
+                      Forma de pago
+                    </label>
+                    <select className={inputCls} value={form.medioPago} onChange={set('medioPago')}>
+                      {MEDIO_PAGO_OPTS.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               )}
 
@@ -993,7 +1149,7 @@ function NuevaFacturaModal({
                     </label>
                     <select
                       className={inputCls}
-                      value={notaMotivo}
+                      value={notaMotivoEf}
                       onChange={(e) => {
                         setNotaMotivo(e.target.value as MotivoNota);
                         setNotaImporte('');
@@ -1016,7 +1172,9 @@ function NuevaFacturaModal({
                         Importe {modoNota.esNc ? 'a acreditar' : 'a debitar'}
                         {notaRelacionada && notaFacturaSel && (
                           <span className="ml-1 font-normal text-gray-400">
-                            (máx. {fmtMoney(notaFacturaSel.importe)})
+                            {modoNota.esNc && notaAcreditadoSel > 0.001
+                              ? `(disponible ${fmtMoney(notaDisponibleSel)} de ${fmtMoney(notaFacturaSel.importe)} — ya acreditado ${fmtMoney(notaAcreditadoSel)})`
+                              : `(máx. ${fmtMoney(modoNota.esNc ? notaDisponibleSel : parseFloat(notaFacturaSel.importe ?? '0'))})`}
                           </span>
                         )}
                       </label>
@@ -1046,62 +1204,56 @@ function NuevaFacturaModal({
                 />
               </div>
 
+              {/* NC/ND sin comprobante de origen: ARCA exige asociar la nota a
+              comprobantes o a un período — acá va el período. */}
+              {modoNota && !notaRelacionada && (
+                <div>
+                  <p className="mb-1.5 text-xs font-semibold" style={{ color: '#101828' }}>
+                    Período asociado{' '}
+                    <span className="font-normal text-gray-400">
+                      (rango de fechas al que corresponde la nota — se informa a ARCA en lugar de un
+                      comprobante puntual)
+                    </span>
+                  </p>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-1.5 block text-xs font-semibold text-gray-500">
+                        Desde*
+                      </label>
+                      <input
+                        type="date"
+                        className={inputCls}
+                        value={notaPeriodoDesde}
+                        onChange={(e) => setNotaPeriodoDesde(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1.5 block text-xs font-semibold text-gray-500">
+                        Hasta*
+                      </label>
+                      <input
+                        type="date"
+                        className={inputCls}
+                        value={notaPeriodoHasta}
+                        onChange={(e) => setNotaPeriodoHasta(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {!modoNota && (
-                <>
-                  <div>
-                    <label
-                      className="mb-1.5 block text-xs font-semibold"
-                      style={{ color: '#101828' }}
-                    >
-                      Forma de pago
-                    </label>
-                    <select className={inputCls} value={form.medioPago} onChange={set('medioPago')}>
-                      {MEDIO_PAGO_OPTS.map((o) => (
-                        <option key={o.value} value={o.value}>
-                          {o.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
+                <div>
+                  <p className="mb-1.5 text-xs font-semibold" style={{ color: '#101828' }}>
+                    Período facturado{' '}
+                    <span className="font-normal text-gray-400">
+                      (a qué rango de fechas corresponde el servicio — se informa a ARCA)
+                    </span>
+                  </p>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div>
-                      <label
-                        className="mb-1.5 block text-xs font-semibold"
-                        style={{ color: '#101828' }}
-                      >
-                        Fecha*
-                      </label>
-                      <input
-                        type="date"
-                        className={inputCls}
-                        value={form.fecha}
-                        onChange={set('fecha')}
-                      />
-                    </div>
-                    <div>
-                      <label
-                        className="mb-1.5 block text-xs font-semibold"
-                        style={{ color: '#101828' }}
-                      >
-                        Vencimiento*
-                      </label>
-                      <input
-                        type="date"
-                        className={inputCls}
-                        value={form.vencimiento}
-                        onChange={set('vencimiento')}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <div>
-                      <label
-                        className="mb-1.5 block text-xs font-semibold"
-                        style={{ color: '#101828' }}
-                      >
-                        Período desde*
+                      <label className="mb-1.5 block text-xs font-semibold text-gray-500">
+                        Desde*
                       </label>
                       <input
                         type="date"
@@ -1111,11 +1263,8 @@ function NuevaFacturaModal({
                       />
                     </div>
                     <div>
-                      <label
-                        className="mb-1.5 block text-xs font-semibold"
-                        style={{ color: '#101828' }}
-                      >
-                        Período hasta*
+                      <label className="mb-1.5 block text-xs font-semibold text-gray-500">
+                        Hasta*
                       </label>
                       <input
                         type="date"
@@ -1125,7 +1274,7 @@ function NuevaFacturaModal({
                       />
                     </div>
                   </div>
-                </>
+                </div>
               )}
 
               {error && (
@@ -1143,27 +1292,84 @@ function NuevaFacturaModal({
             </div>
 
             <div className="border-t border-gray-200 p-6">
-              {/* Total destacado */}
+              {/* Desglose + total destacado. Regla del cuadro de condiciones IVA:
+              Factura A discrimina (neto + IVA), Factura B no discrimina (IVA
+              incluido en el bruto), Factura C (club Monotributo) no lleva IVA. */}
               {!modoNota && form.socioId && selectedMovs.size > 0 && (
                 <div className="mb-4 rounded-[10px] bg-gray-50 px-4 py-3">
+                  {form.tipoFactura === 'factura_a' ? (
+                    <div className="mb-1.5 space-y-1 border-b border-gray-200 pb-1.5">
+                      <div className="flex items-center justify-between text-sm text-gray-600">
+                        <p>Importe neto</p>
+                        <p>{fmtMoney(netoSeleccionado)}</p>
+                      </div>
+                      <div className="flex items-center justify-between text-sm text-gray-600">
+                        <p>IVA</p>
+                        <p>{fmtMoney(ivaSeleccionado)}</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="mb-1.5 border-b border-gray-200 pb-1.5 text-xs text-gray-400">
+                      {form.tipoFactura === 'factura_c'
+                        ? 'Sin IVA — Factura C (Monotributo)'
+                        : 'IVA incluido — la Factura B no lo discrimina'}
+                    </p>
+                  )}
                   <div className="flex items-center justify-between">
                     <p className="text-sm font-semibold" style={{ color: '#101828' }}>
-                      Total a emitir
+                      Importe bruto (total a emitir)
                     </p>
                     <p className="text-lg font-bold" style={{ color: '#175861' }}>
                       {fmtMoney(totalSeleccionado)}
                     </p>
                   </div>
-                  {alicuotaSeleccionada > 0 ? (
-                    <p className="mt-1 text-right text-xs text-gray-500">
-                      {fmtMoney(netoSeleccionado)} + IVA {alicuotaSeleccionada}% (
-                      {fmtMoney(totalSeleccionado - netoSeleccionado)})
-                    </p>
-                  ) : (
-                    <p className="mt-1 text-right text-xs text-gray-400">Exento / No gravado</p>
-                  )}
                 </div>
               )}
+              {/* Mismo desglose para NC/ND (las notas van a una sola alícuota,
+              21% — ver alicuotaPara() en facturacion.ts). */}
+              {modoNota &&
+                (() => {
+                  const total = notaNeedsImporte
+                    ? Number.isFinite(notaImporteNum)
+                      ? notaImporteNum
+                      : 0
+                    : parseFloat(notaFacturaSel?.importe ?? '0');
+                  if (!(total > 0)) return null;
+                  const tipoNota = notaRelacionada
+                    ? (notaFacturaSel?.tipoFactura ?? form.tipoFactura)
+                    : form.tipoFactura;
+                  const neto = tipoNota === 'factura_c' ? total : total / 1.21;
+                  return (
+                    <div className="mb-4 rounded-[10px] bg-gray-50 px-4 py-3">
+                      {tipoNota === 'factura_a' ? (
+                        <div className="mb-1.5 space-y-1 border-b border-gray-200 pb-1.5">
+                          <div className="flex items-center justify-between text-sm text-gray-600">
+                            <p>Importe neto</p>
+                            <p>{fmtMoney(neto)}</p>
+                          </div>
+                          <div className="flex items-center justify-between text-sm text-gray-600">
+                            <p>IVA</p>
+                            <p>{fmtMoney(total - neto)}</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="mb-1.5 border-b border-gray-200 pb-1.5 text-xs text-gray-400">
+                          {tipoNota === 'factura_c'
+                            ? 'Sin IVA — comprobante C (Monotributo)'
+                            : 'IVA incluido — el comprobante B no lo discrimina'}
+                        </p>
+                      )}
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-semibold" style={{ color: '#101828' }}>
+                          Importe bruto (total {modoNota.esNc ? 'a acreditar' : 'a debitar'})
+                        </p>
+                        <p className="text-lg font-bold" style={{ color: '#175861' }}>
+                          {fmtMoney(total)}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })()}
               <div className="flex gap-3">
                 <button
                   onClick={handleClose}
@@ -1524,10 +1730,12 @@ function LoteModal({
   open,
   onClose,
   socios,
+  guarderiaCondicionIva,
 }: {
   open: boolean;
   onClose: () => void;
   socios: Socio[];
+  guarderiaCondicionIva: string | null;
 }) {
   const router = useRouter();
 
@@ -1633,6 +1841,27 @@ function LoteModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [deselected, elegibles],
   );
+
+  // Desglose Neto/IVA de todo lo seleccionado con la alícuota real de cada
+  // tarifa (fallback 21%). Club Monotributo → Factura C, sin IVA: no aplica.
+  const clubMonotributo = guarderiaCondicionIva === 'monotributo';
+  const netoSeleccionado = useMemo(() => {
+    if (clubMonotributo) return totalSeleccionado;
+    return elegibles.reduce((sum, s) => {
+      return (
+        sum +
+        s.movsFiltrados
+          .filter((m) => isMovSel(s.id, m.id))
+          .reduce((s2, m) => {
+            const bruto = parseFloat(m.debe ?? '0');
+            const ali = m.alicuotaIva ?? 21;
+            return s2 + (ali > 0 ? bruto / (1 + ali / 100) : bruto);
+          }, 0)
+      );
+    }, 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deselected, elegibles, clubMonotributo, totalSeleccionado]);
+  const ivaSeleccionado = totalSeleccionado - netoSeleccionado;
 
   const allSelected = elegibles.every((s) => s.movsFiltrados.every((m) => isMovSel(s.id, m.id)));
 
@@ -1923,6 +2152,36 @@ function LoteModal({
         </div>
 
         <div className="border-t border-gray-200 p-6">
+          {/* Desglose + total. Regla del cuadro de condiciones IVA: club RI
+          discrimina neto + IVA; club Monotributo emite Factura C sin IVA. */}
+          {!result && sociosConSel > 0 && (
+            <div className="mb-4 rounded-[10px] bg-gray-50 px-4 py-3">
+              {clubMonotributo ? (
+                <p className="mb-1.5 border-b border-gray-200 pb-1.5 text-xs text-gray-400">
+                  Sin IVA — Factura C (Monotributo)
+                </p>
+              ) : (
+                <div className="mb-1.5 space-y-1 border-b border-gray-200 pb-1.5">
+                  <div className="flex items-center justify-between text-sm text-gray-600">
+                    <p>Importe neto</p>
+                    <p>{fmtMoney(netoSeleccionado)}</p>
+                  </div>
+                  <div className="flex items-center justify-between text-sm text-gray-600">
+                    <p>IVA</p>
+                    <p>{fmtMoney(ivaSeleccionado)}</p>
+                  </div>
+                </div>
+              )}
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold" style={{ color: '#101828' }}>
+                  Importe bruto (total a emitir)
+                </p>
+                <p className="text-lg font-bold" style={{ color: '#175861' }}>
+                  {fmtMoney(totalSeleccionado)}
+                </p>
+              </div>
+            </div>
+          )}
           <div className="flex gap-3">
             <button
               onClick={handleClose}
@@ -2417,10 +2676,13 @@ function NotaCreditoModal({
   open,
   onClose,
   factura,
+  acreditado,
 }: {
   open: boolean;
   onClose: () => void;
   factura: Factura | null;
+  // Total ya acreditado por NC anteriores (no rechazadas) sobre esta factura.
+  acreditado: number;
 }) {
   const router = useRouter();
   const [esNc, setEsNc] = useState(true);
@@ -2438,7 +2700,13 @@ function NotaCreditoModal({
   if (!open || !factura) return null;
 
   const importeOriginal = parseFloat(factura.importe ?? '0');
-  const needsImporte = !(esNc && motivo === 'anulacion_total');
+  // Entre todas las NC de una factura no se puede acreditar más que su total.
+  // Con NC previas, "anulación total" deja de aplicar: cae a parcial por lo
+  // disponible (derivado, sin efecto).
+  const disponible = Math.max(0, importeOriginal - acreditado);
+  const motivoEf: MotivoNota =
+    esNc && motivo === 'anulacion_total' && acreditado > 0.001 ? 'descuento_parcial' : motivo;
+  const needsImporte = !(esNc && motivoEf === 'anulacion_total');
   const tipoNota = esNc ? 'NC' : 'ND';
 
   function handleSubmit() {
@@ -2449,7 +2717,7 @@ function NotaCreditoModal({
       const res = await emitirNotaAsociadaAction({
         facturaOriginalId: factura.id,
         esNc,
-        motivo,
+        motivo: motivoEf,
         importe: importeNum,
         descripcion: descripcion || undefined,
       });
@@ -2546,17 +2814,19 @@ function NotaCreditoModal({
                 </label>
                 <select
                   className={inputCls}
-                  value={motivo}
+                  value={motivoEf}
                   onChange={(e) => {
                     setMotivo(e.target.value as MotivoNota);
                     setImporte('');
                   }}
                 >
-                  {motivoOptsPara(esNc).map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
+                  {motivoOptsPara(esNc)
+                    .filter((o) => o.value !== 'anulacion_total' || acreditado <= 0.001)
+                    .map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
                 </select>
               </div>
 
@@ -2568,13 +2838,15 @@ function NotaCreditoModal({
                   >
                     Importe {esNc ? 'a acreditar' : 'a debitar'}
                     <span className="ml-1 font-normal text-gray-400">
-                      (máx. {fmtMoney(factura.importe)})
+                      {esNc && acreditado > 0.001
+                        ? `(disponible ${fmtMoney(disponible)} de ${fmtMoney(factura.importe)} — ya acreditado ${fmtMoney(acreditado)})`
+                        : `(máx. ${fmtMoney(esNc ? disponible : importeOriginal)})`}
                     </span>
                   </label>
                   <input
                     className={inputCls}
                     inputMode="decimal"
-                    placeholder={`0,00 (máx ${importeOriginal.toFixed(2)})`}
+                    placeholder={`0,00 (máx ${(esNc ? disponible : importeOriginal).toFixed(2)})`}
                     value={importe}
                     onChange={(e) => setImporte(e.target.value)}
                   />
@@ -2636,10 +2908,13 @@ function NotaCreditoInternaModal({
   open,
   onClose,
   factura,
+  acreditado,
 }: {
   open: boolean;
   onClose: () => void;
   factura: Factura | null;
+  // Total ya acreditado por NC internas anteriores sobre este comprobante.
+  acreditado: number;
 }) {
   const router = useRouter();
   const [motivo, setMotivo] = useState<MotivoNota>('anulacion_total');
@@ -2652,7 +2927,12 @@ function NotaCreditoInternaModal({
   if (!open || !factura) return null;
 
   const importeOriginal = parseFloat(factura.importe ?? '0');
-  const needsImporte = motivo !== 'anulacion_total';
+  // Mismo tope acumulado que las NC fiscales: con NC internas previas,
+  // "anulación total" cae a parcial por lo disponible.
+  const disponible = Math.max(0, importeOriginal - acreditado);
+  const motivoEf: MotivoNota =
+    motivo === 'anulacion_total' && acreditado > 0.001 ? 'descuento_parcial' : motivo;
+  const needsImporte = motivoEf !== 'anulacion_total';
 
   function handleSubmit() {
     if (!factura) return;
@@ -2661,7 +2941,7 @@ function NotaCreditoInternaModal({
     startTransition(async () => {
       const res = await emitirNotaCreditoInternaAction({
         facturaOriginalId: factura.id,
-        motivo,
+        motivo: motivoEf,
         importe: importeNum,
         descripcion: descripcion || undefined,
       });
@@ -2730,13 +3010,15 @@ function NotaCreditoInternaModal({
                 </label>
                 <select
                   className={inputCls}
-                  value={motivo}
+                  value={motivoEf}
                   onChange={(e) => {
                     setMotivo(e.target.value as MotivoNota);
                     setImporte('');
                   }}
                 >
-                  {MOTIVO_OPTS.map((o) => (
+                  {MOTIVO_OPTS.filter(
+                    (o) => o.value !== 'anulacion_total' || acreditado <= 0.001,
+                  ).map((o) => (
                     <option key={o.value} value={o.value}>
                       {o.label}
                     </option>
@@ -2752,13 +3034,15 @@ function NotaCreditoInternaModal({
                   >
                     Importe a acreditar
                     <span className="ml-1 font-normal text-gray-400">
-                      (máx. {fmtMoney(factura.importe)})
+                      {acreditado > 0.001
+                        ? `(disponible ${fmtMoney(disponible)} de ${fmtMoney(factura.importe)} — ya acreditado ${fmtMoney(acreditado)})`
+                        : `(máx. ${fmtMoney(disponible)})`}
                     </span>
                   </label>
                   <input
                     className={inputCls}
                     inputMode="decimal"
-                    placeholder={`0,00 (máx ${importeOriginal.toFixed(2)})`}
+                    placeholder={`0,00 (máx ${disponible.toFixed(2)})`}
                     value={importe}
                     onChange={(e) => setImporte(e.target.value)}
                   />
@@ -3320,6 +3604,22 @@ export function VentasClient({
       ),
     [facturas],
   );
+
+  // Total acreditado por NC (fiscales e internas, no rechazadas) sobre cada
+  // comprobante — entre todas las NC de un comprobante no se puede acreditar
+  // más que su total, así que las nuevas se topean a lo disponible.
+  const acreditadoNcPorFactura = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const f of facturas) {
+      if (!f.facturaOriginalId || f.rechazada) continue;
+      if (!f.tipoFactura?.startsWith('nota_credito')) continue;
+      map.set(
+        f.facturaOriginalId,
+        (map.get(f.facturaOriginalId) ?? 0) + parseFloat(f.importe ?? '0'),
+      );
+    }
+    return map;
+  }, [facturas]);
   const esNcEligible = (f: Factura) =>
     ['factura_a', 'factura_b', 'factura_c'].includes(f.tipoFactura ?? '') &&
     Boolean(f.cae) &&
@@ -3490,7 +3790,12 @@ export function VentasClient({
         facturas={facturas}
         centrosEmisores={centrosEmisores}
       />
-      <LoteModal open={loteOpen} onClose={() => setLoteOpen(false)} socios={socios} />
+      <LoteModal
+        open={loteOpen}
+        onClose={() => setLoteOpen(false)}
+        socios={socios}
+        guarderiaCondicionIva={guarderiaCondicionIva}
+      />
       <ComprobanteInternoManualModal
         open={comprobanteInternoOpen}
         onClose={() => setComprobanteInternoOpen(false)}
@@ -3506,11 +3811,19 @@ export function VentasClient({
         onClose={() => setPagarFactura(null)}
         factura={pagarFactura}
       />
-      <NotaCreditoModal open={!!ncFactura} onClose={() => setNcFactura(null)} factura={ncFactura} />
+      <NotaCreditoModal
+        open={!!ncFactura}
+        onClose={() => setNcFactura(null)}
+        factura={ncFactura}
+        acreditado={ncFactura ? (acreditadoNcPorFactura.get(ncFactura.id) ?? 0) : 0}
+      />
       <NotaCreditoInternaModal
         open={!!ncInternaComprobante}
         onClose={() => setNcInternaComprobante(null)}
         factura={ncInternaComprobante}
+        acreditado={
+          ncInternaComprobante ? (acreditadoNcPorFactura.get(ncInternaComprobante.id) ?? 0) : 0
+        }
       />
       {reenviarFactura && (
         <ReenviarFacturaModal
@@ -4028,16 +4341,27 @@ export function VentasClient({
                         <td className="px-4 py-3 text-gray-500">{f.centroEmisor}</td>
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-end gap-1">
-                            {(f.codigo?.startsWith('CM-') || f.codigo?.startsWith('CL-')) && (
-                              <button
-                                type="button"
-                                onClick={() => setNcInternaComprobante(f)}
-                                title="Emitir Nota de Crédito interna"
-                                className="rounded-[6px] p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-[#175861]"
-                              >
-                                <CornerDownLeft className="h-4 w-4" />
-                              </button>
-                            )}
+                            {(f.codigo?.startsWith('CM-') || f.codigo?.startsWith('CL-')) &&
+                              (() => {
+                                const agotado =
+                                  (acreditadoNcPorFactura.get(f.id) ?? 0) >=
+                                  parseFloat(f.importe ?? '0') - 0.001;
+                                return (
+                                  <button
+                                    type="button"
+                                    onClick={() => setNcInternaComprobante(f)}
+                                    disabled={agotado}
+                                    title={
+                                      agotado
+                                        ? 'Ya acreditado por completo por NC internas'
+                                        : 'Emitir Nota de Crédito interna'
+                                    }
+                                    className="rounded-[6px] p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-[#175861] disabled:opacity-30 disabled:hover:bg-transparent"
+                                  >
+                                    <CornerDownLeft className="h-4 w-4" />
+                                  </button>
+                                );
+                              })()}
                             <a
                               href={`/ventas/recibo/${f.id}`}
                               target="_blank"

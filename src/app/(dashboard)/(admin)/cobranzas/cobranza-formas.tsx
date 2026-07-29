@@ -192,7 +192,7 @@ function Linea({
         )}
 
         {/* Monto en pesos (no para dólares, que es derivado). Con una sola
-            forma de pago, sigue automáticamente al "Monto a pagar" de
+            forma de pago, sigue automáticamente al "Monto a cobrar" de
             arriba — no tiene sentido pedirle al admin que escriba el mismo
             número dos veces (y era la causa de que un pago parcial pareciera
             bloqueado: bastaba con que este campo no se actualizara solo). */}
@@ -203,7 +203,7 @@ function Linea({
                 className={`${inputCls} bg-gray-50 text-gray-500`}
                 value={forma.monto}
                 disabled
-                title="Sigue al Monto a pagar de arriba"
+                title="Sigue al Monto a cobrar de arriba"
               />
             </Field>
           ) : (

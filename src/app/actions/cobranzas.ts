@@ -48,9 +48,18 @@ function medioPagoDeFormas(formas: { tipo: string }[]): string | null {
 
 const MARCA_TARJETA: Record<string, string> = { '1': 'Visa', '2': 'Mastercard', '65': 'Amex' };
 
-// Tipos de comprobante que entran a la cobranza: facturas fiscales + recibos
+// Tipos de comprobante que entran a la cobranza: facturas fiscales, notas de
+// débito (deuda nueva del socio, se cobran igual que una factura) y recibos
 // internos. Se excluyen explícitamente las notas de crédito.
-const TIPOS_COBRABLES = ['factura_a', 'factura_b', 'factura_c', 'recibo'] as const;
+const TIPOS_COBRABLES = [
+  'factura_a',
+  'factura_b',
+  'factura_c',
+  'nota_debito_a',
+  'nota_debito_b',
+  'nota_debito_c',
+  'recibo',
+] as const;
 
 export type ComprobantePendiente = {
   id: string;
@@ -281,12 +290,12 @@ export async function registrarCobranzaAction(data: RegistrarCobranzaData): Prom
 
   const montoAPagar = parseFloat(data.montoAPagar);
   if (!Number.isFinite(montoAPagar) || montoAPagar <= 0)
-    return { error: 'El monto a pagar debe ser mayor a 0.' };
+    return { error: 'El monto a cobrar debe ser mayor a 0.' };
 
   // La suma de las formas tiene que dar el monto a pagar (no se confía en el cliente).
   const sumaFormas = data.formas.reduce((acc, f) => acc + (parseFloat(f.monto) || 0), 0);
   if (Math.abs(sumaFormas - montoAPagar) > 0.01)
-    return { error: 'La suma de las formas de pago no coincide con el monto a pagar.' };
+    return { error: 'La suma de las formas de pago no coincide con el monto a cobrar.' };
 
   const gId = ctx.activeMembership.guarderiaId;
 
@@ -453,7 +462,16 @@ export async function registrarCobranzaAction(data: RegistrarCobranzaData): Prom
 
 // ─── Anular un recibo de cobranza (reversa total) ──────────────────────────────
 
-const TIPOS_FISCALES = ['factura_a', 'factura_b', 'factura_c'];
+// Incluye las ND: su cargo nace 'facturado' (tiene comprobante fiscal propio),
+// igual que el de una factura.
+const TIPOS_FISCALES = [
+  'factura_a',
+  'factura_b',
+  'factura_c',
+  'nota_debito_a',
+  'nota_debito_b',
+  'nota_debito_c',
+];
 
 // Anular = deshacer el cobro: revierte el pago (borra el haber), devuelve los
 // comprobantes cobrados a 'pendiente' y sus cargos al estado previo (fiscal →

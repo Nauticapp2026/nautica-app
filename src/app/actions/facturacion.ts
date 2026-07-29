@@ -135,7 +135,11 @@ function derivarTipoFactura(
   socioCondicion: string | null,
 ): TipoFactura {
   if (guarderiaCondicion !== 'responsable_inscripto') return 'factura_c';
-  if (socioCondicion === 'responsable_inscripto') return 'factura_a';
+  // Socios RI y Monotributistas reciben Factura A (cuadro del cliente:
+  // a los monotributistas les corresponde A, no B).
+  if (socioCondicion === 'responsable_inscripto' || socioCondicion === 'monotributo') {
+    return 'factura_a';
+  }
   return 'factura_b';
 }
 
@@ -1245,6 +1249,10 @@ export type PendienteEmision = {
   esProporcional: boolean;
   esVariable: boolean;
   origen: 'contrato' | 'espacio' | 'baja' | 'legacy';
+  /** Alícuota IVA de la tarifa — para el desglose Neto/IVA del modal. */
+  alicuotaIva: number | null;
+  /** Plazo de cobro (días) de la tarifa — para sugerir el vencimiento. */
+  plazoPagoDias: number | null;
 };
 
 function itemPendienteARow(item: ItemPendiente): PendienteEmision {
@@ -1258,6 +1266,8 @@ function itemPendienteARow(item: ItemPendiente): PendienteEmision {
     esProporcional: item.esProporcional,
     esVariable: item.esVariable,
     origen: item.origen,
+    alicuotaIva: item.alicuotaIva,
+    plazoPagoDias: item.plazoPagoDias,
   };
 }
 
@@ -1295,6 +1305,8 @@ export async function getPendientesEmisionAction(
       concepto: movimientosCuentaCorriente.concepto,
       debe: movimientosCuentaCorriente.debe,
       tipoServicio: servicios.tipo,
+      alicuotaIva: servicios.alicuotaIva,
+      plazoPagoDias: servicios.plazoPagoDias,
     })
     .from(movimientosCuentaCorriente)
     .leftJoin(servicios, eq(servicios.id, movimientosCuentaCorriente.servicioId))
@@ -1328,6 +1340,8 @@ export async function getPendientesEmisionAction(
         esProporcional: false,
         esVariable: false,
         origen: 'legacy' as const,
+        alicuotaIva: r.alicuotaIva != null ? Number(r.alicuotaIva) : null,
+        plazoPagoDias: r.plazoPagoDias,
       })),
     ],
   };
@@ -1415,30 +1429,33 @@ export async function markInvoicePaidAction(
       .update(facturacion)
       .set({ estado: 'pagada', medioPago })
       .where(and(eq(facturacion.id, id), eq(facturacion.guarderiaId, gId)))
-      .returning({ socioId: facturacion.socioId });
+      .returning({ socioId: facturacion.socioId, movimientoId: facturacion.movimientoId });
 
     if (!updated) return { error: 'Factura no encontrada.' };
 
-    // Propagar estado 'pagado' a los movimientos vinculados a esta factura
+    // Propagar estado 'pagado' a los movimientos vinculados a esta factura:
+    // M:N (facturas con items) + link directo (Notas de Débito, comprobantes
+    // internos con movimiento propio).
     const items = await db
       .select({ id: facturacionItems.id })
       .from(facturacionItems)
       .where(eq(facturacionItems.facturacionId, id));
 
+    const movIds = new Set<string>();
+    if (updated.movimientoId) movIds.add(updated.movimientoId);
     if (items.length > 0) {
       const itemIds = items.map((i) => i.id);
       const links = await db
         .select({ movimientoId: facturacionItemMovimientos.movimientoId })
         .from(facturacionItemMovimientos)
         .where(inArray(facturacionItemMovimientos.facturacionItemId, itemIds));
-
-      const movIds = links.map((l) => l.movimientoId);
-      if (movIds.length > 0) {
-        await db
-          .update(movimientosCuentaCorriente)
-          .set({ estado: 'pagado' })
-          .where(inArray(movimientosCuentaCorriente.id, movIds));
-      }
+      for (const l of links) movIds.add(l.movimientoId);
+    }
+    if (movIds.size > 0) {
+      await db
+        .update(movimientosCuentaCorriente)
+        .set({ estado: 'pagado' })
+        .where(inArray(movimientosCuentaCorriente.id, [...movIds]));
     }
 
     revalidatePath('/ventas');
@@ -2072,8 +2089,10 @@ async function cargarCredsGuarderia(
 /**
  * Arma el payload de NC/ND y lo emite en TusFacturas. `asociado` es opcional:
  * si viene, se manda `comprobantes_asociados` (camino "asociada"); si no, se
- * omite (camino "libre"). Nunca se manda `pagos` — ni la NC ni la ND lo
- * aceptan (confirmado contra la documentación oficial de TusFacturas).
+ * manda `comprobantes_asociados_periodo` (camino "libre" — ARCA exige uno de
+ * los dos bloques, una nota sin ninguno se rechaza). Nunca se manda `pagos` —
+ * ni la NC ni la ND lo aceptan (confirmado contra la documentación oficial de
+ * TusFacturas).
  */
 async function emitirNotaTusFacturas(params: {
   notaId: string;
@@ -2085,16 +2104,25 @@ async function emitirNotaTusFacturas(params: {
   guarderia: { puntoDeVenta: number | null; rubro: string | null };
   creds: TusFacturasCredentials;
   asociado?: TusFacturasComprobanteAsociado;
+  /** Fecha de emisión (formato TusFecha). Default: hoy. */
+  fecha?: string;
   /** Inicio del período facturado (formato TusFecha). Default: hoy. */
   periodoDesde?: string;
+  /** Fin del período facturado (formato TusFecha). Default: hoy. */
+  periodoHasta?: string;
+  /** Rango asociado (formato TusFecha) para notas SIN comprobante de origen:
+   *  se manda como `comprobantes_asociados_periodo`. Ignorado si hay
+   *  `asociado`. */
+  periodoAsociado?: { desde: string; hasta: string };
 }) {
   const notaId = params.notaId;
   const hoy = toTusFecha(new Date());
+  const fecha = params.fecha ?? hoy;
   const tipoApi = params.esNc ? TIPO_NC_API[params.tipoFactura] : TIPO_ND_API[params.tipoFactura];
 
   const comprobante: TusFacturasComprobante = {
-    fecha: hoy,
-    vencimiento: hoy,
+    fecha,
+    vencimiento: fecha,
     tipo: tipoApi,
     idioma: 1,
     external_reference: notaId,
@@ -2103,7 +2131,7 @@ async function emitirNotaTusFacturas(params: {
     moneda: 'PES',
     cotizacion: 1,
     periodo_facturado_desde: params.periodoDesde ?? hoy,
-    periodo_facturado_hasta: hoy,
+    periodo_facturado_hasta: params.periodoHasta ?? hoy,
     rubro: params.guarderia.rubro ?? 'Servicios náuticos',
     rubro_grupo_contable: process.env.TUSFACTURAS_RUBRO_GRUPO ?? 'Servicios',
     detalle: buildDetalle(
@@ -2111,7 +2139,16 @@ async function emitirNotaTusFacturas(params: {
       params.tipoFactura,
     ),
     total: params.importe.toFixed(2),
-    ...(params.asociado ? { comprobantes_asociados: [params.asociado] } : {}),
+    ...(params.asociado
+      ? { comprobantes_asociados: [params.asociado] }
+      : params.periodoAsociado
+        ? {
+            comprobantes_asociados_periodo: {
+              fecha_desde: params.periodoAsociado.desde,
+              fecha_hasta: params.periodoAsociado.hasta,
+            },
+          }
+        : {}),
   };
 
   const apiResponse = await crearFactura({ cliente: params.cliente, comprobante }, params.creds);
@@ -2231,8 +2268,40 @@ export async function emitirNotaAsociadaAction(
   // (completar automáticamente el importe original en una ND implicaría
   // cobrarle al socio el doble, así que ahí el importe siempre es manual).
   const importeOriginal = parseFloat(original.importe ?? '0');
+
+  // Tope ACUMULADO (solo NC): entre todas las notas de crédito de una misma
+  // factura no se puede acreditar más que su total — sería devolver plata que
+  // nunca se facturó. Las NC rechazadas por ARCA no cuentan.
+  let disponibleNc = importeOriginal;
+  if (data.esNc) {
+    const previas = await db
+      .select({ importe: facturacion.importe, rechazada: facturacion.rechazada })
+      .from(facturacion)
+      .where(
+        and(
+          eq(facturacion.guarderiaId, gId),
+          eq(facturacion.facturaOriginalId, data.facturaOriginalId),
+          inArray(facturacion.tipoFactura, ['nota_credito_a', 'nota_credito_b', 'nota_credito_c']),
+        ),
+      );
+    const acreditado = previas
+      .filter((p) => !p.rechazada)
+      .reduce((s, p) => s + parseFloat(p.importe ?? '0'), 0);
+    disponibleNc = importeOriginal - acreditado;
+    if (disponibleNc <= 0.001) {
+      return {
+        error: `La factura ${original.codigo} ya fue acreditada por completo por notas de crédito anteriores.`,
+      };
+    }
+  }
+
   let importeNota: number;
   if (data.esNc && data.motivo === 'anulacion_total') {
+    if (disponibleNc < importeOriginal - 0.001) {
+      return {
+        error: `Esta factura ya tiene notas de crédito por $${(importeOriginal - disponibleNc).toFixed(2)}: no se puede anular por el total. Emití una NC parcial de hasta $${disponibleNc.toFixed(2)}.`,
+      };
+    }
     importeNota = importeOriginal;
   } else {
     if (!data.importe || data.importe <= 0) {
@@ -2241,6 +2310,11 @@ export async function emitirNotaAsociadaAction(
     if (data.importe > importeOriginal) {
       return {
         error: `El importe de la ${tipoNota} no puede superar el total de la factura original.`,
+      };
+    }
+    if (data.esNc && data.importe > disponibleNc + 0.001) {
+      return {
+        error: `Entre todas las NC de una factura no se puede acreditar más que su total: quedan disponibles $${disponibleNc.toFixed(2)} de $${importeOriginal.toFixed(2)}.`,
       };
     }
     importeNota = data.importe;
@@ -2343,7 +2417,10 @@ export async function emitirNotaAsociadaAction(
       guarderiaId: gId,
       socioId: original.socioId,
       tipoFactura: tipoNotaFactura as never,
-      estado: 'pagada',
+      // NC nace 'pagada' (un crédito no queda pendiente de cobro). La ND es
+      // deuda nueva del socio, igual que una factura: nace 'pendiente' para
+      // entrar al circuito de cobro (Cobranzas, KPIs, estado en Ventas).
+      estado: data.esNc ? 'pagada' : 'pendiente',
       codigo: apiResponse.comprobante_nro ?? null,
       folioLocal,
       archivo: apiResponse.comprobante_pdf_url ?? null,
@@ -2462,15 +2539,43 @@ export async function emitirNotaCreditoInternaAction(
   if (!original.socioId) return { error: 'El comprobante no tiene socio asociado.' };
 
   const importeOriginal = parseFloat(original.importe ?? '0');
+
+  // Tope acumulado, igual que en las NC fiscales: entre todas las NC internas
+  // de un mismo comprobante no se puede acreditar más que su total.
+  const previasNci = await db
+    .select({ importe: facturacion.importe })
+    .from(facturacion)
+    .where(
+      and(
+        eq(facturacion.guarderiaId, gId),
+        eq(facturacion.facturaOriginalId, data.facturaOriginalId),
+        eq(facturacion.tipoFactura, 'nota_credito_interna'),
+      ),
+    );
+  const acreditadoNci = previasNci.reduce((s, p) => s + parseFloat(p.importe ?? '0'), 0);
+  const disponibleNci = importeOriginal - acreditadoNci;
+  if (disponibleNci <= 0.001) {
+    return {
+      error: `El comprobante ${original.codigo} ya fue acreditado por completo por notas de crédito internas anteriores.`,
+    };
+  }
+
   let importeNota: number;
   if (data.motivo === 'anulacion_total') {
+    if (disponibleNci < importeOriginal - 0.001) {
+      return {
+        error: `Este comprobante ya tiene NC internas por $${acreditadoNci.toFixed(2)}: no se puede anular por el total. Emití una NC parcial de hasta $${disponibleNci.toFixed(2)}.`,
+      };
+    }
     importeNota = importeOriginal;
   } else {
     if (!data.importe || data.importe <= 0) {
       return { error: 'Ingresá el importe de la Nota de Crédito interna.' };
     }
-    if (data.importe > importeOriginal) {
-      return { error: 'El importe no puede superar el total del comprobante original.' };
+    if (data.importe > disponibleNci + 0.001) {
+      return {
+        error: `Entre todas las NC internas no se puede acreditar más que el total del comprobante: quedan disponibles $${disponibleNci.toFixed(2)} de $${importeOriginal.toFixed(2)}.`,
+      };
     }
     importeNota = data.importe;
   }
@@ -2531,7 +2636,16 @@ export type EmitirNotaLibreData = {
   descripcion?: string;
   /** Centro emisor (punto de venta) por el que sale. Default: el principal. */
   centroEmisorId?: string | null;
+  /** Fecha de emisión (YYYY-MM-DD). Default: hoy. */
+  fecha?: string;
+  /** Período asociado (YYYY-MM-DD): la alternativa de ARCA a asociar un
+   *  comprobante puntual — la nota queda referida a este rango de fechas.
+   *  Default: últimos 30 días. */
+  periodoDesde?: string;
+  periodoHasta?: string;
 };
+
+const YMD_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export async function emitirNotaLibreAction(data: EmitirNotaLibreData): Promise<EmitirNotaResult> {
   const ctx = await getActiveMarina();
@@ -2542,6 +2656,17 @@ export async function emitirNotaLibreAction(data: EmitirNotaLibreData): Promise<
 
   if (!data.importe || data.importe <= 0) {
     return { error: `Ingresá el importe de la ${tipoNota}.` };
+  }
+  for (const f of [data.fecha, data.periodoDesde, data.periodoHasta]) {
+    if (f != null && !YMD_RE.test(f)) return { error: 'Fecha inválida.' };
+  }
+  // ARCA exige que toda NC/ND referencie comprobantes o un período: sin
+  // comprobante de origen, va el período (default: últimos 30 días).
+  const periodoDesde =
+    data.periodoDesde ?? new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const periodoHasta = data.periodoHasta ?? new Date().toISOString().slice(0, 10);
+  if (periodoDesde > periodoHasta) {
+    return { error: 'El inicio del período no puede ser posterior al fin.' };
   }
 
   const socio = await cargarSocioParaFacturar(gId, data.socioId);
@@ -2578,9 +2703,13 @@ export async function emitirNotaLibreAction(data: EmitirNotaLibreData): Promise<
       cliente,
       guarderia,
       creds,
-      // Sin comprobante de origen: el período facturado informado a ARCA
-      // cubre los últimos 30 días.
-      periodoDesde: toTusFecha(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)),
+      fecha: data.fecha ? toTusFecha(data.fecha) : undefined,
+      // Sin comprobante de origen, ARCA exige asociar un período: la nota
+      // queda referida a este rango (bloque comprobantes_asociados_periodo)
+      // y el período facturado informado acompaña.
+      periodoDesde: toTusFecha(periodoDesde),
+      periodoHasta: toTusFecha(periodoHasta),
+      periodoAsociado: { desde: toTusFecha(periodoDesde), hasta: toTusFecha(periodoHasta) },
     }));
   } catch (err) {
     const motivoError =
@@ -2597,7 +2726,7 @@ export async function emitirNotaLibreAction(data: EmitirNotaLibreData): Promise<
         montoNeto: montos.montoNeto.toFixed(2),
         montoExento: montos.montoExento.toFixed(2),
         montoIva: montos.montoIva.toFixed(2),
-        emision: new Date(),
+        emision: data.fecha ? fechaCalendariaArg(data.fecha) : new Date(),
         externalReference: notaId,
         centroEmisorId: centro.id,
         rechazada: true,
@@ -2618,7 +2747,9 @@ export async function emitirNotaLibreAction(data: EmitirNotaLibreData): Promise<
       guarderiaId: gId,
       socioId: data.socioId,
       tipoFactura: tipoNotaFactura as never,
-      estado: 'pagada',
+      // Igual que en la nota asociada: NC 'pagada', ND 'pendiente' (deuda
+      // nueva a cobrar, como una factura).
+      estado: data.esNc ? 'pagada' : 'pendiente',
       codigo: apiResponse.comprobante_nro ?? null,
       folioLocal,
       archivo: apiResponse.comprobante_pdf_url ?? null,
@@ -2629,7 +2760,7 @@ export async function emitirNotaLibreAction(data: EmitirNotaLibreData): Promise<
       montoNeto: montos.montoNeto.toFixed(2),
       montoExento: montos.montoExento.toFixed(2),
       montoIva: montos.montoIva.toFixed(2),
-      emision: new Date(),
+      emision: data.fecha ? fechaCalendariaArg(data.fecha) : new Date(),
       externalReference: notaId,
       centroEmisorId: centro.id,
     });

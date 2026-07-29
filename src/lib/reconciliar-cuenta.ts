@@ -138,7 +138,16 @@ export async function reconciliarCuentaSocio(socioId: string): Promise<string[]>
 
 // Tipos de comprobante fiscal que se marcan pagados al quedar cubiertos. Solo
 // fiscales: los recibos internos (RB-) tienen su ciclo propio vía Cobranza.
-const TIPOS_FISCALES = ['factura_a', 'factura_b', 'factura_c'] as const;
+// Las ND entran: son deuda a cobrar igual que una factura (su cargo se linkea
+// directo vía facturacion.movimientoId).
+const TIPOS_FISCALES = [
+  'factura_a',
+  'factura_b',
+  'factura_c',
+  'nota_debito_a',
+  'nota_debito_b',
+  'nota_debito_c',
+] as const;
 
 /**
  * Marca como `pagada` toda factura fiscal `pendiente`/`vencida` del socio cuyos

@@ -300,6 +300,7 @@ export default async function VentasPage() {
         debe: movimientosCuentaCorriente.debe,
         servicioNombre: servicios.nombre,
         tipoServicio: servicios.tipo,
+        alicuotaIva: servicios.alicuotaIva,
       })
       .from(movimientosCuentaCorriente)
       .innerJoin(
@@ -474,6 +475,7 @@ export default async function VentasPage() {
     debe: string | null;
     servicioNombre: string | null;
     tipoServicio: string | null;
+    alicuotaIva: number | null;
     itemKey: import('@/lib/pendientes-facturar').ItemPendienteKey | null;
   };
 
@@ -488,6 +490,7 @@ export default async function VentasPage() {
       debe: item.importe.toFixed(2),
       servicioNombre: null,
       tipoServicio: item.servicioTipo,
+      alicuotaIva: item.alicuotaIva,
       itemKey: item.key,
     });
   }
@@ -500,6 +503,7 @@ export default async function VentasPage() {
       debe: m.debe,
       servicioNombre: m.servicioNombre,
       tipoServicio: m.tipoServicio,
+      alicuotaIva: m.alicuotaIva != null ? Number(m.alicuotaIva) : null,
       itemKey: null,
     });
   }
@@ -546,6 +550,8 @@ export default async function VentasPage() {
       debe: item.importe.toFixed(2),
       servicioNombre: null,
       tipoServicio: item.servicioTipo,
+      // Interno: sin IVA, el desglose no aplica.
+      alicuotaIva: null,
       itemKey: item.key,
     });
   }
@@ -557,6 +563,7 @@ export default async function VentasPage() {
       debe: m.debe,
       servicioNombre: m.servicioNombre,
       tipoServicio: m.tipoServicio,
+      alicuotaIva: null,
       itemKey: null,
     });
   }
