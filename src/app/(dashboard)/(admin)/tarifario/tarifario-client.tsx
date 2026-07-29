@@ -169,7 +169,15 @@ function formatDate(iso: string): string {
 
 type ModalState = { mode: 'create' } | { mode: 'edit'; tarifa: Tarifa } | null;
 
-export function TarifarioClient({ tarifas }: { tarifas: Tarifa[] }) {
+export function TarifarioClient({
+  tarifas,
+  clubMonotributo,
+}: {
+  tarifas: Tarifa[];
+  // true si la guardería es Monotributista: emite Factura C sin discriminar
+  // IVA, así que la alícuota queda bloqueada en "Exento / No gravado".
+  clubMonotributo: boolean;
+}) {
   const router = useRouter();
   const [filtro, setFiltro] = useState<FiltroCategoria>('todas');
   const [modal, setModal] = useState<ModalState>(null);
@@ -327,6 +335,7 @@ export function TarifarioClient({ tarifas }: { tarifas: Tarifa[] }) {
       {modal && (
         <TarifaModal
           state={modal}
+          clubMonotributo={clubMonotributo}
           onClose={() => setModal(null)}
           onSaved={() => {
             setModal(null);
@@ -559,10 +568,12 @@ function EstadoBadge({ estado, vigenciaHasta }: { estado: EstadoTarifa; vigencia
 
 function TarifaModal({
   state,
+  clubMonotributo,
   onClose,
   onSaved,
 }: {
   state: NonNullable<ModalState>;
+  clubMonotributo: boolean;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -576,7 +587,11 @@ function TarifaModal({
   const [tipo, setTipo] = useState<TipoTarifa | ''>(initial?.tipo ?? '');
   const [nombre, setNombre] = useState(initial?.nombre ?? '');
   const [precio, setPrecio] = useState<string>(initial ? String(initial.precio) : '');
-  const [alicuotaIva, setAlicuotaIva] = useState<number>(initial?.alicuotaIva ?? 21);
+  // Club Monotributista: la alícuota se fuerza a 0 siempre (también al editar
+  // una tarifa vieja que hubiera quedado con IVA cargado).
+  const [alicuotaIva, setAlicuotaIva] = useState<number>(
+    clubMonotributo ? 0 : (initial?.alicuotaIva ?? 21),
+  );
   const [plazoPagoDias, setPlazoPagoDias] = useState<number>(initial?.plazoPagoDias ?? 0);
   const [politicaBajaAnticipada, setPoliticaBajaAnticipada] =
     useState<PoliticaBajaAnticipada | null>(initial?.politicaBajaAnticipada ?? null);
@@ -919,20 +934,26 @@ function TarifaModal({
             <div>
               <label className="mb-1 block text-sm font-semibold text-gray-700">IVA</label>
               <select
-                className={inputCls}
+                className={`${inputCls} disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400`}
                 value={alicuotaIva}
                 onChange={(e) => setAlicuotaIva(Number(e.target.value))}
+                disabled={clubMonotributo}
               >
                 <option value={0}>Exento / No gravado</option>
                 <option value={10.5}>10,5%</option>
                 <option value={21}>21%</option>
               </select>
+              {clubMonotributo && (
+                <p className="mt-1 text-xs text-gray-500">
+                  Tu club es Monotributista: emite Factura C sin discriminar IVA.
+                </p>
+              )}
             </div>
           </div>
 
           <div>
             <label className="mb-1 block text-sm font-semibold text-gray-700">
-              Plazo de pago <span className="font-normal text-gray-400">(fecha de factura)</span>
+              Plazo de cobro <span className="font-normal text-gray-400">(fecha de factura)</span>
             </label>
             <select
               className={inputCls}

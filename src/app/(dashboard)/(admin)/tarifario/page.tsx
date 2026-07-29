@@ -3,7 +3,8 @@ import { and, asc, eq } from 'drizzle-orm';
 
 import { getActiveMarina } from '@/lib/auth/session';
 import { db } from '@/lib/db';
-import { servicios, serviciosAjustesProgramados } from '@/lib/db/schema';
+import { guarderias, servicios, serviciosAjustesProgramados } from '@/lib/db/schema';
+import { ADMIN_ROLES } from '@/config/roles';
 
 import { TarifarioClient, type Tarifa } from './tarifario-client';
 
@@ -13,11 +14,19 @@ export default async function TarifarioPage() {
 
   const isAdmin =
     ctx.profile.isSuperAdmin ||
-    ctx.activeMembership.rol === 'administrador_general' ||
-    ctx.activeMembership.rol === 'administrativo';
+    ADMIN_ROLES.includes(ctx.activeMembership.rol as (typeof ADMIN_ROLES)[number]);
   if (!isAdmin) redirect('/dashboard');
 
   const guarderiaId = ctx.activeMembership.guarderiaId;
+
+  // Un club Monotributista emite siempre Factura C, sin discriminar IVA: el
+  // selector de alícuota del tarifario se bloquea en "Exento / No gravado".
+  const [guarderiaRow] = await db
+    .select({ condicionIva: guarderias.condicionIva })
+    .from(guarderias)
+    .where(eq(guarderias.id, guarderiaId))
+    .limit(1);
+  const clubMonotributo = guarderiaRow?.condicionIva === 'monotributo';
 
   const rows = await db
     .select({
@@ -91,5 +100,5 @@ export default async function TarifarioPage() {
     };
   });
 
-  return <TarifarioClient tarifas={tarifas} />;
+  return <TarifarioClient tarifas={tarifas} clubMonotributo={clubMonotributo} />;
 }

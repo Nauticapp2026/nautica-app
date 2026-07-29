@@ -6,6 +6,7 @@ import { and, desc, eq, gt, gte, isNotNull, isNull, lt, lte, ne, not, or, sql } 
 import { db } from '@/lib/db';
 import {
   espacios,
+  guarderias,
   profiles,
   servicios,
   serviciosAjustesProgramados,
@@ -14,6 +15,7 @@ import {
   socioServiciosCancelados,
 } from '@/lib/db/schema';
 import { getActiveMarina } from '@/lib/auth/session';
+import { ADMIN_ROLES } from '@/config/roles';
 import { todayArg } from '@/lib/dates';
 
 type Origen = 'manual' | 'masivo_porcentaje' | 'masivo_monto';
@@ -141,9 +143,27 @@ export type AjusteMasivoData =
 function isAdmin(ctx: NonNullable<Awaited<ReturnType<typeof getActiveMarina>>>): boolean {
   return (
     ctx.profile.isSuperAdmin ||
-    ctx.activeMembership.rol === 'administrador_general' ||
-    ctx.activeMembership.rol === 'administrativo'
+    ADMIN_ROLES.includes(ctx.activeMembership.rol as (typeof ADMIN_ROLES)[number])
   );
+}
+
+// Un club Monotributista emite siempre Factura C, sin discriminar IVA: sus
+// tarifas no pueden llevar alícuota (la UI bloquea el selector; esto es el
+// backstop server-side).
+async function validarIvaSegunClub(
+  guarderiaId: string,
+  alicuotaIva: number,
+): Promise<string | null> {
+  if (alicuotaIva === 0) return null;
+  const [g] = await db
+    .select({ condicionIva: guarderias.condicionIva })
+    .from(guarderias)
+    .where(eq(guarderias.id, guarderiaId))
+    .limit(1);
+  if (g?.condicionIva === 'monotributo') {
+    return 'Tu club es Monotributista y emite comprobantes sin IVA: la alícuota debe ser "Exento / No gravado".';
+  }
+  return null;
 }
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -156,7 +176,7 @@ function validar(data: CreateTarifaData): string | null {
     return 'Tipo de tarifa variable inválido.';
   }
   if (!(PLAZOS_PAGO as readonly number[]).includes(data.plazoPagoDias)) {
-    return 'Plazo de pago inválido.';
+    return 'Plazo de cobro inválido.';
   }
   if (
     data.politicaBajaAnticipada !== null &&
@@ -276,6 +296,9 @@ export async function createTarifaAction(
 
   const guarderiaId = ctx.activeMembership.guarderiaId;
 
+  const ivaErr = await validarIvaSegunClub(guarderiaId, data.alicuotaIva);
+  if (ivaErr) return { error: ivaErr };
+
   const overlapErr = await checkVigenciaOverlap(guarderiaId, data);
   if (overlapErr) return { error: overlapErr };
 
@@ -302,6 +325,9 @@ export async function updateTarifaAction(data: UpdateTarifaData): Promise<{ erro
   if (!ESTADOS.includes(data.estado)) return { error: 'Estado inválido.' };
 
   const guarderiaId = ctx.activeMembership.guarderiaId;
+
+  const ivaErr = await validarIvaSegunClub(guarderiaId, data.alicuotaIva);
+  if (ivaErr) return { error: ivaErr };
 
   const [current] = await db
     .select({ id: servicios.id, estado: servicios.estado })
