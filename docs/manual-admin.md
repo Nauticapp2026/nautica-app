@@ -236,9 +236,11 @@ Al aplicar **cualquier filtro**, la tarjeta de **Saldo** se **oculta**: su valor
 
 **Ordenar por fecha.** Hacé clic en el encabezado **Fecha** para alternar el orden de los movimientos entre **más nuevo primero** (por defecto) y **más antiguo primero**. La flechita del encabezado indica el orden actual.
 
-**Columnas de la tabla.** En orden: **Fecha**, **Tipo de comprobante**, **Nº Comprobante**, **Detalle**, **Vencimiento**, **Situación**, **Ventas**, **Cobranzas**, **Saldo** y **Estado**.
+**Columnas de la tabla.** En orden: **Fecha**, **Tipo de comprobante**, **Nº Comprobante**, **Nº de operación**, **Detalle**, **Vencimiento**, **Situación**, **Ventas**, **Cobranzas**, **Saldo** y **Estado**.
 
-- **Vencimiento** — fecha límite de pago del cargo. Se calcula como la **fecha de la factura más el Plazo de pago** definido en la tarifa del Tarifario (Contado, 5, 10, 15, 20 o 30 días). Ejemplo: una factura del 26/06 con plazo de 30 días vence el 26/07. Solo aparece en cargos con **comprobante fiscal**; en cargos sin facturar, recibos internos o cobranzas muestra "—".
+Cada comprobante ocupa **una sola fila**: si una factura o un comprobante interno se emitió por varios Servicios Contratados a la vez, sus cargos se muestran consolidados en una línea, con el importe total y el detalle indicando el primer servicio y cuántos más incluye (ej. "Guarda mensual (+2)").
+
+- **Vencimiento** — fecha límite de pago del cargo. En las **facturas fiscales** es el vencimiento que se eligió al emitirlas. En los **comprobantes internos** se calcula como la **fecha de emisión más el Plazo de cobro** definido en la tarifa del Tarifario (Contado, 5, 10, 15, 20 o 30 días); si la fila consolida varios servicios con plazos distintos, rige el que vence primero. Ejemplo: un comprobante del 26/06 con plazo de 30 días vence el 26/07. En cargos sin comprobante y en cobranzas muestra "—".
 - **Situación** — estado según esa fecha: **En término** (verde) o **Vencida** (rojo). Una fila pasa a **Vencida** el día siguiente al vencimiento (siguiendo el ejemplo, el 27/07). Es **puramente por fecha**: un cargo pagado tarde también puede figurar Vencida. Es independiente de la columna **Estado**, que refleja el estado de pago: **Cobrado** (cubierto por cobranzas), **Parcial** (cobrado en parte), **Pendiente** (sin cobrar), **Vencido** o **Anulado (NC)** (anulado por una nota de crédito).
 
 #### Pestaña Accesos Externos
@@ -626,21 +628,23 @@ Las tarjetas superiores muestran:
 
 ### Emitir una factura individual
 
-1. Hacé clic en **Nuevo comprobante** → **Facturación manual**.
-2. Buscá y seleccioná el **socio** en el campo Cliente — el buscador filtra por nombre, número de socio o embarcación (mismo buscador que usás en Cobranzas).
-3. El sistema muestra automáticamente los **servicios a facturar** del socio: los servicios vigentes del período (mensualidades, proporcionales, variables, cobros por baja) que todavía no tienen comprobante. Marcá los que querés incluir — lo que destildes queda pendiente para la próxima emisión. Podés usar **Todos** o **Ninguno** para seleccionar rápido.
-4. Completá los campos:
-   - **Tipo de comprobante** — se determina automáticamente según la condición IVA del club y del socio (campo de solo lectura):
+1. Hacé clic en **Nuevo comprobante** → **Facturación manual**. El formulario sigue este orden:
+2. **Socio y Número de documento** — buscá y seleccioná el socio; el buscador filtra por nombre, número de socio o embarcación (mismo buscador que usás en Cobranzas). El documento (DNI/CUIT/CUIL) se completa solo.
+3. **Fecha y Vencimiento** — el vencimiento se sugiere solo **según el tarifario**: fecha + el **Plazo de cobro** de los servicios seleccionados (si tienen plazos distintos, rige el que vence primero). Podés pisarlo a mano cuando haga falta.
+4. **Centro emisor y Tipo de comprobante**:
+   - **Centro emisor** — por qué punto de venta de ARCA sale el comprobante. Este campo **solo aparece si el club tiene más de un centro emisor** configurado (ver "Centros emisores" en Mi perfil → Datos Impositivos); viene preseleccionado en el principal. Con un solo centro, todo sale automáticamente por ese. Los centros emisores solo intervienen en la facturación por ARCA — los **comprobantes internos no los usan**.
+   - **Tipo de comprobante** — se determina automáticamente según la condición IVA del club y del socio:
      - Club Monotributo → siempre **Factura C**.
-     - Club Responsable Inscripto + Socio Responsable Inscripto → **Factura A**.
-     - Club Responsable Inscripto + cualquier otra condición → **Factura B**.
-   - **Centro emisor** — por qué punto de venta de ARCA sale el comprobante. Este campo **solo aparece si el club tiene más de un centro emisor** configurado (ver "Centros emisores" en Mi perfil → Datos Impositivos); viene preseleccionado en el principal. Con un solo centro, todo sale automáticamente por ese.
-   - **Condición de venta**: Contado, Cuenta corriente, 30 / 60 / 90 días.
-   - **Forma de pago**: Efectivo, Transferencia, Tarjeta de crédito, Mercado Pago, etc.
-   - **Estado** del comprobante: Pendiente, Pagada o Vencida.
-   - **Fecha** y **Vencimiento**.
-   - **Período desde / hasta**.
-5. Hacé clic en **Emitir**. La factura se envía a ARCA y queda registrada.
+     - Club Responsable Inscripto + Socio Responsable Inscripto o Monotributista → **Factura A**.
+     - Club Responsable Inscripto + cualquier otra condición (Exento, Consumidor Final) → **Factura B**.
+5. **Servicios a facturar** — el sistema muestra automáticamente los servicios vigentes del período (mensualidades, proporcionales, variables, cobros por baja) que todavía no tienen comprobante. Marcá los que querés incluir — lo que destildes queda pendiente para la próxima emisión. Podés usar **Todos** o **Ninguno** para seleccionar rápido.
+6. **Condición de venta** (Contado, Cuenta corriente, 30 / 60 / 90 días) y **Forma de pago** (Efectivo, Transferencia, Tarjeta de crédito, Mercado Pago, etc.).
+7. **Descripción** (opcional) y **Período facturado** — el rango de fechas del servicio que se informa a ARCA en el comprobante (por defecto, el mes en curso).
+8. Antes del botón Emitir aparece el **desglose del importe**, que sigue la regla de condiciones frente al IVA:
+   - **Factura A** (discrimina impuesto): **Importe neto**, **IVA** e **Importe bruto** (el total a emitir).
+   - **Factura B** (no discrimina): solo el **Importe bruto**, con el IVA incluido.
+   - **Factura C** (club Monotributista): solo el **Importe bruto** — no hay IVA.
+9. Hacé clic en **Emitir**. La factura se envía a ARCA y queda registrada.
 
 > En el selector aparecen **todos los socios del club**. Lo que define si la emisión sale bien son los **datos fiscales/personales completos** del socio (ver "Datos requeridos para emitir facturas ARCA"); si faltan, ARCA puede rechazar la emisión.
 
@@ -654,7 +658,7 @@ Emití facturas para múltiples socios al mismo tiempo.
 2. El sistema lista los socios con conceptos pendientes. Cada socio puede tener uno o más conceptos expandibles.
    - La **casilla del socio** selecciona o deselecciona todos sus conceptos de una vez.
    - Podés marcar o desmarcar conceptos individuales dentro del socio. Si solo algunos están marcados, la casilla del socio muestra el estado **intermedio** (guión) indicando selección parcial.
-3. Revisá el resumen y confirmá.
+3. Revisá el resumen y confirmá. Antes del botón Emitir aparece el mismo **desglose** que en la factura individual: **Importe neto**, **IVA** e **Importe bruto** del total seleccionado (si el club es Monotributista no hay IVA y se muestra solo el bruto).
 
 El tipo de comprobante se determina automáticamente para cada socio según la condición IVA del club y de cada socio individualmente (igual que en la factura individual). La condición de venta es siempre **Contado**.
 
@@ -716,9 +720,13 @@ Si necesitás anular parcial o totalmente una factura ya emitida (nota de crédi
 En **Nuevo comprobante → Facturación manual**, el campo **Tipo de comprobante** también ofrece **Nota de crédito** y **Nota de débito**. Al elegir una, el formulario cambia al de la nota, con dos variantes:
 
 - **Sobre un comprobante emitido** — elegís entre las facturas fiscales con CAE del socio; equivale al camino 1.
-- **Sin comprobante de origen** — una NC/ND "libre", sin factura asociada (por ejemplo, una bonificación comercial nueva). El tipo (A/B/C) se deriva de la condición IVA del club y del socio, y el importe es siempre manual.
+- **Sin comprobante de origen** — una NC/ND "libre", sin factura asociada (por ejemplo, una bonificación comercial nueva). El tipo (A/B/C) se deriva de la condición IVA del club y del socio, y el importe es siempre manual. Como ARCA exige que toda nota referencie comprobantes **o un rango de fechas**, esta variante pide un **Período asociado** (Desde/Hasta, por defecto los últimos 30 días): la nota queda referida a ese rango en lugar de a una factura puntual. El formulario sigue el mismo formato que la factura: **Fecha**, Centro emisor, Tipo, Motivo e Importe, Descripción, Período asociado y el **desglose** (neto/IVA/bruto según la letra) antes de emitir.
 
 > El botón de la fila solo aparece en facturas tipo A, B o C que ya tienen **CAE** asignado. El CAE es el código que ARCA emite al autorizar una factura — sin él la factura no es válida fiscalmente ni puede tener nota de crédito asociada. En la **nota de débito** el importe es siempre manual (no existe "anulación total": completarlo automáticamente duplicaría el cobro al socio).
+
+> La **nota de débito impacta como una factura**: es deuda nueva del socio. Nace **Pendiente**, suma al saldo de la Cuenta Corriente y se cobra por los mismos circuitos que una factura — aparece en **Cobranzas → Nueva cobranza**, se puede **Marcar como cobrada** desde la fila, y el débito automático/pagos a cuenta la saldan por FIFO. La **nota de crédito**, en cambio, nace ya "Cobrada" (un crédito no queda pendiente de cobro).
+
+> **Tope de las notas de crédito**: entre todas las NC de una misma factura no se puede acreditar más que el **total facturado**. Podés emitir varias NC parciales, pero el formulario muestra cuánto queda **disponible** (total menos lo ya acreditado) y el sistema rechaza cualquier importe que lo supere. Una factura totalmente acreditada ya no admite más NC, y si tiene NC parciales deja de ofrecer "Anulación total" (queda el camino parcial por lo disponible). La misma regla aplica a las **NC internas** sobre comprobantes CM-/CL-.
 
 > La nota de crédito o débito sobre un comprobante emitido sale siempre por el **mismo punto de venta** que la factura original (así las asocia ARCA) — no hay que elegir centro emisor. Lo mismo aplica al **Reenviar** una factura rechazada: se reintenta por el punto de venta del intento original.
 
@@ -776,16 +784,17 @@ Arriba de la tabla de Cobranzas está el botón **Nueva cobranza**.
 ### Registrar una cobranza nueva
 
 1. Hacé clic en **Nueva cobranza**.
-2. Buscá al socio por nombre, número de socio o embarcación, y hacé clic sobre él en la lista.
-3. El sistema te muestra los **comprobantes pendientes de cobro** de ese socio: facturas ARCA (A/B/C) y recibos internos que todavía no están pagados. No incluye notas de crédito ni comprobantes ya cubiertos por un pago anterior.
-4. Tildá los comprobantes que estás cobrando (o usá **Seleccionar todos**). Abajo se muestra el **Total seleccionado**.
-5. Hacé clic en **Continuar**.
-6. Revisá o ajustá el **Monto a pagar** (viene precargado con el total seleccionado) y la **Fecha** del cobro.
+2. Elegí **qué tipo de comprobantes vas a cobrar**: **Comprobantes ARCA** (facturas A/B/C y notas de débito) o **Comprobantes internos** (CM-/CL-/CA-) — la misma separación que las pestañas de Ventas. Un recibo no puede mezclar los dos circuitos, así que la lista solo muestra los del tipo elegido.
+3. Buscá al socio por nombre, número de socio o embarcación, y hacé clic sobre él en la lista.
+4. El sistema te muestra los **comprobantes pendientes de cobro** de ese socio, del tipo elegido en el paso 2. No incluye notas de crédito ni comprobantes ya cubiertos por un pago anterior.
+5. Tildá los comprobantes que estás cobrando (o usá **Seleccionar todos**). Abajo se muestra el **Total seleccionado**.
+6. Hacé clic en **Continuar**.
+7. Revisá o ajustá el **Monto a cobrar** (viene precargado con el total seleccionado) y la **Fecha** del cobro.
    - Si el monto es **menor** al total seleccionado, es un **pago parcial**: el sistema cubre los comprobantes más viejos primero, hasta donde alcance; el resto queda pendiente.
    - Si el monto es **mayor**, el excedente queda como **saldo a favor** del socio.
-7. Elegí la **forma de pago**: Efectivo (pesos), Efectivo (dólares), Tarjeta de crédito, Tarjeta de débito, Transferencia bancaria, Cheque, Mercado Pago u Otro. Cada una pide sus propios datos (por ejemplo, Efectivo en dólares pide el tipo de cambio y calcula el equivalente en pesos; si el socio ya tiene una tarjeta cargada para débito automático, podés reutilizarla con un clic).
-8. **Podés combinar más de una forma de pago** en el mismo cobro: hacé clic en **Agregar forma de pago** y repetí el paso anterior para cada una. La suma de todas tiene que coincidir con el Monto a pagar.
-9. Hacé clic en **Registrar cobranza**.
+8. Elegí la **forma de pago**: Efectivo (pesos), Efectivo (dólares), Tarjeta de crédito, Tarjeta de débito, Transferencia bancaria, Cheque, Mercado Pago u Otro. Cada una pide sus propios datos (por ejemplo, Efectivo en dólares pide el tipo de cambio y calcula el equivalente en pesos; si el socio ya tiene una tarjeta cargada para débito automático, podés reutilizarla con un clic).
+9. **Podés combinar más de una forma de pago** en el mismo cobro: hacé clic en **Agregar forma de pago** y repetí el paso anterior para cada una. La suma de todas tiene que coincidir con el Monto a cobrar.
+10. Hacé clic en **Registrar cobranza**.
 
 ### Qué pasa al confirmar
 
@@ -834,8 +843,11 @@ Cada tarifa muestra su concepto, un badge **Fijo** o **Variable** (fijo = precio
    > **Importante:** el campo "Cantidad de días" solo existe en **Cargar Servicio** (ficha del socio → Servicios Contratados). Si creás una tarifa de categoría "Espacio de guarda" que sea Variable con tarifa diaria y la asignás desde **Espacios → Asignar espacio**, ahí no se piden los días y se cobraría el precio de un solo día. Para tarifas diarias, usá siempre **Cargar Servicio**.
 
 4. Ingresá el **Precio (sin IVA)** y la **Alícuota de IVA**: **Exento / No gravado**, **10,5 %** o **21 %**. El sistema suma el IVA automáticamente para calcular lo que se le cobra al socio.
-5. Configurá el **Plazo de pago** (días) y la **Vigencia**:
-   - El **Plazo de pago** (Contado, 5, 10, 15, 20 o 30 días) define la **fecha de vencimiento** de los cargos de esa tarifa en la Cuenta Corriente del socio: vencimiento = fecha de la factura + el plazo elegido.
+
+   > Si tu club es **Monotributista**, el campo IVA queda **bloqueado en "Exento / No gravado"**: un Monotributista emite siempre Factura C, sin IVA, así que sus tarifas no llevan alícuota y al socio se le cobra el precio tal cual lo cargás.
+
+5. Configurá el **Plazo de cobro** (días) y la **Vigencia**:
+   - El **Plazo de cobro** (Contado, 5, 10, 15, 20 o 30 días) define la **fecha de vencimiento** de los cargos de esa tarifa en la Cuenta Corriente del socio: vencimiento = fecha de la factura + el plazo elegido.
    - **Vigencia desde** — fecha a partir de la cual la tarifa está activa.
    - **Vencimiento** — fecha hasta la que aplica.
    - No pueden existir dos tarifas del mismo concepto con fechas superpuestas.
