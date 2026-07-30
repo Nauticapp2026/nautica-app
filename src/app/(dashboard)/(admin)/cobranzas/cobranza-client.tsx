@@ -102,14 +102,11 @@ function NuevaCobranzaModal({
   const [step, setStep] = useState<Step>('socio');
   const internosHabilitados = mediosInternos.length > 0;
 
-  // Qué va a cobrar el club: todos los comprobantes, solo fiscales (ARCA) o
-  // solo internos. "Todas" muestra ambos circuitos juntos, pero un recibo
-  // sigue sin poder mezclarlos: si la selección combina fiscal + interno, no
-  // se puede continuar. Sin internos habilitados, el selector no aparece y
-  // solo se cobran ARCA.
-  const [canal, setCanal] = useState<'todas' | 'fiscal' | 'interno'>(
-    internosHabilitados ? 'todas' : 'fiscal',
-  );
+  // Qué va a cobrar el club: comprobantes fiscales (ARCA) o internos. Misma
+  // separación que las pestañas de Ventas — un recibo no puede mezclar los dos
+  // circuitos, así que se elige de entrada y la lista no los muestra juntos.
+  // Sin internos habilitados, el selector no aparece y solo se cobran ARCA.
+  const [canal, setCanal] = useState<'fiscal' | 'interno'>('fiscal');
 
   // Paso socio
   const [query, setQuery] = useState('');
@@ -131,27 +128,12 @@ function NuevaCobranzaModal({
 
   const sociosFiltrados = useMemo(() => buscarSocios(socios, query).slice(0, 50), [socios, query]);
 
-  // Comprobantes del canal elegido: interno = CM-/CL-/CA- (tipo 'recibo');
-  // fiscal = facturas A/B/C y notas de débito; todas = ambos.
+  // Solo los comprobantes del canal elegido: interno = CM-/CL-/CA- (tipo
+  // 'recibo'); fiscal = facturas A/B/C y notas de débito.
   const comprobantesCanal = useMemo(
-    () =>
-      canal === 'todas'
-        ? comprobantes
-        : comprobantes.filter((c) => (c.tipoFactura === 'recibo') === (canal === 'interno')),
+    () => comprobantes.filter((c) => (c.tipoFactura === 'recibo') === (canal === 'interno')),
     [comprobantes, canal],
   );
-
-  // Circuitos presentes en la selección actual. Un recibo no puede mezclar
-  // fiscal + interno: con "Todas" se ve todo junto, pero si la selección
-  // combina los dos tipos no se puede continuar.
-  const tiposSeleccion = useMemo(() => {
-    const s = new Set<'fiscal' | 'interno'>();
-    for (const c of comprobantesCanal) {
-      if (selected.has(c.id)) s.add(c.tipoFactura === 'recibo' ? 'interno' : 'fiscal');
-    }
-    return s;
-  }, [comprobantesCanal, selected]);
-  const seleccionMezclada = tiposSeleccion.size > 1;
 
   const totalSeleccionado = useMemo(
     () =>
@@ -163,9 +145,7 @@ function NuevaCobranzaModal({
 
   // Cobrando internos, el dropdown de formas solo muestra los medios que el
   // club habilitó en la Configuración de cobranzas. Fiscal: lista completa.
-  // Se deriva de la SELECCIÓN (no del canal) para que funcione con "Todas".
-  const tiposPermitidos =
-    tiposSeleccion.has('interno') && tiposSeleccion.size === 1 ? mediosInternos : null;
+  const tiposPermitidos = canal === 'interno' ? mediosInternos : null;
   // Puede ser 0 si el club solo habilitó medios sin cobro manual (ej. solo
   // Débito automático): en ese caso Registrar queda deshabilitado (el aviso
   // lo muestra FormasDePago).
@@ -290,10 +270,9 @@ function NuevaCobranzaModal({
                   <p className="mb-2 text-xs font-semibold" style={{ color: '#101828' }}>
                     ¿Qué tipo de comprobantes vas a cobrar?
                   </p>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 gap-2">
                     {(
                       [
-                        { value: 'todas', label: 'Todas' },
                         { value: 'fiscal', label: 'Comprobantes ARCA' },
                         { value: 'interno', label: 'Comprobantes internos' },
                       ] as const
@@ -356,8 +335,7 @@ function NuevaCobranzaModal({
                 <p className="py-8 text-center text-sm text-gray-400">Cargando comprobantes…</p>
               ) : comprobantesCanal.length === 0 ? (
                 <p className="py-8 text-center text-sm text-gray-400">
-                  Este socio no tiene comprobantes
-                  {canal === 'todas' ? '' : canal === 'interno' ? ' internos' : ' ARCA'} para
+                  Este socio no tiene comprobantes {canal === 'interno' ? 'internos' : 'ARCA'} para
                   cobrar.
                 </p>
               ) : (
@@ -415,12 +393,6 @@ function NuevaCobranzaModal({
                       {fmtMoney(totalSeleccionado)}
                     </span>
                   </div>
-                  {seleccionMezclada && (
-                    <p className="rounded-[10px] border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
-                      No se pueden cobrar juntos comprobantes ARCA e internos en un mismo recibo.
-                      Destildá los de un tipo y registralos en una cobranza aparte.
-                    </p>
-                  )}
                 </>
               )}
             </>
@@ -516,7 +488,7 @@ function NuevaCobranzaModal({
                 </button>
                 <button
                   onClick={irAPago}
-                  disabled={selected.size === 0 || seleccionMezclada}
+                  disabled={selected.size === 0}
                   className="flex-1 rounded-[10px] py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
                   style={{ background: '#175861' }}
                 >
