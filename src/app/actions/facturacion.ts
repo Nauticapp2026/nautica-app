@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { and, asc, count, eq, inArray, like, ne, sql } from 'drizzle-orm';
+import { and, asc, count, eq, inArray, like, ne, or, sql } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 
 import { db } from '@/lib/db';
@@ -1478,6 +1478,9 @@ export type CargarServicioData = {
   // Solo para tarifas Variable diaria: días contratados (el cargo único del
   // cron = precio diario × días). Se ignora para el resto de las tarifas.
   cantidadDias?: number | null;
+  // Incluir el contrato en el débito automático Payway. undefined = default
+  // según la adhesión general del socio (tilde en Datos Impositivos).
+  debitoAutomatico?: boolean;
 };
 
 export async function cargarServicioAction(data: CargarServicioData): Promise<{
@@ -1489,6 +1492,22 @@ export async function cargarServicioAction(data: CargarServicioData): Promise<{
 
   if (!data.servicioId) return { error: 'Faltan datos del servicio.' };
   const esInterno = data.comprobante === 'interno';
+
+  // Gate de la Configuración de cobranzas: sin medios habilitados para
+  // comprobantes internos, no se pueden cargar servicios con canal Interno.
+  if (esInterno) {
+    const [g] = await db
+      .select({ medios: guarderias.mediosCobroInternos })
+      .from(guarderias)
+      .where(eq(guarderias.id, gId))
+      .limit(1);
+    if (!g || g.medios.length === 0) {
+      return {
+        error:
+          'Los comprobantes internos están deshabilitados. Habilitá al menos un medio de pago en Mi Perfil → Datos Impositivos → Configuración de cobranzas.',
+      };
+    }
+  }
 
   if (!data.fechaInicio) {
     return { error: 'La fecha de inicio del servicio es obligatoria.' };
@@ -1549,6 +1568,7 @@ export async function cargarServicioAction(data: CargarServicioData): Promise<{
       fechaInicio: data.fechaInicio,
       fechaBaja: data.fechaBaja,
       comprobanteInterno: esInterno,
+      debitoAutomatico: data.debitoAutomatico,
       concepto: conceptoFinal,
       cantidadDias,
       createdBy: ctx.profile.id,
@@ -1578,9 +1598,12 @@ async function nextComprobanteInternoCodigo(
   // guardería (el lock por socio no cubre a dos socios distintos). Solo tiene
   // efecto si dbx es una transacción — el codigo se asigna siempre dentro de
   // la tx de emisión.
-  await dbx.execute(
-    sql`SELECT pg_advisory_xact_lock(hashtextextended(${'ci:' + gId + ':' + prefix}, 0))`,
-  );
+  await dbx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${'ci:' + gId}, 0))`);
+  // Correlativo ÚNICO entre todos los comprobantes internos del club: CM-,
+  // CL- y CA- comparten la secuencia (el prefijo solo indica el origen), y la
+  // numeración es propia, separada de la de ARCA. Se cuenta el total emitido
+  // con cualquiera de los tres prefijos; como cada secuencia vieja era
+  // sequential por prefijo, total+1 nunca repite un número ya usado.
   const [{ n }] = await dbx
     .select({ n: count() })
     .from(facturacion)
@@ -1588,7 +1611,11 @@ async function nextComprobanteInternoCodigo(
       and(
         eq(facturacion.guarderiaId, gId),
         eq(facturacion.tipoFactura, 'recibo'),
-        like(facturacion.codigo, `${prefix}-%`),
+        or(
+          like(facturacion.codigo, 'CM-%'),
+          like(facturacion.codigo, 'CL-%'),
+          like(facturacion.codigo, 'CA-%'),
+        ),
       ),
     );
   return `${prefix}-${String(Number(n) + 1).padStart(6, '0')}`;
@@ -1877,6 +1904,7 @@ export async function enviarReciboPorMailAction(
       medioPago: facturacion.medioPago,
       emision: facturacion.emision,
       socioId: facturacion.socioId,
+      cobranzaComprobanteIds: facturacion.cobranzaComprobanteIds,
       socioNombre: profiles.nombre,
       socioApellido: profiles.apellido,
       socioCuit: profiles.cuit,
@@ -1900,36 +1928,112 @@ export async function enviarReciboPorMailAction(
   const destino = row.socioEmailFacturacion?.trim() || row.socioEmail;
   if (!destino) return { error: 'El socio no tiene email cargado.' };
 
-  // Comprobantes cancelados (FIFO), igual que la vista del recibo. Solo
-  // aplica a recibos de cobranza (RC-): son los únicos que efectivamente
-  // cobran comprobantes existentes. RB-/CM-/CL- documentan un cargo propio,
-  // no un pago — para esos se usa row.descripcion más abajo.
+  // Comprobantes que cobró el recibo — igual que la vista del recibo: los
+  // exactos guardados en cobranza_comprobante_ids (con el detalle de sus
+  // cargos), o la heurística FIFO para recibos viejos sin ese dato. Solo
+  // aplica a recibos de cobranza (RC-): RB-/CM-/CL- documentan un cargo
+  // propio, no un pago — para esos se usa row.descripcion más abajo.
+  const fmtPesos = (v: string | null) =>
+    `$${parseFloat(v ?? '0').toLocaleString('es-AR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
   const comprobantes: string[] = [];
   if (row.socioId && row.codigo?.startsWith('RC-')) {
-    const facturasSocio = await db
-      .select({
-        codigo: facturacion.codigo,
-        tipoFactura: facturacion.tipoFactura,
-        importe: facturacion.importe,
-      })
-      .from(facturacion)
-      .where(
-        and(
-          eq(facturacion.socioId, row.socioId),
-          eq(facturacion.guarderiaId, gId),
-          ne(facturacion.tipoFactura, 'recibo'),
-          inArray(facturacion.tipoFactura, ['factura_a', 'factura_b', 'factura_c']),
-        ),
-      )
-      .orderBy(asc(facturacion.emision));
-    const importeRecibo = parseFloat(row.importe ?? '0');
-    let acumulado = 0;
-    for (const f of facturasSocio) {
-      if (acumulado >= importeRecibo - 0.001) break;
-      comprobantes.push(
-        `${TIPO_COMPROBANTE_LABEL_MAIL[f.tipoFactura ?? ''] ?? f.tipoFactura ?? ''} ${f.codigo ?? ''}`.trim(),
-      );
-      acumulado += parseFloat(f.importe ?? '0');
+    if (row.cobranzaComprobanteIds && row.cobranzaComprobanteIds.length > 0) {
+      const cobrados = await db
+        .select({
+          id: facturacion.id,
+          codigo: facturacion.codigo,
+          tipoFactura: facturacion.tipoFactura,
+          importe: facturacion.importe,
+          descripcion: facturacion.descripcion,
+        })
+        .from(facturacion)
+        .where(
+          and(
+            inArray(facturacion.id, row.cobranzaComprobanteIds),
+            eq(facturacion.guarderiaId, gId),
+          ),
+        )
+        .orderBy(asc(facturacion.emision));
+
+      // Detalle de cargos (concepto + importe) por comprobante cobrado.
+      const detallePorComprobante = new Map<
+        string,
+        { concepto: string | null; importe: string | null }[]
+      >();
+      if (cobrados.length > 0) {
+        const itemRows = await db
+          .select({
+            facturacionId: facturacionItems.facturacionId,
+            importe: facturacionItems.importe,
+            concepto: movimientosCuentaCorriente.concepto,
+          })
+          .from(facturacionItems)
+          .innerJoin(
+            facturacionItemMovimientos,
+            eq(facturacionItemMovimientos.facturacionItemId, facturacionItems.id),
+          )
+          .innerJoin(
+            movimientosCuentaCorriente,
+            eq(movimientosCuentaCorriente.id, facturacionItemMovimientos.movimientoId),
+          )
+          .where(
+            inArray(
+              facturacionItems.facturacionId,
+              cobrados.map((c) => c.id),
+            ),
+          );
+        for (const it of itemRows) {
+          if (!detallePorComprobante.has(it.facturacionId)) {
+            detallePorComprobante.set(it.facturacionId, []);
+          }
+          detallePorComprobante
+            .get(it.facturacionId)!
+            .push({ concepto: it.concepto, importe: it.importe });
+        }
+      }
+
+      const labelDe = (t: string | null) =>
+        t === 'recibo' ? 'Comprobante interno' : (TIPO_COMPROBANTE_LABEL_MAIL[t ?? ''] ?? t ?? '');
+      for (const c of cobrados) {
+        comprobantes.push(`${labelDe(c.tipoFactura)} ${c.codigo ?? ''} — ${fmtPesos(c.importe)}`);
+        const detalle =
+          detallePorComprobante.get(c.id) ??
+          (c.descripcion ? [{ concepto: c.descripcion, importe: null }] : []);
+        for (const d of detalle) {
+          comprobantes.push(
+            `· ${d.concepto ?? 'Servicio'}${d.importe != null ? ` — ${fmtPesos(d.importe)}` : ''}`,
+          );
+        }
+      }
+    } else {
+      const facturasSocio = await db
+        .select({
+          codigo: facturacion.codigo,
+          tipoFactura: facturacion.tipoFactura,
+          importe: facturacion.importe,
+        })
+        .from(facturacion)
+        .where(
+          and(
+            eq(facturacion.socioId, row.socioId),
+            eq(facturacion.guarderiaId, gId),
+            ne(facturacion.tipoFactura, 'recibo'),
+            inArray(facturacion.tipoFactura, ['factura_a', 'factura_b', 'factura_c']),
+          ),
+        )
+        .orderBy(asc(facturacion.emision));
+      const importeRecibo = parseFloat(row.importe ?? '0');
+      let acumulado = 0;
+      for (const f of facturasSocio) {
+        if (acumulado >= importeRecibo - 0.001) break;
+        comprobantes.push(
+          `${TIPO_COMPROBANTE_LABEL_MAIL[f.tipoFactura ?? ''] ?? f.tipoFactura ?? ''} ${f.codigo ?? ''}`.trim(),
+        );
+        acumulado += parseFloat(f.importe ?? '0');
+      }
     }
   }
   if (comprobantes.length === 0 && row.descripcion) comprobantes.push(row.descripcion);

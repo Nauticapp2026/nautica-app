@@ -193,9 +193,9 @@ function tipoComprobanteLabel(f: {
 }
 
 const TIPO_FACTURA_OPTS = [
-  { value: 'factura_c', label: 'Factura C (Monotributo)' },
-  { value: 'factura_b', label: 'Factura B (Consumidor Final)' },
-  { value: 'factura_a', label: 'Factura A (Responsable Inscripto)' },
+  { value: 'factura_c', label: 'Factura C' },
+  { value: 'factura_b', label: 'Factura B' },
+  { value: 'factura_a', label: 'Factura A' },
 ];
 
 // Tipos de factura que el club puede emitir según SU condición frente al
@@ -839,7 +839,7 @@ function NuevaFacturaModal({
                       className="mb-1.5 block text-xs font-semibold"
                       style={{ color: '#101828' }}
                     >
-                      Fecha*
+                      Fecha de comprobante*
                     </label>
                     <input
                       type="date"
@@ -869,6 +869,41 @@ function NuevaFacturaModal({
                 </div>
               )}
 
+              {!modoNota && (
+                <div>
+                  <p className="mb-1.5 text-xs font-semibold" style={{ color: '#101828' }}>
+                    Período facturado{' '}
+                    <span className="font-normal text-gray-400">
+                      (a qué rango de fechas corresponde el servicio — se informa a ARCA)
+                    </span>
+                  </p>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-1.5 block text-xs font-semibold text-gray-500">
+                        Desde*
+                      </label>
+                      <input
+                        type="date"
+                        className={inputCls}
+                        value={form.desde}
+                        onChange={set('desde')}
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1.5 block text-xs font-semibold text-gray-500">
+                        Hasta*
+                      </label>
+                      <input
+                        type="date"
+                        className={inputCls}
+                        value={form.hasta}
+                        onChange={set('hasta')}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* NC/ND sin comprobante de origen: fecha de emisión propia,
               mismo formato que la factura. */}
               {modoNota && !notaRelacionada && (
@@ -878,7 +913,7 @@ function NuevaFacturaModal({
                       className="mb-1.5 block text-xs font-semibold"
                       style={{ color: '#101828' }}
                     >
-                      Fecha*
+                      Fecha de comprobante*
                     </label>
                     <input
                       type="date"
@@ -890,31 +925,69 @@ function NuevaFacturaModal({
                 </div>
               )}
 
-              {/* Centro emisor: solo si el club tiene más de un punto de venta.
-              Para NC/ND relacionadas no se elige — salen por el mismo POS que
-              el comprobante original. */}
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {centrosEmisores.length > 1 && (!modoNota || !notaRelacionada) && (
-                  <div>
-                    <label
-                      className="mb-1.5 block text-xs font-semibold"
-                      style={{ color: '#101828' }}
-                    >
-                      Centro emisor
-                    </label>
-                    <select
-                      className={inputCls}
-                      value={centroEmisorId}
-                      onChange={(e) => setCentroEmisorId(e.target.value)}
-                    >
-                      {centrosEmisores.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.nombre} — N.º {c.puntoDeVenta}
-                        </option>
-                      ))}
-                    </select>
+              {/* NC/ND sin comprobante de origen: ARCA exige asociar la nota a
+              comprobantes o a un período — acá va el período. */}
+              {modoNota && !notaRelacionada && (
+                <div>
+                  <p className="mb-1.5 text-xs font-semibold" style={{ color: '#101828' }}>
+                    Período asociado{' '}
+                    <span className="font-normal text-gray-400">
+                      (rango de fechas al que corresponde la nota — se informa a ARCA en lugar de un
+                      comprobante puntual)
+                    </span>
+                  </p>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-1.5 block text-xs font-semibold text-gray-500">
+                        Desde*
+                      </label>
+                      <input
+                        type="date"
+                        className={inputCls}
+                        value={notaPeriodoDesde}
+                        onChange={(e) => setNotaPeriodoDesde(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1.5 block text-xs font-semibold text-gray-500">
+                        Hasta*
+                      </label>
+                      <input
+                        type="date"
+                        className={inputCls}
+                        value={notaPeriodoHasta}
+                        onChange={(e) => setNotaPeriodoHasta(e.target.value)}
+                      />
+                    </div>
                   </div>
-                )}
+                </div>
+              )}
+
+              {/* Centro emisor: solo si el club tiene más de un punto de venta,
+              en su propia línea. Para NC/ND relacionadas no se elige — salen
+              por el mismo POS que el comprobante original. */}
+              {centrosEmisores.length > 1 && (!modoNota || !notaRelacionada) && (
+                <div>
+                  <label
+                    className="mb-1.5 block text-xs font-semibold"
+                    style={{ color: '#101828' }}
+                  >
+                    Centro emisor
+                  </label>
+                  <select
+                    className={inputCls}
+                    value={centroEmisorId}
+                    onChange={(e) => setCentroEmisorId(e.target.value)}
+                  >
+                    {centrosEmisores.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.nombre} — N.º {c.puntoDeVenta}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <label
                     className="mb-1.5 block text-xs font-semibold"
@@ -950,10 +1023,45 @@ function NuevaFacturaModal({
                         {o.label}
                       </option>
                     ))}
-                    <option value="nota_credito">Nota de crédito</option>
-                    <option value="nota_debito">Nota de débito</option>
+                    {(() => {
+                      // Misma letra que va a llevar la nota (ver tipoNota en el
+                      // desglose): relacionada → la de la factura elegida;
+                      // libre → la sugerida según el socio/club.
+                      const tipoNotaBase = notaRelacionada
+                        ? (notaFacturaSel?.tipoFactura ?? form.tipoFactura)
+                        : form.tipoFactura;
+                      const letra = tipoNotaBase?.split('_').pop()?.toUpperCase();
+                      const suf = letra && letra.length === 1 ? ` ${letra}` : '';
+                      return (
+                        <>
+                          <option value="nota_credito">{`Nota de crédito${suf}`}</option>
+                          <option value="nota_debito">{`Nota de débito${suf}`}</option>
+                        </>
+                      );
+                    })()}
                   </select>
                 </div>
+                {!modoNota && (
+                  <div>
+                    <label
+                      className="mb-1.5 block text-xs font-semibold"
+                      style={{ color: '#101828' }}
+                    >
+                      Condición de venta*
+                    </label>
+                    <select
+                      className={inputCls}
+                      value={form.condicionVenta}
+                      onChange={set('condicionVenta')}
+                    >
+                      {CONDICION_VENTA_OPTS.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </div>
 
               {/* Checklist de movimientos pendientes */}
@@ -1015,45 +1123,6 @@ function NuevaFacturaModal({
                       ))}
                     </div>
                   )}
-                </div>
-              )}
-
-              {!modoNota && (
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div>
-                    <label
-                      className="mb-1.5 block text-xs font-semibold"
-                      style={{ color: '#101828' }}
-                    >
-                      Condición de venta*
-                    </label>
-                    <select
-                      className={inputCls}
-                      value={form.condicionVenta}
-                      onChange={set('condicionVenta')}
-                    >
-                      {CONDICION_VENTA_OPTS.map((o) => (
-                        <option key={o.value} value={o.value}>
-                          {o.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label
-                      className="mb-1.5 block text-xs font-semibold"
-                      style={{ color: '#101828' }}
-                    >
-                      Forma de pago
-                    </label>
-                    <select className={inputCls} value={form.medioPago} onChange={set('medioPago')}>
-                      {MEDIO_PAGO_OPTS.map((o) => (
-                        <option key={o.value} value={o.value}>
-                          {o.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
                 </div>
               )}
 
@@ -1203,79 +1272,6 @@ function NuevaFacturaModal({
                   onChange={set('descripcion')}
                 />
               </div>
-
-              {/* NC/ND sin comprobante de origen: ARCA exige asociar la nota a
-              comprobantes o a un período — acá va el período. */}
-              {modoNota && !notaRelacionada && (
-                <div>
-                  <p className="mb-1.5 text-xs font-semibold" style={{ color: '#101828' }}>
-                    Período asociado{' '}
-                    <span className="font-normal text-gray-400">
-                      (rango de fechas al que corresponde la nota — se informa a ARCA en lugar de un
-                      comprobante puntual)
-                    </span>
-                  </p>
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <div>
-                      <label className="mb-1.5 block text-xs font-semibold text-gray-500">
-                        Desde*
-                      </label>
-                      <input
-                        type="date"
-                        className={inputCls}
-                        value={notaPeriodoDesde}
-                        onChange={(e) => setNotaPeriodoDesde(e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-1.5 block text-xs font-semibold text-gray-500">
-                        Hasta*
-                      </label>
-                      <input
-                        type="date"
-                        className={inputCls}
-                        value={notaPeriodoHasta}
-                        onChange={(e) => setNotaPeriodoHasta(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {!modoNota && (
-                <div>
-                  <p className="mb-1.5 text-xs font-semibold" style={{ color: '#101828' }}>
-                    Período facturado{' '}
-                    <span className="font-normal text-gray-400">
-                      (a qué rango de fechas corresponde el servicio — se informa a ARCA)
-                    </span>
-                  </p>
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <div>
-                      <label className="mb-1.5 block text-xs font-semibold text-gray-500">
-                        Desde*
-                      </label>
-                      <input
-                        type="date"
-                        className={inputCls}
-                        value={form.desde}
-                        onChange={set('desde')}
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-1.5 block text-xs font-semibold text-gray-500">
-                        Hasta*
-                      </label>
-                      <input
-                        type="date"
-                        className={inputCls}
-                        value={form.hasta}
-                        onChange={set('hasta')}
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
 
               {error && (
                 <div className="flex items-start gap-2 rounded-[10px] bg-red-50 p-3 text-sm text-red-700">
@@ -3532,6 +3528,7 @@ export function VentasClient({
   certificadoOk,
   guarderiaCondicionIva,
   centrosEmisores,
+  internosHabilitados,
 }: {
   facturas: Factura[];
   socios: Socio[];
@@ -3541,6 +3538,9 @@ export function VentasClient({
   certificadoOk: boolean;
   guarderiaCondicionIva: string | null;
   centrosEmisores: CentroEmisorOpt[];
+  // false = el club no habilitó medios de cobro para comprobantes internos
+  // (Mi Perfil → Configuración de cobranzas): se apaga la emisión de internos.
+  internosHabilitados: boolean;
 }) {
   const [activeTab, setActiveTab] = useState<'afip' | 'recibos'>('afip');
   const [search, setSearch] = useState('');
@@ -3883,10 +3883,26 @@ export function VentasClient({
                 Facturación por lote
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={() => setComprobanteInternoOpen(true)}>
+              <DropdownMenuItem
+                disabled={!internosHabilitados}
+                title={
+                  !internosHabilitados
+                    ? 'Habilitá al menos un medio de pago para comprobantes internos en Mi Perfil → Datos Impositivos → Configuración de cobranzas.'
+                    : undefined
+                }
+                onSelect={() => setComprobanteInternoOpen(true)}
+              >
                 Comprobante interno manual
               </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => setComprobanteInternoLoteOpen(true)}>
+              <DropdownMenuItem
+                disabled={!internosHabilitados}
+                title={
+                  !internosHabilitados
+                    ? 'Habilitá al menos un medio de pago para comprobantes internos en Mi Perfil → Datos Impositivos → Configuración de cobranzas.'
+                    : undefined
+                }
+                onSelect={() => setComprobanteInternoLoteOpen(true)}
+              >
                 Comprobante interno por lote
               </DropdownMenuItem>
             </DropdownMenuContent>

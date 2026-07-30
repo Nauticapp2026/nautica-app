@@ -137,16 +137,74 @@ export default async function ReciboPage({ params }: { params: Promise<{ id: str
   // heurística FIFO (facturas AFIP del socio, de la más antigua a la más
   // nueva, hasta cubrir el importe). RB-/CM-/CL- documentan un cargo propio,
   // no un pago — para esos se muestra row.descripcion directamente más abajo.
-  const comprobantes: { codigo: string | null; tipoFactura: string | null }[] = [];
+  type DetalleCargo = { concepto: string | null; importe: string | null };
+  const comprobantes: {
+    codigo: string | null;
+    tipoFactura: string | null;
+    importe: string | null;
+    detalle: DetalleCargo[];
+  }[] = [];
   if (row.cobranzaComprobanteIds && row.cobranzaComprobanteIds.length > 0) {
     const cobrados = await db
-      .select({ codigo: facturacion.codigo, tipoFactura: facturacion.tipoFactura })
+      .select({
+        id: facturacion.id,
+        codigo: facturacion.codigo,
+        tipoFactura: facturacion.tipoFactura,
+        importe: facturacion.importe,
+        descripcion: facturacion.descripcion,
+      })
       .from(facturacion)
       .where(
         and(inArray(facturacion.id, row.cobranzaComprobanteIds), eq(facturacion.guarderiaId, gId)),
       )
       .orderBy(asc(facturacion.emision));
-    comprobantes.push(...cobrados);
+
+    // Detalle de cada comprobante cobrado: sus cargos (concepto + importe)
+    // vía facturacion_items → movimientos. Sin ítems (ej. una ND con vínculo
+    // directo) se cae a la descripción del comprobante.
+    const detallePorComprobante = new Map<string, DetalleCargo[]>();
+    if (cobrados.length > 0) {
+      const itemRows = await db
+        .select({
+          facturacionId: facturacionItems.facturacionId,
+          importe: facturacionItems.importe,
+          concepto: movimientosCuentaCorriente.concepto,
+        })
+        .from(facturacionItems)
+        .innerJoin(
+          facturacionItemMovimientos,
+          eq(facturacionItemMovimientos.facturacionItemId, facturacionItems.id),
+        )
+        .innerJoin(
+          movimientosCuentaCorriente,
+          eq(movimientosCuentaCorriente.id, facturacionItemMovimientos.movimientoId),
+        )
+        .where(
+          inArray(
+            facturacionItems.facturacionId,
+            cobrados.map((c) => c.id),
+          ),
+        );
+      for (const it of itemRows) {
+        if (!detallePorComprobante.has(it.facturacionId)) {
+          detallePorComprobante.set(it.facturacionId, []);
+        }
+        detallePorComprobante
+          .get(it.facturacionId)!
+          .push({ concepto: it.concepto, importe: it.importe });
+      }
+    }
+
+    comprobantes.push(
+      ...cobrados.map((c) => ({
+        codigo: c.codigo,
+        tipoFactura: c.tipoFactura,
+        importe: c.importe,
+        detalle:
+          detallePorComprobante.get(c.id) ??
+          (c.descripcion ? [{ concepto: c.descripcion, importe: null }] : []),
+      })),
+    );
   } else if (row.socioId && row.codigo?.startsWith('RC-')) {
     const facturasSocio = await db
       .select({
@@ -169,7 +227,12 @@ export default async function ReciboPage({ params }: { params: Promise<{ id: str
     let acumulado = 0;
     for (const f of facturasSocio) {
       if (acumulado >= importeRecibo - 0.001) break;
-      comprobantes.push({ codigo: f.codigo, tipoFactura: f.tipoFactura });
+      comprobantes.push({
+        codigo: f.codigo,
+        tipoFactura: f.tipoFactura,
+        importe: f.importe,
+        detalle: [],
+      });
       acumulado += parseFloat(f.importe ?? '0');
     }
   }
@@ -300,11 +363,24 @@ export default async function ReciboPage({ params }: { params: Promise<{ id: str
               <span className="font-semibold text-gray-500">En concepto de:</span>
               <span className="text-gray-900">
                 {comprobantes.length > 0 ? (
-                  <span className="flex flex-col gap-0.5">
+                  <span className="flex flex-col gap-1">
                     {comprobantes.map((c, i) => (
-                      <span key={i}>
-                        {TIPO_COMPROBANTE_LABEL[c.tipoFactura ?? ''] ?? c.tipoFactura}{' '}
-                        {c.codigo ?? ''}
+                      <span key={i} className="flex flex-col gap-0.5">
+                        <span className="flex justify-between gap-4">
+                          <span>
+                            {TIPO_COMPROBANTE_LABEL[c.tipoFactura ?? ''] ?? c.tipoFactura}{' '}
+                            {c.codigo ?? ''}
+                          </span>
+                          {c.importe != null && (
+                            <span className="text-gray-500">{fmtMoney(c.importe)}</span>
+                          )}
+                        </span>
+                        {c.detalle.map((d, j) => (
+                          <span key={j} className="flex justify-between gap-4 pl-4 text-gray-500">
+                            <span>· {d.concepto ?? 'Servicio'}</span>
+                            {d.importe != null && <span>{fmtMoney(d.importe)}</span>}
+                          </span>
+                        ))}
                       </span>
                     ))}
                   </span>

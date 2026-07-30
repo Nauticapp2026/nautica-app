@@ -26,6 +26,7 @@ import {
   deleteMiembroEquipoAction,
   marcarCentroEmisorPrincipalAction,
   renombrarCentroEmisorAction,
+  saveMediosCobroInternosAction,
   savePuntoVentaAction,
   savePaywayCredsAction,
   solicitarCertificadoAfipAction,
@@ -44,6 +45,7 @@ import {
   type UpdateMiembroEquipoData,
 } from '@/app/actions/configuracion';
 import { normalizarBusqueda } from '@/lib/buscador';
+import { MEDIOS_PAGO } from '@/lib/medios-pago';
 import { EmptyState } from '@/components/shared/empty-state';
 import { ImagesUploader } from '@/components/shared/images-uploader';
 
@@ -195,6 +197,7 @@ export function ConfiguracionClient({
   currentUserId,
   features,
   puntoVenta,
+  mediosCobroInternos,
   centrosEmisores,
   payway,
   planes,
@@ -208,6 +211,7 @@ export function ConfiguracionClient({
   currentUserId: string;
   features: GuarderiaFeatures;
   puntoVenta: PuntoVentaData;
+  mediosCobroInternos: string[];
   centrosEmisores: CentroEmisor[];
   payway: PaywayData;
   planes: PlanInfo[];
@@ -275,13 +279,21 @@ export function ConfiguracionClient({
           <InfoGeneralForm initial={infoGeneral} />
           {!showImpositivosTab && (
             <div className="mt-6">
-              <PuntoVentaTab initial={puntoVenta} centros={centrosEmisores} />
+              <PuntoVentaTab
+                initial={puntoVenta}
+                centros={centrosEmisores}
+                mediosCobroInternos={mediosCobroInternos}
+              />
             </div>
           )}
         </>
       )}
       {activeTab === 'impositivos' && (
-        <PuntoVentaTab initial={puntoVenta} centros={centrosEmisores} />
+        <PuntoVentaTab
+          initial={puntoVenta}
+          centros={centrosEmisores}
+          mediosCobroInternos={mediosCobroInternos}
+        />
       )}
       {activeTab === 'equipo' && (
         <EquipoTab
@@ -1490,7 +1502,15 @@ function PlanCard({
   );
 }
 
-function PuntoVentaTab({ initial, centros }: { initial: PuntoVentaData; centros: CentroEmisor[] }) {
+function PuntoVentaTab({
+  initial,
+  centros,
+  mediosCobroInternos,
+}: {
+  initial: PuntoVentaData;
+  centros: CentroEmisor[];
+  mediosCobroInternos: string[];
+}) {
   const [data, setData] = useState<PuntoVentaData>(initial);
   const [feedback, setFeedback] = useState<{ type: 'error' | 'success'; msg: string } | null>(null);
   const [pending, startTransition] = useTransition();
@@ -1668,6 +1688,10 @@ function PuntoVentaTab({ initial, centros }: { initial: PuntoVentaData; centros:
           </button>
         </div>
 
+        <div className="mt-2 border-t border-gray-200 pt-6">
+          <ConfiguracionCobranzasSection initial={mediosCobroInternos} />
+        </div>
+
         {yaConfigurado && <CentrosEmisoresSection centros={centros} />}
 
         {yaConfigurado && (
@@ -1684,6 +1708,94 @@ function PuntoVentaTab({ initial, centros }: { initial: PuntoVentaData; centros:
         )}
       </div>
     </section>
+  );
+}
+
+// Configuración de cobranzas: qué medios de pago admite el club para cobrar
+// comprobantes internos. Sin ninguno tildado, la emisión de comprobantes
+// internos queda deshabilitada en toda la app (tilde del socio, Cargar
+// Servicio, Ventas y Cobranzas).
+function ConfiguracionCobranzasSection({ initial }: { initial: string[] }) {
+  const router = useRouter();
+  const [medios, setMedios] = useState<string[]>(initial);
+  const [feedback, setFeedback] = useState<{ type: 'error' | 'success'; msg: string } | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  const toggleMedio = (value: string) => {
+    setMedios((prev) =>
+      prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value],
+    );
+    setFeedback(null);
+  };
+
+  const onGuardar = () => {
+    startTransition(async () => {
+      const res = await saveMediosCobroInternosAction(medios);
+      if (res.error) {
+        setFeedback({ type: 'error', msg: res.error });
+        toast.error(res.error);
+      } else {
+        setFeedback({ type: 'success', msg: 'Configuración de cobranzas guardada.' });
+        toast.success('Configuración de cobranzas guardada.');
+        router.refresh();
+      }
+    });
+  };
+
+  return (
+    <div>
+      <h3 className="mb-1 text-sm font-bold" style={{ color: '#101828' }}>
+        Configuración de cobranzas
+      </h3>
+      <p className="mb-4 text-sm text-gray-500">
+        Medios de pago que el club admite para cobrar comprobantes internos. Al no ser comprobantes
+        legales, lo ideal es admitir solo Efectivo.
+      </p>
+
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-3">
+        {MEDIOS_PAGO.map((m) => (
+          <label
+            key={m.value}
+            className="flex cursor-pointer items-center gap-2.5 rounded-[10px] border border-gray-200 px-4 py-2.5 text-sm text-[#101828] hover:bg-gray-50"
+          >
+            <input
+              type="checkbox"
+              className="h-4 w-4 accent-[#175861]"
+              checked={medios.includes(m.value)}
+              onChange={() => toggleMedio(m.value)}
+            />
+            {m.label}
+          </label>
+        ))}
+      </div>
+
+      {medios.length === 0 && (
+        <div className="mt-3 rounded-[10px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          Sin ningún medio seleccionado, los comprobantes internos quedan deshabilitados: no se va a
+          poder marcar el tilde en Datos Impositivos del socio, cargar servicios con facturación
+          Interno, emitir comprobantes internos desde Ventas ni cobrarlos desde Cobranzas.
+        </div>
+      )}
+
+      {feedback && (
+        <p
+          className={`mt-3 text-sm ${feedback.type === 'error' ? 'text-red-600' : 'text-green-700'}`}
+        >
+          {feedback.msg}
+        </p>
+      )}
+
+      <div className="pt-4">
+        <button
+          type="button"
+          onClick={onGuardar}
+          disabled={pending}
+          className="rounded-[10px] bg-[#175861] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#0f4249] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {pending ? 'Guardando…' : 'Guardar configuración'}
+        </button>
+      </div>
+    </div>
   );
 }
 

@@ -117,8 +117,9 @@ export function CobranzaTabla({ cobranzas }: { cobranzas: CobranzaRow[] }) {
                 {c.fecha ? formatArgentinaDate(c.fecha) : '—'}
               </td>
               <td className="px-4 py-3 text-gray-700">{c.codigo ?? '—'}</td>
+              {/* Anulado: el cobro quedó revertido — el monto efectivo es $0. */}
               <td className="px-4 py-3 text-right font-semibold text-[#101828]">
-                {fmtMoney(c.importe)}
+                {c.anulada ? fmtMoney('0') : fmtMoney(c.importe)}
               </td>
               <td className="px-4 py-3 text-gray-700">{instrumentoCobro(c.formas, 0)}</td>
               <td className="px-4 py-3 text-gray-700">{instrumentoCobro(c.formas, 1)}</td>

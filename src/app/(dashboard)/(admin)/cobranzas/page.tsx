@@ -96,7 +96,11 @@ export default async function CobranzasPage() {
       .limit(300),
 
     db
-      .select({ nombre: guarderias.nombre, razonSocial: guarderias.razonSocial })
+      .select({
+        nombre: guarderias.nombre,
+        razonSocial: guarderias.razonSocial,
+        mediosCobroInternos: guarderias.mediosCobroInternos,
+      })
       .from(guarderias)
       .where(eq(guarderias.id, gId))
       .limit(1),
@@ -196,7 +200,10 @@ export default async function CobranzasPage() {
             Registrá los pagos de tus socios y aplicalos a sus comprobantes.
           </p>
         </div>
-        <CobranzaClient socios={sociosOptions} />
+        <CobranzaClient
+          socios={sociosOptions}
+          mediosInternos={guarderiaInfo?.mediosCobroInternos ?? []}
+        />
       </div>
       <CobranzasTabsClient cobranzas={cobranzas} cobrosPayway={cobrosPayway} />
     </div>

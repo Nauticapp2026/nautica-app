@@ -38,9 +38,9 @@ Listo. A partir de acá ya podés registrar tarjetas de socios.
 
 ## Paso 3 — Registrar la tarjeta de un socio
 
-Esto se hace una sola vez por socio. Después, el sistema cobra solo cada mes.
+Esto se hace una sola vez por socio.
 
-1. Andá a **Usuarios** y abrí el perfil del socio.
+1. Andá a **Socios** y abrí el perfil del socio.
 2. Hacé clic en la pestaña **Débito automático**.
 3. Completá los datos de la tarjeta:
    - Número de tarjeta
@@ -53,25 +53,32 @@ El sistema confirma que la tarjeta quedó registrada mostrando los últimos 4 d�
 
 ---
 
-## Paso 4 — Cobros mensuales automáticos
+## Paso 4 — Adherir al socio
 
-No hace falta hacer nada. El día de facturación configurado en tu club, el sistema:
+Con la tarjeta cargada, marcá el tilde **Cobro Automático Payway** en la pestaña **Datos Impositivos** del socio (sin tarjeta, el tilde no se puede marcar).
 
-1. Genera los movimientos del mes.
-2. Emite la factura automáticamente.
-3. Cobra desde la tarjeta de cada socio que tenga débito registrado.
+A partir de ahí, todo servicio nuevo que se le cargue viene con el tilde **"Incluir este servicio en el débito automático"** marcado por defecto. Los servicios que ya tenía contratados no se adhieren solos: prendeles el tilde uno por uno desde **Editar** en Servicios Contratados (la columna **Débito autom.** muestra Sí/No).
 
-Los movimientos cobrados quedan marcados como **Pagados**.
+---
 
-> **Importante:** el sistema cobra **todos los movimientos pendientes del socio**, no solo los del mes actual. Si el socio tenía deuda anterior al momento de registrar la tarjeta, ese monto se sumará al próximo cobro automático. Revisá la cuenta corriente del socio antes de registrar la tarjeta si querés evitar un cobro de golpe por deuda acumulada.
+## Paso 5 — Cobros mensuales automáticos
+
+No hace falta hacer nada más. El día de facturación configurado en tu club, el sistema:
+
+1. Emite el comprobante automáticamente (eso genera los cargos del mes).
+2. Cobra desde la tarjeta de cada socio **adherido**: los cargos pendientes de sus **servicios con el tilde de débito**, descontando el crédito que ya tuviera a favor.
+
+Los cargos cobrados quedan marcados como **Cobrados** y los comprobantes cubiertos enteros pasan a **Cobrada**.
+
+> **Qué entra al débito:** solo los Servicios Contratados con el tilde puesto, de socios adheridos. La deuda que no salió de un servicio contratado (por ejemplo una nota de débito) se cobra a mano desde **Cobranzas**. Los servicios con facturación **Interno** solo entran si el club habilitó **Débito automático** en Mi perfil → Datos Impositivos → **Configuración de cobranzas**, y siempre en un pago separado de los fiscales.
 
 ---
 
 ## Si un cobro falla
 
-1. Andá a **Ventas** → **Débito automático**.
+1. Andá a **Cobranzas** → **Débito automático**.
 2. Buscá el cobro con estado **Rechazado** o **Error**.
-3. Hacé clic en **Reintentar**.
+3. Hacé clic en **Reintentar**. El sistema vuelve a correr el débito del socio hoy, con las mismas reglas del cobro mensual.
 
 > Si el cobro vuelve a fallar, comunicate con el socio para actualizar los datos de la tarjeta o con el soporte de Payway.
 

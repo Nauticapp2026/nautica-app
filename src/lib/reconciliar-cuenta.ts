@@ -42,11 +42,26 @@ import { calcularCoberturaNotasCredito } from '@/lib/nc-cobertura';
  * para detectar qué comprobantes quedaron 100% saldados.
  */
 export async function getCargosSaldadosFifo(socioId: string): Promise<Set<string>> {
+  return (await getEstadoFifo(socioId)).saldados;
+}
+
+/**
+ * Igual que getCargosSaldadosFifo pero además devuelve el pool de haberes que
+ * sobra después de la pasada FIFO (`poolRestante`): crédito ya pagado por el
+ * socio que cubre PARCIALMENTE el cargo no saldado más viejo. El débito
+ * automático lo necesita para descontarlo del cobro y no cobrar de más.
+ * Invariante: poolRestante < debe del primer cargo no saldado (si alcanzara,
+ * ese cargo estaría en `saldados`).
+ */
+export async function getEstadoFifo(
+  socioId: string,
+): Promise<{ saldados: Set<string>; poolRestante: number }> {
   const { montoPorMovimiento, movimientosDeNc } = await calcularCoberturaNotasCredito(socioId);
 
   const movs = await db
     .select({
       id: movimientosCuentaCorriente.id,
+      tipo: movimientosCuentaCorriente.tipo,
       debe: movimientosCuentaCorriente.debe,
       haber: movimientosCuentaCorriente.haber,
       estado: movimientosCuentaCorriente.estado,
@@ -62,13 +77,24 @@ export async function getCargosSaldadosFifo(socioId: string): Promise<Set<string
   }
 
   // Pool genérico: excluye los movimientos que son el asiento de una NC ya
-  // aplicada puntualmente arriba (ver calcularCoberturaNotasCredito).
+  // aplicada puntualmente arriba (ver calcularCoberturaNotasCredito). Los
+  // contraasientos de anulación de recibo (debe) restan del pool: anulan
+  // exactamente el haber del pago anulado, que sigue sumando — el neto del
+  // par es cero y esa plata no cubre ningún cargo.
   let pool = movs
     .filter((m) => !movimientosDeNc.has(m.id))
-    .reduce((acc, m) => acc + parseFloat(m.haber ?? '0'), 0);
+    .reduce(
+      (acc, m) =>
+        acc +
+        parseFloat(m.haber ?? '0') -
+        (m.tipo === 'anulacion_recibo' ? parseFloat(m.debe ?? '0') : 0),
+      0,
+    );
 
   for (const m of movs) {
     if (saldados.has(m.id)) continue;
+    // El contraasiento no es un cargo cobrable: ya se descontó del pool.
+    if (m.tipo === 'anulacion_recibo') continue;
     const debe = parseFloat(m.debe ?? '0');
     if (debe <= 0) continue;
     if (m.estado === 'pagado') {
@@ -84,7 +110,7 @@ export async function getCargosSaldadosFifo(socioId: string): Promise<Set<string
     }
   }
 
-  return saldados;
+  return { saldados, poolRestante: Math.max(0, pool) };
 }
 
 export async function reconciliarCuentaSocio(socioId: string): Promise<string[]> {
@@ -93,6 +119,7 @@ export async function reconciliarCuentaSocio(socioId: string): Promise<string[]>
   const movs = await db
     .select({
       id: movimientosCuentaCorriente.id,
+      tipo: movimientosCuentaCorriente.tipo,
       debe: movimientosCuentaCorriente.debe,
       haber: movimientosCuentaCorriente.haber,
       estado: movimientosCuentaCorriente.estado,
@@ -105,13 +132,21 @@ export async function reconciliarCuentaSocio(socioId: string): Promise<string[]>
   // Excluye los movimientos que son el asiento de una NC ya aplicada
   // puntualmente a su propia factura (ver calcularCoberturaNotasCredito) —
   // esta función solo reconcilia pagos genéricos (ej. Payway), no créditos
-  // ya targeteados.
+  // ya targeteados. Los contraasientos de anulación restan del pool (anulan
+  // el haber del pago anulado, ver getEstadoFifo).
   let pool = movs
     .filter((m) => !movimientosDeNc.has(m.id))
-    .reduce((acc, m) => acc + parseFloat(m.haber ?? '0'), 0);
+    .reduce(
+      (acc, m) =>
+        acc +
+        parseFloat(m.haber ?? '0') -
+        (m.tipo === 'anulacion_recibo' ? parseFloat(m.debe ?? '0') : 0),
+      0,
+    );
   const toMark: string[] = [];
 
   for (const m of movs) {
+    if (m.tipo === 'anulacion_recibo') continue;
     const debe = parseFloat(m.debe ?? '0');
     if (debe <= 0) continue;
     if (m.estado === 'pagado') {
@@ -157,15 +192,22 @@ const TIPOS_FISCALES = [
  * sigue figurando "pendiente" en el listado de comprobantes aunque ya esté
  * cobrada. Devuelve los ids de las facturas marcadas.
  *
+ * `incluirInternos`: además de los fiscales, marca los comprobantes internos
+ * (tipo 'recibo') cubiertos. Solo lo usa el débito automático de canal interno
+ * — en el resto de los flujos los internos se saldan vía Cobranza.
+ *
  * Read-side seguro: solo toca facturas 100% cubiertas; nunca marca una factura
  * cubierta a medias (no se puede "pagar media factura").
  */
 export async function marcarComprobantesSaldados(
   socioId: string,
   guarderiaId: string,
+  incluirInternos = false,
 ): Promise<string[]> {
   const saldados = await getCargosSaldadosFifo(socioId);
 
+  const tipos: ((typeof TIPOS_FISCALES)[number] | 'recibo')[] = [...TIPOS_FISCALES];
+  if (incluirInternos) tipos.push('recibo');
   const facs = await db
     .select({
       id: facturacion.id,
@@ -177,7 +219,7 @@ export async function marcarComprobantesSaldados(
         eq(facturacion.guarderiaId, guarderiaId),
         eq(facturacion.socioId, socioId),
         inArray(facturacion.estado, ['pendiente', 'vencida']),
-        inArray(facturacion.tipoFactura, [...TIPOS_FISCALES]),
+        inArray(facturacion.tipoFactura, tipos),
       ),
     );
   if (facs.length === 0) return [];

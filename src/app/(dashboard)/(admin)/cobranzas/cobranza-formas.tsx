@@ -35,8 +35,20 @@ function num(v: string | undefined): number {
   return parseFloat((v ?? '').replace(',', '.')) || 0;
 }
 
-export function nuevaForma(): FormaCobranza {
-  return { id: crypto.randomUUID(), tipo: 'efectivo', monto: '', datos: {} };
+// Tipos de cobranza visibles según los medios habilitados por el club para
+// comprobantes internos (Configuración de cobranzas). null = sin restricción
+// (canal fiscal). 'efectivo_usd' cuenta como 'efectivo'; 'otro' no es un
+// medio configurable y se excluye cuando hay restricción.
+export function tiposCobranzaPermitidos(permitidos: string[] | null) {
+  if (!permitidos) return [...TIPOS_COBRANZA];
+  return TIPOS_COBRANZA.filter((o) =>
+    permitidos.includes(o.value === 'efectivo_usd' ? 'efectivo' : o.value),
+  );
+}
+
+export function nuevaForma(tiposPermitidos: string[] | null = null): FormaCobranza {
+  const tipos = tiposCobranzaPermitidos(tiposPermitidos);
+  return { id: crypto.randomUUID(), tipo: tipos[0]?.value ?? 'efectivo', monto: '', datos: {} };
 }
 
 export function FormasDePago({
@@ -44,12 +56,23 @@ export function FormasDePago({
   setFormas,
   montoAPagar,
   tarjetaGuardada,
+  tiposPermitidos = null,
 }: {
   formas: FormaCobranza[];
   setFormas: React.Dispatch<React.SetStateAction<FormaCobranza[]>>;
   montoAPagar: string;
   tarjetaGuardada: TarjetaGuardada;
+  tiposPermitidos?: string[] | null;
 }) {
+  const tipos = tiposCobranzaPermitidos(tiposPermitidos);
+  if (tipos.length === 0) {
+    return (
+      <p className="rounded-[10px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        Ninguno de los medios habilitados para comprobantes internos permite un cobro manual. Revisá
+        la Configuración de cobranzas en Mi Perfil → Datos Impositivos.
+      </p>
+    );
+  }
   function update(id: string, patch: Partial<FormaCobranza>) {
     setFormas((prev) => prev.map((f) => (f.id === id ? { ...f, ...patch } : f)));
   }
@@ -72,13 +95,14 @@ export function FormasDePago({
           canRemove={formas.length > 1}
           soloUnaForma={formas.length === 1}
           tarjetaGuardada={tarjetaGuardada}
+          tipos={tipos}
           onChange={(patch) => update(forma.id, patch)}
           onRemove={() => remove(forma.id)}
         />
       ))}
       <button
         type="button"
-        onClick={() => setFormas((prev) => [...prev, nuevaForma()])}
+        onClick={() => setFormas((prev) => [...prev, nuevaForma(tiposPermitidos)])}
         className="inline-flex items-center gap-1.5 rounded-[10px] border border-dashed border-gray-300 px-3 py-2 text-sm font-medium text-[#175861] transition hover:bg-gray-50"
       >
         <Plus className="h-4 w-4" />
@@ -93,6 +117,7 @@ function Linea({
   canRemove,
   soloUnaForma,
   tarjetaGuardada,
+  tipos,
   onChange,
   onRemove,
 }: {
@@ -100,6 +125,7 @@ function Linea({
   canRemove: boolean;
   soloUnaForma: boolean;
   tarjetaGuardada: TarjetaGuardada;
+  tipos: { value: string; label: string }[];
   onChange: (patch: Partial<FormaCobranza>) => void;
   onRemove: () => void;
 }) {
@@ -144,7 +170,7 @@ function Linea({
             value={forma.tipo}
             onChange={(e) => changeTipo(e.target.value)}
           >
-            {TIPOS_COBRANZA.map((o) => (
+            {tipos.map((o) => (
               <option key={o.value} value={o.value}>
                 {o.label}
               </option>

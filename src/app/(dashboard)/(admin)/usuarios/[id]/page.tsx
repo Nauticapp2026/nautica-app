@@ -65,6 +65,8 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
       numeroSocio: memberships.numeroSocio,
       facturaFiscal: memberships.facturaFiscal,
       comprobanteInterno: memberships.comprobanteInterno,
+      cobroAutomaticoPayway: memberships.cobroAutomaticoPayway,
+      cobroAutomaticoBaja: memberships.cobroAutomaticoBaja,
     })
     .from(profiles)
     .innerJoin(
@@ -304,7 +306,10 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
       .orderBy(asc(areas.nombre), asc(espacios.orden)),
 
     db
-      .select({ paywayPublicKey: guarderias.paywayPublicKey })
+      .select({
+        paywayPublicKey: guarderias.paywayPublicKey,
+        mediosCobroInternos: guarderias.mediosCobroInternos,
+      })
       .from(guarderias)
       .where(eq(guarderias.id, gId))
       .limit(1),
@@ -338,6 +343,7 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
         fechaBaja: socioServicios.fechaBaja,
         concepto: socioServicios.concepto,
         comprobanteInterno: socioServicios.comprobanteInterno,
+        debitoAutomatico: socioServicios.debitoAutomatico,
         cantidadDias: socioServicios.cantidadDias,
       })
       .from(socioServicios)
@@ -564,6 +570,7 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
   return (
     <SocioDetail
       paywayPublicKey={guarderiaRow[0]?.paywayPublicKey ?? null}
+      internosHabilitados={(guarderiaRow[0]?.mediosCobroInternos ?? []).length > 0}
       paywayToken={
         paywayTokenRow[0]
           ? {
@@ -582,6 +589,8 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
         estadoSocio: socio.estadoSocio ?? null,
         facturaFiscal: socio.facturaFiscal ?? false,
         comprobanteInterno: socio.comprobanteInterno ?? false,
+        cobroAutomaticoPayway: socio.cobroAutomaticoPayway ?? false,
+        cobroAutomaticoBaja: socio.cobroAutomaticoBaja ?? null,
       }}
       embarcaciones={embarcacionesList.map((e) => ({
         ...e,
@@ -654,6 +663,7 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
         fechaBaja: s.fechaBaja,
         concepto: s.concepto,
         comprobanteInterno: s.comprobanteInterno,
+        debitoAutomatico: s.debitoAutomatico,
         cantidadDias: s.cantidadDias,
         tieneCargo: contratosConCargo.has(s.id),
       }))}

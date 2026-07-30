@@ -341,6 +341,11 @@
 
 <p><strong>Comprobante interno</strong> — checkbox de esta pestaña. Define el valor <strong>por defecto</strong> del campo Comprobante al <strong>Cargar Servicio</strong> a este socio: tildado, los servicios nuevos arrancan como <strong>Interno</strong>; destildado, como <strong>Fiscal (ARCA)</strong>. Es solo el default — en cada carga se puede cambiar.</p>
 
+<blockquote>Este checkbox solo se puede marcar si el club tiene al menos un medio de pago habilitado para comprobantes internos en <strong>Mi perfil → Datos Impositivos → Configuración de cobranzas</strong>. Con la configuración vacía, el tilde queda deshabilitado (igual que la opción Interno al cargar servicios y la emisión de comprobantes internos en Ventas).</blockquote>
+
+<p><strong>Cobro Automático Payway</strong> — checkbox de esta pestaña. Adhiere al socio al <strong>débito automático</strong>: sus servicios contratados fiscales se cobran todos los meses con la tarjeta de crédito que tenga cargada (ver capítulo 14).</p>
+
+<ul><li>Requiere que el socio tenga una <strong>tarjeta cargada</strong> en la pestaña <strong>Débito automático</strong>; sin tarjeta el tilde no se puede marcar y la pantalla lo indica.</li><li>Al <strong>tildarlo</strong>, los servicios que se le carguen de ahí en más vienen con el tilde "Incluir en el débito automático" ya marcado (se puede destildar servicio por servicio).</li><li>Al <strong>destildarlo</strong>, el débito automático del socio se frena y queda registrada la <strong>fecha de baja</strong>, visible debajo del checkbox. Si se vuelve a marcar, la fecha se blanquea (arranca un período nuevo de adhesión).</li></ul>
 <blockquote><strong>Campos requeridos para poder emitir factura ARCA al socio:</strong></blockquote>
 <p>></p>
 <blockquote>Según el modo elegido, el receptor del comprobante necesita: <strong>razón social / nombre</strong>, <strong>documento</strong> (CUIT para Responsable Inscripto o Monotributo —11 dígitos sin guiones—; DNI válido para Consumidor Final), <strong>condición frente al IVA</strong> (determina si es comprobante A, B o C) y <strong>dirección</strong>.</blockquote>
@@ -357,7 +362,7 @@
 
 <h4>Pestaña Servicios Contratados</h4>
 
-<p>Lista los servicios que el socio tiene contratados. Es un <strong>contrato</strong>, no un historial de cargos: cada servicio ocupa su propia fila, con su categoría, un badge <strong>Fijo</strong> o <strong>Variable</strong> según su tarifa, el tipo de comprobante (<strong>Interno / Fiscal</strong>), el precio con y sin IVA, la fecha de inicio, la fecha de baja (si tiene) y su <strong>estado</strong>:</p>
+<p>Lista los servicios que el socio tiene contratados. Es un <strong>contrato</strong>, no un historial de cargos: cada servicio ocupa su propia fila, con su categoría, un badge <strong>Fijo</strong> o <strong>Variable</strong> según su tarifa, el tipo de comprobante (<strong>Interno / Fiscal</strong>), la columna <strong>Débito autom.</strong> (Sí/No — si el servicio entra al débito automático Payway, ver capítulo 14), el precio con y sin IVA, la fecha de inicio, la fecha de baja (si tiene) y su <strong>estado</strong>:</p>
 
 <ul><li><strong>Vigente</strong> — el contrato está activo y se sigue facturando.</li><li><strong>Concluido</strong> — servicio <strong>Variable</strong> que ya se facturó: los Variables se cobran una sola vez y el contrato se cierra solo. Para volver a cobrarlo, cargalo de nuevo.</li><li><strong>Dado de baja</strong> — la fecha de baja ya se cumplió.</li></ul>
 <p><strong>Cargar un servicio nuevo no genera ningún cargo en el momento.</strong> Solo registra el contrato; el cargo real lo va a generar la facturación (mensual para los servicios Fijos, una vez para los Variables) cuando corresponda.</p>
@@ -365,11 +370,11 @@
 <p><strong>Cargar Servicio:</strong></p>
 
 <ol><li>Hacé clic en <strong>Cargar Servicio</strong>.</li><li>Elegí el servicio en el buscador (agrupado por categoría, igual que en el Tarifario — solo aparecen tarifas <strong>Activas</strong>).</li><li>Completá el <strong>Detalle del servicio</strong> (texto libre, opcional) y la <strong>Fecha de inicio</strong> del servicio (obligatoria). La <strong>Fecha de baja</strong> es opcional — dejala vacía si el servicio sigue vigente.</li><li>Si el servicio elegido es <strong>Variable con tarifa diaria</strong> (en el buscador su precio aparece como "por día"), aparece un campo más: <strong>Cantidad de días</strong> (obligatorio). El cargo va a ser el precio diario multiplicado por esos días — el total se muestra abajo del campo antes de confirmar, y la cantidad queda visible en la fila del contrato (por ej. "5 días").</li><li>Elegí el <strong>tipo de comprobante</strong>:</li></ol>   - <strong>Fiscal (ARCA)</strong> — el cargo se va a facturar por ARCA cuando corresponda (manual o automático).
-<p>- <strong>Interno</strong> — el cargo queda excluido de toda facturación por ARCA; se consolida después en un comprobante interno desde <strong>Ventas</strong> (ver sección Comprobantes internos).</p>
-<ol><li>Confirmá. El sistema muestra: <em>"Servicio contratado. Todavía no aparece en la cuenta corriente — va a impactar recién cuando corresponda facturarlo."</em></li></ol>
+<p>- <strong>Interno</strong> — el cargo queda excluido de toda facturación por ARCA; se consolida después en un comprobante interno desde <strong>Ventas</strong> (ver sección Comprobantes internos). La opción solo está disponible si el club tiene medios habilitados en <strong>Mi perfil → Configuración de cobranzas</strong>.</p>
+<ol><li>Si el socio está <strong>adherido al Cobro Automático Payway</strong> (con tarjeta cargada), aparece además el tilde <strong>"Incluir este servicio en el débito automático"</strong>, marcado por defecto. Destildalo si este servicio en particular se va a cobrar por otro medio.</li><li>Confirmá. El sistema muestra: <em>"Servicio contratado. Todavía no aparece en la cuenta corriente — va a impactar recién cuando corresponda facturarlo."</em></li></ol>
 <p><strong>Editar un servicio contratado:</strong></p>
 
-<ol><li>Hacé clic en el ícono de <strong>lápiz</strong> de la fila del servicio.</li><li>En el modal podés modificar: <strong>Fecha de inicio</strong>, <strong>Fecha de baja</strong>, <strong>Detalle del servicio</strong> y el tipo de <strong>Comprobante</strong> (Interno / Fiscal).</li><li>Si es la <strong>primera vez</strong> que le ponés fecha de baja a ese contrato, aparece un bloque adicional: un checkbox <strong>"Cobrar por esta baja"</strong> con el monto sugerido según la <strong>política de baja anticipada</strong> configurada en la tarifa (mes completo o proporcional al uso) — podés editar ese monto antes de guardar (con techo en el precio de un mes completo). Si lo tildás, el cobro queda <strong>pendiente de facturar</strong> y se incluye en el <strong>próximo comprobante</strong> que se le emita al socio (manual o automático) — recién ahí aparece en la Cuenta Corriente. Si no lo tildás (o si solo estás editando una baja ya cargada antes), no se genera ningún cobro.</li><li>Hacé clic en <strong>Guardar</strong>.</li></ol>
+<ol><li>Hacé clic en el ícono de <strong>lápiz</strong> de la fila del servicio.</li><li>En el modal podés modificar: <strong>Fecha de inicio</strong>, <strong>Fecha de baja</strong>, <strong>Detalle del servicio</strong>, el tipo de <strong>Comprobante</strong> (Interno / Fiscal) y el tilde <strong>"Incluir este servicio en el débito automático"</strong> (solo tiene efecto si el socio está adherido al Cobro Automático Payway con tarjeta cargada).</li><li>Si es la <strong>primera vez</strong> que le ponés fecha de baja a ese contrato, aparece un bloque adicional: un checkbox <strong>"Cobrar por esta baja"</strong> con el monto sugerido según la <strong>política de baja anticipada</strong> configurada en la tarifa (mes completo o proporcional al uso) — podés editar ese monto antes de guardar (con techo en el precio de un mes completo). Si lo tildás, el cobro queda <strong>pendiente de facturar</strong> y se incluye en el <strong>próximo comprobante</strong> que se le emita al socio (manual o automático) — recién ahí aparece en la Cuenta Corriente. Si no lo tildás (o si solo estás editando una baja ya cargada antes), no se genera ningún cobro.</li><li>Hacé clic en <strong>Guardar</strong>.</li></ol>
 <p><strong>Servicio de guarda (espacio):</strong> ponerle fecha de baja a un servicio de guarda <strong>detiene el cargo mensual automático</strong> de ahí en más. El espacio <strong>sigue asignado</strong> (la embarcación queda en su lugar); si querés <strong>liberar el lugar</strong> para otro socio, hacelo desde la sección <strong>Espacios</strong>. Si más adelante le volvés a asignar ese espacio al socio, la baja se limpia sola y vuelve a facturarse.</p>
 
 <blockquote><strong>Recordá:</strong> contratar un servicio o asignar un espacio <strong>no genera deuda por sí solo</strong>. La deuda nace recién cuando se <strong>emite el comprobante</strong> (factura o comprobante interno), que toma los servicios vigentes del socio: los Fijos cada mes, los Variables una sola vez, y el proporcional de los días restantes si el servicio arrancó a mitad de mes.</blockquote>
@@ -790,9 +795,9 @@
 
 <h3>Registrar una cobranza nueva</h3>
 
-<ol><li>Hacé clic en <strong>Nueva cobranza</strong>.</li><li>Elegí <strong>qué tipo de comprobantes vas a cobrar</strong>: <strong>Comprobantes ARCA</strong> (facturas A/B/C y notas de débito) o <strong>Comprobantes internos</strong> (CM-/CL-/CA-) — la misma separación que las pestañas de Ventas. Un recibo no puede mezclar los dos circuitos, así que la lista solo muestra los del tipo elegido.</li><li>Buscá al socio por nombre, número de socio o embarcación, y hacé clic sobre él en la lista.</li><li>El sistema te muestra los <strong>comprobantes pendientes de cobro</strong> de ese socio, del tipo elegido en el paso 2. No incluye notas de crédito ni comprobantes ya cubiertos por un pago anterior.</li><li>Tildá los comprobantes que estás cobrando (o usá <strong>Seleccionar todos</strong>). Abajo se muestra el <strong>Total seleccionado</strong>.</li><li>Hacé clic en <strong>Continuar</strong>.</li><li>Revisá o ajustá el <strong>Monto a cobrar</strong> (viene precargado con el total seleccionado) y la <strong>Fecha</strong> del cobro.</li></ol>   - Si el monto es <strong>menor</strong> al total seleccionado, es un <strong>pago parcial</strong>: el sistema cubre los comprobantes más viejos primero, hasta donde alcance; el resto queda pendiente.
+<ol><li>Hacé clic en <strong>Nueva cobranza</strong>.</li><li>Elegí <strong>qué tipo de comprobantes vas a cobrar</strong>: <strong>Comprobantes ARCA</strong> (facturas A/B/C y notas de débito) o <strong>Comprobantes internos</strong> (CM-/CL-/CA-) — la misma separación que las pestañas de Ventas. Un recibo no puede mezclar los dos circuitos, así que la lista solo muestra los del tipo elegido. La opción <strong>Comprobantes internos</strong> solo aparece si el club tiene medios habilitados en <strong>Mi perfil → Datos Impositivos → Configuración de cobranzas</strong>.</li><li>Buscá al socio por nombre, número de socio o embarcación, y hacé clic sobre él en la lista.</li><li>El sistema te muestra los <strong>comprobantes pendientes de cobro</strong> de ese socio, del tipo elegido en el paso 2. No incluye notas de crédito ni comprobantes ya cubiertos por un pago anterior.</li><li>Tildá los comprobantes que estás cobrando (o usá <strong>Seleccionar todos</strong>). Abajo se muestra el <strong>Total seleccionado</strong>.</li><li>Hacé clic en <strong>Continuar</strong>.</li><li>Revisá o ajustá el <strong>Monto a cobrar</strong> (viene precargado con el total seleccionado) y la <strong>Fecha</strong> del cobro.</li></ol>   - Si el monto es <strong>menor</strong> al total seleccionado, es un <strong>pago parcial</strong>: el sistema cubre los comprobantes más viejos primero, hasta donde alcance; el resto queda pendiente.
 <p>- Si el monto es <strong>mayor</strong>, el excedente queda como <strong>saldo a favor</strong> del socio.</p>
-<ol><li>Elegí la <strong>forma de pago</strong>: Efectivo (pesos), Efectivo (dólares), Tarjeta de crédito, Tarjeta de débito, Transferencia bancaria, Cheque, Mercado Pago u Otro. Cada una pide sus propios datos (por ejemplo, Efectivo en dólares pide el tipo de cambio y calcula el equivalente en pesos; si el socio ya tiene una tarjeta cargada para débito automático, podés reutilizarla con un clic).</li><li><strong>Podés combinar más de una forma de pago</strong> en el mismo cobro: hacé clic en <strong>Agregar forma de pago</strong> y repetí el paso anterior para cada una. La suma de todas tiene que coincidir con el Monto a cobrar.</li><li>Hacé clic en <strong>Registrar cobranza</strong>.</li></ol>
+<ol><li>Elegí la <strong>forma de pago</strong>: Efectivo (pesos), Efectivo (dólares), Tarjeta de crédito, Tarjeta de débito, Transferencia bancaria, Cheque, Mercado Pago u Otro. Cada una pide sus propios datos (por ejemplo, Efectivo en dólares pide el tipo de cambio y calcula el equivalente en pesos; si el socio ya tiene una tarjeta cargada para débito automático, podés reutilizarla con un clic). Si estás cobrando <strong>comprobantes internos</strong>, el desplegable muestra <strong>solo los medios habilitados</strong> en la Configuración de cobranzas del club (Efectivo habilita también Efectivo en dólares).</li><li><strong>Podés combinar más de una forma de pago</strong> en el mismo cobro: hacé clic en <strong>Agregar forma de pago</strong> y repetí el paso anterior para cada una. La suma de todas tiene que coincidir con el Monto a cobrar.</li><li>Hacé clic en <strong>Registrar cobranza</strong>.</li></ol>
 <h3>Qué pasa al confirmar</h3>
 
 <p>Al registrar la cobranza, el sistema genera un <strong>recibo de cobranza</strong> con numeración propia <strong>RC-NNNNNN</strong>, marca como <strong>Cobrados</strong> los comprobantes que quedaron cubiertos enteros (del más viejo al más nuevo) y actualiza la Cuenta Corriente del socio. Si el pago fue parcial, los comprobantes no cubiertos del todo quedan pendientes para una próxima cobranza.</p>
@@ -930,6 +935,15 @@
 <ul><li>En <strong>Facturación manual</strong> (y en las NC/ND "sin comprobante de origen") aparece el dropdown <strong>Centro emisor</strong> para elegir por cuál sale, preseleccionado en el principal. Con un solo centro el dropdown no se muestra.</li><li>Las <strong>NC/ND sobre un comprobante emitido</strong>, el <strong>Reenviar</strong> de rechazadas y la descarga de <strong>PDF</strong> usan siempre el punto de venta del comprobante original.</li><li>En la tabla de Ventas, la columna <strong>Centro emisor</strong> muestra el punto de venta real de cada comprobante.</li></ul>
 <blockquote>Los centros emisores no se pueden eliminar desde el panel (solo renombrar y cambiar el principal): borrar un punto de venta con comprobantes emitidos afectaría la trazabilidad fiscal. Si necesitás dar de baja uno, contactá a soporte.</blockquote>
 
+<p><em>Configuración de cobranzas:</em></p>
+
+<p>Debajo del formulario de datos impositivos está la sección <strong>Configuración de cobranzas</strong>: los <strong>medios de pago que el club admite para cobrar comprobantes internos</strong> (Efectivo, Tarjeta de crédito, Tarjeta de débito, Débito automático, Transferencia, Cheque, Mercado Pago). Como los comprobantes internos no son comprobantes legales, lo ideal es admitir <strong>solo Efectivo</strong> — que es como viene configurado de entrada.</p>
+
+<p>Esta configuración gobierna toda la pata de internos de la app:</p>
+
+<ul><li><strong>Sin ningún medio tildado</strong>, los comprobantes internos quedan <strong>deshabilitados</strong>: no se puede marcar el tilde "Comprobante interno" en Datos Impositivos del socio, ni cargar servicios con facturación Interno, ni emitir comprobantes internos desde Ventas, y la opción "Comprobantes internos" desaparece de Nueva cobranza.</li><li>En <strong>Cobranzas</strong>, al cobrar comprobantes internos el desplegable <strong>Forma de cobro</strong> muestra <strong>solo los medios habilitados acá</strong> (para los comprobantes ARCA se sigue mostrando la lista completa).</li><li>Tildar <strong>Débito automático</strong> habilita además que los servicios <strong>Interno</strong> de socios adheridos entren al cobro automático por Payway (ver capítulo 14) — sin este tilde, el débito automático cobra únicamente servicios fiscales.</li></ul>
+<p>Elegí los medios y hacé clic en <strong>Guardar configuración</strong>.</p>
+
 <h3>Pestaña: Equipo</h3>
 
 <p>Gestioná el personal del club que tiene acceso al panel web o a la app mobile.</p>
@@ -966,11 +980,13 @@
 
 <h2>14. Débito automático (Payway)</h2>
 
-<p>El débito automático permite cobrar la cuota mensual directamente desde la tarjeta de crédito o débito del socio, sin necesidad de que el socio realice ninguna acción. El cobro se genera automáticamente el día de facturación de tu club.</p>
+<p>El débito automático permite cobrar los servicios contratados directamente desde la tarjeta de crédito del socio, sin necesidad de que el socio realice ninguna acción. El cobro se genera automáticamente el día de facturación de tu club.</p>
 
 <h3>¿Cómo funciona?</h3>
 
-<ol><li>El admin configura las credenciales de Payway de tu club (una sola vez).</li><li>El admin registra la tarjeta de cada socio que quiera adherirse al débito automático.</li><li>Cada mes, el sistema genera la factura y cobra automáticamente desde la tarjeta.</li><li>Si un cobro falla, el admin puede reintentarlo desde el panel de comprobantes.</li></ol>
+<ol><li>El admin configura las credenciales de Payway de tu club (una sola vez).</li><li>El admin registra la tarjeta de cada socio que quiera adherirse.</li><li>El admin marca el tilde <strong>Cobro Automático Payway</strong> en la pestaña <strong>Datos Impositivos</strong> del socio (con tarjeta ya cargada). Desde ahí, los servicios que se le carguen vienen incluidos en el débito por defecto, y cada Servicio Contratado se puede incluir o excluir individualmente.</li><li>Cada mes, el sistema emite el comprobante y cobra automáticamente los servicios incluidos.</li><li>Si un cobro falla, el admin puede reintentarlo desde Cobranzas → Débito automático.</li></ol>
+<blockquote><strong>Qué entra al débito y qué no.</strong> Se cobran los cargos de los <strong>Servicios Contratados con el tilde de débito</strong> de socios <strong>adheridos</strong>. Los cargos que no salen de un servicio contratado (una nota de débito, un cobro por baja anticipada suelto) quedan afuera y se cobran a mano desde <strong>Cobranzas</strong>. Los servicios <strong>Interno</strong> solo entran si el club tildó <strong>Débito automático</strong> en su Configuración de cobranzas — y aún así se cobran en un <strong>pago separado</strong> de los fiscales: los dos circuitos nunca se mezclan en un mismo cobro.</blockquote>
+
 <h3>Paso 1 — Configurar Payway en tu club</h3>
 
 <blockquote>Necesitás tener una cuenta en <strong>Payway (Decidir)</strong> y tus claves pública y privada. Si no las tenés, contactá a Payway para darlas de alta.</blockquote>
@@ -993,16 +1009,21 @@
 
 <p><strong>Para reemplazar una tarjeta:</strong> hacé clic en <strong>Reemplazar</strong> y completá los nuevos datos. El proceso es el mismo que el alta.</p>
 
-<p><strong>Para dar de baja el débito automático:</strong> hacé clic en <strong>Eliminar tarjeta</strong> al pie de la sección. Los cobros automáticos se detienen, pero los movimientos pendientes siguen en la cuenta del socio.</p>
+<p><strong>Para dar de baja el débito automático:</strong> destildá <strong>Cobro Automático Payway</strong> en la pestaña <strong>Datos Impositivos</strong> del socio (queda registrada la fecha de baja). También podés hacer clic en <strong>Eliminar tarjeta</strong> al pie de la pestaña Débito automático — sin tarjeta activa no se procesa ningún cobro. En los dos casos los movimientos pendientes siguen en la cuenta del socio.</p>
 
-<h3>Paso 3 — Cobros mensuales automáticos</h3>
+<h3>Paso 3 — Adherir al socio y sus servicios</h3>
 
-<p>No hace falta hacer nada. El día de facturación configurado en tu club, el sistema:</p>
+<p>Con la tarjeta cargada, marcá el tilde <strong>Cobro Automático Payway</strong> en la pestaña <strong>Datos Impositivos</strong> del socio. A partir de ahí:</p>
 
-<ol><li>Genera los movimientos mensuales de cada espacio asignado.</li><li>Emite la factura automáticamente (para socios que ya tuvieron al menos una factura).</li><li>Cobra via débito automático a todos los socios con tarjeta registrada.</li></ol>
-<p>Cuando el cobro se aprueba, se registra un pago <strong>Pago — Débito automático</strong> en la cuenta corriente del socio y su saldo queda saldado. El monto cobrado es el <strong>saldo real</strong> del socio (todos los cargos pendientes menos los pagos ya registrados), no la suma de cargos sin descontar lo ya pagado.</p>
+<ul><li>Todo <strong>servicio nuevo</strong> que se le cargue viene con el tilde <strong>"Incluir este servicio en el débito automático"</strong> marcado por defecto (se puede destildar en la carga).</li><li>Los servicios ya contratados <strong>no</strong> se adhieren solos: prendeles el tilde uno por uno desde <strong>Editar</strong> en Servicios Contratados (la columna <strong>Débito autom.</strong> muestra Sí/No para cada uno).</li></ul>
+<h3>Paso 4 — Cobros mensuales automáticos</h3>
 
-<blockquote><strong>La factura y el cobro de Payway no toman lo mismo.</strong> La <strong>factura</strong> documenta los <strong>cargos pendientes</strong> del socio (mensualidad + consumos del mes) y los marca como facturados. El <strong>cobro de Payway</strong> toma el <strong>saldo neto</strong> de toda la cuenta corriente: todo lo que el socio debe (<code>debe</code>) menos todo lo que ya pagó (<code>haber</code>). En el caso normal (factura recién emitida y nada pagado todavía) los dos montos coinciden, pero si el socio tenía saldo a favor o pagos parciales, <strong>Payway cobra menos que el total facturado</strong> ese día. Si el saldo neto es cero o está a favor del socio, no se genera cobro.</blockquote>
+<p>No hace falta hacer nada más. El día de facturación configurado en tu club, el sistema:</p>
+
+<ol><li>Emite el comprobante automáticamente a cada socio con servicios pendientes de facturar, lo que genera los cargos del mes.</li><li>Cobra por débito automático los cargos de los <strong>servicios con el tilde de débito</strong> de cada socio <strong>adherido</strong> con tarjeta activa. Fiscales e internos van en cobros separados (los internos solo si el club los habilitó, ver arriba).</li></ol>
+<p>Cuando el cobro se aprueba, se registra un pago <strong>Pago — Débito automático</strong> en la cuenta corriente del socio, los cargos cobrados quedan <strong>Cobrados</strong> y los comprobantes cubiertos enteros pasan a <strong>Cobrada</strong>.</p>
+
+<blockquote><strong>No se cobra de más.</strong> Si el socio tenía <strong>saldo a favor</strong> o pagos parciales previos, ese crédito se descuenta del débito del mes. Y si un cargo ya quedó cubierto por un pago anterior, no se vuelve a cobrar.</blockquote>
 
 <h3>Ver el historial de cobros</h3>
 
@@ -1021,7 +1042,7 @@
 
 <p>Si un cobro aparece como <strong>Rechazado</strong> o <strong>Error</strong>:</p>
 
-<ol><li>En la tabla de <strong>Débito automático</strong>, buscá el cobro fallido.</li><li>Hacé clic en <strong>Reintentar</strong>.</li><li>El sistema vuelve a intentar el cobro del <strong>saldo actual</strong> del socio con la misma tarjeta registrada (sirve también para los cobros generados por el cron mensual).</li><li>Si sale aprobado, se registra el pago y el saldo del socio baja automáticamente.</li></ol>
+<ol><li>En la tabla de <strong>Débito automático</strong>, buscá el cobro fallido.</li><li>Hacé clic en <strong>Reintentar</strong>.</li><li>El sistema vuelve a correr el <strong>débito automático del socio hoy</strong>, con las mismas reglas del cobro mensual: cargos pendientes de sus servicios con el tilde de débito, con el crédito previo descontado. Requiere que el socio siga adherido y con tarjeta activa.</li><li>Si sale aprobado, se registra el pago y el saldo del socio baja automáticamente.</li></ol>
 <blockquote>Si el cobro vuelve a fallar, probablemente la tarjeta tiene un problema. Comunicarte con el socio para actualizar los datos.</blockquote>
 
 <h3>Preguntas frecuentes sobre débito automático</h3>
@@ -1030,13 +1051,13 @@
 <p>Payway envía la notificación directamente al banco del socio. La app no envía notificación adicional por el momento.</p>
 
 <p><strong>¿Qué pasa si el socio tiene deuda de meses anteriores?</strong></p>
-<p>El cron cobra el <strong>saldo real</strong> del socio en ese momento (todos los cargos pendientes menos los pagos ya registrados), no solo el mes corriente. Si tenía deuda acumulada, se cobra todo junto.</p>
+<p>Se cobra todo lo pendiente de sus <strong>servicios con el tilde de débito</strong>, no solo el mes corriente — siempre descontando lo que ya haya pagado. La deuda que no salió de esos servicios (por ejemplo una nota de débito) no entra: se cobra desde Cobranzas.</p>
 
 <p><strong>¿Se puede configurar un tope de monto?</strong></p>
-<p>No. Se cobra el saldo pendiente completo sin tope.</p>
+<p>No. Se cobra el pendiente completo de los servicios incluidos, sin tope.</p>
 
 <p><strong>¿Qué pasa si el socio no tiene movimientos pendientes ese mes?</strong></p>
-<p>No se genera ningún cobro. El débito automático solo se dispara si el socio tiene saldo pendiente — no importa si tiene o no espacio asignado.</p>
+<p>No se genera ningún cobro. El débito automático solo se dispara si el socio tiene cargos pendientes de servicios incluidos — no importa si tiene o no espacio asignado.</p>
 
 <hr>
 
@@ -1052,7 +1073,7 @@
 <p>Sí. La tarifa es opcional al momento de asignar. Podés cargarla después; cuando lo hagas, el sistema genera el movimiento mensual correspondiente con cálculo proporcional desde la fecha de asignación.</p>
 
 <p><strong>¿La facturación automática mensual aplica a todos los socios?</strong></p>
-<p>Solo a los socios que ya tuvieron al menos una factura emitida. Los socios nuevos sin factura previa hay que facturarlos la primera vez de forma manual.</p>
+<p>Sí: emite a todo socio con servicios vigentes pendientes de facturar, tenga o no facturas anteriores. Si el socio ya tiene facturas, la nueva hereda el tipo de comprobante y la condición de venta de la última; si es la primera, se derivan de su condición frente al IVA. Los comprobantes fiscales requieren además que el club tenga TusFacturas y el certificado ARCA configurados.</p>
 
 <p><strong>¿Cómo contacto a soporte?</strong></p>
 <p>Desde el menú lateral, hacé clic en <strong>¿Necesitás ayuda?</strong> para abrir el chat de soporte por WhatsApp.</p>

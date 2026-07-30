@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, gt } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import {
@@ -10,6 +10,7 @@ import {
   horariosDia,
   memberships,
   profiles,
+  servicios,
 } from '@/lib/db/schema';
 import { getActiveMarina } from '@/lib/auth/session';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -22,6 +23,7 @@ import {
   toTusFecha,
 } from '@/lib/tusfacturas/client';
 import { CONDICION_IVA_API } from '@/lib/tusfacturas/mappers';
+import { MEDIO_PAGO_VALUES } from '@/lib/medios-pago';
 
 const DIAS = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'] as const;
 type Dia = (typeof DIAS)[number];
@@ -227,6 +229,31 @@ function buildTusFacturasWebhookUrl(): string | undefined {
   return `${appUrl}/api/webhooks/tusfacturas?secret=${encodeURIComponent(secret)}`;
 }
 
+// Configuración de cobranzas: medios de pago que el club admite para
+// comprobantes internos. Lista vacía = deshabilita la emisión de comprobantes
+// internos en toda la app (tilde del socio, Cargar Servicio, Ventas y
+// Cobranzas).
+export async function saveMediosCobroInternosAction(medios: string[]): Promise<{ error?: string }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+  if (!isAdmin(ctx)) return { error: 'Solo administradores pueden editar la configuración.' };
+
+  if (!Array.isArray(medios) || medios.some((m) => !MEDIO_PAGO_VALUES.includes(m))) {
+    return { error: 'Medio de pago inválido.' };
+  }
+  const unicos = [...new Set(medios)];
+
+  await db
+    .update(guarderias)
+    .set({ mediosCobroInternos: unicos, updatedAt: new Date() })
+    .where(eq(guarderias.id, ctx.activeMembership.guarderiaId));
+
+  revalidatePath('/configuracion');
+  revalidatePath('/cobranzas');
+  revalidatePath('/ventas');
+  return {};
+}
+
 export type SavePuntoVentaData = {
   puntoDeVenta: number;
   razonSocial: string;
@@ -372,6 +399,17 @@ export async function savePuntoVentaAction(data: SavePuntoVentaData): Promise<{ 
       updatedAt: new Date(),
     })
     .where(eq(guarderias.id, guarderiaId));
+
+  // Club Monotributista: nunca muestra ni cobra IVA (emite Factura C). Si el
+  // club pasa a Monotributo, cualquier tarifa que tuviera alícuota cargada se
+  // sanea a 0 — el bloqueo del Tarifario solo aplica al editar (mismo criterio
+  // que la mig 0137 para los datos legacy).
+  if (data.condicionIva === 'monotributo') {
+    await db
+      .update(servicios)
+      .set({ alicuotaIva: '0', updatedAt: new Date() })
+      .where(and(eq(servicios.guarderiaId, guarderiaId), gt(servicios.alicuotaIva, '0')));
+  }
 
   revalidatePath('/configuracion');
   return {};

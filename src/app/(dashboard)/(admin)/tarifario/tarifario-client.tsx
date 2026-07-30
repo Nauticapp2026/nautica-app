@@ -323,6 +323,7 @@ export function TarifarioClient({
             </h3>
             <TablaTarifas
               items={list}
+              clubMonotributo={clubMonotributo}
               onEdit={(t) => setModal({ mode: 'edit', tarifa: t })}
               onPausar={handlePausar}
               onReactivar={handleReactivar}
@@ -411,12 +412,16 @@ export function TarifarioClient({
 
 function TablaTarifas({
   items,
+  clubMonotributo,
   onEdit,
   onPausar,
   onReactivar,
   accionDisabled,
 }: {
   items: Tarifa[];
+  // Club Monotributista: emite Factura C sin IVA — el precio se muestra solo,
+  // sin leyendas c/IVA / s/IVA / Exento.
+  clubMonotributo: boolean;
   onEdit: (t: Tarifa) => void;
   onPausar: (t: Tarifa) => void;
   onReactivar: (t: Tarifa) => void;
@@ -468,27 +473,39 @@ function TablaTarifas({
                   {formatDate(t.vigenciaDesde)} – {formatDate(t.vigenciaHasta)}
                 </td>
                 <td className="px-5 py-3" style={{ color: '#101828' }}>
-                  <span className="block text-sm font-medium">
-                    {formatARS(precioConIva(t.precio, t.alicuotaIva))}
-                    {t.alicuotaIva > 0 && (
-                      <span className="ml-1.5 text-xs font-normal text-gray-400">c/IVA</span>
-                    )}
-                  </span>
-                  {t.alicuotaIva > 0 && (
-                    <span className="block text-xs text-gray-500">
-                      {formatARS(t.precio)}
-                      <span className="ml-1 text-gray-400">s/IVA · {t.alicuotaIva}%</span>
-                    </span>
-                  )}
-                  {t.alicuotaIva === 0 && (
-                    <span className="block text-xs text-gray-400">Exento / No gravado</span>
+                  {clubMonotributo ? (
+                    // Monotributo: Factura C sin IVA — el precio va solo, sin
+                    // leyendas de IVA ni "Exento".
+                    <span className="block text-sm font-medium">{formatARS(t.precio)}</span>
+                  ) : (
+                    <>
+                      <span className="block text-sm font-medium">
+                        {formatARS(precioConIva(t.precio, t.alicuotaIva))}
+                        {t.alicuotaIva > 0 && (
+                          <span className="ml-1.5 text-xs font-normal text-gray-400">c/IVA</span>
+                        )}
+                      </span>
+                      {t.alicuotaIva > 0 && (
+                        <span className="block text-xs text-gray-500">
+                          {formatARS(t.precio)}
+                          <span className="ml-1 text-gray-400">s/IVA · {t.alicuotaIva}%</span>
+                        </span>
+                      )}
+                      {t.alicuotaIva === 0 && (
+                        <span className="block text-xs text-gray-400">Exento / No gravado</span>
+                      )}
+                    </>
                   )}
                   {t.ajusteProgramado && (
                     <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
                       <Clock className="h-3 w-3" />
                       {formatARS(
-                        precioConIva(t.ajusteProgramado.precioNuevo, t.alicuotaIva),
-                      )} desde {formatDate(t.ajusteProgramado.fechaAplicacion)}
+                        precioConIva(
+                          t.ajusteProgramado.precioNuevo,
+                          clubMonotributo ? 0 : t.alicuotaIva,
+                        ),
+                      )}{' '}
+                      desde {formatDate(t.ajusteProgramado.fechaAplicacion)}
                     </span>
                   )}
                 </td>
@@ -911,10 +928,13 @@ function TarifaModal({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          {/* Club Monotributista: emite Factura C sin IVA — el campo IVA no se
+          muestra (la alícuota queda forzada a 0) y el precio va sin leyendas. */}
+          <div className={`grid gap-3 ${clubMonotributo ? 'grid-cols-1' : 'grid-cols-2'}`}>
             <div>
               <label className="mb-1 block text-sm font-semibold text-gray-700">
-                Precio <span className="font-normal text-gray-400">(sin IVA)</span>
+                Precio
+                {!clubMonotributo && <span className="font-normal text-gray-400"> (sin IVA)</span>}
               </label>
               <input
                 className={inputCls}
@@ -925,30 +945,26 @@ function TarifaModal({
                 value={precio}
                 onChange={(e) => setPrecio(e.target.value)}
               />
-              {alicuotaIva > 0 && Number(precio) > 0 && (
+              {!clubMonotributo && alicuotaIva > 0 && Number(precio) > 0 && (
                 <p className="mt-1 text-xs text-gray-500">
                   Total c/IVA: {formatARS(precioConIva(Number(precio), alicuotaIva))}
                 </p>
               )}
             </div>
-            <div>
-              <label className="mb-1 block text-sm font-semibold text-gray-700">IVA</label>
-              <select
-                className={`${inputCls} disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400`}
-                value={alicuotaIva}
-                onChange={(e) => setAlicuotaIva(Number(e.target.value))}
-                disabled={clubMonotributo}
-              >
-                <option value={0}>Exento / No gravado</option>
-                <option value={10.5}>10,5%</option>
-                <option value={21}>21%</option>
-              </select>
-              {clubMonotributo && (
-                <p className="mt-1 text-xs text-gray-500">
-                  Tu club es Monotributista: emite Factura C sin discriminar IVA.
-                </p>
-              )}
-            </div>
+            {!clubMonotributo && (
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-gray-700">IVA</label>
+                <select
+                  className={inputCls}
+                  value={alicuotaIva}
+                  onChange={(e) => setAlicuotaIva(Number(e.target.value))}
+                >
+                  <option value={0}>Exento / No gravado</option>
+                  <option value={10.5}>10,5%</option>
+                  <option value={21}>21%</option>
+                </select>
+              </div>
+            )}
           </div>
 
           <div>

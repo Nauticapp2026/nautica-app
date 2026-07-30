@@ -6,13 +6,16 @@ import {
   cargosPendientes,
   documentos,
   embarcaciones,
+  guarderias,
   memberships,
+  paywayTokens,
   profiles,
   servicios,
   socioServicios,
   socioServiciosCancelados,
 } from '@/lib/db/schema';
 import { precioConIva } from '@/lib/iva';
+import { todayArg } from '@/lib/dates';
 import { getActiveMarina } from '@/lib/auth/session';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { translateInviteError } from '@/lib/auth/errors';
@@ -575,6 +578,7 @@ const updateSocioServicioSchema = z.object({
   fechaBaja: z.string().nullable(),
   concepto: z.string().nullable(),
   comprobanteInterno: z.boolean(),
+  debitoAutomatico: z.boolean(),
   cobro: z.object({ monto: z.string(), concepto: z.string() }).nullable(),
 });
 
@@ -586,7 +590,8 @@ export async function updateSocioServicioAction(input: unknown): Promise<{ error
 
   const parsed = updateSocioServicioSchema.safeParse(input);
   if (!parsed.success) return { error: 'Datos inválidos' };
-  const { id, fechaInicio, fechaBaja, concepto, comprobanteInterno, cobro } = parsed.data;
+  const { id, fechaInicio, fechaBaja, concepto, comprobanteInterno, debitoAutomatico, cobro } =
+    parsed.data;
   const guarderiaId = ctx.activeMembership.guarderiaId;
 
   if (!fechaInicio) {
@@ -623,6 +628,7 @@ export async function updateSocioServicioAction(input: unknown): Promise<{ error
         fechaBaja,
         concepto: concepto?.trim() || null,
         comprobanteInterno,
+        debitoAutomatico,
         updatedAt: new Date(),
       })
       .where(eq(socioServicios.id, id));
@@ -703,9 +709,74 @@ export async function toggleComprobanteInternoAction(socioId: string, value: boo
   if (!ctx) return { error: 'No autenticado' };
   const guarderiaId = ctx.activeMembership.guarderiaId;
   try {
+    // Gate de la Configuración de cobranzas: sin medios habilitados para
+    // comprobantes internos, el tilde no se puede activar.
+    if (value) {
+      const [g] = await db
+        .select({ medios: guarderias.mediosCobroInternos })
+        .from(guarderias)
+        .where(eq(guarderias.id, guarderiaId))
+        .limit(1);
+      if (!g || g.medios.length === 0) {
+        return {
+          error:
+            'Los comprobantes internos están deshabilitados. Habilitá al menos un medio de pago en Mi Perfil → Datos Impositivos → Configuración de cobranzas.',
+        };
+      }
+    }
     await db
       .update(memberships)
       .set({ comprobanteInterno: value })
+      .where(
+        and(
+          eq(memberships.userId, socioId),
+          eq(memberships.guarderiaId, guarderiaId),
+          eq(memberships.rol, 'socio'),
+        ),
+      );
+    revalidatePath(`/usuarios/${socioId}`);
+    return {};
+  } catch {
+    return { error: 'Error al actualizar.' };
+  }
+}
+
+// Tilde "Cobro Automático Payway" (Datos Impositivos): adhesión general del
+// socio al débito automático. Requiere tarjeta cargada (payway_tokens activo).
+// Al destildar se guarda la fecha de baja; al re-tildar se blanquea (arranca
+// un período nuevo de adhesión).
+export async function toggleCobroAutomaticoPaywayAction(socioId: string, value: boolean) {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+  if (!isAdminSocios(ctx)) return { error: 'Solo administradores pueden editar esta opción.' };
+  const guarderiaId = ctx.activeMembership.guarderiaId;
+  try {
+    if (value) {
+      const [token] = await db
+        .select({ id: paywayTokens.id })
+        .from(paywayTokens)
+        .where(
+          and(
+            eq(paywayTokens.guarderiaId, guarderiaId),
+            eq(paywayTokens.socioId, socioId),
+            eq(paywayTokens.activo, true),
+          ),
+        )
+        .limit(1);
+      if (!token) {
+        return {
+          error:
+            'El socio no tiene una tarjeta de crédito cargada. Cargala primero desde la pestaña Débito automático.',
+        };
+      }
+    }
+    await db
+      .update(memberships)
+      .set({
+        cobroAutomaticoPayway: value,
+        cobroAutomaticoBaja: value ? null : todayArg(),
+        updatedAt: new Date(),
+      })
       .where(
         and(
           eq(memberships.userId, socioId),

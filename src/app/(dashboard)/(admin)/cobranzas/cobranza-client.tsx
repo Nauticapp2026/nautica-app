@@ -53,7 +53,15 @@ function todayISODate(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-export function CobranzaClient({ socios }: { socios: SocioOption[] }) {
+export function CobranzaClient({
+  socios,
+  mediosInternos,
+}: {
+  socios: SocioOption[];
+  // Medios de pago habilitados para comprobantes internos (Configuración de
+  // cobranzas en Mi Perfil). Vacío = la pata de internos no aparece.
+  mediosInternos: string[];
+}) {
   const [modalOpen, setModalOpen] = useState(false);
 
   return (
@@ -67,21 +75,40 @@ export function CobranzaClient({ socios }: { socios: SocioOption[] }) {
         Nueva cobranza
       </button>
 
-      {modalOpen && <NuevaCobranzaModal socios={socios} onClose={() => setModalOpen(false)} />}
+      {modalOpen && (
+        <NuevaCobranzaModal
+          socios={socios}
+          mediosInternos={mediosInternos}
+          onClose={() => setModalOpen(false)}
+        />
+      )}
     </div>
   );
 }
 
 type Step = 'socio' | 'comprobantes' | 'pago';
 
-function NuevaCobranzaModal({ socios, onClose }: { socios: SocioOption[]; onClose: () => void }) {
+function NuevaCobranzaModal({
+  socios,
+  mediosInternos,
+  onClose,
+}: {
+  socios: SocioOption[];
+  mediosInternos: string[];
+  onClose: () => void;
+}) {
   const router = useRouter();
   const [step, setStep] = useState<Step>('socio');
+  const internosHabilitados = mediosInternos.length > 0;
 
-  // Qué va a cobrar el club: comprobantes fiscales (ARCA) o internos. Misma
-  // separación que las pestañas de Ventas — un recibo no puede mezclar los dos
-  // circuitos, así que se elige de entrada y la lista no los muestra juntos.
-  const [canal, setCanal] = useState<'fiscal' | 'interno'>('fiscal');
+  // Qué va a cobrar el club: todos los comprobantes, solo fiscales (ARCA) o
+  // solo internos. "Todas" muestra ambos circuitos juntos, pero un recibo
+  // sigue sin poder mezclarlos: si la selección combina fiscal + interno, no
+  // se puede continuar. Sin internos habilitados, el selector no aparece y
+  // solo se cobran ARCA.
+  const [canal, setCanal] = useState<'todas' | 'fiscal' | 'interno'>(
+    internosHabilitados ? 'todas' : 'fiscal',
+  );
 
   // Paso socio
   const [query, setQuery] = useState('');
@@ -103,12 +130,27 @@ function NuevaCobranzaModal({ socios, onClose }: { socios: SocioOption[]; onClos
 
   const sociosFiltrados = useMemo(() => buscarSocios(socios, query).slice(0, 50), [socios, query]);
 
-  // Solo los comprobantes del canal elegido: interno = CM-/CL-/CA- (tipo
-  // 'recibo'); fiscal = facturas A/B/C y notas de débito.
+  // Comprobantes del canal elegido: interno = CM-/CL-/CA- (tipo 'recibo');
+  // fiscal = facturas A/B/C y notas de débito; todas = ambos.
   const comprobantesCanal = useMemo(
-    () => comprobantes.filter((c) => (c.tipoFactura === 'recibo') === (canal === 'interno')),
+    () =>
+      canal === 'todas'
+        ? comprobantes
+        : comprobantes.filter((c) => (c.tipoFactura === 'recibo') === (canal === 'interno')),
     [comprobantes, canal],
   );
+
+  // Circuitos presentes en la selección actual. Un recibo no puede mezclar
+  // fiscal + interno: con "Todas" se ve todo junto, pero si la selección
+  // combina los dos tipos no se puede continuar.
+  const tiposSeleccion = useMemo(() => {
+    const s = new Set<'fiscal' | 'interno'>();
+    for (const c of comprobantesCanal) {
+      if (selected.has(c.id)) s.add(c.tipoFactura === 'recibo' ? 'interno' : 'fiscal');
+    }
+    return s;
+  }, [comprobantesCanal, selected]);
+  const seleccionMezclada = tiposSeleccion.size > 1;
 
   const totalSeleccionado = useMemo(
     () =>
@@ -162,6 +204,12 @@ function NuevaCobranzaModal({ socios, onClose }: { socios: SocioOption[]; onClos
     );
   }
 
+  // Cobrando internos, el dropdown de formas solo muestra los medios que el
+  // club habilitó en la Configuración de cobranzas. Fiscal: lista completa.
+  // Se deriva de la SELECCIÓN (no del canal) para que funcione con "Todas".
+  const tiposPermitidos =
+    tiposSeleccion.has('interno') && tiposSeleccion.size === 1 ? mediosInternos : null;
+
   function irAPago() {
     // Pre-llenar el monto a pagar con el total seleccionado, y la única forma
     // de pago con el mismo importe (se mantienen sincronizados mientras haya
@@ -169,7 +217,7 @@ function NuevaCobranzaModal({ socios, onClose }: { socios: SocioOption[]; onClos
     // formas para partir el pago, cada una se edita por separado.
     const inicial = totalSeleccionado > 0 ? totalSeleccionado.toFixed(2) : '';
     setMontoAPagar(inicial);
-    setFormas([{ ...nuevaForma(), monto: inicial }]);
+    setFormas([{ ...nuevaForma(tiposPermitidos), monto: inicial }]);
     setError(null);
     setStep('pago');
   }
@@ -230,41 +278,40 @@ function NuevaCobranzaModal({ socios, onClose }: { socios: SocioOption[]; onClos
           {/* Paso 1: tipo de cobranza + elegir socio */}
           {step === 'socio' && (
             <>
-              <div>
-                <p className="mb-2 text-xs font-semibold" style={{ color: '#101828' }}>
-                  ¿Qué tipo de comprobantes vas a cobrar?
-                </p>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCanal('fiscal');
-                      setSelected(new Set());
-                    }}
-                    className={`rounded-[10px] border px-3 py-2.5 text-sm font-medium transition ${
-                      canal === 'fiscal'
-                        ? 'border-[#175861] bg-[#EFF8F7] text-[#175861]'
-                        : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
-                    }`}
-                  >
-                    Comprobantes ARCA
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCanal('interno');
-                      setSelected(new Set());
-                    }}
-                    className={`rounded-[10px] border px-3 py-2.5 text-sm font-medium transition ${
-                      canal === 'interno'
-                        ? 'border-[#175861] bg-[#EFF8F7] text-[#175861]'
-                        : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
-                    }`}
-                  >
-                    Comprobantes internos
-                  </button>
+              {/* Sin medios habilitados para internos (Configuración de
+                  cobranzas), la opción no aparece: solo se cobran ARCA. */}
+              {internosHabilitados && (
+                <div>
+                  <p className="mb-2 text-xs font-semibold" style={{ color: '#101828' }}>
+                    ¿Qué tipo de comprobantes vas a cobrar?
+                  </p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(
+                      [
+                        { value: 'todas', label: 'Todas' },
+                        { value: 'fiscal', label: 'Comprobantes ARCA' },
+                        { value: 'interno', label: 'Comprobantes internos' },
+                      ] as const
+                    ).map((o) => (
+                      <button
+                        key={o.value}
+                        type="button"
+                        onClick={() => {
+                          setCanal(o.value);
+                          setSelected(new Set());
+                        }}
+                        className={`rounded-[10px] border px-3 py-2.5 text-sm font-medium transition ${
+                          canal === o.value
+                            ? 'border-[#175861] bg-[#EFF8F7] text-[#175861]'
+                            : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+                        }`}
+                      >
+                        {o.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
               <div className="relative">
                 <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400" />
                 <input
@@ -304,8 +351,9 @@ function NuevaCobranzaModal({ socios, onClose }: { socios: SocioOption[]; onClos
                 <p className="py-8 text-center text-sm text-gray-400">Cargando comprobantes…</p>
               ) : comprobantesCanal.length === 0 ? (
                 <p className="py-8 text-center text-sm text-gray-400">
-                  Este socio no tiene comprobantes {canal === 'interno' ? 'internos' : 'ARCA'}{' '}
-                  pendientes de cobro.
+                  Este socio no tiene comprobantes
+                  {canal === 'todas' ? '' : canal === 'interno' ? ' internos' : ' ARCA'} para
+                  cobrar.
                 </p>
               ) : (
                 <>
@@ -343,7 +391,11 @@ function NuevaCobranzaModal({ socios, onClose }: { socios: SocioOption[]; onClos
                           </span>
                           <span className="text-xs text-gray-400">
                             {c.emision ? formatArgentinaDate(c.emision) : '—'}
-                            {c.estado === 'vencida' ? ' · Vencida' : ''}
+                            {c.estado === 'vencida'
+                              ? ' · Vencida'
+                              : c.estado === 'pagada'
+                                ? ' · Cobrada'
+                                : ''}
                           </span>
                         </div>
                         <span className="text-sm font-semibold text-[#101828]">
@@ -358,6 +410,12 @@ function NuevaCobranzaModal({ socios, onClose }: { socios: SocioOption[]; onClos
                       {fmtMoney(totalSeleccionado)}
                     </span>
                   </div>
+                  {seleccionMezclada && (
+                    <p className="rounded-[10px] border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+                      No se pueden cobrar juntos comprobantes ARCA e internos en un mismo recibo.
+                      Destildá los de un tipo y registralos en una cobranza aparte.
+                    </p>
+                  )}
                 </>
               )}
             </>
@@ -412,6 +470,7 @@ function NuevaCobranzaModal({ socios, onClose }: { socios: SocioOption[]; onClos
                   setFormas={setFormas}
                   montoAPagar={montoAPagar}
                   tarjetaGuardada={tarjetaGuardada}
+                  tiposPermitidos={tiposPermitidos}
                 />
               </div>
 
@@ -452,7 +511,7 @@ function NuevaCobranzaModal({ socios, onClose }: { socios: SocioOption[]; onClos
                 </button>
                 <button
                   onClick={irAPago}
-                  disabled={selected.size === 0}
+                  disabled={selected.size === 0 || seleccionMezclada}
                   className="flex-1 rounded-[10px] py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
                   style={{ background: '#175861' }}
                 >

@@ -188,6 +188,10 @@ export const tipoCuentaCorrienteEnum = pgEnum('tipo_cta_cte', [
   // cargo — se distingue de 'otro' para que la cuenta corriente pueda
   // mostrar "Anulado (NC)" en vez de "Cobrado" quien cubre el cargo.
   'nota_credito',
+  // Contraasiento (debe) que genera la anulación de un recibo de cobranza:
+  // revierte el haber del pago sin borrarlo (queda el rastro). El par
+  // pago+contraasiento se excluye del pool FIFO de cobertura. Mig 0138.
+  'anulacion_recibo',
 ]);
 
 export const tipoServicioEnum = pgEnum('tipo_servicio', [
@@ -403,6 +407,14 @@ export const guarderias = pgTable(
     // Credenciales Payway por guardería (débito automático con tarjeta tokenizada).
     paywayPublicKey: text('payway_public_key'),
     paywayPrivateKey: text('payway_private_key'),
+    // Medios de pago que el club admite para comprobantes internos (sección
+    // "Configuración de cobranzas" en Mi Perfil → Datos Impositivos). Valores
+    // del set MEDIOS_PAGO (enum medio_pago). Vacío = comprobantes internos
+    // deshabilitados en toda la app. Mig 0136.
+    mediosCobroInternos: text('medios_cobro_internos')
+      .array()
+      .notNull()
+      .default(sql`'{efectivo}'`),
     // Activación a nivel plataforma. false = los usuarios de la guardería ven
     // una pantalla "pendiente de activación" en lugar del dashboard. El super
     // admin activa desde /super-admin/guarderias.
@@ -476,6 +488,13 @@ export const memberships = pgTable(
     // Tilde "Comprobante interno" (Datos Impositivos del socio): default del
     // toggle Interno/Fiscal al cargarle un servicio. Mig 0132.
     comprobanteInterno: boolean('comprobante_interno').notNull().default(false),
+    // Tilde "Cobro Automático Payway" (Datos Impositivos del socio): sus
+    // servicios contratados con debito_automatico se cobran por el cron Payway.
+    // Requiere tarjeta cargada (payway_tokens activo). Mig 0136.
+    cobroAutomaticoPayway: boolean('cobro_automatico_payway').notNull().default(false),
+    // Fecha del último destilde de cobro_automatico_payway; se blanquea al
+    // re-tildar (arranca un período nuevo de adhesión).
+    cobroAutomaticoBaja: date('cobro_automatico_baja'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
@@ -1699,6 +1718,10 @@ export const socioServicios = pgTable(
     // comprobante interno (no fiscal), igual que `comprobanteInterno` en
     // movimientos_cuenta_corriente. Elegido una vez al contratar.
     comprobanteInterno: boolean('comprobante_interno').notNull().default(false),
+    // true = los cargos de este contrato entran al débito automático Payway,
+    // si además el socio está adherido (memberships.cobro_automatico_payway).
+    // Default al contratar = tilde del socio; editable después. Mig 0136.
+    debitoAutomatico: boolean('debito_automatico').notNull().default(false),
     // Detalle opcional tipeado al contratar; si es null, el cron usa el
     // nombre de la tarifa como concepto del cargo.
     concepto: text('concepto'),

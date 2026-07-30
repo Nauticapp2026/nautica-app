@@ -42,6 +42,7 @@ import { toast } from 'sonner';
 import {
   deleteSocioAction,
   deleteSocioDocumentoAction,
+  toggleCobroAutomaticoPaywayAction,
   toggleComprobanteInternoAction,
   toggleFacturaFiscalAction,
   updateNumeroSocioAction,
@@ -94,6 +95,12 @@ type SocioData = {
   // Tilde "Comprobante interno" (Datos Impositivos): default del toggle
   // Interno/Fiscal en Cargar Servicio.
   comprobanteInterno: boolean;
+  // Tilde "Cobro Automático Payway" (Datos Impositivos): adhesión general al
+  // débito automático. Requiere tarjeta cargada.
+  cobroAutomaticoPayway: boolean;
+  // Fecha (YYYY-MM-DD) del último destilde; null si nunca se destildó o si se
+  // re-tildó después.
+  cobroAutomaticoBaja: string | null;
 };
 
 type Embarcacion = {
@@ -174,6 +181,9 @@ type ServicioContratado = {
   fechaBaja: string | null;
   concepto: string | null;
   comprobanteInterno: boolean;
+  // true = los cargos de este contrato entran al débito automático Payway
+  // (si además el socio está adherido en Datos Impositivos).
+  debitoAutomatico: boolean;
   // Solo para contratos de tarifa Variable diaria: días contratados.
   cantidadDias: number | null;
   // true = el contrato ya tiene al menos un cargo emitido. Distingue
@@ -322,6 +332,7 @@ const ESTADO_LABEL: Record<string, string> = {
 // impagos queda consistente con el saldo neto (Σdebe − Σhaber).
 function calcularSaldoYEstado<
   T extends {
+    tipo: string | null;
     debe: string | null;
     haber: string | null;
     estado: string | null;
@@ -335,6 +346,10 @@ function calcularSaldoYEstado<
   for (const m of movimientos) {
     if (m.esMovimientoNc) continue;
     poolHaber += parseFloat(m.haber ?? '0');
+    // Contraasiento de anulación de recibo: su debe anula el haber del pago
+    // anulado (que sigue sumando arriba) — el neto del par es cero y esa
+    // plata no cubre ningún cargo.
+    if (m.tipo === 'anulacion_recibo') poolHaber -= parseFloat(m.debe ?? '0');
   }
   const conSaldo = asc.map((m) => {
     const venta = parseFloat(m.debe ?? '0');
@@ -342,7 +357,7 @@ function calcularSaldoYEstado<
     acum = acum + venta - cobranza;
     let estadoDisplay = m.estado;
     const montoNc = parseFloat(m.montoCubiertoNc ?? '0');
-    if (venta > 0) {
+    if (venta > 0 && m.tipo !== 'anulacion_recibo') {
       if (m.estado === 'pagado') {
         // Ya pagado: consume el pool (su pago ya está comprometido con ese
         // cargo), no se reescribe.
@@ -526,6 +541,8 @@ function AgregarServicioModal({
   socioNombre,
   servicios,
   comprobanteInternoDefault,
+  internosHabilitados,
+  debitoDefault,
 }: {
   open: boolean;
   onClose: () => void;
@@ -535,6 +552,12 @@ function AgregarServicioModal({
   // Tilde "Comprobante interno" de Datos Impositivos del socio: define con
   // qué opción arranca el toggle Interno/Fiscal.
   comprobanteInternoDefault: boolean;
+  // false = el club no habilitó medios de cobro para comprobantes internos:
+  // la opción Interno se apaga.
+  internosHabilitados: boolean;
+  // true = el socio está adherido al Cobro Automático Payway (con tarjeta
+  // activa): se muestra el tilde de débito, marcado por default.
+  debitoDefault: boolean;
 }) {
   const router = useRouter();
   const [servicioId, setServicioId] = useState('');
@@ -542,8 +565,9 @@ function AgregarServicioModal({
   const [fechaInicio, setFechaInicio] = useState(todayISODate);
   const [fechaBaja, setFechaBaja] = useState('');
   const [comprobante, setComprobante] = useState<'interno' | 'fiscal'>(
-    comprobanteInternoDefault ? 'interno' : 'fiscal',
+    comprobanteInternoDefault && internosHabilitados ? 'interno' : 'fiscal',
   );
+  const [debito, setDebito] = useState(debitoDefault);
   const [cantidadDias, setCantidadDias] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState(false);
@@ -561,7 +585,8 @@ function AgregarServicioModal({
     setConcepto('');
     setFechaInicio(todayISODate());
     setFechaBaja('');
-    setComprobante(comprobanteInternoDefault ? 'interno' : 'fiscal');
+    setComprobante(comprobanteInternoDefault && internosHabilitados ? 'interno' : 'fiscal');
+    setDebito(debitoDefault);
     setCantidadDias('');
     setError(null);
     setResult(false);
@@ -579,6 +604,9 @@ function AgregarServicioModal({
         fechaInicio,
         fechaBaja: fechaBaja || null,
         cantidadDias: esDiaria ? diasNum : null,
+        // Sin adhesión del socio el tilde no se muestra: se manda undefined y
+        // el server resuelve el default (false).
+        debitoAutomatico: debitoDefault ? debito : undefined,
       });
       if (res.error) {
         setError(res.error);
@@ -728,8 +756,9 @@ function AgregarServicioModal({
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
+                    disabled={!internosHabilitados}
                     onClick={() => setComprobante('interno')}
-                    className={`rounded-[10px] border px-3 py-2.5 text-sm font-medium transition ${
+                    className={`rounded-[10px] border px-3 py-2.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${
                       comprobante === 'interno'
                         ? 'border-[#175861] bg-[#EFF8F7] text-[#175861]'
                         : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
@@ -750,11 +779,33 @@ function AgregarServicioModal({
                   </button>
                 </div>
                 <p className="mt-1.5 text-xs text-gray-400">
-                  {comprobante === 'interno'
-                    ? 'Marca los cargos como no fiscales (NO se facturan por ARCA). Vas a poder emitirles un Comprobante interno desde Ventas cuando corresponda.'
-                    : 'Los cargos se facturan por ARCA cuando corresponda (manual o automático), como el resto.'}
+                  {!internosHabilitados
+                    ? 'Los comprobantes internos están deshabilitados: el club no tiene medios de cobro habilitados en Mi Perfil → Datos Impositivos → Configuración de cobranzas.'
+                    : comprobante === 'interno'
+                      ? 'Marca los cargos como no fiscales (NO se facturan por ARCA). Vas a poder emitirles un Comprobante interno desde Ventas cuando corresponda.'
+                      : 'Los cargos se facturan por ARCA cuando corresponda (manual o automático), como el resto.'}
                 </p>
               </div>
+
+              {debitoDefault && (
+                <label className="flex items-start gap-2.5 rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
+                  <input
+                    type="checkbox"
+                    checked={debito}
+                    onChange={(e) => setDebito(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 cursor-pointer accent-[#175861]"
+                  />
+                  <span>
+                    <span className="block text-sm font-medium" style={{ color: '#101828' }}>
+                      Incluir este servicio en el débito automático
+                    </span>
+                    <span className="block text-xs text-gray-500">
+                      El socio está adherido al Cobro Automático Payway: este servicio se cobra con
+                      su tarjeta. Destildalo si este servicio en particular se cobra por otro medio.
+                    </span>
+                  </span>
+                </label>
+              )}
 
               {error && <p className="text-sm text-red-600">{error}</p>}
             </div>
@@ -1686,6 +1737,7 @@ export function SocioDetail({
   serviciosContratados = [],
   paywayPublicKey = null,
   paywayToken = null,
+  internosHabilitados = true,
 }: {
   socio: SocioData;
   embarcaciones: Embarcacion[];
@@ -1699,6 +1751,10 @@ export function SocioDetail({
   serviciosContratados?: ServicioContratado[];
   paywayPublicKey?: string | null;
   paywayToken?: PaywayTokenInfo | null;
+  // false = el club no habilitó ningún medio de cobro para comprobantes
+  // internos (Mi Perfil → Configuración de cobranzas): se apagan los puntos
+  // donde nace un comprobante interno.
+  internosHabilitados?: boolean;
 }) {
   const [activeTab, setActiveTab] = useState<TabId>('generales');
   const [modalServicioOpen, setModalServicioOpen] = useState(false);
@@ -1873,25 +1929,45 @@ export function SocioDetail({
   const movimientosFiltrados = movimientosCalc.filter((m) => pasaFiltrosCC(m, m.estadoDisplay));
   const hayFiltrosCC = Boolean(ccFechaDesde || ccFechaHasta || ccEstado || ccTipoComp);
 
-  // Cards Ventas/Cobranzas: reflejan los movimientos filtrados.
-  const totalIngresos = movimientosFiltrados.reduce((sum, m) => sum + parseFloat(m.debe ?? '0'), 0);
+  // Cards Ventas/Cobranzas: reflejan los movimientos filtrados. Una Nota de
+  // Crédito no es una cobranza: RESTA de las ventas (y la ND suma, como
+  // cualquier cargo). El contraasiento de una anulación de recibo no es una
+  // venta: RESTA de las cobranzas. Cobranzas queda con los cobros reales
+  // netos de anulaciones.
+  const totalIngresos = movimientosFiltrados.reduce(
+    (sum, m) =>
+      m.tipo === 'anulacion_recibo'
+        ? sum
+        : sum +
+          parseFloat(m.debe ?? '0') -
+          (m.tipo === 'nota_credito' ? parseFloat(m.haber ?? '0') : 0),
+    0,
+  );
   const totalPagosACuenta = movimientosFiltrados.reduce(
-    (sum, m) => sum + parseFloat(m.haber ?? '0'),
+    (sum, m) =>
+      m.tipo === 'nota_credito'
+        ? sum
+        : m.tipo === 'anulacion_recibo'
+          ? sum - parseFloat(m.debe ?? '0')
+          : sum + parseFloat(m.haber ?? '0'),
     0,
   );
 
   return (
     <div className="p-4 md:p-8">
       <AgregarServicioModal
-        // key: si cambia el tilde de Datos Impositivos, remonta el modal para
-        // que el toggle Interno/Fiscal arranque con el default nuevo.
-        key={socio.comprobanteInterno ? 'ci-interno' : 'ci-fiscal'}
+        // key: si cambia un tilde de Datos Impositivos, remonta el modal para
+        // que el toggle Interno/Fiscal y el tilde de débito arranquen con el
+        // default nuevo.
+        key={`${socio.comprobanteInterno ? 'ci-interno' : 'ci-fiscal'}-${socio.cobroAutomaticoPayway ? 'da-on' : 'da-off'}`}
         open={modalServicioOpen}
         onClose={() => setModalServicioOpen(false)}
         socioId={socio.id}
         socioNombre={nombre}
         servicios={servicios}
         comprobanteInternoDefault={socio.comprobanteInterno}
+        internosHabilitados={internosHabilitados}
+        debitoDefault={socio.cobroAutomaticoPayway && (paywayToken?.activo ?? false)}
       />
 
       {/* Back */}
@@ -2238,6 +2314,8 @@ export function SocioDetail({
             handleCancelar={handleCancelar}
             editError={editError}
             isSaving={isSaving}
+            internosHabilitados={internosHabilitados}
+            tieneTarjeta={paywayToken?.activo ?? false}
           />
         </div>
       )}
@@ -2260,6 +2338,7 @@ export function SocioDetail({
           serviciosContratados={serviciosContratados}
           socioId={socio.id}
           onCargarServicio={() => setModalServicioOpen(true)}
+          internosHabilitados={internosHabilitados}
         />
       )}
 
@@ -2538,11 +2617,24 @@ export function SocioDetail({
                                 <span className="text-gray-400">—</span>
                               )}
                             </td>
+                            {/* NC: no es una cobranza — resta en la columna
+                                Ventas (importe negativo) y no aparece en
+                                Cobranzas. ND: suma en Ventas como un cargo.
+                                Contraasiento de anulación de recibo: no es
+                                una venta — resta en la columna Cobranzas. */}
                             <td className="px-4 py-3 text-right font-medium text-[#101828]">
-                              {venta > 0 ? fmt(venta) : '—'}
+                              {m.tipo === 'nota_credito' && cobranza > 0
+                                ? `-${fmt(cobranza)}`
+                                : venta > 0 && m.tipo !== 'anulacion_recibo'
+                                  ? fmt(venta)
+                                  : '—'}
                             </td>
                             <td className="px-4 py-3 text-right font-medium text-green-700">
-                              {cobranza > 0 ? fmt(cobranza) : '—'}
+                              {m.tipo === 'anulacion_recibo' && venta > 0
+                                ? `-${fmt(venta)}`
+                                : cobranza > 0 && m.tipo !== 'nota_credito'
+                                  ? fmt(cobranza)
+                                  : '—'}
                             </td>
                             <td
                               className="px-4 py-3 text-right font-semibold"
@@ -2560,14 +2652,20 @@ export function SocioDetail({
                             </td>
                             <td className="px-4 py-3 text-right">
                               <div className="flex items-center justify-end gap-2">
-                                <span
-                                  className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${
-                                    ESTADO_BADGE[m.estadoDisplay ?? ''] ??
-                                    'bg-gray-100 text-gray-500'
-                                  }`}
-                                >
-                                  {ESTADO_LABEL[m.estadoDisplay ?? ''] ?? m.estadoDisplay ?? '—'}
-                                </span>
+                                {m.tipo === 'anulacion_recibo' ? (
+                                  <span className="inline-block rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-500">
+                                    Anulación
+                                  </span>
+                                ) : (
+                                  <span
+                                    className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${
+                                      ESTADO_BADGE[m.estadoDisplay ?? ''] ??
+                                      'bg-gray-100 text-gray-500'
+                                    }`}
+                                  >
+                                    {ESTADO_LABEL[m.estadoDisplay ?? ''] ?? m.estadoDisplay ?? '—'}
+                                  </span>
+                                )}
                               </div>
                             </td>
                           </tr>
@@ -2898,6 +2996,8 @@ function ImpositivosTab({
   handleCancelar,
   editError,
   isSaving,
+  internosHabilitados,
+  tieneTarjeta,
 }: {
   socio: SocioData;
   editForm: {
@@ -2923,10 +3023,15 @@ function ImpositivosTab({
   handleCancelar: () => void;
   editError: string | null;
   isSaving: boolean;
+  internosHabilitados: boolean;
+  // true = el socio tiene una tarjeta cargada y activa en Payway.
+  tieneTarjeta: boolean;
 }) {
   const router = useRouter();
   const [facturaFiscal, setFacturaFiscal] = useState(socio.facturaFiscal);
   const [comprobanteInterno, setComprobanteInterno] = useState(socio.comprobanteInterno);
+  const [cobroAutomatico, setCobroAutomatico] = useState(socio.cobroAutomaticoPayway);
+  const [cobroAutomaticoBaja, setCobroAutomaticoBaja] = useState(socio.cobroAutomaticoBaja);
   const [isToggling, startToggle] = useTransition();
 
   const inputCls =
@@ -2966,6 +3071,25 @@ function ImpositivosTab({
     });
   }
 
+  function handleToggleCobroAutomatico(checked: boolean) {
+    setCobroAutomatico(checked);
+    startToggle(async () => {
+      const res = await toggleCobroAutomaticoPaywayAction(socio.id, checked);
+      if (res?.error) {
+        toast.error(res.error);
+        setCobroAutomatico(!checked);
+      } else {
+        setCobroAutomaticoBaja(checked ? null : todayISODate());
+        toast.success(
+          checked
+            ? 'Cobro automático Payway activado. Los servicios nuevos se incluyen en el débito.'
+            : 'Cobro automático Payway desactivado.',
+        );
+        router.refresh();
+      }
+    });
+  }
+
   return (
     <div className="space-y-4">
       {/* Check facturación */}
@@ -2995,15 +3119,42 @@ function ImpositivosTab({
             Comprobante interno
           </p>
           <p className="text-xs text-gray-500">
-            Activado: al cargarle un servicio, el modal arranca en Interno (no va por ARCA).
-            Desactivado: arranca en Fiscal (ARCA). Se puede cambiar en cada carga.
+            {internosHabilitados
+              ? 'Activado: al cargarle un servicio, el modal arranca en Interno (no va por ARCA). Desactivado: arranca en Fiscal (ARCA). Se puede cambiar en cada carga.'
+              : 'Deshabilitado: el club no tiene medios de cobro habilitados para comprobantes internos. Se configuran en Mi Perfil → Datos Impositivos → Configuración de cobranzas.'}
           </p>
         </div>
         <input
           type="checkbox"
           checked={comprobanteInterno}
-          disabled={isToggling}
+          disabled={isToggling || (!internosHabilitados && !comprobanteInterno)}
           onChange={(e) => handleToggleComprobanteInterno(e.target.checked)}
+          className="h-4 w-4 cursor-pointer accent-[#175861] disabled:cursor-not-allowed"
+        />
+      </div>
+
+      {/* Check cobro automático Payway */}
+      <div className="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
+        <div>
+          <p className="text-sm font-semibold" style={{ color: '#101828' }}>
+            Cobro Automático Payway
+          </p>
+          <p className="text-xs text-gray-500">
+            {tieneTarjeta
+              ? 'Activado: los servicios fiscales de este socio se cobran automáticamente con la tarjeta cargada. Cada Servicio Contratado se puede excluir puntualmente.'
+              : 'Para activar esta opción, primero cargá la tarjeta de crédito del socio en la pestaña Débito automático.'}
+            {!cobroAutomatico && cobroAutomaticoBaja && (
+              <span className="mt-0.5 block text-amber-700">
+                Fecha de baja: {fmtYmd(cobroAutomaticoBaja)}
+              </span>
+            )}
+          </p>
+        </div>
+        <input
+          type="checkbox"
+          checked={cobroAutomatico}
+          disabled={isToggling || (!tieneTarjeta && !cobroAutomatico)}
+          onChange={(e) => handleToggleCobroAutomatico(e.target.checked)}
           className="h-4 w-4 cursor-pointer accent-[#175861] disabled:cursor-not-allowed"
         />
       </div>
@@ -3145,11 +3296,13 @@ function ServiciosContratadosTab({
   serviciosContratados,
   socioId,
   onCargarServicio,
+  internosHabilitados,
 }: {
   movimientos: Movimiento[];
   serviciosContratados: ServicioContratado[];
   socioId: string;
   onCargarServicio: () => void;
+  internosHabilitados: boolean;
 }) {
   const router = useRouter();
   const [editingSC, setEditingSC] = useState<ServicioContratado | null>(null);
@@ -3215,6 +3368,7 @@ function ServiciosContratadosTab({
                 <th className="pr-4 pb-2">Categoría</th>
                 <th className="pr-4 pb-2">Facturación</th>
                 <th className="pr-4 pb-2">Cobro</th>
+                <th className="pr-4 pb-2">Débito autom.</th>
                 <th className="pr-4 pb-2">Fecha de asignación</th>
                 <th className="pr-4 pb-2">Nº de operación</th>
                 <th className="pr-4 pb-2">Estado</th>
@@ -3272,6 +3426,17 @@ function ServiciosContratadosTab({
                           <span className="text-gray-400">—</span>
                         )}
                       </td>
+                      <td className="py-3 pr-4">
+                        {sc.debitoAutomatico ? (
+                          <span className="rounded-full bg-[#EFF8F7] px-2 py-0.5 text-[10px] font-semibold text-[#175861]">
+                            Sí
+                          </span>
+                        ) : (
+                          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-500">
+                            No
+                          </span>
+                        )}
+                      </td>
                       <td className="py-3 pr-4 text-gray-600">{fmtDate(sc.fechaAsignacion)}</td>
                       <td className="py-3 pr-4 text-gray-600">
                         {String(sc.numeroOperacion).padStart(6, '0')}
@@ -3321,6 +3486,7 @@ function ServiciosContratadosTab({
         <EditServicioContratadoModal
           sc={editingSC}
           movimientos={movimientos.filter((m) => m.servicioId === editingSC.servicioId)}
+          internosHabilitados={internosHabilitados}
           onClose={() => setEditingSC(null)}
           onSaved={() => {
             setEditingSC(null);
@@ -3359,11 +3525,13 @@ function calcularProporcional(
 function EditServicioContratadoModal({
   sc,
   movimientos,
+  internosHabilitados,
   onClose,
   onSaved,
 }: {
   sc: ServicioContratado;
   movimientos: Movimiento[];
+  internosHabilitados: boolean;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -3373,6 +3541,7 @@ function EditServicioContratadoModal({
   const [comprobante, setComprobante] = useState<'interno' | 'fiscal'>(
     sc.comprobanteInterno ? 'interno' : 'fiscal',
   );
+  const [debito, setDebito] = useState(sc.debitoAutomatico);
   const [cobrar, setCobrar] = useState(true);
   const [montoOverride, setMontoOverride] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -3418,6 +3587,7 @@ function EditServicioContratadoModal({
         fechaBaja: fechaBaja || null,
         concepto: concepto.trim() || null,
         comprobanteInterno: comprobante === 'interno',
+        debitoAutomatico: debito,
         cobro:
           esBajaNueva && cobrar
             ? {
@@ -3502,8 +3672,11 @@ function EditServicioContratadoModal({
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
+                // Con la config de cobranzas vacía no se puede PASAR a
+                // Interno; si el contrato ya era Interno, se deja como está.
+                disabled={!internosHabilitados && !sc.comprobanteInterno}
                 onClick={() => setComprobante('interno')}
-                className={`rounded-[10px] border px-3 py-2 text-sm font-medium transition ${
+                className={`rounded-[10px] border px-3 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${
                   comprobante === 'interno'
                     ? 'border-[#175861] bg-[#EFF8F7] text-[#175861]'
                     : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
@@ -3524,6 +3697,22 @@ function EditServicioContratadoModal({
               </button>
             </div>
           </div>
+
+          <label className="flex items-start gap-2 rounded-xl border border-gray-100 bg-gray-50 p-3">
+            <input
+              type="checkbox"
+              checked={debito}
+              onChange={(e) => setDebito(e.target.checked)}
+              className="mt-0.5 h-4 w-4 cursor-pointer accent-[#175861]"
+            />
+            <span className="text-xs text-gray-600">
+              <span className="block font-semibold" style={{ color: '#101828' }}>
+                Incluir este servicio en el débito automático
+              </span>
+              Solo tiene efecto si el socio está adherido al Cobro Automático Payway (Datos
+              Impositivos) con tarjeta cargada.
+            </span>
+          </label>
 
           {esBajaNueva && (
             <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">

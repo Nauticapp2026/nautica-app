@@ -81,6 +81,7 @@ export default async function ConfiguracionPage({ searchParams }: Props) {
       planPendiente: guarderias.planPendiente,
       paywayPublicKey: guarderias.paywayPublicKey,
       paywayPrivateKey: guarderias.paywayPrivateKey,
+      mediosCobroInternos: guarderias.mediosCobroInternos,
     })
     .from(guarderias)
     .where(eq(guarderias.id, guarderiaId))
@@ -229,6 +230,7 @@ export default async function ConfiguracionPage({ searchParams }: Props) {
       currentUserId={ctx.profile.id}
       features={features}
       puntoVenta={puntoVenta}
+      mediosCobroInternos={guarderia?.mediosCobroInternos ?? ['efectivo']}
       centrosEmisores={centrosEmisores}
       payway={payway}
       planes={planes}

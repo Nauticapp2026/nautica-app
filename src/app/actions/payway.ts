@@ -5,16 +5,10 @@ import { eq, and } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 
 import { db } from '@/lib/db';
-import {
-  guarderias,
-  memberships,
-  movimientosCuentaCorriente,
-  paywayCobros,
-  paywayTokens,
-  profiles,
-} from '@/lib/db/schema';
+import { guarderias, memberships, paywayCobros, paywayTokens, profiles } from '@/lib/db/schema';
 import { getActiveMarina } from '@/lib/auth/session';
 import { formatPaywayError } from '@/lib/payway/format-error';
+import { cobrarDebitoSocio, type PaywayChargesResult } from '@/lib/payway-cobros';
 
 // SDK callback-based → wrappear en Promise
 
@@ -39,20 +33,6 @@ function paymentAsync(
 ): Promise<Record<string, unknown>> {
   return new Promise((resolve, reject) => {
     sdk.payment(args, (result, err) => {
-      if (err) reject(err);
-      else resolve(result);
-    });
-  });
-}
-
-// Re-tokeniza el customer_token guardado para obtener un token de pago fresco.
-// Payway no acepta el customer_token directo en /payments. Ver payway-cobros.ts.
-function tokensAsync(
-  sdk: ReturnType<typeof makePaywaySdk>,
-  args: Record<string, unknown>,
-): Promise<Record<string, unknown>> {
-  return new Promise((resolve, reject) => {
-    sdk.tokens(args, (result, err) => {
       if (err) reject(err);
       else resolve(result);
     });
@@ -217,21 +197,27 @@ export async function reintentarCobroPaywayAction(cobroId: string): Promise<{ er
     .limit(1);
   if (!cobro) return { error: 'Cobro no encontrado.' };
 
-  // El monto a reintentar es el SALDO NETO actual del socio (misma fórmula que el
-  // cobro del cron: SUM(debe) - SUM(haber)). No se usa movimientosIds porque los
-  // cobros del cron se guardan con la lista vacía (el cobro es del neto, no mapea
-  // 1:1 a movimientos puntuales).
-  const movimientos = await db
-    .select({
-      debe: movimientosCuentaCorriente.debe,
-      haber: movimientosCuentaCorriente.haber,
-    })
-    .from(movimientosCuentaCorriente)
-    .where(eq(movimientosCuentaCorriente.socioId, cobro.socioId));
-  const sumDebe = movimientos.reduce((acc, m) => acc + parseFloat(m.debe ?? '0'), 0);
-  const sumHaber = movimientos.reduce((acc, m) => acc + parseFloat(m.haber ?? '0'), 0);
-  const totalPesos = Math.round((sumDebe - sumHaber) * 100) / 100;
-  if (totalPesos < 0.01) return { error: 'El socio no tiene saldo pendiente para cobrar.' };
+  // Reintentar = volver a correr el débito automático del socio HOY, con las
+  // mismas reglas que el cron: cargos de contratos con el tilde de débito,
+  // canales fiscal/interno separados y el crédito FIFO descontado. Ya no se
+  // cobra el saldo neto de toda la cuenta.
+  const [m] = await db
+    .select({ adherido: memberships.cobroAutomaticoPayway })
+    .from(memberships)
+    .where(
+      and(
+        eq(memberships.userId, cobro.socioId),
+        eq(memberships.guarderiaId, guarderiaId),
+        eq(memberships.rol, 'socio'),
+      ),
+    )
+    .limit(1);
+  if (!m?.adherido) {
+    return {
+      error:
+        'El socio no está adherido al Cobro Automático Payway. Se activa desde su pestaña Datos Impositivos.',
+    };
+  }
 
   // Token del socio + email para customer
   const [token] = await db
@@ -253,9 +239,13 @@ export async function reintentarCobroPaywayAction(cobroId: string): Promise<{ er
     .limit(1);
   if (!token) return { error: 'El socio no tiene tarjeta registrada.' };
 
-  // Credenciales
+  // Credenciales + medios habilitados para internos
   const [g] = await db
-    .select({ publicKey: guarderias.paywayPublicKey, privateKey: guarderias.paywayPrivateKey })
+    .select({
+      publicKey: guarderias.paywayPublicKey,
+      privateKey: guarderias.paywayPrivateKey,
+      mediosInternos: guarderias.mediosCobroInternos,
+    })
     .from(guarderias)
     .where(eq(guarderias.id, guarderiaId))
     .limit(1);
@@ -264,88 +254,39 @@ export async function reintentarCobroPaywayAction(cobroId: string): Promise<{ er
   // PAYWAY_SANDBOX=1 fuerza ambient developer aun en prod (testing).
   const useSandbox = process.env.NODE_ENV !== 'production' || process.env.PAYWAY_SANDBOX === '1';
   const ambient = useSandbox ? 'developer' : 'production';
-  const sdk = makePaywaySdk(ambient, g.publicKey, g.privateKey);
-  const siteTransactionId = randomUUID();
 
-  // Nuevo registro de intento (pago del neto: movimientosIds vacío, como el cron).
-  const [nuevoCobro] = await db
-    .insert(paywayCobros)
-    .values({
-      guarderiaId,
-      socioId: cobro.socioId,
-      monto: Math.round(totalPesos * 100),
-      siteTransactionId,
-      estado: 'pendiente',
-      movimientosIds: [],
-    })
-    .returning({ id: paywayCobros.id });
+  const stats: PaywayChargesResult = {
+    guarderias: 1,
+    socios: 0,
+    cobrosAprobados: 0,
+    cobrosRechazados: 0,
+    cobrosError: 0,
+    montoTotal: 0,
+  };
+  const outcome = await cobrarDebitoSocio({
+    ambient,
+    guarderia: {
+      id: guarderiaId,
+      publicKey: g.publicKey,
+      privateKey: g.privateKey,
+      mediosInternos: g.mediosInternos,
+    },
+    token: { ...token, socioId: cobro.socioId },
+    result: stats,
+    descripcion: 'Cuota mensual (reintento) — NauticaApp',
+  });
 
-  let result: Record<string, unknown>;
-  try {
-    // Paso 1: re-tokenizar el customer_token (MIT, sin CVV) → token de pago fresco.
-    const tokenResult = await tokensAsync(sdk, { token: token.customerToken });
-    const freshToken = tokenResult.id as string | undefined;
-    if (!freshToken) {
-      throw new Error(`Payway no devolvió token de pago: ${JSON.stringify(tokenResult)}`);
-    }
-    // Paso 2: cobrar con el token fresco y payment_type 'single' (no 'recurrente').
-    result = await paymentAsync(sdk, {
-      site_transaction_id: siteTransactionId,
-      token: freshToken,
-      user_id: cobro.socioId,
-      payment_method_id: token.paymentMethodId,
-      bin: token.bin,
-      amount: Math.round(totalPesos * 100), // Payway en centavos
-      currency: 'ARS',
-      installments: 1,
-      description: 'Cuota mensual (reintento) — NauticaApp',
-      payment_type: 'single',
-      sub_payments: [],
-      establishment_name: 'NauticaApp',
-      fraud_detection: { send_to_cs: false },
-    });
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    await db
-      .update(paywayCobros)
-      .set({ estado: 'error', errorMensaje: msg })
-      .where(eq(paywayCobros.id, nuevoCobro.id));
-    return { error: 'Error al conectar con Payway. Intentá de nuevo.' };
+  if (outcome.intentos === 0) {
+    return { error: 'El socio no tiene cargos pendientes habilitados para el débito automático.' };
+  }
+  if (outcome.aprobados === 0) {
+    return {
+      error: outcome.ultimoError ? `Cobro rechazado: ${outcome.ultimoError}` : 'Cobro rechazado.',
+    };
   }
 
-  const approved = result.status === 'approved';
-  const paywayPaymentId = result.id != null ? String(result.id) : null;
-
-  if (approved) {
-    // Registrar el cobro como movimiento de pago (haber), igual que el cron y el
-    // flujo manual de "Registrar pago": lleva el saldo neto del socio a 0.
-    await db.insert(movimientosCuentaCorriente).values({
-      socioId: cobro.socioId,
-      concepto: 'Pago — Débito automático',
-      tipo: 'otro',
-      estado: 'pagado',
-      debe: '0',
-      haber: totalPesos.toFixed(2),
-      importeSigned: `-${totalPesos.toFixed(2)}`,
-      fecha: new Date(),
-      formaDePago: 'debito_automatico',
-      datosPago: null,
-    });
-    await db
-      .update(paywayCobros)
-      .set({ estado: 'aprobado', paywayPaymentId })
-      .where(eq(paywayCobros.id, nuevoCobro.id));
-  } else {
-    console.error('[reintentarCobroAction] Payway no aprobó', JSON.stringify(result));
-    const msg = formatPaywayError(result);
-    await db
-      .update(paywayCobros)
-      .set({ estado: 'rechazado', paywayPaymentId, errorMensaje: msg })
-      .where(eq(paywayCobros.id, nuevoCobro.id));
-    return { error: `Cobro rechazado: ${msg}` };
-  }
-
-  revalidatePath('/ventas');
+  revalidatePath('/cobranzas');
+  revalidatePath(`/usuarios/${cobro.socioId}`);
   return {};
 }
 

@@ -286,6 +286,7 @@ export default async function VentasPage() {
         nombre: guarderias.nombre,
         razonSocial: guarderias.razonSocial,
         cuit: guarderias.cuit,
+        mediosCobroInternos: guarderias.mediosCobroInternos,
       })
       .from(guarderias)
       .where(eq(guarderias.id, gId))
@@ -595,6 +596,7 @@ export default async function VentasPage() {
       certificadoOk={certificadoOk}
       guarderiaCondicionIva={guarderiaCondicionIva}
       centrosEmisores={centrosEmisoresList}
+      internosHabilitados={(guarderiaInfo?.mediosCobroInternos ?? []).length > 0}
     />
   );
 }

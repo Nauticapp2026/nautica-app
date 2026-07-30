@@ -8,13 +8,13 @@ import {
   facturacion,
   facturacionItemMovimientos,
   facturacionItems,
+  guarderias,
   memberships,
   movimientosCuentaCorriente,
   paywayTokens,
 } from '@/lib/db/schema';
 import { getActiveMarina } from '@/lib/auth/session';
 import { fechaCalendariaArg } from '@/lib/dates';
-import { calcularCoberturaNotasCredito } from '@/lib/nc-cobertura';
 
 type Ctx = NonNullable<Awaited<ReturnType<typeof getActiveMarina>>>;
 
@@ -120,6 +120,12 @@ export async function getComprobantesPendientesAction(socioId: string): Promise<
     ? { marca: MARCA_TARJETA[String(tok.paymentMethodId)] ?? 'Tarjeta', lastFour: tok.lastFour }
     : null;
 
+  // Se listan TODOS los comprobantes cobrables del socio, incluso los que ya
+  // figuran cobrados o cubiertos por pagos vía FIFO (pedido del cliente
+  // 2026-07-30: antes se ocultaban y el club no los veía). El club decide qué
+  // cobrar; un doble cobro queda como saldo a favor y el recibo se puede
+  // anular. Solo quedan afuera los anulados y los rechazados por ARCA, que no
+  // son deuda válida. El estado viaja para que la UI etiquete "Cobrada".
   const rows = await db
     .select({
       id: facturacion.id,
@@ -130,73 +136,22 @@ export async function getComprobantesPendientesAction(socioId: string): Promise<
       emision: facturacion.emision,
       vencimiento: facturacion.vencimiento,
       descripcion: facturacion.descripcion,
-      movimientoId: facturacion.movimientoId,
     })
     .from(facturacion)
     .where(
       and(
         eq(facturacion.guarderiaId, ctx.activeMembership.guarderiaId),
         eq(facturacion.socioId, socioId),
-        inArray(facturacion.estado, ['pendiente', 'vencida']),
         inArray(facturacion.tipoFactura, [...TIPOS_COBRABLES]),
+        eq(facturacion.anulada, false),
+        eq(facturacion.rechazada, false),
       ),
     )
     .orderBy(facturacion.emision);
 
-  if (rows.length === 0) return { comprobantes: [], tarjeta };
-
-  // Un comprobante puede figurar 'pendiente' en facturacion pero estar ya cubierto
-  // por un pago neto (haber) vía el FIFO de la cuenta corriente — la cuenta corriente
-  // lo muestra "Pagado". No hay que ofrecerlo para cobrar de nuevo. Calculamos qué
-  // cargos están saldados (mismo criterio que calcularSaldoYEstado en el display) y
-  // ocultamos los comprobantes cuyos cargos ya estén todos cubiertos.
-  const cargosPagados = await getCargosPagadosFifo(socioId);
-
-  // Mapear cada comprobante a sus cargos: link directo (recibos internos) + M:N (facturas).
-  const facIds = rows.map((r) => r.id);
-  const items = await db
-    .select({ id: facturacionItems.id, facturacionId: facturacionItems.facturacionId })
-    .from(facturacionItems)
-    .where(inArray(facturacionItems.facturacionId, facIds));
-  const itemToFac = new Map(items.map((i) => [i.id, i.facturacionId]));
-  const links = items.length
-    ? await db
-        .select({
-          facturacionItemId: facturacionItemMovimientos.facturacionItemId,
-          movimientoId: facturacionItemMovimientos.movimientoId,
-        })
-        .from(facturacionItemMovimientos)
-        .where(
-          inArray(
-            facturacionItemMovimientos.facturacionItemId,
-            items.map((i) => i.id),
-          ),
-        )
-    : [];
-
-  const cargosPorComprobante = new Map<string, Set<string>>();
-  for (const r of rows) {
-    const s = new Set<string>();
-    if (r.movimientoId) s.add(r.movimientoId);
-    cargosPorComprobante.set(r.id, s);
-  }
-  for (const l of links) {
-    const facId = itemToFac.get(l.facturacionItemId);
-    if (facId) cargosPorComprobante.get(facId)?.add(l.movimientoId);
-  }
-
-  // Mostrar el comprobante salvo que TODOS sus cargos estén saldados. Si no tiene
-  // cargos vinculados, no podemos inferir cobertura → se muestra.
-  const visibles = rows.filter((r) => {
-    const cargos = cargosPorComprobante.get(r.id);
-    if (!cargos || cargos.size === 0) return true;
-    for (const c of cargos) if (!cargosPagados.has(c)) return true;
-    return false;
-  });
-
   return {
     tarjeta,
-    comprobantes: visibles.map((r) => ({
+    comprobantes: rows.map((r) => ({
       id: r.id,
       codigo: r.codigo,
       tipoFactura: r.tipoFactura,
@@ -207,58 +162,6 @@ export async function getComprobantesPendientesAction(socioId: string): Promise<
       descripcion: r.descripcion,
     })),
   };
-}
-
-// Conjunto de ids de cargos (movimientos con debe>0) que están saldados para el
-// socio: los ya `pagado`, más los cubiertos puntualmente por una Nota de
-// Crédito de su propia factura (`calcularCoberturaNotasCredito`), más los
-// cubiertos por el pool de pagos genéricos vía FIFO (del más viejo al más
-// nuevo). Mismo criterio que `calcularSaldoYEstado` en el display.
-async function getCargosPagadosFifo(socioId: string): Promise<Set<string>> {
-  const { montoPorMovimiento, movimientosDeNc } = await calcularCoberturaNotasCredito(socioId);
-
-  const movs = await db
-    .select({
-      id: movimientosCuentaCorriente.id,
-      debe: movimientosCuentaCorriente.debe,
-      haber: movimientosCuentaCorriente.haber,
-      estado: movimientosCuentaCorriente.estado,
-    })
-    .from(movimientosCuentaCorriente)
-    .where(eq(movimientosCuentaCorriente.socioId, socioId))
-    .orderBy(asc(movimientosCuentaCorriente.fecha), asc(movimientosCuentaCorriente.createdAt));
-
-  const pagados = new Set<string>();
-  for (const [movId, monto] of montoPorMovimiento) {
-    const m = movs.find((x) => x.id === movId);
-    if (m && monto >= parseFloat(m.debe ?? '0') - 0.001) pagados.add(movId);
-  }
-
-  // Pool genérico: pagos reales + NC "libres" sin factura original — excluye
-  // los movimientos que son el asiento de una NC ya aplicada puntualmente
-  // arriba, para no contar esa plata dos veces.
-  let pool = movs
-    .filter((m) => !movimientosDeNc.has(m.id))
-    .reduce((acc, m) => acc + parseFloat(m.haber ?? '0'), 0);
-
-  for (const m of movs) {
-    if (pagados.has(m.id)) continue;
-    const debe = parseFloat(m.debe ?? '0');
-    if (debe <= 0) continue;
-    if (m.estado === 'pagado') {
-      // Ya pagado: consume su parte del pool (su haber está comprometido), igual
-      // que calcularSaldoYEstado, para no inflar la cobertura de otros cargos.
-      pagados.add(m.id);
-      pool -= debe;
-      continue;
-    }
-    if (pool >= debe - 0.001) {
-      pool -= debe;
-      pagados.add(m.id);
-    }
-  }
-
-  return pagados;
 }
 
 // ─── Registrar una cobranza ────────────────────────────────────────────────────
@@ -316,8 +219,13 @@ export async function registrarCobranzaAction(data: RegistrarCobranzaData): Prom
         eq(facturacion.guarderiaId, gId),
         eq(facturacion.socioId, data.socioId),
         inArray(facturacion.id, data.comprobanteIds),
-        inArray(facturacion.estado, ['pendiente', 'vencida']),
+        // Sin filtro de estado: se puede cobrar también un comprobante que ya
+        // figura cobrado (decisión del cliente 2026-07-30 — el doble cobro
+        // queda como saldo a favor y el recibo se puede anular). Solo se
+        // excluyen anulados y rechazados, que no son deuda válida.
         inArray(facturacion.tipoFactura, [...TIPOS_COBRABLES]),
+        eq(facturacion.anulada, false),
+        eq(facturacion.rechazada, false),
       ),
     )
     .orderBy(asc(facturacion.emision));
@@ -337,6 +245,33 @@ export async function registrarCobranzaAction(data: RegistrarCobranzaData): Prom
     return { error: 'No se pueden cobrar juntos comprobantes fiscales e internos.' };
   }
   const tipoRecibo = tiposEnSeleccion.has('interno') ? 'interno' : 'fiscal';
+
+  // Comprobantes internos solo se cobran con los medios que el club habilitó
+  // en Mi Perfil → Datos Impositivos → Configuración de cobranzas. Efectivo
+  // en dólares cuenta como Efectivo; 'otro' no es un medio configurable.
+  if (tipoRecibo === 'interno') {
+    const [g] = await db
+      .select({ medios: guarderias.mediosCobroInternos })
+      .from(guarderias)
+      .where(eq(guarderias.id, gId))
+      .limit(1);
+    const medios = g?.medios ?? [];
+    if (medios.length === 0) {
+      return {
+        error:
+          'Los comprobantes internos están deshabilitados. Habilitá al menos un medio de pago en Mi Perfil → Datos Impositivos → Configuración de cobranzas.',
+      };
+    }
+    const noPermitida = data.formas.find(
+      (f) => !medios.includes(f.tipo === 'efectivo_usd' ? 'efectivo' : f.tipo),
+    );
+    if (noPermitida) {
+      return {
+        error:
+          'Alguna forma de pago no está habilitada para comprobantes internos. Revisá la Configuración de cobranzas en Mi Perfil.',
+      };
+    }
+  }
 
   // FIFO: el monto cubre los comprobantes del más viejo al más nuevo. Solo los que
   // se cubren ENTEROS quedan pagados; el primero que no alcanza (y el resto) sigue
@@ -473,10 +408,12 @@ const TIPOS_FISCALES = [
   'nota_debito_c',
 ];
 
-// Anular = deshacer el cobro: revierte el pago (borra el haber), devuelve los
-// comprobantes cobrados a 'pendiente' y sus cargos al estado previo (fiscal →
-// 'facturado', recibo interno → 'no_pagado'), y marca el recibo anulado con
-// fecha. No genera comprobante. Siempre por el total.
+// Anular = deshacer el cobro: revierte el pago con un CONTRAASIENTO (el haber
+// original queda visible en la cuenta corriente y se agrega un debe
+// 'anulacion_recibo' por el mismo monto), devuelve los comprobantes cobrados a
+// 'pendiente' y sus cargos al estado previo (fiscal → 'facturado', recibo
+// interno → 'no_pagado'), y marca el recibo anulado con fecha. No genera
+// comprobante. Siempre por el total.
 export async function anularCobranzaAction(reciboId: string): Promise<{ error?: string }> {
   const ctx = await getActiveMarina();
   if (!ctx) return { error: 'No autenticado' };
@@ -490,6 +427,7 @@ export async function anularCobranzaAction(reciboId: string): Promise<{ error?: 
       socioId: facturacion.socioId,
       codigo: facturacion.codigo,
       tipoFactura: facturacion.tipoFactura,
+      importe: facturacion.importe,
       movimientoId: facturacion.movimientoId,
       anulada: facturacion.anulada,
       cobranzaComprobanteIds: facturacion.cobranzaComprobanteIds,
@@ -579,11 +517,30 @@ export async function anularCobranzaAction(reciboId: string): Promise<{ error?: 
           .where(inArray(facturacion.id, comprobanteIds));
       }
 
-      // Revertir el pago: borrar el haber de la cobranza.
+      // Revertir el pago SIN borrarlo: la cobranza original queda visible en
+      // la cuenta corriente y se agrega un contraasiento (debe) por el mismo
+      // monto que la anula. El par pago+contraasiento se excluye del pool
+      // FIFO de cobertura (ver reconciliar-cuenta.ts) para que esa plata no
+      // cubra otros cargos.
       if (recibo.movimientoId) {
-        await tx
-          .delete(movimientosCuentaCorriente)
-          .where(eq(movimientosCuentaCorriente.id, recibo.movimientoId));
+        const [pago] = await tx
+          .select({ haber: movimientosCuentaCorriente.haber })
+          .from(movimientosCuentaCorriente)
+          .where(eq(movimientosCuentaCorriente.id, recibo.movimientoId))
+          .limit(1);
+        const monto = parseFloat(pago?.haber ?? recibo.importe ?? '0');
+        if (recibo.socioId && monto > 0.001) {
+          await tx.insert(movimientosCuentaCorriente).values({
+            socioId: recibo.socioId,
+            concepto: `Anulación recibo ${recibo.codigo}`,
+            tipo: 'anulacion_recibo',
+            estado: 'pagado',
+            debe: monto.toFixed(2),
+            haber: '0',
+            importeSigned: monto.toFixed(2),
+            fecha: new Date(),
+          });
+        }
       }
 
       // Marcar el recibo anulado.

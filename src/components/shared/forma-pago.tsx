@@ -2,18 +2,12 @@
 
 import React from 'react';
 
+import { MEDIOS_PAGO } from '@/lib/medios-pago';
+
 // Opciones de forma de pago, compartidas entre el alta de pago del socio
-// (cuenta corriente) y el Registro de Cobranza. El value matchea el enum
-// `medio_pago` de la DB y el map FORMAS_PAGO_LABEL de movimientos.ts.
-export const FORMAS_PAGO = [
-  { value: 'efectivo', label: 'Efectivo' },
-  { value: 'tarjeta_credito', label: 'Tarjeta de crédito' },
-  { value: 'tarjeta_debito', label: 'Tarjeta de débito' },
-  { value: 'debito_automatico', label: 'Débito automático' },
-  { value: 'transferencia', label: 'Transferencia' },
-  { value: 'cheque', label: 'Cheque' },
-  { value: 'mercado_pago', label: 'Mercado Pago' },
-];
+// (cuenta corriente) y el Registro de Cobranza. La lista canónica vive en
+// src/lib/medios-pago.ts (module compartido con server actions).
+export const FORMAS_PAGO = MEDIOS_PAGO;
 
 export const inputCls =
   'h-11 w-full rounded-[10px] border border-gray-200 bg-white px-4 text-sm text-[#101828] focus:border-[#175861] focus:outline-none focus:ring-1 focus:ring-[#175861]';

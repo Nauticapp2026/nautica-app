@@ -1,7 +1,7 @@
 import { and, count, eq, gte, isNull, ne, or } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
-import { servicios, socioServicios, socioServiciosCancelados } from '@/lib/db/schema';
+import { memberships, servicios, socioServicios, socioServiciosCancelados } from '@/lib/db/schema';
 import { todayArg } from '@/lib/dates';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -69,6 +69,9 @@ export async function crearSocioServicio(
     fechaInicio: string;
     fechaBaja?: string | null;
     comprobanteInterno?: boolean;
+    // Inclusión en el débito automático Payway. undefined = usar el default:
+    // la adhesión general del socio (memberships.cobro_automatico_payway).
+    debitoAutomatico?: boolean;
     concepto?: string | null;
     // Solo para tarifas Variable diaria: días contratados.
     cantidadDias?: number | null;
@@ -76,6 +79,22 @@ export async function crearSocioServicio(
   },
 ): Promise<{ id: string; numeroOperacion: number }> {
   const numeroOperacion = await nextNumeroOperacion(tx, params.guarderiaId);
+
+  let debitoAutomatico = params.debitoAutomatico;
+  if (debitoAutomatico === undefined) {
+    const [m] = await tx
+      .select({ adherido: memberships.cobroAutomaticoPayway })
+      .from(memberships)
+      .where(
+        and(
+          eq(memberships.userId, params.socioId),
+          eq(memberships.guarderiaId, params.guarderiaId),
+          eq(memberships.rol, 'socio'),
+        ),
+      )
+      .limit(1);
+    debitoAutomatico = m?.adherido ?? false;
+  }
 
   await tx
     .delete(socioServiciosCancelados)
@@ -98,6 +117,7 @@ export async function crearSocioServicio(
       fechaInicio: params.fechaInicio,
       fechaBaja: params.fechaBaja ?? null,
       comprobanteInterno: params.comprobanteInterno ?? false,
+      debitoAutomatico,
       concepto: params.concepto ?? null,
       cantidadDias: params.cantidadDias ?? null,
       createdBy: params.createdBy,
