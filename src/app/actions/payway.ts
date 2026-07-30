@@ -209,6 +209,7 @@ export async function reintentarCobroPaywayAction(cobroId: string): Promise<{ er
         eq(memberships.userId, cobro.socioId),
         eq(memberships.guarderiaId, guarderiaId),
         eq(memberships.rol, 'socio'),
+        eq(memberships.status, 'active'),
       ),
     )
     .limit(1);

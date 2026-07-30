@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { and, asc, count, eq, inArray, like } from 'drizzle-orm';
+import { and, asc, count, eq, inArray, isNull, like, notLike, or } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import {
@@ -145,6 +145,9 @@ export async function getComprobantesPendientesAction(socioId: string): Promise<
         inArray(facturacion.tipoFactura, [...TIPOS_COBRABLES]),
         eq(facturacion.anulada, false),
         eq(facturacion.rechazada, false),
+        // Los recibos de cobranza (RC-) también son tipo 'recibo' pero
+        // documentan un pago pasado, no deuda: nunca son cobrables.
+        or(isNull(facturacion.codigo), notLike(facturacion.codigo, 'RC-%')),
       ),
     )
     .orderBy(facturacion.emision);
@@ -221,11 +224,13 @@ export async function registrarCobranzaAction(data: RegistrarCobranzaData): Prom
         inArray(facturacion.id, data.comprobanteIds),
         // Sin filtro de estado: se puede cobrar también un comprobante que ya
         // figura cobrado (decisión del cliente 2026-07-30 — el doble cobro
-        // queda como saldo a favor y el recibo se puede anular). Solo se
-        // excluyen anulados y rechazados, que no son deuda válida.
+        // queda como saldo a favor y el recibo se puede anular). Se excluyen
+        // anulados, rechazados y los recibos de cobranza RC- (documentan un
+        // pago pasado, no deuda).
         inArray(facturacion.tipoFactura, [...TIPOS_COBRABLES]),
         eq(facturacion.anulada, false),
         eq(facturacion.rechazada, false),
+        or(isNull(facturacion.codigo), notLike(facturacion.codigo, 'RC-%')),
       ),
     )
     .orderBy(asc(facturacion.emision));
@@ -446,6 +451,16 @@ export async function anularCobranzaAction(reciboId: string): Promise<{ error?: 
 
   try {
     await db.transaction(async (tx) => {
+      // Marcar anulado PRIMERO, con guarda atómica: si otra request (doble
+      // click, dos admins) ya lo anuló, acá no matchea ninguna fila y se
+      // aborta — sin esto se insertarían dos contraasientos.
+      const marcado = await tx
+        .update(facturacion)
+        .set({ anulada: true, anuladaAt: new Date(), updatedAt: new Date() })
+        .where(and(eq(facturacion.id, reciboId), eq(facturacion.anulada, false)))
+        .returning({ id: facturacion.id });
+      if (marcado.length === 0) throw new Error('YA_ANULADO');
+
       if (comprobanteIds.length > 0) {
         // Comprobantes cobrados + su tipo, para saber a qué estado volver el cargo.
         const comps = await tx
@@ -523,12 +538,15 @@ export async function anularCobranzaAction(reciboId: string): Promise<{ error?: 
       // FIFO de cobertura (ver reconciliar-cuenta.ts) para que esa plata no
       // cubra otros cargos.
       if (recibo.movimientoId) {
+        // Sin fallback al importe del recibo: si el haber del pago ya no
+        // existe, no hay nada que revertir — un contraasiento sin su par
+        // generaría deuda fantasma.
         const [pago] = await tx
           .select({ haber: movimientosCuentaCorriente.haber })
           .from(movimientosCuentaCorriente)
           .where(eq(movimientosCuentaCorriente.id, recibo.movimientoId))
           .limit(1);
-        const monto = parseFloat(pago?.haber ?? recibo.importe ?? '0');
+        const monto = parseFloat(pago?.haber ?? '0');
         if (recibo.socioId && monto > 0.001) {
           await tx.insert(movimientosCuentaCorriente).values({
             socioId: recibo.socioId,
@@ -542,19 +560,16 @@ export async function anularCobranzaAction(reciboId: string): Promise<{ error?: 
           });
         }
       }
-
-      // Marcar el recibo anulado.
-      await tx
-        .update(facturacion)
-        .set({ anulada: true, anuladaAt: new Date(), updatedAt: new Date() })
-        .where(eq(facturacion.id, reciboId));
     });
 
     if (recibo.socioId) revalidatePath(`/usuarios/${recibo.socioId}`);
     revalidatePath('/ventas');
     revalidatePath('/cobranzas');
     return {};
-  } catch {
+  } catch (err) {
+    if (err instanceof Error && err.message === 'YA_ANULADO') {
+      return { error: 'El recibo ya está anulado.' };
+    }
     return { error: 'Error al anular la cobranza.' };
   }
 }

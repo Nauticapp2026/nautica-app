@@ -1,7 +1,13 @@
 import { and, count, eq, gte, isNull, ne, or } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
-import { memberships, servicios, socioServicios, socioServiciosCancelados } from '@/lib/db/schema';
+import {
+  memberships,
+  paywayTokens,
+  servicios,
+  socioServicios,
+  socioServiciosCancelados,
+} from '@/lib/db/schema';
 import { todayArg } from '@/lib/dates';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -94,6 +100,24 @@ export async function crearSocioServicio(
       )
       .limit(1);
     debitoAutomatico = m?.adherido ?? false;
+    // Adhesión sin tarjeta activa (ej. token dado de baja después de
+    // adherirse): el default cae a false, igual que la UI, que en ese caso
+    // no muestra el tilde — si no, el contrato nacería con débito "Sí" sin
+    // que el admin lo haya visto.
+    if (debitoAutomatico) {
+      const [tok] = await tx
+        .select({ id: paywayTokens.id })
+        .from(paywayTokens)
+        .where(
+          and(
+            eq(paywayTokens.guarderiaId, params.guarderiaId),
+            eq(paywayTokens.socioId, params.socioId),
+            eq(paywayTokens.activo, true),
+          ),
+        )
+        .limit(1);
+      debitoAutomatico = !!tok;
+    }
   }
 
   await tx

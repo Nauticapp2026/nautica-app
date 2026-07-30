@@ -23,6 +23,9 @@ import { randomUUID } from 'crypto';
 
 import { db } from '@/lib/db';
 import {
+  facturacion,
+  facturacionItemMovimientos,
+  facturacionItems,
   guarderias,
   memberships,
   movimientosCuentaCorriente,
@@ -265,12 +268,14 @@ export async function cobrarDebitoSocio(args: {
   const scSet = new Set(scRows.map((r) => r.id));
 
   // Estado FIFO de la cuenta: qué cargos ya están cubiertos por pagos
-  // previos, y cuánto crédito sobra sin asignar.
-  const { saldados, poolRestante } = await getEstadoFifo(token.socioId);
+  // previos, cuánto crédito sobra sin asignar, y qué cobertura parcial de NC
+  // targeted ya está acreditada (no debe volver a cobrarse).
+  const { saldados, poolRestante, ncParcial } = await getEstadoFifo(token.socioId);
 
   const movimientos = await db
     .select({
       id: movimientosCuentaCorriente.id,
+      tipo: movimientosCuentaCorriente.tipo,
       debe: movimientosCuentaCorriente.debe,
       comprobanteInterno: movimientosCuentaCorriente.comprobanteInterno,
       socioServicioId: movimientosCuentaCorriente.socioServicioId,
@@ -279,8 +284,52 @@ export async function cobrarDebitoSocio(args: {
     .where(eq(movimientosCuentaCorriente.socioId, token.socioId))
     .orderBy(asc(movimientosCuentaCorriente.fecha), asc(movimientosCuentaCorriente.createdAt));
 
+  // Cargos cuya factura fiscal quedó RECHAZADA por ARCA: bloqueados hasta que
+  // el club la reenvíe (misma regla que Cobranzas) — no se debitan sin
+  // comprobante válido. Se resuelven por las dos vías de vínculo (directo +
+  // M:N de items).
+  const bloqueados = new Set<string>();
+  const rechazadas = await db
+    .select({ id: facturacion.id, movimientoId: facturacion.movimientoId })
+    .from(facturacion)
+    .where(
+      and(
+        eq(facturacion.guarderiaId, g.id),
+        eq(facturacion.socioId, token.socioId),
+        eq(facturacion.rechazada, true),
+      ),
+    );
+  if (rechazadas.length > 0) {
+    for (const r of rechazadas) if (r.movimientoId) bloqueados.add(r.movimientoId);
+    const items = await db
+      .select({ id: facturacionItems.id })
+      .from(facturacionItems)
+      .where(
+        inArray(
+          facturacionItems.facturacionId,
+          rechazadas.map((r) => r.id),
+        ),
+      );
+    if (items.length > 0) {
+      const links = await db
+        .select({ movimientoId: facturacionItemMovimientos.movimientoId })
+        .from(facturacionItemMovimientos)
+        .where(
+          inArray(
+            facturacionItemMovimientos.facturacionItemId,
+            items.map((i) => i.id),
+          ),
+        );
+      for (const l of links) bloqueados.add(l.movimientoId);
+    }
+  }
+
+  // Los contraasientos de anulación no son cargos cobrables (su debe ya está
+  // descontado del pool) — se excluyen para que no se roben el descuento del
+  // pool sobrante.
   const noCubiertos = movimientos.filter(
-    (m) => parseFloat(m.debe ?? '0') > 0.001 && !saldados.has(m.id),
+    (m) =>
+      m.tipo !== 'anulacion_recibo' && parseFloat(m.debe ?? '0') > 0.001 && !saldados.has(m.id),
   );
   // El pool sobrante cubre parcialmente SOLO al no cubierto más viejo (si
   // alcanzara para más, esos cargos ya estarían saldados). Si ese cargo entra
@@ -289,11 +338,16 @@ export async function cobrarDebitoSocio(args: {
   const primerNoCubiertoId = noCubiertos[0]?.id ?? null;
 
   const elegibles: (CargoACobrar & { interno: boolean })[] = noCubiertos
-    .filter((m) => m.socioServicioId && scSet.has(m.socioServicioId))
+    .filter((m) => m.socioServicioId && scSet.has(m.socioServicioId) && !bloqueados.has(m.id))
     .map((m) => ({
       id: m.id,
       interno: m.comprobanteInterno,
-      monto: parseFloat(m.debe ?? '0') - (m.id === primerNoCubiertoId ? poolRestante : 0),
+      // Al debe se le descuenta la cobertura parcial de NC ya acreditada y,
+      // solo para el no cubierto más viejo, el pool sobrante.
+      monto:
+        parseFloat(m.debe ?? '0') -
+        (ncParcial.get(m.id) ?? 0) -
+        (m.id === primerNoCubiertoId ? poolRestante : 0),
     }))
     .filter((c) => c.monto >= 0.01);
 
@@ -398,6 +452,9 @@ export async function runPaywayCharges(guarderiaIds: string[]): Promise<PaywayCh
           eq(paywayTokens.guarderiaId, g.id),
           eq(paywayTokens.activo, true),
           eq(memberships.cobroAutomaticoPayway, true),
+          // Socios dados de baja del club no se debitan más, aunque hayan
+          // quedado con adhesión y token activos.
+          eq(memberships.status, 'active'),
         ),
       );
 

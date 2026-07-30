@@ -52,10 +52,16 @@ export async function getCargosSaldadosFifo(socioId: string): Promise<Set<string
  * automático lo necesita para descontarlo del cobro y no cobrar de más.
  * Invariante: poolRestante < debe del primer cargo no saldado (si alcanzara,
  * ese cargo estaría en `saldados`).
+ *
+ * `ncParcial`: cobertura de Nota de Crédito targeted que cubre un cargo SOLO
+ * en parte (el cargo no llega a `saldados`, pero ese monto ya está acreditado
+ * y no debe volver a cobrarse).
  */
-export async function getEstadoFifo(
-  socioId: string,
-): Promise<{ saldados: Set<string>; poolRestante: number }> {
+export async function getEstadoFifo(socioId: string): Promise<{
+  saldados: Set<string>;
+  poolRestante: number;
+  ncParcial: Map<string, number>;
+}> {
   const { montoPorMovimiento, movimientosDeNc } = await calcularCoberturaNotasCredito(socioId);
 
   const movs = await db
@@ -74,6 +80,12 @@ export async function getEstadoFifo(
   for (const [movId, monto] of montoPorMovimiento) {
     const m = movs.find((x) => x.id === movId);
     if (m && monto >= parseFloat(m.debe ?? '0') - 0.001) saldados.add(movId);
+  }
+
+  // Cobertura NC que quedó parcial (no alcanzó para saldar el cargo entero).
+  const ncParcial = new Map<string, number>();
+  for (const [movId, monto] of montoPorMovimiento) {
+    if (!saldados.has(movId)) ncParcial.set(movId, monto);
   }
 
   // Pool genérico: excluye los movimientos que son el asiento de una NC ya
@@ -110,7 +122,7 @@ export async function getEstadoFifo(
     }
   }
 
-  return { saldados, poolRestante: Math.max(0, pool) };
+  return { saldados, poolRestante: Math.max(0, pool), ncParcial };
 }
 
 export async function reconciliarCuentaSocio(socioId: string): Promise<string[]> {

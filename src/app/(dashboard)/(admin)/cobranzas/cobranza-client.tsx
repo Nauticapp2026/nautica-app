@@ -21,6 +21,7 @@ import {
 import {
   FormasDePago,
   nuevaForma,
+  tiposCobranzaPermitidos,
   type FormaCobranza,
   type TarjetaGuardada,
 } from './cobranza-formas';
@@ -160,13 +161,23 @@ function NuevaCobranzaModal({
     [comprobantesCanal, selected],
   );
 
+  // Cobrando internos, el dropdown de formas solo muestra los medios que el
+  // club habilitó en la Configuración de cobranzas. Fiscal: lista completa.
+  // Se deriva de la SELECCIÓN (no del canal) para que funcione con "Todas".
+  const tiposPermitidos =
+    tiposSeleccion.has('interno') && tiposSeleccion.size === 1 ? mediosInternos : null;
+  // Puede ser 0 si el club solo habilitó medios sin cobro manual (ej. solo
+  // Débito automático): en ese caso Registrar queda deshabilitado (el aviso
+  // lo muestra FormasDePago).
+  const hayMediosManuales = tiposCobranzaPermitidos(tiposPermitidos).length > 0;
+
   const montoNum = parseFloat(montoToNumberStr(montoAPagar)) || 0;
   const totalCargado = useMemo(
     () => formas.reduce((acc, f) => acc + (parseFloat(montoToNumberStr(f.monto)) || 0), 0),
     [formas],
   );
   const cuadra = Math.abs(totalCargado - montoNum) < 0.01;
-  const pagoValido = montoNum > 0 && cuadra && formas.length > 0;
+  const pagoValido = montoNum > 0 && cuadra && formas.length > 0 && hayMediosManuales;
 
   function handleSelectSocio(s: SocioOption) {
     setSocio(s);
@@ -203,12 +214,6 @@ function NuevaCobranzaModal({
         : new Set(comprobantesCanal.map((c) => c.id)),
     );
   }
-
-  // Cobrando internos, el dropdown de formas solo muestra los medios que el
-  // club habilitó en la Configuración de cobranzas. Fiscal: lista completa.
-  // Se deriva de la SELECCIÓN (no del canal) para que funcione con "Todas".
-  const tiposPermitidos =
-    tiposSeleccion.has('interno') && tiposSeleccion.size === 1 ? mediosInternos : null;
 
   function irAPago() {
     // Pre-llenar el monto a pagar con el total seleccionado, y la única forma
