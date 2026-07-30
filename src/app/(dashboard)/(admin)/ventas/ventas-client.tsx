@@ -453,6 +453,7 @@ function NuevaFacturaModal({
   // asociado — ARCA exige que toda nota referencie un comprobante o un rango
   // de fechas; sin origen puntual, va el rango (default: últimos 30 días).
   const [notaFecha, setNotaFecha] = useState(todayIso());
+  const [notaVencimiento, setNotaVencimiento] = useState(addDays(todayIso(), 30));
   const [notaPeriodoDesde, setNotaPeriodoDesde] = useState(addDays(todayIso(), -30));
   const [notaPeriodoHasta, setNotaPeriodoHasta] = useState(todayIso());
   const [notaResult, setNotaResult] = useState<{
@@ -663,6 +664,7 @@ function NuevaFacturaModal({
     setNotaMotivo('bonificacion');
     setNotaImporte('');
     setNotaFecha(todayIso());
+    setNotaVencimiento(addDays(todayIso(), 30));
     setNotaPeriodoDesde(addDays(todayIso(), -30));
     setNotaPeriodoHasta(todayIso());
     setNotaResult(null);
@@ -694,6 +696,8 @@ function NuevaFacturaModal({
               descripcion: form.descripcion || undefined,
               centroEmisorId: centroEmisorId || undefined,
               fecha: notaFecha,
+              vencimiento: notaVencimiento || undefined,
+              condicionVenta: form.condicionVenta as never,
               periodoDesde: notaPeriodoDesde,
               periodoHasta: notaPeriodoHasta,
             });
@@ -922,6 +926,20 @@ function NuevaFacturaModal({
                       onChange={(e) => setNotaFecha(e.target.value)}
                     />
                   </div>
+                  <div>
+                    <label
+                      className="mb-1.5 block text-xs font-semibold"
+                      style={{ color: '#101828' }}
+                    >
+                      Vencimiento*
+                    </label>
+                    <input
+                      type="date"
+                      className={inputCls}
+                      value={notaVencimiento}
+                      onChange={(e) => setNotaVencimiento(e.target.value)}
+                    />
+                  </div>
                 </div>
               )}
 
@@ -1041,7 +1059,10 @@ function NuevaFacturaModal({
                     })()}
                   </select>
                 </div>
-                {!modoNota && (
+                {/* También para NC/ND sin comprobante de origen (mismo
+                formato que la factura manual). Con nota relacionada no se
+                elige: sale con la condición del comprobante original. */}
+                {(!modoNota || !notaRelacionada) && (
                   <div>
                     <label
                       className="mb-1.5 block text-xs font-semibold"

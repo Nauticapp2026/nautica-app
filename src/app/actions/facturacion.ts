@@ -2210,6 +2210,8 @@ async function emitirNotaTusFacturas(params: {
   asociado?: TusFacturasComprobanteAsociado;
   /** Fecha de emisión (formato TusFecha). Default: hoy. */
   fecha?: string;
+  /** Vencimiento (formato TusFecha). Default: igual a la fecha de emisión. */
+  vencimiento?: string;
   /** Inicio del período facturado (formato TusFecha). Default: hoy. */
   periodoDesde?: string;
   /** Fin del período facturado (formato TusFecha). Default: hoy. */
@@ -2226,7 +2228,7 @@ async function emitirNotaTusFacturas(params: {
 
   const comprobante: TusFacturasComprobante = {
     fecha,
-    vencimiento: fecha,
+    vencimiento: params.vencimiento ?? fecha,
     tipo: tipoApi,
     idioma: 1,
     external_reference: notaId,
@@ -2742,6 +2744,10 @@ export type EmitirNotaLibreData = {
   centroEmisorId?: string | null;
   /** Fecha de emisión (YYYY-MM-DD). Default: hoy. */
   fecha?: string;
+  /** Vencimiento (YYYY-MM-DD). Default: igual a la fecha de emisión. */
+  vencimiento?: string;
+  /** Condición de venta del comprobante. Default: cuenta corriente. */
+  condicionVenta?: CondicionVenta;
   /** Período asociado (YYYY-MM-DD): la alternativa de ARCA a asociar un
    *  comprobante puntual — la nota queda referida a este rango de fechas.
    *  Default: últimos 30 días. */
@@ -2761,8 +2767,20 @@ export async function emitirNotaLibreAction(data: EmitirNotaLibreData): Promise<
   if (!data.importe || data.importe <= 0) {
     return { error: `Ingresá el importe de la ${tipoNota}.` };
   }
-  for (const f of [data.fecha, data.periodoDesde, data.periodoHasta]) {
-    if (f != null && !YMD_RE.test(f)) return { error: 'Fecha inválida.' };
+  if (data.fecha != null && !YMD_RE.test(data.fecha)) {
+    return { error: 'La fecha de comprobante no es válida.' };
+  }
+  if (data.vencimiento != null && !YMD_RE.test(data.vencimiento)) {
+    return { error: 'La fecha de vencimiento no es válida.' };
+  }
+  if (data.periodoDesde != null && !YMD_RE.test(data.periodoDesde)) {
+    return { error: 'El inicio del período asociado no es válido.' };
+  }
+  if (data.periodoHasta != null && !YMD_RE.test(data.periodoHasta)) {
+    return { error: 'El fin del período asociado no es válido.' };
+  }
+  if (data.fecha && data.vencimiento && data.vencimiento < data.fecha) {
+    return { error: 'El vencimiento no puede ser anterior a la fecha de comprobante.' };
   }
   // ARCA exige que toda NC/ND referencie comprobantes o un período: sin
   // comprobante de origen, va el período (default: últimos 30 días).
@@ -2785,7 +2803,13 @@ export async function emitirNotaLibreAction(data: EmitirNotaLibreData): Promise<
   const socioCondicionIva = socio.facturaFiscal ? socio.condicionIvaPersonal : socio.condicionIva;
   const tipoFactura = derivarTipoFactura(guarderia.condicionIva, socioCondicionIva);
 
-  const cliente = buildCliente({ ...socio, condicionVenta: 'cuenta_corriente' });
+  // Condición de venta elegida en el modal (mismo campo que la factura
+  // manual). Default histórico: cuenta corriente.
+  const condicionVenta: CondicionVenta =
+    data.condicionVenta && data.condicionVenta in CONDICION_PAGO_API
+      ? data.condicionVenta
+      : 'cuenta_corriente';
+  const cliente = buildCliente({ ...socio, condicionVenta });
   const descripcionNota =
     data.descripcion?.trim() || `${tipoNota} — ${MOTIVO_NOTA_LABEL[data.motivo]}`;
 
@@ -2808,6 +2832,7 @@ export async function emitirNotaLibreAction(data: EmitirNotaLibreData): Promise<
       guarderia,
       creds,
       fecha: data.fecha ? toTusFecha(data.fecha) : undefined,
+      vencimiento: data.vencimiento ? toTusFecha(data.vencimiento) : undefined,
       // Sin comprobante de origen, ARCA exige asociar un período: la nota
       // queda referida a este rango (bloque comprobantes_asociados_periodo)
       // y el período facturado informado acompaña.
@@ -2831,6 +2856,8 @@ export async function emitirNotaLibreAction(data: EmitirNotaLibreData): Promise<
         montoExento: montos.montoExento.toFixed(2),
         montoIva: montos.montoIva.toFixed(2),
         emision: data.fecha ? fechaCalendariaArg(data.fecha) : new Date(),
+        vencimiento: data.vencimiento ? fechaCalendariaArg(data.vencimiento) : null,
+        condicionVenta: condicionVenta as never,
         externalReference: notaId,
         centroEmisorId: centro.id,
         rechazada: true,
@@ -2865,6 +2892,8 @@ export async function emitirNotaLibreAction(data: EmitirNotaLibreData): Promise<
       montoExento: montos.montoExento.toFixed(2),
       montoIva: montos.montoIva.toFixed(2),
       emision: data.fecha ? fechaCalendariaArg(data.fecha) : new Date(),
+      vencimiento: data.vencimiento ? fechaCalendariaArg(data.vencimiento) : null,
+      condicionVenta: condicionVenta as never,
       externalReference: notaId,
       centroEmisorId: centro.id,
     });
