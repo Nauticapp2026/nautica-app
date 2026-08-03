@@ -83,9 +83,10 @@ async function getRecibosConAplicaciones(socioId: string): Promise<
 /**
  * Cuánto de cada comprobante del socio ya está cubierto puntualmente: suma de
  * las aplicaciones de recibos vigentes + el importe de las NC asociadas a él.
- * Cobranzas resta esto del importe para saber el saldo pendiente real.
+ * Fallback de `getPendientePorComprobante` para comprobantes sin cargos
+ * vinculados (no hay de dónde leer estados por cargo).
  */
-export async function getAplicadoPorComprobante(
+async function getAplicadoPorComprobante(
   socioId: string,
   guarderiaId: string,
 ): Promise<Map<string, number>> {
@@ -123,6 +124,113 @@ export async function getAplicadoPorComprobante(
   }
 
   return aplicado;
+}
+
+/**
+ * Saldo PENDIENTE de cobro de cada comprobante del socio — lo que Cobranzas
+ * muestra y puede aplicar.
+ *
+ * Con cargos vinculados (link directo `facturacion.movimiento_id` + M:N vía
+ * items), el saldo se calcula POR CARGO: un cargo ya `pagado` no debe nada
+ * (lo cobró el débito automático Payway o una cobranza previa), y a los demás
+ * se les descuenta la cobertura targeted (NC de su factura + pagos parciales
+ * de recibos). Esto cubre el caso del comprobante interno "mixto": un CA- que
+ * consolida servicios con y sin débito queda 'pendiente' hasta cobrarse
+ * entero, pero su saldo real es solo la parte que Payway no debitó.
+ *
+ * Sin cargos vinculados (comprobantes legacy o sin items) se cae al cálculo
+ * por importe: total − aplicaciones de recibos − NC asociadas.
+ */
+export async function getPendientePorComprobante(
+  socioId: string,
+  guarderiaId: string,
+  comprobantes: { id: string; importe: string | null }[],
+): Promise<Map<string, number>> {
+  const pendiente = new Map<string, number>();
+  if (comprobantes.length === 0) return pendiente;
+
+  const ids = comprobantes.map((c) => c.id);
+
+  const [{ montoPorMovimiento }, items, directos] = await Promise.all([
+    calcularCoberturaTargeted(socioId),
+    db
+      .select({ id: facturacionItems.id, facturacionId: facturacionItems.facturacionId })
+      .from(facturacionItems)
+      .where(inArray(facturacionItems.facturacionId, ids)),
+    db
+      .select({ id: facturacion.id, movimientoId: facturacion.movimientoId })
+      .from(facturacion)
+      .where(inArray(facturacion.id, ids)),
+  ]);
+
+  const itemToFac = new Map(items.map((i) => [i.id, i.facturacionId]));
+  const links = items.length
+    ? await db
+        .select({
+          facturacionItemId: facturacionItemMovimientos.facturacionItemId,
+          movimientoId: facturacionItemMovimientos.movimientoId,
+        })
+        .from(facturacionItemMovimientos)
+        .where(
+          inArray(
+            facturacionItemMovimientos.facturacionItemId,
+            items.map((i) => i.id),
+          ),
+        )
+    : [];
+
+  const movsPorComprobante = new Map<string, Set<string>>();
+  for (const d of directos) {
+    const s = new Set<string>();
+    if (d.movimientoId) s.add(d.movimientoId);
+    movsPorComprobante.set(d.id, s);
+  }
+  for (const l of links) {
+    const facId = itemToFac.get(l.facturacionItemId);
+    if (facId) movsPorComprobante.get(facId)?.add(l.movimientoId);
+  }
+
+  const cargoIds = [...new Set([...movsPorComprobante.values()].flatMap((s) => [...s]))];
+  const cargos = cargoIds.length
+    ? await db
+        .select({
+          id: movimientosCuentaCorriente.id,
+          debe: movimientosCuentaCorriente.debe,
+          estado: movimientosCuentaCorriente.estado,
+        })
+        .from(movimientosCuentaCorriente)
+        .where(inArray(movimientosCuentaCorriente.id, cargoIds))
+    : [];
+  const cargoById = new Map(cargos.map((c) => [c.id, c]));
+
+  // Fallback por importe, solo para los comprobantes sin ningún cargo vinculado.
+  let aplicadoFallback: Map<string, number> | null = null;
+
+  for (const c of comprobantes) {
+    const movIds = [...(movsPorComprobante.get(c.id) ?? [])];
+    const cargosDeEste = movIds
+      .map((id) => cargoById.get(id))
+      .filter((m): m is NonNullable<typeof m> => Boolean(m))
+      .filter((m) => parseFloat(m.debe ?? '0') > 0);
+
+    if (cargosDeEste.length > 0) {
+      let resto = 0;
+      for (const m of cargosDeEste) {
+        if (m.estado === 'pagado') continue;
+        const debe = parseFloat(m.debe ?? '0');
+        resto += Math.max(0, debe - (montoPorMovimiento.get(m.id) ?? 0));
+      }
+      pendiente.set(c.id, resto);
+    } else {
+      if (!aplicadoFallback) {
+        aplicadoFallback = await getAplicadoPorComprobante(socioId, guarderiaId);
+      }
+      const importe = parseFloat(c.importe ?? '0');
+      pendiente.set(c.id, importe - (aplicadoFallback.get(c.id) ?? 0));
+    }
+  }
+
+  return pendiente;
 }
 
 /**

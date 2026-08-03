@@ -14,7 +14,7 @@ import {
   paywayTokens,
 } from '@/lib/db/schema';
 import { getActiveMarina } from '@/lib/auth/session';
-import { getAplicadoPorComprobante } from '@/lib/cobranza-cobertura';
+import { getPendientePorComprobante } from '@/lib/cobranza-cobertura';
 import { fechaCalendariaArg } from '@/lib/dates';
 
 type Ctx = NonNullable<Awaited<ReturnType<typeof getActiveMarina>>>;
@@ -127,50 +127,53 @@ export async function getComprobantesPendientesAction(socioId: string): Promise<
 
   // Solo los comprobantes PENDIENTES de cobro, total o parcial (pedido del
   // cliente 2026-08-03: los ya cobrados enteros no se muestran). Quedan
-  // afuera los 'pagada', los anulados y los rechazados por ARCA. De los que
-  // tienen cobros parciales (recibos targeted) o NC asociadas se muestra el
-  // saldo que falta cobrar.
-  const [rows, aplicado] = await Promise.all([
-    db
-      .select({
-        id: facturacion.id,
-        codigo: facturacion.codigo,
-        tipoFactura: facturacion.tipoFactura,
-        importe: facturacion.importe,
-        estado: facturacion.estado,
-        emision: facturacion.emision,
-        vencimiento: facturacion.vencimiento,
-        descripcion: facturacion.descripcion,
-      })
-      .from(facturacion)
-      .where(
-        and(
-          eq(facturacion.guarderiaId, ctx.activeMembership.guarderiaId),
-          eq(facturacion.socioId, socioId),
-          inArray(facturacion.tipoFactura, [...TIPOS_COBRABLES]),
-          eq(facturacion.anulada, false),
-          eq(facturacion.rechazada, false),
-          or(isNull(facturacion.estado), ne(facturacion.estado, 'pagada')),
-          // Los recibos de cobranza (RC-/CI-) también son tipo 'recibo' pero
-          // documentan un pago pasado, no deuda: nunca son cobrables.
-          or(
-            isNull(facturacion.codigo),
-            and(notLike(facturacion.codigo, 'RC-%'), notLike(facturacion.codigo, 'CI-%')),
-          ),
+  // afuera los 'pagada', los anulados y los rechazados por ARCA. El saldo
+  // pendiente descuenta cobros parciales (recibos targeted), NC asociadas y
+  // cargos ya cobrados por otra vía (ej. débito automático Payway en un
+  // comprobante interno mixto) — ver getPendientePorComprobante.
+  const rows = await db
+    .select({
+      id: facturacion.id,
+      codigo: facturacion.codigo,
+      tipoFactura: facturacion.tipoFactura,
+      importe: facturacion.importe,
+      estado: facturacion.estado,
+      emision: facturacion.emision,
+      vencimiento: facturacion.vencimiento,
+      descripcion: facturacion.descripcion,
+    })
+    .from(facturacion)
+    .where(
+      and(
+        eq(facturacion.guarderiaId, ctx.activeMembership.guarderiaId),
+        eq(facturacion.socioId, socioId),
+        inArray(facturacion.tipoFactura, [...TIPOS_COBRABLES]),
+        eq(facturacion.anulada, false),
+        eq(facturacion.rechazada, false),
+        or(isNull(facturacion.estado), ne(facturacion.estado, 'pagada')),
+        // Los recibos de cobranza (RC-/CI-) también son tipo 'recibo' pero
+        // documentan un pago pasado, no deuda: nunca son cobrables.
+        or(
+          isNull(facturacion.codigo),
+          and(notLike(facturacion.codigo, 'RC-%'), notLike(facturacion.codigo, 'CI-%')),
         ),
-      )
-      .orderBy(facturacion.emision),
-    getAplicadoPorComprobante(socioId, ctx.activeMembership.guarderiaId),
-  ]);
+      ),
+    )
+    .orderBy(facturacion.emision);
+
+  const pendientes = await getPendientePorComprobante(
+    socioId,
+    ctx.activeMembership.guarderiaId,
+    rows,
+  );
 
   return {
     tarjeta,
     comprobantes: rows.flatMap((r) => {
       const importe = parseFloat(r.importe ?? '0');
-      const cubierto = aplicado.get(r.id) ?? 0;
-      const pendiente = importe - cubierto;
-      // Cubierto entero por pagos parciales previos + NC (aunque el estado
-      // todavía no diga 'pagada'): no hay nada que cobrar.
+      const pendiente = pendientes.get(r.id) ?? importe;
+      // Cubierto entero por otras vías (aunque el estado todavía no diga
+      // 'pagada'): no hay nada que cobrar.
       if (pendiente <= 0.005) return [];
       return [
         {
@@ -179,7 +182,7 @@ export async function getComprobantesPendientesAction(socioId: string): Promise<
           tipoFactura: r.tipoFactura,
           importe: r.importe ?? '0',
           importePendiente: pendiente.toFixed(2),
-          cobradoParcial: cubierto > 0.005,
+          cobradoParcial: pendiente < importe - 0.005,
           estado: r.estado,
           emision: r.emision ? r.emision.toISOString() : null,
           vencimiento: r.vencimiento ? r.vencimiento.toISOString() : null,
@@ -320,10 +323,10 @@ export async function registrarCobranzaAction(data: RegistrarCobranzaData): Prom
   // al más nuevo, y puede cubrir el último en parte (pago parcial): esa parte
   // queda registrada como aplicación targeted sobre ESE comprobante — nunca
   // "sobra" hacia comprobantes no seleccionados (ver cobranza-cobertura.ts).
-  // Solo los cubiertos enteros (contando cobros parciales previos) pasan a
-  // 'pagada'. El excedente (si pagó de más) queda como saldo a favor.
-  const aplicadoPrevio = comprobantes.length
-    ? await getAplicadoPorComprobante(data.socioId, gId)
+  // Solo los cubiertos enteros (contando cobros parciales previos y cargos ya
+  // debitados) pasan a 'pagada'. El excedente queda como saldo a favor.
+  const pendientePrevio = comprobantes.length
+    ? await getPendientePorComprobante(data.socioId, gId, comprobantes)
     : new Map<string, number>();
 
   let remaining = montoAPagar;
@@ -331,7 +334,7 @@ export async function registrarCobranzaAction(data: RegistrarCobranzaData): Prom
   const pagados: typeof comprobantes = [];
   for (const c of comprobantes) {
     if (remaining <= 0.005) break;
-    const restante = parseFloat(c.importe ?? '0') - (aplicadoPrevio.get(c.id) ?? 0);
+    const restante = pendientePrevio.get(c.id) ?? parseFloat(c.importe ?? '0');
     if (restante <= 0.005) continue;
     const aplicar = Math.min(remaining, restante);
     aplicaciones.push({ comprobanteId: c.id, monto: aplicar.toFixed(2) });
