@@ -21,6 +21,7 @@ import {
 import { getActiveMarina } from '@/lib/auth/session';
 import { fechaCalendariaArg } from '@/lib/dates';
 import { sendEmail } from '@/lib/email/resend';
+import { comprobanteFiscalEmail } from '@/lib/email/templates/comprobante-fiscal';
 import { reciboEmail } from '@/lib/email/templates/recibo';
 import { identidadFacturacion, type SocioFacturacion } from '@/lib/facturacion/identidad';
 import { getCargosSaldadosFifo } from '@/lib/reconciliar-cuenta';
@@ -1413,6 +1414,105 @@ export async function obtenerPdfFacturaAction(
   }
 }
 
+// ─── Action: enviar comprobante fiscal por mail al socio ───────────────────
+
+// Manda el comprobante ARCA (factura / NC / ND) al mail del socio con el PDF
+// adjunto. Se adjunta en lugar de linkear porque el link de TusFacturas vence
+// (ver obtenerPdfFacturaAction) — si la descarga del PDF falla, el mail sale
+// igual avisando que lo pidan al club.
+export async function enviarComprobantePorMailAction(
+  facturaId: string,
+): Promise<{ error?: string; email?: string }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+  const gId = ctx.activeMembership.guarderiaId;
+
+  const [row] = await db
+    .select({
+      id: facturacion.id,
+      codigo: facturacion.codigo,
+      tipoFactura: facturacion.tipoFactura,
+      importe: facturacion.importe,
+      emision: facturacion.emision,
+      rechazada: facturacion.rechazada,
+      socioNombre: profiles.nombre,
+      socioApellido: profiles.apellido,
+      socioEmail: profiles.email,
+      socioEmailFacturacion: profiles.emailFacturacion,
+      guarderiaName: guarderias.nombre,
+      guarderiaRazonSocial: guarderias.razonSocial,
+      guarderiaDireccion: guarderias.direccion,
+      guarderiaCuit: guarderias.cuit,
+      guarderiaLogo: guarderias.logoUrl,
+    })
+    .from(facturacion)
+    .leftJoin(profiles, eq(profiles.id, facturacion.socioId))
+    .innerJoin(guarderias, eq(guarderias.id, facturacion.guarderiaId))
+    .where(and(eq(facturacion.id, facturaId), eq(facturacion.guarderiaId, gId)))
+    .limit(1);
+
+  if (!row) return { error: 'Comprobante no encontrado.' };
+  if (row.rechazada) {
+    return { error: 'El comprobante fue rechazado por ARCA — no hay nada que enviar.' };
+  }
+  if (!row.codigo) return { error: 'Este comprobante no tiene número de ARCA.' };
+
+  const destino = row.socioEmailFacturacion?.trim() || row.socioEmail;
+  if (!destino) return { error: 'El socio no tiene email cargado.' };
+
+  // PDF fresco de TusFacturas (mismo camino que el botón Ver/Descargar).
+  const pdf = await obtenerPdfFacturaAction(facturaId);
+  if (pdf.error || !pdf.url) {
+    return { error: pdf.error ?? 'No se pudo obtener el PDF del comprobante.' };
+  }
+
+  const tipoLabel =
+    TIPO_COMPROBANTE_LABEL_MAIL[row.tipoFactura ?? ''] ?? row.tipoFactura ?? 'Comprobante';
+
+  let adjunto: { filename: string; content: Buffer } | null = null;
+  try {
+    const resp = await fetch(pdf.url);
+    if (resp.ok) {
+      adjunto = {
+        filename: `${tipoLabel.replace(/\s+/g, '-')}-${row.codigo}.pdf`,
+        content: Buffer.from(await resp.arrayBuffer()),
+      };
+    }
+  } catch {
+    // Sin adjunto: el mail avisa que pidan el PDF al club.
+  }
+
+  const { subject, html } = comprobanteFiscalEmail({
+    clubNombre: row.guarderiaRazonSocial ?? row.guarderiaName,
+    clubCuit: row.guarderiaCuit,
+    clubDireccion: row.guarderiaDireccion,
+    clubLogoUrl: row.guarderiaLogo,
+    tipoLabel,
+    numero: row.codigo,
+    fecha: (row.emision ?? new Date()).toLocaleDateString('es-AR', {
+      timeZone: 'America/Argentina/Buenos_Aires',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    }),
+    socioNombre: [row.socioNombre, row.socioApellido].filter(Boolean).join(' ').trim() || 'Socio',
+    importeFmt: `$${parseFloat(row.importe ?? '0').toLocaleString('es-AR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`,
+    conAdjunto: adjunto != null,
+  });
+
+  const res = await sendEmail({
+    to: destino,
+    subject,
+    html,
+    attachments: adjunto ? [adjunto] : undefined,
+  });
+  if (!res.ok) return { error: 'No se pudo enviar el mail. Intentá de nuevo.' };
+  return { email: destino };
+}
+
 // ─── Action: marcar factura como pagada ────────────────────────────────────
 
 export async function markInvoicePaidAction(
@@ -1493,8 +1593,12 @@ export async function cargarServicioAction(data: CargarServicioData): Promise<{
   if (!data.servicioId) return { error: 'Faltan datos del servicio.' };
   const esInterno = data.comprobante === 'interno';
 
-  // Gate de la Configuración de cobranzas: sin medios habilitados para
-  // comprobantes internos, no se pueden cargar servicios con canal Interno.
+  // Gate de la Gestión de cobranza: sin medios habilitados para comprobantes
+  // internos, no se pueden cargar servicios con canal Interno. Y un contrato
+  // Interno solo puede entrar al débito automático si el club habilitó
+  // 'debito_automatico' como medio para internos (el cron ya lo ignora sin
+  // eso — acá se sanea para que el tilde no quede prendido de mentira).
+  let debitoAutomatico = data.debitoAutomatico;
   if (esInterno) {
     const [g] = await db
       .select({ medios: guarderias.mediosCobroInternos })
@@ -1504,9 +1608,10 @@ export async function cargarServicioAction(data: CargarServicioData): Promise<{
     if (!g || g.medios.length === 0) {
       return {
         error:
-          'Los comprobantes internos están deshabilitados. Habilitá al menos un medio de pago en Mi Perfil → Datos Impositivos → Configuración de cobranzas.',
+          'Los comprobantes internos están deshabilitados. Habilitá al menos un medio de pago en Mi Perfil → Datos Impositivos → Gestión de cobranza.',
       };
     }
+    if (!g.medios.includes('debito_automatico')) debitoAutomatico = false;
   }
 
   if (!data.fechaInicio) {
@@ -1568,7 +1673,7 @@ export async function cargarServicioAction(data: CargarServicioData): Promise<{
       fechaInicio: data.fechaInicio,
       fechaBaja: data.fechaBaja,
       comprobanteInterno: esInterno,
-      debitoAutomatico: data.debitoAutomatico,
+      debitoAutomatico,
       concepto: conceptoFinal,
       cantidadDias,
       createdBy: ctx.profile.id,
@@ -1885,6 +1990,9 @@ const TIPO_COMPROBANTE_LABEL_MAIL: Record<string, string> = {
   nota_credito_a: 'Nota de crédito A',
   nota_credito_b: 'Nota de crédito B',
   nota_credito_c: 'Nota de crédito C',
+  nota_debito_a: 'Nota de débito A',
+  nota_debito_b: 'Nota de débito B',
+  nota_debito_c: 'Nota de débito C',
 };
 
 export async function enviarReciboPorMailAction(
@@ -1904,6 +2012,7 @@ export async function enviarReciboPorMailAction(
       medioPago: facturacion.medioPago,
       emision: facturacion.emision,
       socioId: facturacion.socioId,
+      movimientoId: facturacion.movimientoId,
       cobranzaComprobanteIds: facturacion.cobranzaComprobanteIds,
       socioNombre: profiles.nombre,
       socioApellido: profiles.apellido,
@@ -1931,15 +2040,36 @@ export async function enviarReciboPorMailAction(
   // Comprobantes que cobró el recibo — igual que la vista del recibo: los
   // exactos guardados en cobranza_comprobante_ids (con el detalle de sus
   // cargos), o la heurística FIFO para recibos viejos sin ese dato. Solo
-  // aplica a recibos de cobranza (RC-): RB-/CM-/CL- documentan un cargo
+  // aplica a recibos de cobranza (RC-/CI-): RB-/CM-/CL- documentan un cargo
   // propio, no un pago — para esos se usa row.descripcion más abajo.
   const fmtPesos = (v: string | null) =>
     `$${parseFloat(v ?? '0').toLocaleString('es-AR', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     })}`;
+  const esReciboCobranza =
+    row.codigo != null && (row.codigo.startsWith('RC-') || row.codigo.startsWith('CI-'));
+
+  // Aplicaciones targeted del pago (recibos nuevos): cuánto fue a cada
+  // comprobante — en un pago parcial el mail muestra lo aplicado, no el total.
+  let aplicaciones: { comprobanteId: string; monto: string }[] | null = null;
+  if (esReciboCobranza && row.movimientoId) {
+    const [mov] = await db
+      .select({ datosPago: movimientosCuentaCorriente.datosPago })
+      .from(movimientosCuentaCorriente)
+      .where(eq(movimientosCuentaCorriente.id, row.movimientoId))
+      .limit(1);
+    const dp = mov?.datosPago as {
+      aplicaciones?: { comprobanteId: string; monto: string }[];
+    } | null;
+    if (dp?.aplicaciones) aplicaciones = dp.aplicaciones;
+  }
+  const aplicadoPorComprobante = new Map(
+    (aplicaciones ?? []).map((a) => [a.comprobanteId, a.monto]),
+  );
+
   const comprobantes: string[] = [];
-  if (row.socioId && row.codigo?.startsWith('RC-')) {
+  if (row.socioId && esReciboCobranza) {
     if (row.cobranzaComprobanteIds && row.cobranzaComprobanteIds.length > 0) {
       const cobrados = await db
         .select({
@@ -1998,7 +2128,15 @@ export async function enviarReciboPorMailAction(
       const labelDe = (t: string | null) =>
         t === 'recibo' ? 'Comprobante interno' : (TIPO_COMPROBANTE_LABEL_MAIL[t ?? ''] ?? t ?? '');
       for (const c of cobrados) {
-        comprobantes.push(`${labelDe(c.tipoFactura)} ${c.codigo ?? ''} — ${fmtPesos(c.importe)}`);
+        // En un pago parcial se informa lo que aplicó ESTE recibo.
+        const aplicado = aplicadoPorComprobante.get(c.id) ?? null;
+        const esParcial =
+          aplicado != null && parseFloat(aplicado) < parseFloat(c.importe ?? '0') - 0.005;
+        comprobantes.push(
+          `${labelDe(c.tipoFactura)} ${c.codigo ?? ''} — ${fmtPesos(aplicado ?? c.importe)}${
+            esParcial ? ` (pago parcial — total ${fmtPesos(c.importe)})` : ''
+          }`,
+        );
         const detalle =
           detallePorComprobante.get(c.id) ??
           (c.descripcion ? [{ concepto: c.descripcion, importe: null }] : []);
@@ -2008,7 +2146,9 @@ export async function enviarReciboPorMailAction(
           );
         }
       }
-    } else {
+    } else if (aplicaciones == null) {
+      // Heurística FIFO solo para recibos viejos (sin aplicaciones
+      // guardadas): un recibo nuevo sin comprobantes es un adelanto.
       const facturasSocio = await db
         .select({
           codigo: facturacion.codigo,
@@ -2067,8 +2207,8 @@ export async function enviarReciboPorMailAction(
     importeFmt,
     comprobantes,
     formaPago: row.medioPago ? (FORMA_PAGO_LABEL[row.medioPago] ?? row.medioPago) : null,
-    // "Recibo" solo para Cobranzas (RC-); CM-/CL-/RB- son Comprobante interno.
-    esComprobanteInterno: !row.codigo?.startsWith('RC-'),
+    // "Recibo" solo para Cobranzas (RC-/CI-); CM-/CL-/RB- son Comprobante interno.
+    esComprobanteInterno: !esReciboCobranza,
   });
 
   const res = await sendEmail({ to: destino, subject, html });

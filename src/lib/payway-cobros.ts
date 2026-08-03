@@ -268,9 +268,10 @@ export async function cobrarDebitoSocio(args: {
   const scSet = new Set(scRows.map((r) => r.id));
 
   // Estado FIFO de la cuenta: qué cargos ya están cubiertos por pagos
-  // previos, cuánto crédito sobra sin asignar, y qué cobertura parcial de NC
-  // targeted ya está acreditada (no debe volver a cobrarse).
-  const { saldados, poolRestante, ncParcial } = await getEstadoFifo(token.socioId);
+  // previos, cuánto crédito sobra sin asignar, y qué cobertura targeted
+  // parcial (NC o pago parcial de Cobranzas) ya está acreditada (no debe
+  // volver a cobrarse).
+  const { saldados, poolRestante, coberturaParcial } = await getEstadoFifo(token.socioId);
 
   const movimientos = await db
     .select({
@@ -342,11 +343,12 @@ export async function cobrarDebitoSocio(args: {
     .map((m) => ({
       id: m.id,
       interno: m.comprobanteInterno,
-      // Al debe se le descuenta la cobertura parcial de NC ya acreditada y,
-      // solo para el no cubierto más viejo, el pool sobrante.
+      // Al debe se le descuenta la cobertura targeted parcial ya acreditada
+      // (NC o pago parcial) y, solo para el no cubierto más viejo, el pool
+      // sobrante.
       monto:
         parseFloat(m.debe ?? '0') -
-        (ncParcial.get(m.id) ?? 0) -
+        (coberturaParcial.get(m.id) ?? 0) -
         (m.id === primerNoCubiertoId ? poolRestante : 0),
     }))
     .filter((c) => c.monto >= 0.01);

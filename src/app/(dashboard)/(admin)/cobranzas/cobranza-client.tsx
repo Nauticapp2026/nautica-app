@@ -135,11 +135,13 @@ function NuevaCobranzaModal({
     [comprobantes, canal],
   );
 
+  // Lo seleccionado se suma por el saldo PENDIENTE de cada comprobante (si ya
+  // tuvo un cobro parcial o una NC, se cobra solo lo que falta).
   const totalSeleccionado = useMemo(
     () =>
       comprobantesCanal
         .filter((c) => selected.has(c.id))
-        .reduce((acc, c) => acc + parseFloat(c.importe ?? '0'), 0),
+        .reduce((acc, c) => acc + parseFloat(c.importePendiente ?? c.importe ?? '0'), 0),
     [comprobantesCanal, selected],
   );
 
@@ -230,6 +232,7 @@ function NuevaCobranzaModal({
           monto: montoToNumberStr(f.monto),
           datos: f.datos,
         })),
+        canal,
       });
       if (res.error) {
         setError(res.error);
@@ -334,10 +337,16 @@ function NuevaCobranzaModal({
               {loadingComps ? (
                 <p className="py-8 text-center text-sm text-gray-400">Cargando comprobantes…</p>
               ) : comprobantesCanal.length === 0 ? (
-                <p className="py-8 text-center text-sm text-gray-400">
-                  Este socio no tiene comprobantes {canal === 'interno' ? 'internos' : 'ARCA'} para
-                  cobrar.
-                </p>
+                <div className="space-y-2 py-8 text-center">
+                  <p className="text-sm text-gray-400">
+                    Este socio no tiene comprobantes {canal === 'interno' ? 'internos' : 'ARCA'}{' '}
+                    pendientes de cobro.
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    Podés continuar igual para registrar un adelanto: el monto queda como saldo a
+                    favor en su cuenta corriente.
+                  </p>
+                </div>
               ) : (
                 <>
                   <div className="flex items-center justify-between">
@@ -374,15 +383,15 @@ function NuevaCobranzaModal({
                           </span>
                           <span className="text-xs text-gray-400">
                             {c.emision ? formatArgentinaDate(c.emision) : '—'}
-                            {c.estado === 'vencida'
-                              ? ' · Vencida'
-                              : c.estado === 'pagada'
-                                ? ' · Cobrada'
-                                : ''}
+                            {c.estado === 'vencida' ? ' · Vencida' : ''}
+                            {c.cobradoParcial
+                              ? ` · Cobro parcial — total ${fmtMoney(parseFloat(c.importe ?? '0'))}`
+                              : ''}
                           </span>
                         </div>
+                        {/* Se muestra (y se cobra) el saldo pendiente, no el total. */}
                         <span className="text-sm font-semibold text-[#101828]">
-                          {fmtMoney(parseFloat(c.importe ?? '0'))}
+                          {fmtMoney(parseFloat(c.importePendiente ?? c.importe ?? '0'))}
                         </span>
                       </label>
                     ))}
@@ -428,16 +437,26 @@ function NuevaCobranzaModal({
                 </Field>
               </div>
 
-              {montoNum > totalSeleccionado + 0.01 && (
+              {selected.size === 0 ? (
                 <p className="text-xs text-amber-600">
-                  El excedente de {fmtMoney(montoNum - totalSeleccionado)} queda como saldo a favor.
+                  Cobranza sin comprobantes: el monto se registra como adelanto y queda como saldo a
+                  favor en la cuenta corriente del socio.
                 </p>
-              )}
-              {montoNum > 0 && montoNum < totalSeleccionado - 0.01 && (
-                <p className="text-xs text-amber-600">
-                  Pago parcial: se cubren los comprobantes más viejos hasta donde alcance; el resto
-                  queda pendiente.
-                </p>
+              ) : (
+                <>
+                  {montoNum > totalSeleccionado + 0.01 && (
+                    <p className="text-xs text-amber-600">
+                      El excedente de {fmtMoney(montoNum - totalSeleccionado)} queda como saldo a
+                      favor.
+                    </p>
+                  )}
+                  {montoNum > 0 && montoNum < totalSeleccionado - 0.01 && (
+                    <p className="text-xs text-amber-600">
+                      Pago parcial: se aplica solo a los comprobantes seleccionados (del más viejo
+                      al más nuevo); lo que falte queda pendiente en esos mismos comprobantes.
+                    </p>
+                  )}
+                </>
               )}
 
               <div className="border-t border-gray-100 pt-3">
@@ -486,13 +505,14 @@ function NuevaCobranzaModal({
                 >
                   Atrás
                 </button>
+                {/* Sin selección también se puede continuar: cobranza sin
+                    comprobante = adelanto (saldo a favor). */}
                 <button
                   onClick={irAPago}
-                  disabled={selected.size === 0}
                   className="flex-1 rounded-[10px] py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
                   style={{ background: '#175861' }}
                 >
-                  Continuar
+                  {selected.size === 0 ? 'Continuar sin comprobantes' : 'Continuar'}
                 </button>
               </>
             )}

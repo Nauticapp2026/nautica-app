@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { and, asc, count, eq, inArray, isNull, like, notLike, or } from 'drizzle-orm';
+import { and, asc, count, eq, inArray, isNull, like, ne, notLike, or } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import {
@@ -14,6 +14,7 @@ import {
   paywayTokens,
 } from '@/lib/db/schema';
 import { getActiveMarina } from '@/lib/auth/session';
+import { getAplicadoPorComprobante } from '@/lib/cobranza-cobertura';
 import { fechaCalendariaArg } from '@/lib/dates';
 
 type Ctx = NonNullable<Awaited<ReturnType<typeof getActiveMarina>>>;
@@ -66,6 +67,10 @@ export type ComprobantePendiente = {
   codigo: string | null;
   tipoFactura: string | null;
   importe: string;
+  // Lo que falta cobrar: importe − pagos parciales aplicados − NC asociadas.
+  // Es el monto que la cobranza puede aplicar a este comprobante.
+  importePendiente: string;
+  cobradoParcial: boolean;
   estado: string | null;
   emision: string | null;
   vencimiento: string | null;
@@ -120,50 +125,68 @@ export async function getComprobantesPendientesAction(socioId: string): Promise<
     ? { marca: MARCA_TARJETA[String(tok.paymentMethodId)] ?? 'Tarjeta', lastFour: tok.lastFour }
     : null;
 
-  // Se listan TODOS los comprobantes cobrables del socio, incluso los que ya
-  // figuran cobrados o cubiertos por pagos vía FIFO (pedido del cliente
-  // 2026-07-30: antes se ocultaban y el club no los veía). El club decide qué
-  // cobrar; un doble cobro queda como saldo a favor y el recibo se puede
-  // anular. Solo quedan afuera los anulados y los rechazados por ARCA, que no
-  // son deuda válida. El estado viaja para que la UI etiquete "Cobrada".
-  const rows = await db
-    .select({
-      id: facturacion.id,
-      codigo: facturacion.codigo,
-      tipoFactura: facturacion.tipoFactura,
-      importe: facturacion.importe,
-      estado: facturacion.estado,
-      emision: facturacion.emision,
-      vencimiento: facturacion.vencimiento,
-      descripcion: facturacion.descripcion,
-    })
-    .from(facturacion)
-    .where(
-      and(
-        eq(facturacion.guarderiaId, ctx.activeMembership.guarderiaId),
-        eq(facturacion.socioId, socioId),
-        inArray(facturacion.tipoFactura, [...TIPOS_COBRABLES]),
-        eq(facturacion.anulada, false),
-        eq(facturacion.rechazada, false),
-        // Los recibos de cobranza (RC-) también son tipo 'recibo' pero
-        // documentan un pago pasado, no deuda: nunca son cobrables.
-        or(isNull(facturacion.codigo), notLike(facturacion.codigo, 'RC-%')),
-      ),
-    )
-    .orderBy(facturacion.emision);
+  // Solo los comprobantes PENDIENTES de cobro, total o parcial (pedido del
+  // cliente 2026-08-03: los ya cobrados enteros no se muestran). Quedan
+  // afuera los 'pagada', los anulados y los rechazados por ARCA. De los que
+  // tienen cobros parciales (recibos targeted) o NC asociadas se muestra el
+  // saldo que falta cobrar.
+  const [rows, aplicado] = await Promise.all([
+    db
+      .select({
+        id: facturacion.id,
+        codigo: facturacion.codigo,
+        tipoFactura: facturacion.tipoFactura,
+        importe: facturacion.importe,
+        estado: facturacion.estado,
+        emision: facturacion.emision,
+        vencimiento: facturacion.vencimiento,
+        descripcion: facturacion.descripcion,
+      })
+      .from(facturacion)
+      .where(
+        and(
+          eq(facturacion.guarderiaId, ctx.activeMembership.guarderiaId),
+          eq(facturacion.socioId, socioId),
+          inArray(facturacion.tipoFactura, [...TIPOS_COBRABLES]),
+          eq(facturacion.anulada, false),
+          eq(facturacion.rechazada, false),
+          or(isNull(facturacion.estado), ne(facturacion.estado, 'pagada')),
+          // Los recibos de cobranza (RC-/CI-) también son tipo 'recibo' pero
+          // documentan un pago pasado, no deuda: nunca son cobrables.
+          or(
+            isNull(facturacion.codigo),
+            and(notLike(facturacion.codigo, 'RC-%'), notLike(facturacion.codigo, 'CI-%')),
+          ),
+        ),
+      )
+      .orderBy(facturacion.emision),
+    getAplicadoPorComprobante(socioId, ctx.activeMembership.guarderiaId),
+  ]);
 
   return {
     tarjeta,
-    comprobantes: rows.map((r) => ({
-      id: r.id,
-      codigo: r.codigo,
-      tipoFactura: r.tipoFactura,
-      importe: r.importe ?? '0',
-      estado: r.estado,
-      emision: r.emision ? r.emision.toISOString() : null,
-      vencimiento: r.vencimiento ? r.vencimiento.toISOString() : null,
-      descripcion: r.descripcion,
-    })),
+    comprobantes: rows.flatMap((r) => {
+      const importe = parseFloat(r.importe ?? '0');
+      const cubierto = aplicado.get(r.id) ?? 0;
+      const pendiente = importe - cubierto;
+      // Cubierto entero por pagos parciales previos + NC (aunque el estado
+      // todavía no diga 'pagada'): no hay nada que cobrar.
+      if (pendiente <= 0.005) return [];
+      return [
+        {
+          id: r.id,
+          codigo: r.codigo,
+          tipoFactura: r.tipoFactura,
+          importe: r.importe ?? '0',
+          importePendiente: pendiente.toFixed(2),
+          cobradoParcial: cubierto > 0.005,
+          estado: r.estado,
+          emision: r.emision ? r.emision.toISOString() : null,
+          vencimiento: r.vencimiento ? r.vencimiento.toISOString() : null,
+          descripcion: r.descripcion,
+        },
+      ];
+    }),
   };
 }
 
@@ -181,6 +204,9 @@ export type RegistrarCobranzaData = {
   fecha: string;
   montoAPagar: string;
   formas: FormaCobranzaInput[];
+  // Sin comprobantes seleccionados (adelanto) no hay de dónde derivar el
+  // canal: lo dice el modal. Con comprobantes, manda el tipo de los elegidos.
+  canal?: 'fiscal' | 'interno';
 };
 
 export async function registrarCobranzaAction(data: RegistrarCobranzaData): Promise<{
@@ -192,7 +218,6 @@ export async function registrarCobranzaAction(data: RegistrarCobranzaData): Prom
   if (!ctx) return { error: 'No autenticado' };
   if (!isAdmin(ctx)) return { error: 'Solo administradores pueden registrar cobranzas.' };
   if (!data.formas?.length) return { error: 'Cargá al menos una forma de pago.' };
-  if (!data.comprobanteIds?.length) return { error: 'Seleccioná al menos un comprobante.' };
 
   const montoAPagar = parseFloat(data.montoAPagar);
   if (!Number.isFinite(montoAPagar) || montoAPagar <= 0)
@@ -209,33 +234,41 @@ export async function registrarCobranzaAction(data: RegistrarCobranzaData): Prom
   if (!m) return { error: 'El socio no pertenece a esta guardería.' };
 
   // Comprobantes seleccionados, ordenados del más viejo al más nuevo (FIFO).
-  const comprobantes = await db
-    .select({
-      id: facturacion.id,
-      importe: facturacion.importe,
-      movimientoId: facturacion.movimientoId,
-      tipoFactura: facturacion.tipoFactura,
-    })
-    .from(facturacion)
-    .where(
-      and(
-        eq(facturacion.guarderiaId, gId),
-        eq(facturacion.socioId, data.socioId),
-        inArray(facturacion.id, data.comprobanteIds),
-        // Sin filtro de estado: se puede cobrar también un comprobante que ya
-        // figura cobrado (decisión del cliente 2026-07-30 — el doble cobro
-        // queda como saldo a favor y el recibo se puede anular). Se excluyen
-        // anulados, rechazados y los recibos de cobranza RC- (documentan un
-        // pago pasado, no deuda).
-        inArray(facturacion.tipoFactura, [...TIPOS_COBRABLES]),
-        eq(facturacion.anulada, false),
-        eq(facturacion.rechazada, false),
-        or(isNull(facturacion.codigo), notLike(facturacion.codigo, 'RC-%')),
-      ),
-    )
-    .orderBy(asc(facturacion.emision));
+  // Puede no haber ninguno: cobranza sin comprobante = adelanto, el monto
+  // queda como saldo a favor en la cuenta corriente.
+  const comprobanteIds = data.comprobanteIds ?? [];
+  const comprobantes = comprobanteIds.length
+    ? await db
+        .select({
+          id: facturacion.id,
+          importe: facturacion.importe,
+          movimientoId: facturacion.movimientoId,
+          tipoFactura: facturacion.tipoFactura,
+        })
+        .from(facturacion)
+        .where(
+          and(
+            eq(facturacion.guarderiaId, gId),
+            eq(facturacion.socioId, data.socioId),
+            inArray(facturacion.id, comprobanteIds),
+            // Solo comprobantes con saldo pendiente (los 'pagada' ya no se
+            // cobran — pedido del cliente 2026-08-03). Se excluyen anulados,
+            // rechazados y los recibos de cobranza RC-/CI- (documentan un
+            // pago pasado, no deuda).
+            inArray(facturacion.tipoFactura, [...TIPOS_COBRABLES]),
+            eq(facturacion.anulada, false),
+            eq(facturacion.rechazada, false),
+            or(isNull(facturacion.estado), ne(facturacion.estado, 'pagada')),
+            or(
+              isNull(facturacion.codigo),
+              and(notLike(facturacion.codigo, 'RC-%'), notLike(facturacion.codigo, 'CI-%')),
+            ),
+          ),
+        )
+        .orderBy(asc(facturacion.emision))
+    : [];
 
-  if (comprobantes.length !== data.comprobanteIds.length) {
+  if (comprobantes.length !== comprobanteIds.length) {
     return {
       error: 'Algún comprobante ya no está disponible para cobrar. Refrescá e intentá de nuevo.',
     };
@@ -249,7 +282,12 @@ export async function registrarCobranzaAction(data: RegistrarCobranzaData): Prom
   if (tiposEnSeleccion.size > 1) {
     return { error: 'No se pueden cobrar juntos comprobantes fiscales e internos.' };
   }
-  const tipoRecibo = tiposEnSeleccion.has('interno') ? 'interno' : 'fiscal';
+  const tipoRecibo: 'fiscal' | 'interno' =
+    comprobantes.length > 0
+      ? tiposEnSeleccion.has('interno')
+        ? 'interno'
+        : 'fiscal'
+      : (data.canal ?? 'fiscal');
 
   // Comprobantes internos solo se cobran con los medios que el club habilitó
   // en Mi Perfil → Datos Impositivos → Configuración de cobranzas. Efectivo
@@ -264,7 +302,7 @@ export async function registrarCobranzaAction(data: RegistrarCobranzaData): Prom
     if (medios.length === 0) {
       return {
         error:
-          'Los comprobantes internos están deshabilitados. Habilitá al menos un medio de pago en Mi Perfil → Datos Impositivos → Configuración de cobranzas.',
+          'Los comprobantes internos están deshabilitados. Habilitá al menos un medio de pago en Mi Perfil → Datos Impositivos → Gestión de cobranza.',
       };
     }
     const noPermitida = data.formas.find(
@@ -273,35 +311,50 @@ export async function registrarCobranzaAction(data: RegistrarCobranzaData): Prom
     if (noPermitida) {
       return {
         error:
-          'Alguna forma de pago no está habilitada para comprobantes internos. Revisá la Configuración de cobranzas en Mi Perfil.',
+          'Alguna forma de pago no está habilitada para comprobantes internos. Revisá la Gestión de cobranza en Mi Perfil.',
       };
     }
   }
 
-  // FIFO: el monto cubre los comprobantes del más viejo al más nuevo. Solo los que
-  // se cubren ENTEROS quedan pagados; el primero que no alcanza (y el resto) sigue
-  // pendiente. El excedente (si pagó de más) queda como saldo a favor.
+  // El monto se aplica SOLO a los comprobantes seleccionados, del más viejo
+  // al más nuevo, y puede cubrir el último en parte (pago parcial): esa parte
+  // queda registrada como aplicación targeted sobre ESE comprobante — nunca
+  // "sobra" hacia comprobantes no seleccionados (ver cobranza-cobertura.ts).
+  // Solo los cubiertos enteros (contando cobros parciales previos) pasan a
+  // 'pagada'. El excedente (si pagó de más) queda como saldo a favor.
+  const aplicadoPrevio = comprobantes.length
+    ? await getAplicadoPorComprobante(data.socioId, gId)
+    : new Map<string, number>();
+
   let remaining = montoAPagar;
+  const aplicaciones: { comprobanteId: string; monto: string }[] = [];
   const pagados: typeof comprobantes = [];
   for (const c of comprobantes) {
-    const imp = parseFloat(c.importe ?? '0');
-    if (remaining >= imp - 0.001) {
-      remaining -= imp;
-      pagados.push(c);
-    } else {
-      break;
-    }
+    if (remaining <= 0.005) break;
+    const restante = parseFloat(c.importe ?? '0') - (aplicadoPrevio.get(c.id) ?? 0);
+    if (restante <= 0.005) continue;
+    const aplicar = Math.min(remaining, restante);
+    aplicaciones.push({ comprobanteId: c.id, monto: aplicar.toFixed(2) });
+    remaining -= aplicar;
+    if (aplicar >= restante - 0.005) pagados.push(c);
   }
+  // El recibo guarda TODOS los comprobantes a los que aplicó algo (enteros o
+  // parciales) — el PDF los muestra y la anulación los revierte.
+  const aplicadosIds = aplicaciones.map((a) => a.comprobanteId);
   const pagadosIds = pagados.map((c) => c.id);
 
   const importe = montoAPagar.toFixed(2);
   const fecha = data.fecha ? fechaCalendariaArg(data.fecha) : new Date();
   const medioPago = medioPagoDeFormas(data.formas) as never;
-  const datosPago = { montoAPagar: importe, formas: data.formas };
+  const datosPago = { montoAPagar: importe, formas: data.formas, aplicaciones };
+  const esAdelanto = comprobantes.length === 0;
 
   try {
     const movimientoId = await db.transaction(async (tx) => {
-      // 1. Numerar el recibo de cobranza (RC-NNNNNN), distinto de los RB- de cargo.
+      // 1. Numerar el recibo de cobranza, distinto de los RB- de cargo. La
+      // numeración es INDEPENDIENTE por canal: RC-NNNNNN para fiscales,
+      // CI-NNNNNN para internos (pedido del cliente 2026-08-03).
+      const prefijo = tipoRecibo === 'interno' ? 'CI' : 'RC';
       const [{ n }] = await tx
         .select({ n: count() })
         .from(facturacion)
@@ -309,17 +362,17 @@ export async function registrarCobranzaAction(data: RegistrarCobranzaData): Prom
           and(
             eq(facturacion.guarderiaId, gId),
             eq(facturacion.tipoFactura, 'recibo'),
-            like(facturacion.codigo, 'RC-%'),
+            like(facturacion.codigo, `${prefijo}-%`),
           ),
         );
-      const codigo = `RC-${String(Number(n) + 1).padStart(6, '0')}`;
+      const codigo = `${prefijo}-${String(Number(n) + 1).padStart(6, '0')}`;
 
       // 2. Movimiento de pago (haber) por el monto pagado.
       const [pago] = await tx
         .insert(movimientosCuentaCorriente)
         .values({
           socioId: data.socioId,
-          concepto: `Cobranza ${codigo}`,
+          concepto: esAdelanto ? `Adelanto ${codigo}` : `Cobranza ${codigo}`,
           tipo: 'otro',
           estado: 'pagado',
           debe: '0',
@@ -372,19 +425,20 @@ export async function registrarCobranzaAction(data: RegistrarCobranzaData): Prom
         }
       }
 
-      // 4. Crear el recibo de cobranza (guarda las formas y los comprobantes pagados).
+      // 4. Crear el recibo de cobranza (guarda las formas y los comprobantes
+      // a los que aplicó — enteros o parciales).
       await tx.insert(facturacion).values({
         guarderiaId: gId,
         socioId: data.socioId,
         tipoFactura: 'recibo',
         estado: 'pagada',
         importe,
-        descripcion: 'Cobranza',
+        descripcion: esAdelanto ? 'Adelanto a cuenta' : 'Cobranza',
         medioPago,
         emision: fecha,
         movimientoId: pago.id,
         codigo,
-        cobranzaComprobanteIds: pagadosIds,
+        cobranzaComprobanteIds: aplicadosIds,
         tipoRecibo,
       });
 
@@ -442,7 +496,9 @@ export async function anularCobranzaAction(reciboId: string): Promise<{ error?: 
     .limit(1);
 
   if (!recibo) return { error: 'Recibo no encontrado.' };
-  if (recibo.tipoFactura !== 'recibo' || !recibo.codigo?.startsWith('RC-')) {
+  const esReciboCobranza =
+    recibo.codigo != null && (recibo.codigo.startsWith('RC-') || recibo.codigo.startsWith('CI-'));
+  if (recibo.tipoFactura !== 'recibo' || !esReciboCobranza) {
     return { error: 'Solo se pueden anular recibos de cobranza.' };
   }
   if (recibo.anulada) return { error: 'El recibo ya está anulado.' };

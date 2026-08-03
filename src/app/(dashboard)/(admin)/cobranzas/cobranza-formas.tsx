@@ -69,7 +69,7 @@ export function FormasDePago({
     return (
       <p className="rounded-[10px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
         Ninguno de los medios habilitados para comprobantes internos permite un cobro manual. Revisá
-        la Configuración de cobranzas en Mi Perfil → Datos Impositivos.
+        la Gestión de cobranza en Mi Perfil → Datos Impositivos.
       </p>
     );
   }

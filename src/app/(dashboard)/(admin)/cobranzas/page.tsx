@@ -1,4 +1,4 @@
-import { and, desc, eq, like } from 'drizzle-orm';
+import { and, desc, eq, like, or } from 'drizzle-orm';
 
 import { getActiveMarina } from '@/lib/auth/session';
 import { db } from '@/lib/db';
@@ -51,7 +51,7 @@ export default async function CobranzasPage() {
       .from(embarcaciones)
       .where(eq(embarcaciones.guarderiaId, gId)),
 
-    // Recibos de cobranza (RC-).
+    // Recibos de cobranza (RC- fiscales, CI- internos).
     db
       .select({
         id: facturacion.id,
@@ -89,7 +89,7 @@ export default async function CobranzasPage() {
         and(
           eq(facturacion.guarderiaId, gId),
           eq(facturacion.tipoFactura, 'recibo'),
-          like(facturacion.codigo, 'RC-%'),
+          or(like(facturacion.codigo, 'RC-%'), like(facturacion.codigo, 'CI-%')),
         ),
       )
       .orderBy(desc(facturacion.emision))

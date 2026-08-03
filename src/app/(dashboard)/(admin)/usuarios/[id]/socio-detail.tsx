@@ -143,6 +143,12 @@ type Movimiento = {
   // factura (no una bolsa común) — ver src/lib/nc-cobertura.ts. Null si
   // ninguna NC aplica a este cargo.
   montoCubiertoNc: string | null;
+  // Cuánto de este cargo cubre puntualmente un pago de Cobranzas aplicado a
+  // SU comprobante (pagos parciales targeted) — ver cobranza-cobertura.ts.
+  montoCubiertoRecibo: string | null;
+  // Para movimientos de PAGO targeted: cuánto de su haber ya está aplicado a
+  // comprobantes puntuales — solo el excedente entra al pool genérico.
+  haberComprometido: string | null;
   // true si este movimiento ES el asiento de una NC ya aplicada arriba —
   // no debe sumar al pool genérico de cobertura (ver calcularSaldoYEstado).
   esMovimientoNc: boolean;
@@ -337,6 +343,8 @@ function calcularSaldoYEstado<
     haber: string | null;
     estado: string | null;
     montoCubiertoNc: string | null;
+    montoCubiertoRecibo: string | null;
+    haberComprometido: string | null;
     esMovimientoNc: boolean;
   },
 >(movimientos: T[]): (T & { saldo: number; estadoDisplay: string | null })[] {
@@ -345,7 +353,9 @@ function calcularSaldoYEstado<
   let poolHaber = 0;
   for (const m of movimientos) {
     if (m.esMovimientoNc) continue;
-    poolHaber += parseFloat(m.haber ?? '0');
+    // De un pago de Cobranzas targeted solo entra al pool el excedente no
+    // aplicado a comprobantes puntuales (adelanto / saldo a favor).
+    poolHaber += parseFloat(m.haber ?? '0') - parseFloat(m.haberComprometido ?? '0');
     // Contraasiento de anulación de recibo: su debe anula el haber del pago
     // anulado (que sigue sumando arriba) — el neto del par es cero y esa
     // plata no cubre ningún cargo.
@@ -357,19 +367,25 @@ function calcularSaldoYEstado<
     acum = acum + venta - cobranza;
     let estadoDisplay = m.estado;
     const montoNc = parseFloat(m.montoCubiertoNc ?? '0');
+    const montoRecibo = parseFloat(m.montoCubiertoRecibo ?? '0');
     if (venta > 0 && m.tipo !== 'anulacion_recibo') {
       if (m.estado === 'pagado') {
         // Ya pagado: consume el pool (su pago ya está comprometido con ese
-        // cargo), no se reescribe.
-        poolHaber -= venta;
+        // cargo), no se reescribe. Lo que le aplicó un recibo targeted no
+        // está en el pool (quedó comprometido en su pago): solo el resto.
+        poolHaber -= Math.max(0, venta - montoRecibo);
       } else if (montoNc >= venta - 0.001) {
         // Cubierto puntualmente por la NC de su propia factura.
         estadoDisplay = 'anulado_nc';
-      } else if (montoNc + poolHaber >= venta - 0.001) {
-        // La NC cubre una parte, el pool genérico completa el resto.
-        estadoDisplay = 'anulado_nc';
-        poolHaber -= venta - montoNc;
-      } else if (montoNc + poolHaber > 0.001) {
+      } else if (montoNc + montoRecibo >= venta - 0.001) {
+        // Cubierto entero entre la NC y pagos targeted de Cobranzas.
+        estadoDisplay = 'pagado';
+      } else if (montoNc + montoRecibo + poolHaber >= venta - 0.001) {
+        // La cobertura targeted cubre una parte, el pool genérico completa
+        // el resto.
+        estadoDisplay = montoNc > 0.001 ? 'anulado_nc' : 'pagado';
+        poolHaber -= venta - montoNc - montoRecibo;
+      } else if (montoNc + montoRecibo + poolHaber > 0.001) {
         // Cubierto solo en parte: consume todo lo que queda y no alcanza
         // para el resto de este cargo ni para otro más nuevo.
         estadoDisplay = 'parcial';
@@ -392,18 +408,21 @@ const TIPO_COMPROBANTE_LABEL: Record<string, string> = {
   nota_credito_c: 'Nota de crédito C',
 };
 
-// 'recibo' agrupa RC- (cobranza), CM-/CL-/CA- (comprobante interno) y RB- —
-// ninguno tiene validez fiscal en sí mismo. "Recibo" queda reservado para
-// Cobranzas (RC-): `facturaTipoRecibo` (se completa al registrar la cobranza)
-// dice de qué tipo era la deuda que cancela. Todo el resto es "Comprobante
-// interno" — nunca "Recibo interno", que es otro documento.
+// 'recibo' agrupa RC-/CI- (cobranza), CM-/CL-/CA- (comprobante interno) y RB-
+// — ninguno tiene validez fiscal en sí mismo. "Recibo" queda reservado para
+// Cobranzas (RC- fiscal / CI- interno): `facturaTipoRecibo` (se completa al
+// registrar la cobranza) dice de qué tipo era la deuda que cancela. Todo el
+// resto es "Comprobante interno" — nunca "Recibo interno", que es otro
+// documento.
 function tipoComprobanteLabel(m: {
   facturaTipo: string | null;
   facturaTipoRecibo: 'fiscal' | 'interno' | null;
   facturaCodigo: string | null;
 }): string {
   if (m.facturaTipo === 'recibo') {
-    if (!m.facturaCodigo?.startsWith('RC-')) return 'Comprobante interno';
+    if (!(m.facturaCodigo?.startsWith('RC-') || m.facturaCodigo?.startsWith('CI-'))) {
+      return 'Comprobante interno';
+    }
     return m.facturaTipoRecibo === 'fiscal' ? 'Recibo fiscal' : 'Recibo interno';
   }
   return TIPO_COMPROBANTE_LABEL[m.facturaTipo ?? ''] ?? m.facturaTipo ?? '—';
@@ -542,6 +561,7 @@ function AgregarServicioModal({
   servicios,
   comprobanteInternoDefault,
   internosHabilitados,
+  debitoInternoHabilitado,
   debitoDefault,
 }: {
   open: boolean;
@@ -555,6 +575,10 @@ function AgregarServicioModal({
   // false = el club no habilitó medios de cobro para comprobantes internos:
   // la opción Interno se apaga.
   internosHabilitados: boolean;
+  // false = el club no admite 'Débito automático' como medio para
+  // comprobantes internos (Gestión de cobranza): con canal Interno el tilde
+  // de débito queda bloqueado.
+  debitoInternoHabilitado: boolean;
   // true = el socio está adherido al Cobro Automático Payway (con tarjeta
   // activa): se muestra el tilde de débito, marcado por default.
   debitoDefault: boolean;
@@ -577,6 +601,11 @@ function AgregarServicioModal({
   const esDiaria = esTarifaDiaria(seleccionado);
   const diasNum = Number(cantidadDias);
   const diasValidos = Number.isInteger(diasNum) && diasNum >= 1;
+
+  // Canal Interno sin 'Débito automático' entre los medios de la Gestión de
+  // cobranza: el tilde de débito no se puede marcar (el club no admite ningún
+  // medio compatible con cobro automático para comprobantes internos).
+  const debitoBloqueado = comprobante === 'interno' && !debitoInternoHabilitado;
 
   const isValid = Boolean(servicioId && fechaInicio) && (!esDiaria || diasValidos);
 
@@ -605,8 +634,9 @@ function AgregarServicioModal({
         fechaBaja: fechaBaja || null,
         cantidadDias: esDiaria ? diasNum : null,
         // Sin adhesión del socio el tilde no se muestra: se manda undefined y
-        // el server resuelve el default (false).
-        debitoAutomatico: debitoDefault ? debito : undefined,
+        // el server resuelve el default (false). Con el tilde bloqueado
+        // (Interno sin débito habilitado) va false, esté como esté el estado.
+        debitoAutomatico: debitoDefault ? (debitoBloqueado ? false : debito) : undefined,
       });
       if (res.error) {
         setError(res.error);
@@ -780,7 +810,7 @@ function AgregarServicioModal({
                 </div>
                 <p className="mt-1.5 text-xs text-gray-400">
                   {!internosHabilitados
-                    ? 'Los comprobantes internos están deshabilitados: el club no tiene medios de cobro habilitados en Mi Perfil → Datos Impositivos → Configuración de cobranzas.'
+                    ? 'Los comprobantes internos están deshabilitados: el club no tiene medios de cobro habilitados en Mi Perfil → Datos Impositivos → Gestión de cobranza.'
                     : comprobante === 'interno'
                       ? 'Marca los cargos como no fiscales (NO se facturan por ARCA). Vas a poder emitirles un Comprobante interno desde Ventas cuando corresponda.'
                       : 'Los cargos se facturan por ARCA cuando corresponda (manual o automático), como el resto.'}
@@ -788,20 +818,26 @@ function AgregarServicioModal({
               </div>
 
               {debitoDefault && (
-                <label className="flex items-start gap-2.5 rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
+                <label
+                  className={`flex items-start gap-2.5 rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 ${
+                    debitoBloqueado ? 'opacity-60' : ''
+                  }`}
+                >
                   <input
                     type="checkbox"
-                    checked={debito}
+                    checked={debito && !debitoBloqueado}
+                    disabled={debitoBloqueado}
                     onChange={(e) => setDebito(e.target.checked)}
-                    className="mt-0.5 h-4 w-4 cursor-pointer accent-[#175861]"
+                    className="mt-0.5 h-4 w-4 cursor-pointer accent-[#175861] disabled:cursor-not-allowed"
                   />
                   <span>
                     <span className="block text-sm font-medium" style={{ color: '#101828' }}>
                       Incluir este servicio en el débito automático
                     </span>
                     <span className="block text-xs text-gray-500">
-                      El socio está adherido al Cobro Automático Payway: este servicio se cobra con
-                      su tarjeta. Destildalo si este servicio en particular se cobra por otro medio.
+                      {debitoBloqueado
+                        ? 'Bloqueado: el club no admite Débito automático como medio para comprobantes internos. Habilitalo en Mi Perfil → Datos Impositivos → Gestión de cobranza (comprobantes internos).'
+                        : 'El socio está adherido al Cobro Automático Payway: este servicio se cobra con su tarjeta. Destildalo si este servicio en particular se cobra por otro medio.'}
                     </span>
                   </span>
                 </label>
@@ -1738,6 +1774,7 @@ export function SocioDetail({
   paywayPublicKey = null,
   paywayToken = null,
   internosHabilitados = true,
+  debitoInternoHabilitado = true,
 }: {
   socio: SocioData;
   embarcaciones: Embarcacion[];
@@ -1752,9 +1789,13 @@ export function SocioDetail({
   paywayPublicKey?: string | null;
   paywayToken?: PaywayTokenInfo | null;
   // false = el club no habilitó ningún medio de cobro para comprobantes
-  // internos (Mi Perfil → Configuración de cobranzas): se apagan los puntos
-  // donde nace un comprobante interno.
+  // internos (Mi Perfil → Gestión de cobranza): se apagan los puntos donde
+  // nace un comprobante interno.
   internosHabilitados?: boolean;
+  // false = el club no tiene 'debito_automatico' entre los medios de la
+  // Gestión de cobranza (comprobantes internos): el tilde de débito de un
+  // Servicio Contratado Interno queda bloqueado (ej. club solo-Efectivo).
+  debitoInternoHabilitado?: boolean;
 }) {
   const [activeTab, setActiveTab] = useState<TabId>('generales');
   const [modalServicioOpen, setModalServicioOpen] = useState(false);
@@ -1967,6 +2008,7 @@ export function SocioDetail({
         servicios={servicios}
         comprobanteInternoDefault={socio.comprobanteInterno}
         internosHabilitados={internosHabilitados}
+        debitoInternoHabilitado={debitoInternoHabilitado}
         debitoDefault={socio.cobroAutomaticoPayway && (paywayToken?.activo ?? false)}
       />
 
@@ -2339,6 +2381,7 @@ export function SocioDetail({
           socioId={socio.id}
           onCargarServicio={() => setModalServicioOpen(true)}
           internosHabilitados={internosHabilitados}
+          debitoInternoHabilitado={debitoInternoHabilitado}
         />
       )}
 
@@ -3121,7 +3164,7 @@ function ImpositivosTab({
           <p className="text-xs text-gray-500">
             {internosHabilitados
               ? 'Activado: al cargarle un servicio, el modal arranca en Interno (no va por ARCA). Desactivado: arranca en Fiscal (ARCA). Se puede cambiar en cada carga.'
-              : 'Deshabilitado: el club no tiene medios de cobro habilitados para comprobantes internos. Se configuran en Mi Perfil → Datos Impositivos → Configuración de cobranzas.'}
+              : 'Deshabilitado: el club no tiene medios de cobro habilitados para comprobantes internos. Se configuran en Mi Perfil → Datos Impositivos → Gestión de cobranza.'}
           </p>
         </div>
         <input
@@ -3297,12 +3340,14 @@ function ServiciosContratadosTab({
   socioId,
   onCargarServicio,
   internosHabilitados,
+  debitoInternoHabilitado,
 }: {
   movimientos: Movimiento[];
   serviciosContratados: ServicioContratado[];
   socioId: string;
   onCargarServicio: () => void;
   internosHabilitados: boolean;
+  debitoInternoHabilitado: boolean;
 }) {
   const router = useRouter();
   const [editingSC, setEditingSC] = useState<ServicioContratado | null>(null);
@@ -3487,6 +3532,7 @@ function ServiciosContratadosTab({
           sc={editingSC}
           movimientos={movimientos.filter((m) => m.servicioId === editingSC.servicioId)}
           internosHabilitados={internosHabilitados}
+          debitoInternoHabilitado={debitoInternoHabilitado}
           onClose={() => setEditingSC(null)}
           onSaved={() => {
             setEditingSC(null);
@@ -3526,12 +3572,16 @@ function EditServicioContratadoModal({
   sc,
   movimientos,
   internosHabilitados,
+  debitoInternoHabilitado,
   onClose,
   onSaved,
 }: {
   sc: ServicioContratado;
   movimientos: Movimiento[];
   internosHabilitados: boolean;
+  // false = sin 'Débito automático' entre los medios de la Gestión de
+  // cobranza: con canal Interno el tilde de débito queda bloqueado.
+  debitoInternoHabilitado: boolean;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -3551,6 +3601,10 @@ function EditServicioContratadoModal({
   // contrato estaba abierto y ahora se le pone fecha de baja) — no al
   // simplemente corregir una fecha en un contrato que ya estaba cerrado.
   const esBajaNueva = sc.fechaBaja === null && fechaBaja !== '';
+
+  // Canal Interno sin 'Débito automático' entre los medios de la Gestión de
+  // cobranza: el tilde de débito no se puede marcar.
+  const debitoBloqueado = comprobante === 'interno' && !debitoInternoHabilitado;
 
   const ultimoMov = [...movimientos]
     .filter((m) => m.fecha)
@@ -3587,7 +3641,7 @@ function EditServicioContratadoModal({
         fechaBaja: fechaBaja || null,
         concepto: concepto.trim() || null,
         comprobanteInterno: comprobante === 'interno',
-        debitoAutomatico: debito,
+        debitoAutomatico: debitoBloqueado ? false : debito,
         cobro:
           esBajaNueva && cobrar
             ? {
@@ -3698,19 +3752,25 @@ function EditServicioContratadoModal({
             </div>
           </div>
 
-          <label className="flex items-start gap-2 rounded-xl border border-gray-100 bg-gray-50 p-3">
+          <label
+            className={`flex items-start gap-2 rounded-xl border border-gray-100 bg-gray-50 p-3 ${
+              debitoBloqueado ? 'opacity-60' : ''
+            }`}
+          >
             <input
               type="checkbox"
-              checked={debito}
+              checked={debito && !debitoBloqueado}
+              disabled={debitoBloqueado}
               onChange={(e) => setDebito(e.target.checked)}
-              className="mt-0.5 h-4 w-4 cursor-pointer accent-[#175861]"
+              className="mt-0.5 h-4 w-4 cursor-pointer accent-[#175861] disabled:cursor-not-allowed"
             />
             <span className="text-xs text-gray-600">
               <span className="block font-semibold" style={{ color: '#101828' }}>
                 Incluir este servicio en el débito automático
               </span>
-              Solo tiene efecto si el socio está adherido al Cobro Automático Payway (Datos
-              Impositivos) con tarjeta cargada.
+              {debitoBloqueado
+                ? 'Bloqueado: el club no admite Débito automático como medio para comprobantes internos. Habilitalo en Mi Perfil → Datos Impositivos → Gestión de cobranza (comprobantes internos).'
+                : 'Solo tiene efecto si el socio está adherido al Cobro Automático Payway (Datos Impositivos) con tarjeta cargada.'}
             </span>
           </label>
 

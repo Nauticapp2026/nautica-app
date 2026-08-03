@@ -26,7 +26,7 @@ import {
 import { eq, and, desc, gte, inArray, isNull, asc, lte } from 'drizzle-orm';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { addDiasYmd, argYmd } from '@/lib/dates';
-import { calcularCoberturaNotasCredito } from '@/lib/nc-cobertura';
+import { calcularCoberturaTargeted } from '@/lib/cobranza-cobertura';
 import { SocioDetail } from './socio-detail';
 
 export default async function SocioPage({ params }: { params: Promise<{ id: string }> }) {
@@ -560,17 +560,21 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
     alicuotaIva: e.alicuotaIva ?? null,
   }));
 
-  // A qué cargo puntual aplica cada Nota de Crédito del socio — el display
-  // de Cuenta Corriente necesita esto para mostrar "Anulado (NC)" en el
-  // cargo correcto en vez de una bolsa común de crédito genérico (ver
-  // src/lib/nc-cobertura.ts).
-  const { montoPorMovimiento: montoNcPorMovimiento, movimientosDeNc } =
-    await calcularCoberturaNotasCredito(id);
+  // Cobertura targeted del socio: a qué cargo puntual aplica cada Nota de
+  // Crédito y cada pago (parcial o total) de Cobranzas — el display de Cuenta
+  // Corriente la necesita para mostrar "Anulado (NC)" / "Parcial" en el cargo
+  // correcto en vez de repartir una bolsa común de crédito genérico (ver
+  // src/lib/cobranza-cobertura.ts).
+  const { montoNcPorMovimiento, montoReciboPorMovimiento, movimientosDeNc, haberComprometido } =
+    await calcularCoberturaTargeted(id);
 
   return (
     <SocioDetail
       paywayPublicKey={guarderiaRow[0]?.paywayPublicKey ?? null}
       internosHabilitados={(guarderiaRow[0]?.mediosCobroInternos ?? []).length > 0}
+      debitoInternoHabilitado={(guarderiaRow[0]?.mediosCobroInternos ?? []).includes(
+        'debito_automatico',
+      )}
       paywayToken={
         paywayTokenRow[0]
           ? {
@@ -606,6 +610,11 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
         const debe = miembros.reduce((t, x) => t + parseFloat(x.debe ?? '0'), 0);
         const haber = miembros.reduce((t, x) => t + parseFloat(x.haber ?? '0'), 0);
         const montoNc = miembros.reduce((t, x) => t + (montoNcPorMovimiento.get(x.id) ?? 0), 0);
+        const montoRecibo = miembros.reduce(
+          (t, x) => t + (montoReciboPorMovimiento.get(x.id) ?? 0),
+          0,
+        );
+        const comprometido = miembros.reduce((t, x) => t + (haberComprometido.get(x.id) ?? 0), 0);
         // Estado consolidado: 'pagado' solo si TODOS los cargos del
         // comprobante lo están; si no, manda el primero impago.
         const estado = miembros.find((x) => x.estado !== 'pagado')?.estado ?? base.estado;
@@ -643,6 +652,8 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
           facturaTipoRecibo: fac?.tipoRecibo ?? null,
           fechaVencimiento,
           montoCubiertoNc: montoNc > 0 ? montoNc.toFixed(2) : null,
+          montoCubiertoRecibo: montoRecibo > 0 ? montoRecibo.toFixed(2) : null,
+          haberComprometido: comprometido > 0 ? comprometido.toFixed(2) : null,
           esMovimientoNc: miembros.some((x) => movimientosDeNc.has(x.id)),
         };
       })}

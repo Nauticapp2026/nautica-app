@@ -590,8 +590,8 @@ export async function updateSocioServicioAction(input: unknown): Promise<{ error
 
   const parsed = updateSocioServicioSchema.safeParse(input);
   if (!parsed.success) return { error: 'Datos inválidos' };
-  const { id, fechaInicio, fechaBaja, concepto, comprobanteInterno, debitoAutomatico, cobro } =
-    parsed.data;
+  const { id, fechaInicio, fechaBaja, concepto, comprobanteInterno, cobro } = parsed.data;
+  let { debitoAutomatico } = parsed.data;
   const guarderiaId = ctx.activeMembership.guarderiaId;
 
   if (!fechaInicio) {
@@ -599,6 +599,18 @@ export async function updateSocioServicioAction(input: unknown): Promise<{ error
   }
   if (fechaBaja && fechaBaja < fechaInicio) {
     return { error: 'La fecha de baja no puede ser anterior a la fecha de inicio.' };
+  }
+
+  // Un contrato Interno solo entra al débito automático si el club habilitó
+  // 'debito_automatico' en la Gestión de cobranza (comprobantes internos) —
+  // misma regla que el tilde de la UI; acá se sanea por si llega igual.
+  if (comprobanteInterno && debitoAutomatico) {
+    const [g] = await db
+      .select({ medios: guarderias.mediosCobroInternos })
+      .from(guarderias)
+      .where(eq(guarderias.id, guarderiaId))
+      .limit(1);
+    if (!g?.medios.includes('debito_automatico')) debitoAutomatico = false;
   }
 
   try {
@@ -720,7 +732,7 @@ export async function toggleComprobanteInternoAction(socioId: string, value: boo
       if (!g || g.medios.length === 0) {
         return {
           error:
-            'Los comprobantes internos están deshabilitados. Habilitá al menos un medio de pago en Mi Perfil → Datos Impositivos → Configuración de cobranzas.',
+            'Los comprobantes internos están deshabilitados. Habilitá al menos un medio de pago en Mi Perfil → Datos Impositivos → Gestión de cobranza.',
         };
       }
     }

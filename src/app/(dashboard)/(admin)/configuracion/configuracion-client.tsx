@@ -1735,8 +1735,8 @@ function ConfiguracionCobranzasSection({ initial }: { initial: string[] }) {
         setFeedback({ type: 'error', msg: res.error });
         toast.error(res.error);
       } else {
-        setFeedback({ type: 'success', msg: 'Configuración de cobranzas guardada.' });
-        toast.success('Configuración de cobranzas guardada.');
+        setFeedback({ type: 'success', msg: 'Gestión de cobranza guardada.' });
+        toast.success('Gestión de cobranza guardada.');
         router.refresh();
       }
     });
@@ -1744,8 +1744,9 @@ function ConfiguracionCobranzasSection({ initial }: { initial: string[] }) {
 
   return (
     <div>
+      {/* Título pedido por el cliente 2026-08-03 (ex "Configuración de cobranzas"). */}
       <h3 className="mb-1 text-sm font-bold" style={{ color: '#101828' }}>
-        Configuración de cobranzas
+        Gestión de cobranza (comprobantes internos)
       </h3>
       <p className="mb-4 text-sm text-gray-500">
         Medios de pago que el club admite para cobrar comprobantes internos. Al no ser comprobantes

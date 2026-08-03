@@ -29,6 +29,7 @@ import {
   emitirNotaCreditoAction,
   emitirNotaCreditoInternaAction,
   emitirNotaLibreAction,
+  enviarComprobantePorMailAction,
   getPendientesEmisionAction,
   markInvoicePaidAction,
   obtenerPdfFacturaAction,
@@ -175,21 +176,35 @@ const TIPO_FACTURA_LABEL: Record<string, string> = {
   nota_credito_interna: 'NC interna',
 };
 
-// 'recibo' agrupa RC- (cobranza), CM-/CL-/CA- (comprobante interno) y RB- —
-// todos documentos sin validez fiscal en sí mismos. "Recibo" queda reservado
-// para Cobranzas (RC-): `tipoRecibo` (columna propia, se computa al registrar
-// la cobranza) dice de qué tipo era la deuda que cancela. Todo el resto es
-// "Comprobante interno" — nunca "Recibo interno", que es otro documento.
+// 'recibo' agrupa RC-/CI- (cobranza), CM-/CL-/CA- (comprobante interno) y RB-
+// — todos documentos sin validez fiscal en sí mismos. "Recibo" queda reservado
+// para Cobranzas (RC- fiscal / CI- interno): `tipoRecibo` (columna propia, se
+// computa al registrar la cobranza) dice de qué tipo era la deuda que cancela.
+// Todo el resto es "Comprobante interno" — nunca "Recibo interno", que es otro
+// documento.
 function tipoComprobanteLabel(f: {
   tipoFactura: string | null;
   tipoRecibo: 'fiscal' | 'interno' | null;
   codigo: string | null;
 }): string {
   if (f.tipoFactura === 'recibo') {
-    if (!f.codigo?.startsWith('RC-')) return 'Comprobante interno';
+    if (!(f.codigo?.startsWith('RC-') || f.codigo?.startsWith('CI-'))) {
+      return 'Comprobante interno';
+    }
     return f.tipoRecibo === 'fiscal' ? 'Recibo fiscal' : 'Recibo interno';
   }
   return TIPO_FACTURA_LABEL[f.tipoFactura ?? ''] ?? f.tipoFactura ?? '—';
+}
+
+// Sigla del tipo de comprobante SIN letra, para la columna "Tipo comprobante"
+// del listado ARCA (pedido 2026-08-03): la letra (A/B/C) va únicamente en su
+// columna "Letra".
+function tipoSiglaSinLetra(tipoFactura: string | null): string {
+  if (!tipoFactura) return '—';
+  if (tipoFactura.startsWith('factura')) return 'FC';
+  if (tipoFactura.startsWith('nota_credito')) return 'NC';
+  if (tipoFactura.startsWith('nota_debito')) return 'ND';
+  return TIPO_FACTURA_LABEL[tipoFactura] ?? tipoFactura;
 }
 
 const TIPO_FACTURA_OPTS = [
@@ -264,6 +279,75 @@ const inputCls =
 function fmtMoney(value: string | number | null): string {
   const n = typeof value === 'string' ? parseFloat(value || '0') : (value ?? 0);
   return `$${n.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+// Desglose neto/exento/IVA de ítems con IVA incluido — espejo exacto de
+// `desglosarMontos` en actions/facturacion.ts (lo que se guarda y se muestra
+// en las columnas del listado): alícuota 0 → el ítem es "exento"; >0 → neto +
+// IVA. `fallbackAlicuota` para ítems sin tarifa: 0 en comprobantes C
+// (Monotributo), 21 en el resto (mismo criterio que `alicuotaPara`).
+function desglosarItemsUi(
+  items: { bruto: number; alicuotaIva: number | null }[],
+  fallbackAlicuota: number,
+): { neto: number; exento: number; iva: number } {
+  let neto = 0;
+  let exento = 0;
+  let iva = 0;
+  for (const it of items) {
+    const ali = it.alicuotaIva ?? fallbackAlicuota;
+    if (ali === 0) {
+      exento += it.bruto;
+    } else {
+      const n = it.bruto / (1 + ali / 100);
+      neto += n;
+      iva += it.bruto - n;
+    }
+  }
+  return { neto, exento, iva };
+}
+
+// Desglose de importes de los modales de emisión. SIEMPRE muestra las cuatro
+// líneas — neto, exento, IVA y bruto — sin importar la letra ni la condición
+// IVA del club (pedido 2026-08-03; antes B/C mostraban solo el bruto).
+function DesgloseImportes({
+  neto,
+  exento,
+  iva,
+  bruto,
+  brutoLabel,
+}: {
+  neto: number;
+  exento: number;
+  iva: number;
+  bruto: number;
+  brutoLabel: string;
+}) {
+  return (
+    <div className="mb-4 rounded-[10px] bg-gray-50 px-4 py-3">
+      <div className="mb-1.5 space-y-1 border-b border-gray-200 pb-1.5">
+        <div className="flex items-center justify-between text-sm text-gray-600">
+          <p>Importe neto</p>
+          <p>{fmtMoney(neto)}</p>
+        </div>
+        <div className="flex items-center justify-between text-sm text-gray-600">
+          <p>Importe exento</p>
+          <p>{fmtMoney(exento)}</p>
+        </div>
+        <div className="flex items-center justify-between text-sm text-gray-600">
+          <p>Impuestos (IVA)</p>
+          <p>{fmtMoney(iva)}</p>
+        </div>
+      </div>
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-semibold" style={{ color: '#101828' }}>
+          {brutoLabel}
+        </p>
+        <p className="text-lg font-bold" style={{ color: '#175861' }}>
+          {fmtMoney(bruto)}
+        </p>
+      </div>
+    </div>
+  );
 }
 
 const fmtDate = formatArgentinaDate;
@@ -517,20 +601,19 @@ function NuevaFacturaModal({
         .reduce((s, m) => s + parseFloat(m.debe || '0'), 0),
     [movimientos, selectedMovs],
   );
-  // Desglose Neto/IVA con la alícuota real de cada tarifa (fallback 21% para
-  // ítems sin tarifa — mismo criterio que alicuotaPara() en facturacion.ts).
-  // Factura C (club Monotributo) no lleva IVA: todo es bruto.
-  const netoSeleccionado = useMemo(() => {
-    if (form.tipoFactura === 'factura_c') return totalSeleccionado;
-    return movimientos
-      .filter((m) => selectedMovs.has(m.id))
-      .reduce((s, m) => {
-        const bruto = parseFloat(m.debe || '0');
-        const ali = m.alicuotaIva ?? 21;
-        return s + (ali > 0 ? bruto / (1 + ali / 100) : bruto);
-      }, 0);
-  }, [movimientos, selectedMovs, form.tipoFactura, totalSeleccionado]);
-  const ivaSeleccionado = totalSeleccionado - netoSeleccionado;
+  // Desglose Neto/Exento/IVA con la alícuota real de cada tarifa (fallback
+  // según la letra: C → 0, resto 21 — mismo criterio que desglosarMontos en
+  // facturacion.ts, así el modal anticipa lo que va a mostrar el listado).
+  const desgloseSeleccionado = useMemo(
+    () =>
+      desglosarItemsUi(
+        movimientos
+          .filter((m) => selectedMovs.has(m.id))
+          .map((m) => ({ bruto: parseFloat(m.debe || '0'), alicuotaIva: m.alicuotaIva })),
+        form.tipoFactura === 'factura_c' ? 0 : 21,
+      ),
+    [movimientos, selectedMovs, form.tipoFactura],
+  );
 
   // Vencimiento sugerido "según tarifario": fecha de emisión + el menor Plazo
   // de cobro de los servicios seleccionados (si difieren, rige el que vence
@@ -981,10 +1064,11 @@ function NuevaFacturaModal({
                 </div>
               )}
 
-              {/* Centro emisor: solo si el club tiene más de un punto de venta,
-              en su propia línea. Para NC/ND relacionadas no se elige — salen
+              {/* Centro emisor, en su propia línea arriba de Tipo/Condición.
+              Se muestra siempre (con un solo POS queda como única opción —
+              pedido 2026-08-03). Para NC/ND relacionadas no se elige — salen
               por el mismo POS que el comprobante original. */}
-              {centrosEmisores.length > 1 && (!modoNota || !notaRelacionada) && (
+              {centrosEmisores.length > 0 && (!modoNota || !notaRelacionada) && (
                 <div>
                   <label
                     className="mb-1.5 block text-xs font-semibold"
@@ -1309,41 +1393,22 @@ function NuevaFacturaModal({
             </div>
 
             <div className="border-t border-gray-200 p-6">
-              {/* Desglose + total destacado. Regla del cuadro de condiciones IVA:
-              Factura A discrimina (neto + IVA), Factura B no discrimina (IVA
-              incluido en el bruto), Factura C (club Monotributo) no lleva IVA. */}
+              {/* Desglose completo + total destacado — las cuatro líneas se
+              muestran SIEMPRE, para cualquier letra y también con club
+              Monotributista (pedido 2026-08-03). El reparto neto/exento/IVA
+              es el mismo que va a guardar el server (desglosarMontos). */}
               {!modoNota && form.socioId && selectedMovs.size > 0 && (
-                <div className="mb-4 rounded-[10px] bg-gray-50 px-4 py-3">
-                  {form.tipoFactura === 'factura_a' ? (
-                    <div className="mb-1.5 space-y-1 border-b border-gray-200 pb-1.5">
-                      <div className="flex items-center justify-between text-sm text-gray-600">
-                        <p>Importe neto</p>
-                        <p>{fmtMoney(netoSeleccionado)}</p>
-                      </div>
-                      <div className="flex items-center justify-between text-sm text-gray-600">
-                        <p>IVA</p>
-                        <p>{fmtMoney(ivaSeleccionado)}</p>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="mb-1.5 border-b border-gray-200 pb-1.5 text-xs text-gray-400">
-                      {form.tipoFactura === 'factura_c'
-                        ? 'Sin IVA — Factura C (Monotributo)'
-                        : 'IVA incluido — la Factura B no lo discrimina'}
-                    </p>
-                  )}
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-semibold" style={{ color: '#101828' }}>
-                      Importe bruto (total a emitir)
-                    </p>
-                    <p className="text-lg font-bold" style={{ color: '#175861' }}>
-                      {fmtMoney(totalSeleccionado)}
-                    </p>
-                  </div>
-                </div>
+                <DesgloseImportes
+                  neto={desgloseSeleccionado.neto}
+                  exento={desgloseSeleccionado.exento}
+                  iva={desgloseSeleccionado.iva}
+                  bruto={totalSeleccionado}
+                  brutoLabel="Importe bruto (total a emitir)"
+                />
               )}
-              {/* Mismo desglose para NC/ND (las notas van a una sola alícuota,
-              21% — ver alicuotaPara() en facturacion.ts). */}
+              {/* Mismo desglose para NC/ND (las notas van a una sola alícuota
+              — 21%, o 0 en comprobante C — ver alicuotaPara() en
+              facturacion.ts). */}
               {modoNota &&
                 (() => {
                   const total = notaNeedsImporte
@@ -1355,36 +1420,18 @@ function NuevaFacturaModal({
                   const tipoNota = notaRelacionada
                     ? (notaFacturaSel?.tipoFactura ?? form.tipoFactura)
                     : form.tipoFactura;
-                  const neto = tipoNota === 'factura_c' ? total : total / 1.21;
+                  const d = desglosarItemsUi(
+                    [{ bruto: total, alicuotaIva: null }],
+                    tipoNota === 'factura_c' ? 0 : 21,
+                  );
                   return (
-                    <div className="mb-4 rounded-[10px] bg-gray-50 px-4 py-3">
-                      {tipoNota === 'factura_a' ? (
-                        <div className="mb-1.5 space-y-1 border-b border-gray-200 pb-1.5">
-                          <div className="flex items-center justify-between text-sm text-gray-600">
-                            <p>Importe neto</p>
-                            <p>{fmtMoney(neto)}</p>
-                          </div>
-                          <div className="flex items-center justify-between text-sm text-gray-600">
-                            <p>IVA</p>
-                            <p>{fmtMoney(total - neto)}</p>
-                          </div>
-                        </div>
-                      ) : (
-                        <p className="mb-1.5 border-b border-gray-200 pb-1.5 text-xs text-gray-400">
-                          {tipoNota === 'factura_c'
-                            ? 'Sin IVA — comprobante C (Monotributo)'
-                            : 'IVA incluido — el comprobante B no lo discrimina'}
-                        </p>
-                      )}
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm font-semibold" style={{ color: '#101828' }}>
-                          Importe bruto (total {modoNota.esNc ? 'a acreditar' : 'a debitar'})
-                        </p>
-                        <p className="text-lg font-bold" style={{ color: '#175861' }}>
-                          {fmtMoney(total)}
-                        </p>
-                      </div>
-                    </div>
+                    <DesgloseImportes
+                      neto={d.neto}
+                      exento={d.exento}
+                      iva={d.iva}
+                      bruto={total}
+                      brutoLabel={`Importe bruto (total ${modoNota.esNc ? 'a acreditar' : 'a debitar'})`}
+                    />
                   );
                 })()}
               <div className="flex gap-3">
@@ -1859,26 +1906,21 @@ function LoteModal({
     [deselected, elegibles],
   );
 
-  // Desglose Neto/IVA de todo lo seleccionado con la alícuota real de cada
-  // tarifa (fallback 21%). Club Monotributo → Factura C, sin IVA: no aplica.
+  // Desglose Neto/Exento/IVA de todo lo seleccionado con la alícuota real de
+  // cada tarifa (fallback: 0 con club Monotributo — Factura C —, 21 el resto;
+  // mismo criterio que desglosarMontos en el server).
   const clubMonotributo = guarderiaCondicionIva === 'monotributo';
-  const netoSeleccionado = useMemo(() => {
-    if (clubMonotributo) return totalSeleccionado;
-    return elegibles.reduce((sum, s) => {
-      return (
-        sum +
+  const desgloseSeleccionado = useMemo(() => {
+    return desglosarItemsUi(
+      elegibles.flatMap((s) =>
         s.movsFiltrados
           .filter((m) => isMovSel(s.id, m.id))
-          .reduce((s2, m) => {
-            const bruto = parseFloat(m.debe ?? '0');
-            const ali = m.alicuotaIva ?? 21;
-            return s2 + (ali > 0 ? bruto / (1 + ali / 100) : bruto);
-          }, 0)
-      );
-    }, 0);
+          .map((m) => ({ bruto: parseFloat(m.debe ?? '0'), alicuotaIva: m.alicuotaIva })),
+      ),
+      clubMonotributo ? 0 : 21,
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [deselected, elegibles, clubMonotributo, totalSeleccionado]);
-  const ivaSeleccionado = totalSeleccionado - netoSeleccionado;
+  }, [deselected, elegibles, clubMonotributo]);
 
   const allSelected = elegibles.every((s) => s.movsFiltrados.every((m) => isMovSel(s.id, m.id)));
 
@@ -2169,35 +2211,16 @@ function LoteModal({
         </div>
 
         <div className="border-t border-gray-200 p-6">
-          {/* Desglose + total. Regla del cuadro de condiciones IVA: club RI
-          discrimina neto + IVA; club Monotributo emite Factura C sin IVA. */}
+          {/* Desglose completo + total — las cuatro líneas se muestran SIEMPRE,
+          también con club Monotributista (pedido 2026-08-03). */}
           {!result && sociosConSel > 0 && (
-            <div className="mb-4 rounded-[10px] bg-gray-50 px-4 py-3">
-              {clubMonotributo ? (
-                <p className="mb-1.5 border-b border-gray-200 pb-1.5 text-xs text-gray-400">
-                  Sin IVA — Factura C (Monotributo)
-                </p>
-              ) : (
-                <div className="mb-1.5 space-y-1 border-b border-gray-200 pb-1.5">
-                  <div className="flex items-center justify-between text-sm text-gray-600">
-                    <p>Importe neto</p>
-                    <p>{fmtMoney(netoSeleccionado)}</p>
-                  </div>
-                  <div className="flex items-center justify-between text-sm text-gray-600">
-                    <p>IVA</p>
-                    <p>{fmtMoney(ivaSeleccionado)}</p>
-                  </div>
-                </div>
-              )}
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-semibold" style={{ color: '#101828' }}>
-                  Importe bruto (total a emitir)
-                </p>
-                <p className="text-lg font-bold" style={{ color: '#175861' }}>
-                  {fmtMoney(totalSeleccionado)}
-                </p>
-              </div>
-            </div>
+            <DesgloseImportes
+              neto={desgloseSeleccionado.neto}
+              exento={desgloseSeleccionado.exento}
+              iva={desgloseSeleccionado.iva}
+              bruto={totalSeleccionado}
+              brutoLabel="Importe bruto (total a emitir)"
+            />
           )}
           <div className="flex gap-3">
             <button
@@ -3672,6 +3695,19 @@ export function VentasClient({
     else window.open(res.url, '_blank');
   }
 
+  // Enviar el comprobante fiscal por mail al socio (PDF de ARCA adjunto).
+  const [enviandoMailId, setEnviandoMailId] = useState<string | null>(null);
+  async function enviarMailFactura(f: Factura) {
+    setEnviandoMailId(f.id);
+    const res = await enviarComprobantePorMailAction(f.id);
+    setEnviandoMailId(null);
+    if (res.error) {
+      toast.error(res.error);
+      return;
+    }
+    toast.success(`Comprobante enviado a ${res.email}`);
+  }
+
   function toggleNc(id: string) {
     setSelectedNc((prev) => {
       const next = new Set(prev);
@@ -3908,7 +3944,7 @@ export function VentasClient({
                 disabled={!internosHabilitados}
                 title={
                   !internosHabilitados
-                    ? 'Habilitá al menos un medio de pago para comprobantes internos en Mi Perfil → Datos Impositivos → Configuración de cobranzas.'
+                    ? 'Habilitá al menos un medio de pago para comprobantes internos en Mi Perfil → Datos Impositivos → Gestión de cobranza.'
                     : undefined
                 }
                 onSelect={() => setComprobanteInternoOpen(true)}
@@ -3919,7 +3955,7 @@ export function VentasClient({
                 disabled={!internosHabilitados}
                 title={
                   !internosHabilitados
-                    ? 'Habilitá al menos un medio de pago para comprobantes internos en Mi Perfil → Datos Impositivos → Configuración de cobranzas.'
+                    ? 'Habilitá al menos un medio de pago para comprobantes internos en Mi Perfil → Datos Impositivos → Gestión de cobranza.'
                     : undefined
                 }
                 onSelect={() => setComprobanteInternoLoteOpen(true)}
@@ -4115,11 +4151,13 @@ export function VentasClient({
                             onChange={toggleTodosNc}
                           />
                         </th>
+                        <th className="px-4 py-3">Ente emisor</th>
+                        <th className="px-4 py-3">CUIT emisor</th>
                         <th className="px-4 py-3">Nº Op. SC</th>
                         <th className="px-4 py-3">Fecha</th>
                         <th className="px-4 py-3">Tipo comprobante</th>
                         <th className="px-4 py-3">Letra</th>
-                        <th className="px-4 py-3">Número</th>
+                        <th className="px-4 py-3">Número de comprobante legal</th>
                         <th className="px-4 py-3">Nº Socio</th>
                         <th className="px-4 py-3">Razón social</th>
                         <th className="px-4 py-3">CUIT/CUIL</th>
@@ -4131,11 +4169,8 @@ export function VentasClient({
                         <th className="px-4 py-3 text-right">Exento</th>
                         <th className="px-4 py-3 text-right">IVA</th>
                         <th className="px-4 py-3 text-right">Total</th>
-                        <th className="px-4 py-3 text-center">Estado envío</th>
+                        <th className="px-4 py-3 text-center">Estado envío ARCA</th>
                         <th className="px-4 py-3 text-center">Estado de cobro</th>
-                        <th className="px-4 py-3">Ente emisor</th>
-                        <th className="px-4 py-3">CUIT emisor</th>
-                        <th className="px-4 py-3">Centro emisor</th>
                         <th className="px-4 py-3 text-right">Acciones</th>
                       </tr>
                     </thead>
@@ -4164,10 +4199,13 @@ export function VentasClient({
                                 onChange={() => toggleNc(f.id)}
                               />
                             </td>
+                            <td className="px-4 py-3 text-gray-500">{f.entreEmisor}</td>
+                            <td className="px-4 py-3 text-gray-500">{f.entreEmisorCuit}</td>
                             <td className="px-4 py-3 text-gray-500">{f.numeroOperacionSC}</td>
                             <td className="px-4 py-3 text-gray-500">{fmtDate(f.emision)}</td>
+                            {/* Solo la sigla (FC/NC/ND) — la letra va en su columna. */}
                             <td className="px-4 py-3 text-gray-500">
-                              {TIPO_FACTURA_LABEL[f.tipoFactura ?? ''] ?? '—'}
+                              {tipoSiglaSinLetra(f.tipoFactura)}
                             </td>
                             <td className="px-4 py-3 text-gray-500">{f.letra}</td>
                             <td className="px-4 py-3 font-medium" style={{ color: '#101828' }}>
@@ -4239,9 +4277,6 @@ export function VentasClient({
                                 {ESTADO_LABEL[f.estado ?? 'pendiente'] ?? f.estado}
                               </span>
                             </td>
-                            <td className="px-4 py-3 text-gray-500">{f.entreEmisor}</td>
-                            <td className="px-4 py-3 text-gray-500">{f.entreEmisorCuit}</td>
-                            <td className="px-4 py-3 text-gray-500">{f.centroEmisor}</td>
                             <td className="px-4 py-3">
                               <div className="flex items-center justify-end gap-2">
                                 <button
@@ -4252,10 +4287,19 @@ export function VentasClient({
                                 >
                                   <Edit3 className="h-4 w-4" />
                                 </button>
+                                {/* Enviar por email (antes duplicaba "Ver PDF"):
+                                    manda el comprobante al mail del socio con
+                                    el PDF de ARCA adjunto. */}
                                 <button
-                                  onClick={() => abrirPdfFactura(f)}
-                                  disabled={!f.codigo}
-                                  title={f.codigo ? 'Ver PDF' : 'PDF no disponible'}
+                                  onClick={() => enviarMailFactura(f)}
+                                  disabled={!f.codigo || enviandoMailId === f.id}
+                                  title={
+                                    !f.codigo
+                                      ? 'Sin comprobante ARCA para enviar'
+                                      : enviandoMailId === f.id
+                                        ? 'Enviando…'
+                                        : 'Enviar comprobante por email'
+                                  }
                                   className="rounded-[6px] p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-[#175861] disabled:opacity-30 disabled:hover:bg-transparent"
                                 >
                                   <Send className="h-4 w-4" />
@@ -4263,7 +4307,7 @@ export function VentasClient({
                                 <button
                                   onClick={() => abrirPdfFactura(f)}
                                   disabled={!f.codigo}
-                                  title={f.codigo ? 'Descargar PDF' : 'PDF no disponible'}
+                                  title={f.codigo ? 'Ver / Descargar PDF' : 'PDF no disponible'}
                                   className="rounded-[6px] p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-[#175861] disabled:opacity-30 disabled:hover:bg-transparent"
                                 >
                                   <Download className="h-4 w-4" />
@@ -4324,6 +4368,8 @@ export function VentasClient({
                 <table className="w-full min-w-[1700px] text-sm">
                   <thead>
                     <tr className="bg-gray-50 text-left text-xs font-semibold text-gray-500">
+                      <th className="px-4 py-3">Ente emisor</th>
+                      <th className="px-4 py-3">CUIT emisor</th>
                       <th className="px-4 py-3">Número</th>
                       <th className="px-4 py-3">Tipo</th>
                       <th className="px-4 py-3">Nº Op. SC</th>
@@ -4335,9 +4381,6 @@ export function VentasClient({
                       <th className="px-4 py-3 text-right">Exento</th>
                       <th className="px-4 py-3 text-right">IVA</th>
                       <th className="px-4 py-3 text-right">Total</th>
-                      <th className="px-4 py-3">Ente emisor</th>
-                      <th className="px-4 py-3">CUIT emisor</th>
-                      <th className="px-4 py-3">Centro emisor</th>
                       <th className="px-4 py-3 text-right">Acciones</th>
                     </tr>
                   </thead>
@@ -4347,6 +4390,8 @@ export function VentasClient({
                         key={f.id}
                         className="border-t border-gray-100 transition hover:bg-gray-50/50"
                       >
+                        <td className="px-4 py-3 text-gray-500">{f.entreEmisor}</td>
+                        <td className="px-4 py-3 text-gray-500">{f.entreEmisorCuit}</td>
                         <td className="px-4 py-3 font-medium" style={{ color: '#101828' }}>
                           {f.codigo ?? '—'}
                         </td>
@@ -4373,9 +4418,6 @@ export function VentasClient({
                         >
                           {fmtMoney(f.importe)}
                         </td>
-                        <td className="px-4 py-3 text-gray-500">{f.entreEmisor}</td>
-                        <td className="px-4 py-3 text-gray-500">{f.entreEmisorCuit}</td>
-                        <td className="px-4 py-3 text-gray-500">{f.centroEmisor}</td>
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-end gap-1">
                             {(f.codigo?.startsWith('CM-') || f.codigo?.startsWith('CL-')) &&

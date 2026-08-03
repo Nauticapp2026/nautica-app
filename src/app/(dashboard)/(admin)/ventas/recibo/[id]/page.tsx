@@ -24,9 +24,10 @@ const TIPO_COMPROBANTE_LABEL: Record<string, string> = {
   nota_credito_c: 'Nota de crédito C',
 };
 
-function fmtMoney(value: string | null): string {
-  const n = parseFloat(value ?? '0');
-  return `$${n.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+function fmtMoney(value: string | null, negativo = false): string {
+  const n = Math.abs(parseFloat(value ?? '0'));
+  const fmt = n.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return `${negativo ? '-' : ''}$${fmt}`;
 }
 
 function fmtDate(d: Date | null): string {
@@ -77,6 +78,7 @@ export default async function ReciboPage({ params }: { params: Promise<{ id: str
       descripcion: facturacion.descripcion,
       medioPago: facturacion.medioPago,
       emision: facturacion.emision,
+      anulada: facturacion.anulada,
       socioId: facturacion.socioId,
       guarderiaId: facturacion.guarderiaId,
       movimientoId: facturacion.movimientoId,
@@ -103,15 +105,19 @@ export default async function ReciboPage({ params }: { params: Promise<{ id: str
     notFound();
   }
   const esNotaCreditoInterna = row.tipoFactura === 'nota_credito_interna';
-  // "Recibo" queda reservado para Cobranzas (RC-). El resto de los documentos
-  // internos (CM-/CL-/RB-) documentan cargos, no un pago: son "Comprobante
-  // interno".
-  const esReciboCobranza = row.codigo?.startsWith('RC-') ?? false;
+  // "Recibo" queda reservado para Cobranzas (RC- fiscal / CI- interno). El
+  // resto de los documentos internos (CM-/CL-/RB-) documentan cargos, no un
+  // pago: son "Comprobante interno".
+  const esReciboCobranza =
+    (row.codigo?.startsWith('RC-') || row.codigo?.startsWith('CI-')) ?? false;
   const titulo = esNotaCreditoInterna
     ? 'NOTA DE CRÉDITO INTERNA'
     : esReciboCobranza
       ? 'RECIBO'
       : 'COMPROBANTE INTERNO';
+  // Recibo anulado: el documento muestra el monto en negativo (la cobranza
+  // quedó revertida) — aplica a RC- y CI- por igual.
+  const anulado = row.anulada && esReciboCobranza;
 
   const socioNombre = [row.socioNombre, row.socioApellido].filter(Boolean).join(' ') || '—';
   const socioDoc = row.socioCuit
@@ -132,9 +138,31 @@ export default async function ReciboPage({ params }: { params: Promise<{ id: str
     codigoOriginal = original?.codigo ?? null;
   }
 
-  // Comprobantes que cobró el recibo. Para recibos de cobranza (RC-) están
-  // guardados exactos en cobranza_comprobante_ids, o si no se buscan por
-  // heurística FIFO (facturas AFIP del socio, de la más antigua a la más
+  // Datos del movimiento de pago vinculado: desglose de formas de pago y —
+  // para recibos nuevos — las aplicaciones targeted (cuánto fue a cada
+  // comprobante, clave en pagos parciales).
+  let formasPago: { tipo: string; monto: string }[] = [];
+  let aplicaciones: { comprobanteId: string; monto: string }[] | null = null;
+  if (row.movimientoId) {
+    const [mov] = await db
+      .select({ datosPago: movimientosCuentaCorriente.datosPago })
+      .from(movimientosCuentaCorriente)
+      .where(eq(movimientosCuentaCorriente.id, row.movimientoId))
+      .limit(1);
+    const dp = mov?.datosPago as {
+      formas?: { tipo: string; monto: string }[];
+      aplicaciones?: { comprobanteId: string; monto: string }[];
+    } | null;
+    if (dp?.formas?.length) formasPago = dp.formas;
+    if (dp?.aplicaciones) aplicaciones = dp.aplicaciones;
+  }
+  const aplicadoPorComprobante = new Map(
+    (aplicaciones ?? []).map((a) => [a.comprobanteId, a.monto]),
+  );
+
+  // Comprobantes que cobró el recibo. Para recibos de cobranza (RC-/CI-)
+  // están guardados exactos en cobranza_comprobante_ids, o si no se buscan
+  // por heurística FIFO (facturas AFIP del socio, de la más antigua a la más
   // nueva, hasta cubrir el importe). RB-/CM-/CL- documentan un cargo propio,
   // no un pago — para esos se muestra row.descripcion directamente más abajo.
   type DetalleCargo = { concepto: string | null; importe: string | null };
@@ -142,6 +170,8 @@ export default async function ReciboPage({ params }: { params: Promise<{ id: str
     codigo: string | null;
     tipoFactura: string | null;
     importe: string | null;
+    // Lo que este recibo le aplicó (puede ser menos que el importe: parcial).
+    montoAplicado: string | null;
     detalle: DetalleCargo[];
   }[] = [];
   if (row.cobranzaComprobanteIds && row.cobranzaComprobanteIds.length > 0) {
@@ -200,12 +230,15 @@ export default async function ReciboPage({ params }: { params: Promise<{ id: str
         codigo: c.codigo,
         tipoFactura: c.tipoFactura,
         importe: c.importe,
+        montoAplicado: aplicadoPorComprobante.get(c.id) ?? null,
         detalle:
           detallePorComprobante.get(c.id) ??
           (c.descripcion ? [{ concepto: c.descripcion, importe: null }] : []),
       })),
     );
-  } else if (row.socioId && row.codigo?.startsWith('RC-')) {
+  } else if (row.socioId && row.codigo?.startsWith('RC-') && aplicaciones == null) {
+    // Heurística solo para recibos viejos (sin aplicaciones guardadas): un
+    // recibo nuevo sin comprobantes es un adelanto y no cobró facturas.
     const facturasSocio = await db
       .select({
         codigo: facturacion.codigo,
@@ -231,6 +264,7 @@ export default async function ReciboPage({ params }: { params: Promise<{ id: str
         codigo: f.codigo,
         tipoFactura: f.tipoFactura,
         importe: f.importe,
+        montoAplicado: null,
         detalle: [],
       });
       acumulado += parseFloat(f.importe ?? '0');
@@ -261,19 +295,6 @@ export default async function ReciboPage({ params }: { params: Promise<{ id: str
       )
       .where(eq(facturacionItems.facturacionId, row.id));
     items = rows;
-  }
-
-  // Desglose de formas de pago (cobranzas con pago combinado) — guardado en el
-  // movimiento de pago vinculado al recibo.
-  let formasPago: { tipo: string; monto: string }[] = [];
-  if (row.movimientoId) {
-    const [mov] = await db
-      .select({ datosPago: movimientosCuentaCorriente.datosPago })
-      .from(movimientosCuentaCorriente)
-      .where(eq(movimientosCuentaCorriente.id, row.movimientoId))
-      .limit(1);
-    const dp = mov?.datosPago as { formas?: { tipo: string; monto: string }[] } | null;
-    if (dp?.formas?.length) formasPago = dp.formas;
   }
 
   return (
@@ -329,8 +350,9 @@ export default async function ReciboPage({ params }: { params: Promise<{ id: str
             </div>
             <div className="text-right">
               <p className="text-2xl font-extrabold tracking-wide text-gray-900">{titulo}</p>
+              {anulado && <p className="text-sm font-bold tracking-wide text-red-600">ANULADO</p>}
               <p className="mt-1 text-sm text-gray-500">Nro: {row.codigo}</p>
-              <p className="text-sm text-gray-500">Fecha: {fmtDate(row.emision)}</p>
+              <p className="text-sm text-gray-500">Fecha de emisión: {fmtDate(row.emision)}</p>
             </div>
           </div>
 
@@ -357,7 +379,9 @@ export default async function ReciboPage({ params }: { params: Promise<{ id: str
               <span className="font-semibold text-gray-500">
                 {esReciboCobranza ? 'La suma de:' : 'Por un importe de:'}
               </span>
-              <span className="text-lg font-bold text-gray-900">{fmtMoney(row.importe)}</span>
+              <span className="text-lg font-bold text-gray-900">
+                {fmtMoney(row.importe, anulado)}
+              </span>
             </div>
             <div className="grid grid-cols-[140px_1fr] gap-2 text-sm">
               <span className="font-semibold text-gray-500">En concepto de:</span>
@@ -370,9 +394,21 @@ export default async function ReciboPage({ params }: { params: Promise<{ id: str
                           <span>
                             {TIPO_COMPROBANTE_LABEL[c.tipoFactura ?? ''] ?? c.tipoFactura}{' '}
                             {c.codigo ?? ''}
+                            {/* Pago parcial: se muestra lo aplicado por ESTE
+                                recibo, no el total del comprobante. */}
+                            {c.montoAplicado != null &&
+                              c.importe != null &&
+                              parseFloat(c.montoAplicado) < parseFloat(c.importe) - 0.005 && (
+                                <span className="text-gray-500">
+                                  {' '}
+                                  (pago parcial — total {fmtMoney(c.importe)})
+                                </span>
+                              )}
                           </span>
-                          {c.importe != null && (
-                            <span className="text-gray-500">{fmtMoney(c.importe)}</span>
+                          {(c.montoAplicado ?? c.importe) != null && (
+                            <span className="text-gray-500">
+                              {fmtMoney(c.montoAplicado ?? c.importe)}
+                            </span>
                           )}
                         </span>
                         {c.detalle.map((d, j) => (
@@ -425,7 +461,9 @@ export default async function ReciboPage({ params }: { params: Promise<{ id: str
           <div className="flex justify-end">
             <div className="text-right">
               <p className="text-xs font-semibold tracking-wide text-gray-400 uppercase">Total</p>
-              <p className="text-2xl font-extrabold text-gray-900">{fmtMoney(row.importe)}</p>
+              <p className="text-2xl font-extrabold text-gray-900">
+                {fmtMoney(row.importe, anulado)}
+              </p>
             </div>
           </div>
 

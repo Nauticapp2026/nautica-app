@@ -169,7 +169,7 @@ El **email de facturación** es la dirección a la que se envía el comprobante.
 
 **Comprobante interno** — checkbox de esta pestaña. Define el valor **por defecto** del campo Comprobante al **Cargar Servicio** a este socio: tildado, los servicios nuevos arrancan como **Interno**; destildado, como **Fiscal (ARCA)**. Es solo el default — en cada carga se puede cambiar.
 
-> Este checkbox solo se puede marcar si el club tiene al menos un medio de pago habilitado para comprobantes internos en **Mi perfil → Datos Impositivos → Configuración de cobranzas**. Con la configuración vacía, el tilde queda deshabilitado (igual que la opción Interno al cargar servicios y la emisión de comprobantes internos en Ventas).
+> Este checkbox solo se puede marcar si el club tiene al menos un medio de pago habilitado para comprobantes internos en **Mi perfil → Datos Impositivos → Gestión de cobranza**. Con la configuración vacía, el tilde queda deshabilitado (igual que la opción Interno al cargar servicios y la emisión de comprobantes internos en Ventas).
 
 **Cobro Automático Payway** — checkbox de esta pestaña. Adhiere al socio al **débito automático**: sus servicios contratados fiscales se cobran todos los meses con la tarjeta de crédito que tenga cargada (ver capítulo 14).
 
@@ -210,14 +210,17 @@ Lista los servicios que el socio tiene contratados. Es un **contrato**, no un hi
 4. Si el servicio elegido es **Variable con tarifa diaria** (en el buscador su precio aparece como "por día"), aparece un campo más: **Cantidad de días** (obligatorio). El cargo va a ser el precio diario multiplicado por esos días — el total se muestra abajo del campo antes de confirmar, y la cantidad queda visible en la fila del contrato (por ej. "5 días").
 5. Elegí el **tipo de comprobante**:
    - **Fiscal (ARCA)** — el cargo se va a facturar por ARCA cuando corresponda (manual o automático).
-   - **Interno** — el cargo queda excluido de toda facturación por ARCA; se consolida después en un comprobante interno desde **Ventas** (ver sección Comprobantes internos). La opción solo está disponible si el club tiene medios habilitados en **Mi perfil → Configuración de cobranzas**.
+   - **Interno** — el cargo queda excluido de toda facturación por ARCA; se consolida después en un comprobante interno desde **Ventas** (ver sección Comprobantes internos). La opción solo está disponible si el club tiene medios habilitados en **Mi perfil → Gestión de cobranza**.
 6. Si el socio está **adherido al Cobro Automático Payway** (con tarjeta cargada), aparece además el tilde **"Incluir este servicio en el débito automático"**, marcado por defecto. Destildalo si este servicio en particular se va a cobrar por otro medio.
+
+   > Con el comprobante en **Interno**, este tilde queda **bloqueado** si el club no admite **Débito automático** entre los medios de la **Gestión de cobranza (comprobantes internos)** — por ejemplo, si solo admite Efectivo. Para poder tildarlo, habilitá ese medio en Mi perfil → Datos Impositivos.
+
 7. Confirmá. El sistema muestra: _"Servicio contratado. Todavía no aparece en la cuenta corriente — va a impactar recién cuando corresponda facturarlo."_
 
 **Editar un servicio contratado:**
 
 1. Hacé clic en el ícono de **lápiz** de la fila del servicio.
-2. En el modal podés modificar: **Fecha de inicio**, **Fecha de baja**, **Detalle del servicio**, el tipo de **Comprobante** (Interno / Fiscal) y el tilde **"Incluir este servicio en el débito automático"** (solo tiene efecto si el socio está adherido al Cobro Automático Payway con tarjeta cargada).
+2. En el modal podés modificar: **Fecha de inicio**, **Fecha de baja**, **Detalle del servicio**, el tipo de **Comprobante** (Interno / Fiscal) y el tilde **"Incluir este servicio en el débito automático"** (solo tiene efecto si el socio está adherido al Cobro Automático Payway con tarjeta cargada; con comprobante **Interno** queda bloqueado si el club no admite Débito automático en la Gestión de cobranza).
 3. Si es la **primera vez** que le ponés fecha de baja a ese contrato, aparece un bloque adicional: un checkbox **"Cobrar por esta baja"** con el monto sugerido según la **política de baja anticipada** configurada en la tarifa (mes completo o proporcional al uso) — podés editar ese monto antes de guardar (con techo en el precio de un mes completo). Si lo tildás, el cobro queda **pendiente de facturar** y se incluye en el **próximo comprobante** que se le emita al socio (manual o automático) — recién ahí aparece en la Cuenta Corriente. Si no lo tildás (o si solo estás editando una baja ya cargada antes), no se genera ningún cobro.
 4. Hacé clic en **Guardar**.
 
@@ -641,7 +644,7 @@ Las tarjetas superiores muestran:
 2. **Socio y Número de documento** — buscá y seleccioná el socio; el buscador filtra por nombre, número de socio o embarcación (mismo buscador que usás en Cobranzas). El documento (DNI/CUIT/CUIL) se completa solo.
 3. **Fecha y Vencimiento** — el vencimiento se sugiere solo **según el tarifario**: fecha + el **Plazo de cobro** de los servicios seleccionados (si tienen plazos distintos, rige el que vence primero). Podés pisarlo a mano cuando haga falta.
 4. **Centro emisor y Tipo de comprobante**:
-   - **Centro emisor** — por qué punto de venta de ARCA sale el comprobante. Este campo **solo aparece si el club tiene más de un centro emisor** configurado (ver "Centros emisores" en Mi perfil → Datos Impositivos); viene preseleccionado en el principal. Con un solo centro, todo sale automáticamente por ese. Los centros emisores solo intervienen en la facturación por ARCA — los **comprobantes internos no los usan**.
+   - **Centro emisor** — por qué punto de venta de ARCA sale el comprobante (ver "Centros emisores" en Mi perfil → Datos Impositivos). El campo aparece siempre, arriba de Tipo de comprobante, preseleccionado en el principal; con un solo centro configurado queda como única opción. Los centros emisores solo intervienen en la facturación por ARCA — los **comprobantes internos no los usan**.
    - **Tipo de comprobante** — se determina automáticamente según la condición IVA del club y del socio:
      - Club Monotributo → siempre **Factura C**.
      - Club Responsable Inscripto + Socio Responsable Inscripto o Monotributista → **Factura A**.
@@ -649,10 +652,11 @@ Las tarjetas superiores muestran:
 5. **Servicios a facturar** — el sistema muestra automáticamente los servicios vigentes del período (mensualidades, proporcionales, variables, cobros por baja) que todavía no tienen comprobante. Marcá los que querés incluir — lo que destildes queda pendiente para la próxima emisión. Podés usar **Todos** o **Ninguno** para seleccionar rápido.
 6. **Condición de venta** (Contado, Cuenta corriente, 30 / 60 / 90 días) y **Forma de pago** (Efectivo, Transferencia, Tarjeta de crédito, Mercado Pago, etc.).
 7. **Descripción** (opcional) y **Período facturado** — el rango de fechas del servicio que se informa a ARCA en el comprobante (por defecto, el mes en curso).
-8. Antes del botón Emitir aparece el **desglose del importe**, que sigue la regla de condiciones frente al IVA:
-   - **Factura A** (discrimina impuesto): **Importe neto**, **IVA** e **Importe bruto** (el total a emitir).
-   - **Factura B** (no discrimina): solo el **Importe bruto**, con el IVA incluido.
-   - **Factura C** (club Monotributista): solo el **Importe bruto** — no hay IVA.
+8. Antes del botón Emitir aparece el **desglose del importe**, siempre completo con sus cuatro líneas, sin importar la letra ni la condición IVA del club:
+   - **Importe neto** — el monto gravado, sin el impuesto.
+   - **Importe exento** — el monto de los conceptos exentos / no gravados (en un club Monotributista, todo el importe va acá).
+   - **Impuestos (IVA)** — el IVA de los conceptos gravados.
+   - **Importe bruto** — la suma de los tres anteriores: el total a emitir.
 9. Hacé clic en **Emitir**. La factura se envía a ARCA y queda registrada.
 
 > En el selector aparecen **todos los socios del club**. Lo que define si la emisión sale bien son los **datos fiscales/personales completos** del socio (ver "Datos requeridos para emitir facturas ARCA"); si faltan, ARCA puede rechazar la emisión.
@@ -667,7 +671,7 @@ Emití facturas para múltiples socios al mismo tiempo.
 2. El sistema lista los socios con conceptos pendientes. Cada socio puede tener uno o más conceptos expandibles.
    - La **casilla del socio** selecciona o deselecciona todos sus conceptos de una vez.
    - Podés marcar o desmarcar conceptos individuales dentro del socio. Si solo algunos están marcados, la casilla del socio muestra el estado **intermedio** (guión) indicando selección parcial.
-3. Revisá el resumen y confirmá. Antes del botón Emitir aparece el mismo **desglose** que en la factura individual: **Importe neto**, **IVA** e **Importe bruto** del total seleccionado (si el club es Monotributista no hay IVA y se muestra solo el bruto).
+3. Revisá el resumen y confirmá. Antes del botón Emitir aparece el mismo **desglose** que en la factura individual, siempre con las cuatro líneas: **Importe neto**, **Importe exento**, **Impuestos (IVA)** e **Importe bruto** del total seleccionado (en un club Monotributista todo el importe figura como exento).
 
 El tipo de comprobante se determina automáticamente para cada socio según la condición IVA del club y de cada socio individualmente (igual que en la factura individual). La condición de venta es siempre **Contado**.
 
@@ -761,15 +765,17 @@ En el tab **Comprobantes ARCA** podés acotar la tabla con los siguientes filtro
 
 Para exportar los comprobantes actualmente visibles (respetando los filtros activos), hacé clic en **Exportar** — se descarga un archivo CSV.
 
-**Columnas de la tabla Comprobantes ARCA.** En orden: casilla de selección, Nº Op. SC, Fecha, Tipo de comprobante, Letra, Número (con el folio interno FM-/FL- debajo), Nº Socio, Razón social, CUIT/CUIL, Vencimiento, CAE, Vencimiento del CAE, Período (Desde/Hasta), Neto, Exento, IVA, Total, Estado de envío (Aceptado/Rechazado), Estado de cobro, Ente emisor, CUIT emisor, Centro emisor y Acciones.
+**Columnas de la tabla Comprobantes ARCA.** En orden: casilla de selección, Ente emisor, CUIT emisor, Nº Op. SC, Fecha, Tipo de comprobante (solo la sigla FC/NC/ND — la letra va en su propia columna), Letra, Número de comprobante legal (con el folio interno FM-/FL- debajo), Nº Socio, Razón social, CUIT/CUIL, Vencimiento, CAE, Vencimiento del CAE, Período (Desde/Hasta), Neto, Exento, IVA, Total, Estado envío ARCA (Aceptado/Rechazado), Estado de cobro y Acciones.
 
-**Columnas de la tabla Comprobantes internos.** En orden: Número, Tipo, Nº Op. SC, Nº Socio, Razón social, CUIT/CUIL, Fecha, Neto, Exento, IVA, Total, Ente emisor, CUIT emisor, Centro emisor y Acciones.
+**Columnas de la tabla Comprobantes internos.** En orden: Ente emisor, CUIT emisor, Número, Tipo, Nº Op. SC, Nº Socio, Razón social, CUIT/CUIL, Fecha, Neto, Exento, IVA, Total y Acciones.
+
+**Acciones por fila (Comprobantes ARCA).** El **lápiz (✏️)** marca la factura como cobrada, el **avión de papel (➤)** envía el comprobante por email al socio con el PDF de ARCA adjunto, y la **flecha de descarga (⬇)** abre el PDF para verlo o descargarlo.
 
 ### Marcar una factura como pagada
 
 Cuando un socio te abona **una factura puntual** que le emitiste, marcala como pagada:
 
-1. En el tab **Comprobantes ARCA**, ubicá la factura en la tabla. En la última columna (acciones) hacé clic en el **ícono de lápiz (✏️)** — al pasar el mouse aparece el texto "Marcar como pagada". Si la factura ya está pagada, el ícono se ve deshabilitado.
+1. En el tab **Comprobantes ARCA**, ubicá la factura en la tabla. En la última columna (acciones) hacé clic en el **ícono de lápiz (✏️)** — al pasar el mouse aparece el texto "Marcar como cobrada". Si la factura ya está cobrada, el ícono se ve deshabilitado.
 2. Seleccioná el **medio de pago**.
 3. Confirmá. La factura pasa de **Pendiente** a **Pagada** y los cargos vinculados a ella quedan saldados.
 
@@ -793,30 +799,30 @@ Arriba de la tabla de Cobranzas está el botón **Nueva cobranza**.
 ### Registrar una cobranza nueva
 
 1. Hacé clic en **Nueva cobranza**.
-2. Elegí **qué tipo de comprobantes vas a cobrar**: **Comprobantes ARCA** (facturas A/B/C y notas de débito) o **Comprobantes internos** (CM-/CL-/CA-) — la misma separación que las pestañas de Ventas. Un recibo no puede mezclar los dos circuitos, así que la lista solo muestra los del tipo elegido. La opción **Comprobantes internos** solo aparece si el club tiene medios habilitados en **Mi perfil → Datos Impositivos → Configuración de cobranzas**.
+2. Elegí **qué tipo de comprobantes vas a cobrar**: **Comprobantes ARCA** (facturas A/B/C y notas de débito) o **Comprobantes internos** (CM-/CL-/CA-) — la misma separación que las pestañas de Ventas. Un recibo no puede mezclar los dos circuitos, así que la lista solo muestra los del tipo elegido. La opción **Comprobantes internos** solo aparece si el club tiene medios habilitados en **Mi perfil → Datos Impositivos → Gestión de cobranza**.
 3. Buscá al socio por nombre, número de socio o embarcación, y hacé clic sobre él en la lista.
-4. El sistema te muestra los **comprobantes pendientes de cobro** de ese socio, del tipo elegido en el paso 2. No incluye notas de crédito ni comprobantes ya cubiertos por un pago anterior.
+4. El sistema te muestra **solo los comprobantes pendientes de cobro** de ese socio (total o parcialmente), del tipo elegido en el paso 2. Los comprobantes ya cobrados enteros no aparecen; los que tuvieron un **cobro parcial** aparecen con el **saldo que falta cobrar** (y la aclaración del total original). Tampoco incluye notas de crédito.
 5. Tildá los comprobantes que estás cobrando (o usá **Seleccionar todos**). Abajo se muestra el **Total seleccionado**.
-6. Hacé clic en **Continuar**.
+6. Hacé clic en **Continuar**. También podés continuar **sin seleccionar ningún comprobante**: en ese caso el monto se registra como **adelanto** y queda como **saldo a favor** en la Cuenta Corriente del socio.
 7. Revisá o ajustá el **Monto a cobrar** (viene precargado con el total seleccionado) y la **Fecha** del cobro.
-   - Si el monto es **menor** al total seleccionado, es un **pago parcial**: el sistema cubre los comprobantes más viejos primero, hasta donde alcance; el resto queda pendiente.
+   - Si el monto es **menor** al total seleccionado, es un **pago parcial**: se aplica **solo a los comprobantes seleccionados** (del más viejo al más nuevo) — nunca toca saldos de otros comprobantes. Lo que falte queda pendiente **en esos mismos comprobantes** para una próxima cobranza.
    - Si el monto es **mayor**, el excedente queda como **saldo a favor** del socio.
-8. Elegí la **forma de pago**: Efectivo (pesos), Efectivo (dólares), Tarjeta de crédito, Tarjeta de débito, Transferencia bancaria, Cheque, Mercado Pago u Otro. Cada una pide sus propios datos (por ejemplo, Efectivo en dólares pide el tipo de cambio y calcula el equivalente en pesos; si el socio ya tiene una tarjeta cargada para débito automático, podés reutilizarla con un clic). Si estás cobrando **comprobantes internos**, el desplegable muestra **solo los medios habilitados** en la Configuración de cobranzas del club (Efectivo habilita también Efectivo en dólares).
+8. Elegí la **forma de pago**: Efectivo (pesos), Efectivo (dólares), Tarjeta de crédito, Tarjeta de débito, Transferencia bancaria, Cheque, Mercado Pago u Otro. Cada una pide sus propios datos (por ejemplo, Efectivo en dólares pide el tipo de cambio y calcula el equivalente en pesos; si el socio ya tiene una tarjeta cargada para débito automático, podés reutilizarla con un clic). Si estás cobrando **comprobantes internos**, el desplegable muestra **solo los medios habilitados** en la Gestión de cobranza del club (Efectivo habilita también Efectivo en dólares).
 9. **Podés combinar más de una forma de pago** en el mismo cobro: hacé clic en **Agregar forma de pago** y repetí el paso anterior para cada una. La suma de todas tiene que coincidir con el Monto a cobrar.
 10. Hacé clic en **Registrar cobranza**.
 
 ### Qué pasa al confirmar
 
-Al registrar la cobranza, el sistema genera un **recibo de cobranza** con numeración propia **RC-NNNNNN**, marca como **Cobrados** los comprobantes que quedaron cubiertos enteros (del más viejo al más nuevo) y actualiza la Cuenta Corriente del socio. Si el pago fue parcial, los comprobantes no cubiertos del todo quedan pendientes para una próxima cobranza.
+Al registrar la cobranza, el sistema genera un **recibo de cobranza** con numeración propia e **independiente por circuito**: **RC-NNNNNN** para cobros de comprobantes ARCA y **CI-NNNNNN** para cobros de comprobantes internos. Marca como **Cobrados** los comprobantes que quedaron cubiertos enteros (contando cobros parciales anteriores) y actualiza la Cuenta Corriente del socio. Si el pago fue parcial, cada comprobante guarda cuánto se le aplicó y queda pendiente por el resto.
 
-El recibo se puede ver e imprimir con el ícono **Ver** (ojo) de su fila.
+El recibo se puede ver e imprimir con el ícono **Ver** (ojo) de su fila. La plantilla muestra la **Fecha de emisión** y, en pagos parciales, el monto aplicado a cada comprobante.
 
 ### Anular una cobranza
 
 1. En la tabla de Cobranzas, hacé clic en **Anular recibo** en la fila del recibo (solo disponible si todavía está **Vigente**).
 2. Confirmá.
 
-Al anular: el pago se revierte, los comprobantes que ese recibo había marcado como cobrados vuelven a pendiente, y los cargos vuelven a su estado previo. El recibo queda marcado **Anulado**, con su fecha de anulación, y no se puede volver a anular ni se genera ningún comprobante nuevo.
+Al anular: el pago se revierte, los comprobantes que ese recibo había cobrado (enteros o en parte) vuelven a pendiente, y los cargos vuelven a su estado previo. El recibo queda marcado **Anulado**, con su fecha de anulación, y no se puede volver a anular ni se genera ningún comprobante nuevo. El PDF del recibo anulado muestra el **monto en negativo** y la leyenda **ANULADO** (vale igual para RC- y CI-).
 
 > La anulación es siempre por el **total** del recibo — no se puede anular parcialmente una cobranza.
 
@@ -973,15 +979,15 @@ Sobre cada centro de la lista podés:
 
 Cómo se comporta la emisión con varios centros:
 
-- En **Facturación manual** (y en las NC/ND "sin comprobante de origen") aparece el dropdown **Centro emisor** para elegir por cuál sale, preseleccionado en el principal. Con un solo centro el dropdown no se muestra.
+- En **Facturación manual** (y en las NC/ND "sin comprobante de origen") aparece el dropdown **Centro emisor** para elegir por cuál sale, preseleccionado en el principal (con un solo centro queda como única opción).
 - Las **NC/ND sobre un comprobante emitido**, el **Reenviar** de rechazadas y la descarga de **PDF** usan siempre el punto de venta del comprobante original.
-- En la tabla de Ventas, la columna **Centro emisor** muestra el punto de venta real de cada comprobante.
+- En la tabla de Ventas, el punto de venta de cada comprobante se ve en el prefijo del **Número de comprobante legal** (formato PPPPP-NNNNNNNN).
 
 > Los centros emisores no se pueden eliminar desde el panel (solo renombrar y cambiar el principal): borrar un punto de venta con comprobantes emitidos afectaría la trazabilidad fiscal. Si necesitás dar de baja uno, contactá a soporte.
 
-_Configuración de cobranzas:_
+_Gestión de cobranza (comprobantes internos):_
 
-Debajo del formulario de datos impositivos está la sección **Configuración de cobranzas**: los **medios de pago que el club admite para cobrar comprobantes internos** (Efectivo, Tarjeta de crédito, Tarjeta de débito, Débito automático, Transferencia, Cheque, Mercado Pago). Como los comprobantes internos no son comprobantes legales, lo ideal es admitir **solo Efectivo** — que es como viene configurado de entrada.
+Debajo del formulario de datos impositivos está la sección **Gestión de cobranza (comprobantes internos)**: los **medios de pago que el club admite para cobrar comprobantes internos** (Efectivo, Tarjeta de crédito, Tarjeta de débito, Débito automático, Transferencia, Cheque, Mercado Pago). Como los comprobantes internos no son comprobantes legales, lo ideal es admitir **solo Efectivo** — que es como viene configurado de entrada.
 
 Esta configuración gobierna toda la pata de internos de la app:
 
@@ -1043,7 +1049,7 @@ El débito automático permite cobrar los servicios contratados directamente des
 4. Cada mes, el sistema emite el comprobante y cobra automáticamente los servicios incluidos.
 5. Si un cobro falla, el admin puede reintentarlo desde Cobranzas → Débito automático.
 
-> **Qué entra al débito y qué no.** Se cobran los cargos de los **Servicios Contratados con el tilde de débito** de socios **adheridos**. Los cargos que no salen de un servicio contratado (una nota de débito, un cobro por baja anticipada suelto) quedan afuera y se cobran a mano desde **Cobranzas**. Los servicios **Interno** solo entran si el club tildó **Débito automático** en su Configuración de cobranzas — y aún así se cobran en un **pago separado** de los fiscales: los dos circuitos nunca se mezclan en un mismo cobro.
+> **Qué entra al débito y qué no.** Se cobran los cargos de los **Servicios Contratados con el tilde de débito** de socios **adheridos**. Los cargos que no salen de un servicio contratado (una nota de débito, un cobro por baja anticipada suelto) quedan afuera y se cobran a mano desde **Cobranzas**. Los servicios **Interno** solo entran si el club tildó **Débito automático** en su Gestión de cobranza — y aún así se cobran en un **pago separado** de los fiscales: los dos circuitos nunca se mezclan en un mismo cobro.
 
 ### Paso 1 — Configurar Payway en tu club
 

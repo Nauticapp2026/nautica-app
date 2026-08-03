@@ -15,6 +15,9 @@ type SendEmailParams = {
   to: string;
   subject: string;
   html: string;
+  // Adjuntos (ej. el PDF de un comprobante ARCA — su link de TusFacturas
+  // vence, así que se manda el archivo y no el link).
+  attachments?: { filename: string; content: Buffer }[];
 };
 
 export async function sendEmail(
@@ -33,6 +36,7 @@ export async function sendEmail(
       to: params.to,
       subject: params.subject,
       html: params.html,
+      attachments: params.attachments,
     });
     if (result.error) {
       return { ok: false, error: result.error.message };

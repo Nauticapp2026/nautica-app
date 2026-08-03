@@ -29,13 +29,13 @@ import {
   facturacionItems,
   movimientosCuentaCorriente,
 } from '@/lib/db/schema';
-import { calcularCoberturaNotasCredito } from '@/lib/nc-cobertura';
+import { calcularCoberturaTargeted } from '@/lib/cobranza-cobertura';
 
 /**
  * Read-only. Devuelve el conjunto de ids de cargos (movimientos con debe>0) que
  * están saldados para el socio: los ya `pagado`, más los cubiertos por el pool
  * de haberes vía FIFO (del más viejo al más nuevo). Mismo criterio exacto que
- * `getCargosPagadosFifo` en cobranzas y `calcularSaldoYEstado` en el display.
+ * `calcularSaldoYEstado` en el display de Cuenta Corriente.
  *
  * Incluye cargos en cualquier estado (no_pagado, facturado, pagado) que el pool
  * cubre — por eso sirve tanto para decidir qué NO facturar (auto-emisión) como
@@ -53,16 +53,17 @@ export async function getCargosSaldadosFifo(socioId: string): Promise<Set<string
  * Invariante: poolRestante < debe del primer cargo no saldado (si alcanzara,
  * ese cargo estaría en `saldados`).
  *
- * `ncParcial`: cobertura de Nota de Crédito targeted que cubre un cargo SOLO
- * en parte (el cargo no llega a `saldados`, pero ese monto ya está acreditado
- * y no debe volver a cobrarse).
+ * `coberturaParcial`: cobertura targeted (NC de su factura o pago parcial de
+ * Cobranzas) que cubre un cargo SOLO en parte (el cargo no llega a `saldados`,
+ * pero ese monto ya está acreditado y no debe volver a cobrarse).
  */
 export async function getEstadoFifo(socioId: string): Promise<{
   saldados: Set<string>;
   poolRestante: number;
-  ncParcial: Map<string, number>;
+  coberturaParcial: Map<string, number>;
 }> {
-  const { montoPorMovimiento, movimientosDeNc } = await calcularCoberturaNotasCredito(socioId);
+  const { montoPorMovimiento, montoReciboPorMovimiento, movimientosDeNc, haberComprometido } =
+    await calcularCoberturaTargeted(socioId);
 
   const movs = await db
     .select({
@@ -82,23 +83,25 @@ export async function getEstadoFifo(socioId: string): Promise<{
     if (m && monto >= parseFloat(m.debe ?? '0') - 0.001) saldados.add(movId);
   }
 
-  // Cobertura NC que quedó parcial (no alcanzó para saldar el cargo entero).
-  const ncParcial = new Map<string, number>();
+  // Cobertura targeted que quedó parcial (no alcanzó para saldar el cargo entero).
+  const coberturaParcial = new Map<string, number>();
   for (const [movId, monto] of montoPorMovimiento) {
-    if (!saldados.has(movId)) ncParcial.set(movId, monto);
+    if (!saldados.has(movId)) coberturaParcial.set(movId, monto);
   }
 
   // Pool genérico: excluye los movimientos que son el asiento de una NC ya
-  // aplicada puntualmente arriba (ver calcularCoberturaNotasCredito). Los
-  // contraasientos de anulación de recibo (debe) restan del pool: anulan
-  // exactamente el haber del pago anulado, que sigue sumando — el neto del
-  // par es cero y esa plata no cubre ningún cargo.
+  // aplicada puntualmente arriba, y de los pagos de Cobranza targeted solo
+  // suma el excedente no aplicado (haber − comprometido: adelanto / saldo a
+  // favor). Los contraasientos de anulación de recibo (debe) restan del pool:
+  // anulan exactamente el haber del pago anulado, que sigue sumando — el neto
+  // del par es cero y esa plata no cubre ningún cargo.
   let pool = movs
     .filter((m) => !movimientosDeNc.has(m.id))
     .reduce(
       (acc, m) =>
         acc +
         parseFloat(m.haber ?? '0') -
+        (haberComprometido.get(m.id) ?? 0) -
         (m.tipo === 'anulacion_recibo' ? parseFloat(m.debe ?? '0') : 0),
       0,
     );
@@ -112,21 +115,27 @@ export async function getEstadoFifo(socioId: string): Promise<{
     if (m.estado === 'pagado') {
       // Ya pagado: consume su parte del pool (su haber está comprometido), para
       // no inflar la cobertura de otros cargos. Igual que calcularSaldoYEstado.
+      // Lo que le aplicó un recibo targeted no está en el pool (quedó
+      // comprometido en su pago): solo se descuenta el resto.
       saldados.add(m.id);
-      pool -= debe;
+      pool -= Math.max(0, debe - (montoReciboPorMovimiento.get(m.id) ?? 0));
       continue;
     }
-    if (pool >= debe - 0.001) {
-      pool -= debe;
+    // La cobertura targeted parcial ya acreditó una parte: el pool solo tiene
+    // que cubrir el resto.
+    const resto = debe - (coberturaParcial.get(m.id) ?? 0);
+    if (pool >= resto - 0.001) {
+      pool -= resto;
       saldados.add(m.id);
     }
   }
 
-  return { saldados, poolRestante: Math.max(0, pool), ncParcial };
+  return { saldados, poolRestante: Math.max(0, pool), coberturaParcial };
 }
 
 export async function reconciliarCuentaSocio(socioId: string): Promise<string[]> {
-  const { movimientosDeNc } = await calcularCoberturaNotasCredito(socioId);
+  const { montoPorMovimiento, montoReciboPorMovimiento, movimientosDeNc, haberComprometido } =
+    await calcularCoberturaTargeted(socioId);
 
   const movs = await db
     .select({
@@ -141,8 +150,8 @@ export async function reconciliarCuentaSocio(socioId: string): Promise<string[]>
     .where(eq(movimientosCuentaCorriente.socioId, socioId))
     .orderBy(asc(movimientosCuentaCorriente.fecha), asc(movimientosCuentaCorriente.createdAt));
 
-  // Excluye los movimientos que son el asiento de una NC ya aplicada
-  // puntualmente a su propia factura (ver calcularCoberturaNotasCredito) —
+  // Excluye los asientos de NC ya aplicadas puntualmente a su propia factura,
+  // y de los pagos de Cobranza targeted suma solo el excedente no aplicado —
   // esta función solo reconcilia pagos genéricos (ej. Payway), no créditos
   // ya targeteados. Los contraasientos de anulación restan del pool (anulan
   // el haber del pago anulado, ver getEstadoFifo).
@@ -152,6 +161,7 @@ export async function reconciliarCuentaSocio(socioId: string): Promise<string[]>
       (acc, m) =>
         acc +
         parseFloat(m.haber ?? '0') -
+        (haberComprometido.get(m.id) ?? 0) -
         (m.tipo === 'anulacion_recibo' ? parseFloat(m.debe ?? '0') : 0),
       0,
     );
@@ -164,11 +174,17 @@ export async function reconciliarCuentaSocio(socioId: string): Promise<string[]>
     if (m.estado === 'pagado') {
       // Ya pagado: consume su parte del pool (su haber está comprometido), para
       // no inflar la cobertura de otros cargos. Igual que calcularSaldoYEstado.
-      pool -= debe;
+      // Lo aplicado por un recibo targeted no está en el pool: solo el resto.
+      pool -= Math.max(0, debe - (montoReciboPorMovimiento.get(m.id) ?? 0));
       continue;
     }
-    if (pool >= debe - 0.001) {
-      pool -= debe;
+    const cubierto = montoPorMovimiento.get(m.id) ?? 0;
+    const resto = debe - cubierto;
+    // Cubierto entero por cobertura targeted: no consume pool y no se marca
+    // acá (los flujos targeted ya marcan lo suyo al registrarse).
+    if (resto <= 0.001) continue;
+    if (pool >= resto - 0.001) {
+      pool -= resto;
       if (m.estado === 'no_pagado' && !m.comprobanteInterno) toMark.push(m.id);
     }
   }
