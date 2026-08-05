@@ -210,6 +210,11 @@ export type RegistrarCobranzaData = {
   // Sin comprobantes seleccionados (adelanto) no hay de dónde derivar el
   // canal: lo dice el modal. Con comprobantes, manda el tipo de los elegidos.
   canal?: 'fiscal' | 'interno';
+  // Reparto explícito elegido por el club cuando hay 2+ comprobantes: cuánto
+  // del pago va a cada uno. Si viene, manda sobre el FIFO por antigüedad (el
+  // pedido del cliente 2026-08-05). Ausente = reparto automático del más viejo
+  // al más nuevo (caso de un solo comprobante o adelanto).
+  aplicaciones?: { comprobanteId: string; monto: string }[];
 };
 
 export async function registrarCobranzaAction(data: RegistrarCobranzaData): Promise<{
@@ -319,27 +324,65 @@ export async function registrarCobranzaAction(data: RegistrarCobranzaData): Prom
     }
   }
 
-  // El monto se aplica SOLO a los comprobantes seleccionados, del más viejo
-  // al más nuevo, y puede cubrir el último en parte (pago parcial): esa parte
-  // queda registrada como aplicación targeted sobre ESE comprobante — nunca
-  // "sobra" hacia comprobantes no seleccionados (ver cobranza-cobertura.ts).
-  // Solo los cubiertos enteros (contando cobros parciales previos y cargos ya
+  // El monto se aplica SOLO a los comprobantes seleccionados y puede cubrir un
+  // comprobante en parte (pago parcial): esa parte queda registrada como
+  // aplicación targeted sobre ESE comprobante — nunca "sobra" hacia
+  // comprobantes no seleccionados (ver cobranza-cobertura.ts). Solo los
+  // cubiertos enteros (contando cobros parciales previos y cargos ya
   // debitados) pasan a 'pagada'. El excedente queda como saldo a favor.
+  //
+  // Reparto: si el club mandó `aplicaciones` (elige a mano cuánto va a cada
+  // comprobante cuando tildó 2+), se respeta ese reparto; si no, se aplica del
+  // más viejo al más nuevo (FIFO) — caso de un solo comprobante.
   const pendientePrevio = comprobantes.length
     ? await getPendientePorComprobante(data.socioId, gId, comprobantes)
     : new Map<string, number>();
 
-  let remaining = montoAPagar;
+  const restanteDe = (c: (typeof comprobantes)[number]) =>
+    pendientePrevio.get(c.id) ?? parseFloat(c.importe ?? '0');
+
   const aplicaciones: { comprobanteId: string; monto: string }[] = [];
   const pagados: typeof comprobantes = [];
-  for (const c of comprobantes) {
-    if (remaining <= 0.005) break;
-    const restante = pendientePrevio.get(c.id) ?? parseFloat(c.importe ?? '0');
-    if (restante <= 0.005) continue;
-    const aplicar = Math.min(remaining, restante);
-    aplicaciones.push({ comprobanteId: c.id, monto: aplicar.toFixed(2) });
-    remaining -= aplicar;
-    if (aplicar >= restante - 0.005) pagados.push(c);
+
+  if (data.aplicaciones?.length) {
+    const porComp = new Map(
+      data.aplicaciones.map((a) => [a.comprobanteId, parseFloat(a.monto) || 0]),
+    );
+    // Toda aplicación tiene que referir a un comprobante de la selección.
+    for (const compId of porComp.keys()) {
+      if (!comprobantes.some((c) => c.id === compId)) {
+        return { error: 'Reparto inválido: refrescá la página y volvé a intentar.' };
+      }
+    }
+    let sumaAplicada = 0;
+    for (const c of comprobantes) {
+      const monto = porComp.get(c.id) ?? 0;
+      if (monto < 0) return { error: 'Los montos por comprobante no pueden ser negativos.' };
+      if (monto <= 0.005) continue;
+      const restante = restanteDe(c);
+      if (monto > restante + 0.01) {
+        return {
+          error: 'No se puede cobrar más de lo que debe un comprobante. Revisá los montos.',
+        };
+      }
+      aplicaciones.push({ comprobanteId: c.id, monto: monto.toFixed(2) });
+      sumaAplicada += monto;
+      if (monto >= restante - 0.005) pagados.push(c);
+    }
+    if (sumaAplicada > montoAPagar + 0.01) {
+      return { error: 'La suma de los montos por comprobante supera el monto a cobrar.' };
+    }
+  } else {
+    let remaining = montoAPagar;
+    for (const c of comprobantes) {
+      if (remaining <= 0.005) break;
+      const restante = restanteDe(c);
+      if (restante <= 0.005) continue;
+      const aplicar = Math.min(remaining, restante);
+      aplicaciones.push({ comprobanteId: c.id, monto: aplicar.toFixed(2) });
+      remaining -= aplicar;
+      if (aplicar >= restante - 0.005) pagados.push(c);
+    }
   }
   // El recibo guarda TODOS los comprobantes a los que aplicó algo (enteros o
   // parciales) — el PDF los muestra y la anulación los revierte.

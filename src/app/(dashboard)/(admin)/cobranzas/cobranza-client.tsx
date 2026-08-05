@@ -121,6 +121,10 @@ function NuevaCobranzaModal({
   // Paso pago
   const [fecha, setFecha] = useState(todayISODate);
   const [montoAPagar, setMontoAPagar] = useState('');
+  // Reparto por comprobante: cuánto del pago va a cada uno. Solo se usa (y se
+  // edita) cuando hay 2+ comprobantes tildados — así el club elige a qué
+  // factura imputa el parcial en vez de que aplique del más viejo al más nuevo.
+  const [montosPorComp, setMontosPorComp] = useState<Record<string, string>>({});
   const [formas, setFormas] = useState<FormaCobranza[]>([]);
 
   const [error, setError] = useState<string | null>(null);
@@ -135,15 +139,25 @@ function NuevaCobranzaModal({
     [comprobantes, canal],
   );
 
+  // Comprobantes tildados, en el orden en que se muestran (del más viejo al
+  // más nuevo). Con 2+ se habilita el reparto manual por comprobante.
+  const seleccionados = useMemo(
+    () => comprobantesCanal.filter((c) => selected.has(c.id)),
+    [comprobantesCanal, selected],
+  );
+  const modoReparto = seleccionados.length >= 2;
+
   // Lo seleccionado se suma por el saldo PENDIENTE de cada comprobante (si ya
   // tuvo un cobro parcial o una NC, se cobra solo lo que falta).
   const totalSeleccionado = useMemo(
     () =>
-      comprobantesCanal
-        .filter((c) => selected.has(c.id))
-        .reduce((acc, c) => acc + parseFloat(c.importePendiente ?? c.importe ?? '0'), 0),
-    [comprobantesCanal, selected],
+      seleccionados.reduce((acc, c) => acc + parseFloat(c.importePendiente ?? c.importe ?? '0'), 0),
+    [seleccionados],
   );
+
+  function pendienteDe(c: ComprobantePendiente): number {
+    return parseFloat(c.importePendiente ?? c.importe ?? '0');
+  }
 
   // Cobrando internos, el dropdown de formas solo muestra los medios que el
   // club habilitó en la Configuración de cobranzas. Fiscal: lista completa.
@@ -159,7 +173,17 @@ function NuevaCobranzaModal({
     [formas],
   );
   const cuadra = Math.abs(totalCargado - montoNum) < 0.01;
-  const pagoValido = montoNum > 0 && cuadra && formas.length > 0 && hayMediosManuales;
+  // En modo reparto ningún comprobante puede recibir más de lo que debe (el
+  // excedente no tiene dónde ir: un comprobante no se sobre-cobra).
+  const repartoValido = useMemo(() => {
+    if (!modoReparto) return true;
+    return seleccionados.every((c) => {
+      const monto = parseFloat(montoToNumberStr(montosPorComp[c.id] ?? '0')) || 0;
+      return monto >= 0 && monto <= pendienteDe(c) + 0.01;
+    });
+  }, [modoReparto, seleccionados, montosPorComp]);
+  const pagoValido =
+    montoNum > 0 && cuadra && formas.length > 0 && hayMediosManuales && repartoValido;
 
   function handleSelectSocio(s: SocioOption) {
     setSocio(s);
@@ -204,18 +228,40 @@ function NuevaCobranzaModal({
     // formas para partir el pago, cada una se edita por separado.
     const inicial = totalSeleccionado > 0 ? totalSeleccionado.toFixed(2) : '';
     setMontoAPagar(inicial);
+    // Reparto inicial: cada comprobante arranca con su saldo pendiente entero.
+    const montos: Record<string, string> = {};
+    for (const c of seleccionados) montos[c.id] = pendienteDe(c).toFixed(2);
+    setMontosPorComp(montos);
     setFormas([{ ...nuevaForma(tiposPermitidos), monto: inicial }]);
     setError(null);
     setStep('pago');
   }
 
-  function handleMontoAPagarChange(value: string) {
-    const limpio = sanitizeMontoInput(value);
-    setMontoAPagar(limpio);
+  function sincronizarConMonto(total: string) {
     // Con una sola forma de pago no tiene sentido pedirle al admin que
     // escriba el mismo importe dos veces — se sigue el monto a pagar
     // (incluye el caso de pago parcial: si lo baja, la forma lo acompaña).
-    setFormas((prev) => (prev.length === 1 ? [{ ...prev[0], monto: limpio }] : prev));
+    setFormas((prev) => (prev.length === 1 ? [{ ...prev[0], monto: total }] : prev));
+  }
+
+  function handleMontoAPagarChange(value: string) {
+    const limpio = sanitizeMontoInput(value);
+    setMontoAPagar(limpio);
+    sincronizarConMonto(limpio);
+  }
+
+  function handleMontoCompChange(compId: string, value: string) {
+    const limpio = sanitizeMontoInput(value);
+    const next = { ...montosPorComp, [compId]: limpio };
+    setMontosPorComp(next);
+    // El monto a cobrar es la suma de lo asignado a cada comprobante.
+    const suma = seleccionados.reduce(
+      (acc, c) => acc + (parseFloat(montoToNumberStr(next[c.id] ?? '0')) || 0),
+      0,
+    );
+    const totalStr = suma > 0 ? suma.toFixed(2) : '';
+    setMontoAPagar(totalStr);
+    sincronizarConMonto(totalStr);
   }
 
   function handleRegistrar() {
@@ -233,6 +279,14 @@ function NuevaCobranzaModal({
           datos: f.datos,
         })),
         canal,
+        // Con 2+ comprobantes el club reparte a mano; con uno solo lo resuelve
+        // el server (aplica todo al único comprobante).
+        aplicaciones: modoReparto
+          ? seleccionados.map((c) => ({
+              comprobanteId: c.id,
+              monto: montoToNumberStr(montosPorComp[c.id] ?? '0'),
+            }))
+          : undefined,
       });
       if (res.error) {
         setError(res.error);
@@ -410,51 +464,118 @@ function NuevaCobranzaModal({
           {/* Paso 3: pago */}
           {step === 'pago' && (
             <>
-              <div className="flex items-center justify-between rounded-[10px] bg-gray-50 px-4 py-3">
-                <span className="text-sm font-medium text-gray-600">Total seleccionado</span>
-                <span className="text-base font-bold text-[#101828]">
-                  {fmtMoney(totalSeleccionado)}
-                </span>
-              </div>
+              {/* En modo reparto el detalle por comprobante ya muestra los
+                  totales; el resumen de arriba sería redundante. */}
+              {!modoReparto && (
+                <div className="flex items-center justify-between rounded-[10px] bg-gray-50 px-4 py-3">
+                  <span className="text-sm font-medium text-gray-600">Total seleccionado</span>
+                  <span className="text-base font-bold text-[#101828]">
+                    {fmtMoney(totalSeleccionado)}
+                  </span>
+                </div>
+              )}
 
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Monto a cobrar">
-                  <input
-                    className={inputCls}
-                    inputMode="decimal"
-                    placeholder="0,00"
-                    value={montoAPagar}
-                    onChange={(e) => handleMontoAPagarChange(e.target.value)}
-                  />
-                </Field>
-                <Field label="Fecha">
-                  <input
-                    type="date"
-                    className={inputCls}
-                    value={fecha}
-                    onChange={(e) => setFecha(e.target.value)}
-                  />
-                </Field>
-              </div>
-
-              {selected.size === 0 ? (
-                <p className="text-xs text-amber-600">
-                  Cobranza sin comprobantes: el monto se registra como adelanto y queda como saldo a
-                  favor en la cuenta corriente del socio.
-                </p>
+              {modoReparto ? (
+                <>
+                  {/* Reparto por comprobante: el club decide cuánto le paga a
+                      cada factura tildada (pedido del cliente 2026-08-05). */}
+                  <div>
+                    <p className="mb-2 text-xs font-semibold" style={{ color: '#101828' }}>
+                      Cuánto cobrás de cada comprobante
+                    </p>
+                    <div className="divide-y divide-gray-100 rounded-[10px] border border-gray-200">
+                      {seleccionados.map((c) => {
+                        const pend = pendienteDe(c);
+                        const monto = parseFloat(montoToNumberStr(montosPorComp[c.id] ?? '0')) || 0;
+                        const excede = monto > pend + 0.01;
+                        return (
+                          <div key={c.id} className="flex items-center gap-3 px-4 py-3">
+                            <div className="flex flex-1 flex-col">
+                              <span className="text-sm font-medium text-[#101828]">
+                                {c.codigo ?? 'Sin código'}
+                                <span className="ml-2 text-xs font-normal text-gray-400">
+                                  {TIPO_COMPROBANTE_LABEL[c.tipoFactura ?? ''] ?? c.tipoFactura}
+                                </span>
+                              </span>
+                              <span className="text-xs text-gray-400">debe {fmtMoney(pend)}</span>
+                            </div>
+                            <input
+                              inputMode="decimal"
+                              placeholder="0,00"
+                              value={montosPorComp[c.id] ?? ''}
+                              onChange={(e) => handleMontoCompChange(c.id, e.target.value)}
+                              className={`h-10 w-24 rounded-[10px] border bg-white px-3 text-right text-sm text-[#101828] focus:ring-1 focus:outline-none ${
+                                excede
+                                  ? 'border-red-300 focus:border-red-400 focus:ring-red-400'
+                                  : 'border-gray-200 focus:border-[#175861] focus:ring-[#175861]'
+                              }`}
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {!repartoValido && (
+                      <p className="mt-1.5 text-xs text-red-600">
+                        Algún comprobante tiene un monto mayor a lo que debe. Ajustalo para
+                        continuar.
+                      </p>
+                    )}
+                  </div>
+                  <Field label="Fecha">
+                    <input
+                      type="date"
+                      className={inputCls}
+                      value={fecha}
+                      onChange={(e) => setFecha(e.target.value)}
+                    />
+                  </Field>
+                  <div className="flex items-center justify-between rounded-[10px] bg-gray-50 px-4 py-3">
+                    <span className="text-sm font-medium text-gray-600">Total a cobrar</span>
+                    <span className="text-base font-bold text-[#101828]">{fmtMoney(montoNum)}</span>
+                  </div>
+                </>
               ) : (
                 <>
-                  {montoNum > totalSeleccionado + 0.01 && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="Monto a cobrar">
+                      <input
+                        className={inputCls}
+                        inputMode="decimal"
+                        placeholder="0,00"
+                        value={montoAPagar}
+                        onChange={(e) => handleMontoAPagarChange(e.target.value)}
+                      />
+                    </Field>
+                    <Field label="Fecha">
+                      <input
+                        type="date"
+                        className={inputCls}
+                        value={fecha}
+                        onChange={(e) => setFecha(e.target.value)}
+                      />
+                    </Field>
+                  </div>
+
+                  {selected.size === 0 ? (
                     <p className="text-xs text-amber-600">
-                      El excedente de {fmtMoney(montoNum - totalSeleccionado)} queda como saldo a
-                      favor.
+                      Cobranza sin comprobantes: el monto se registra como adelanto y queda como
+                      saldo a favor en la cuenta corriente del socio.
                     </p>
-                  )}
-                  {montoNum > 0 && montoNum < totalSeleccionado - 0.01 && (
-                    <p className="text-xs text-amber-600">
-                      Pago parcial: se aplica solo a los comprobantes seleccionados (del más viejo
-                      al más nuevo); lo que falte queda pendiente en esos mismos comprobantes.
-                    </p>
+                  ) : (
+                    <>
+                      {montoNum > totalSeleccionado + 0.01 && (
+                        <p className="text-xs text-amber-600">
+                          El excedente de {fmtMoney(montoNum - totalSeleccionado)} queda como saldo
+                          a favor.
+                        </p>
+                      )}
+                      {montoNum > 0 && montoNum < totalSeleccionado - 0.01 && (
+                        <p className="text-xs text-amber-600">
+                          Pago parcial: se aplica al comprobante seleccionado; lo que falte queda
+                          pendiente en ese comprobante.
+                        </p>
+                      )}
+                    </>
                   )}
                 </>
               )}
