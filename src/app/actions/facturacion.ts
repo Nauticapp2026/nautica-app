@@ -695,11 +695,12 @@ export async function crearFacturaCore(
       total = totalItems(fuentes);
       if (total <= 0) throw new EmisionError('El total de la factura debe ser mayor a 0.');
 
+      // Sin prefijo de tipo ("Factura A — "): ya se muestra aparte en el
+      // campo/columna "Tipo de comprobante", repetirlo acá era redundante
+      // (pedido 2026-08-05).
       descripcionFactura =
         data.descripcion?.trim() ||
-        `Factura ${TIPO_FACTURA_API[data.tipoFactura]} — ${fuentes[0].descripcion}${
-          fuentes.length > 1 ? ` (+${fuentes.length - 1})` : ''
-        }`;
+        `${fuentes[0].descripcion}${fuentes.length > 1 ? ` (+${fuentes.length - 1})` : ''}`;
       montos = desglosarMontos(fuentes, alicuotaPara(data.tipoFactura));
 
       await tx.insert(facturacion).values({
@@ -1019,11 +1020,10 @@ export async function reenviarFacturaRechazadaAction(
   // Reenvío exitoso: recién ahora se asigna folio local (siempre FM — el
   // reenvío siempre es una corrección manual, sea cual sea el origen del
   // intento original) y se limpia el rechazo.
+  // Sin prefijo de tipo (ver comentario análogo en crearFacturaCore).
   const descripcionFactura =
     data.descripcion?.trim() ||
-    `Factura ${TIPO_FACTURA_API[data.tipoFactura]} — ${detalleItems[0].descripcion}${
-      detalleItems.length > 1 ? ` (+${detalleItems.length - 1})` : ''
-    }`;
+    `${detalleItems[0].descripcion}${detalleItems.length > 1 ? ` (+${detalleItems.length - 1})` : ''}`;
   const folioLocal = await nextFolioLocal(gId, 'FM');
   const montos = desglosarMontos(detalleItems, alicuotaPara(data.tipoFactura));
 
@@ -2587,9 +2587,10 @@ export async function emitirNotaAsociadaAction(
   const condVenta = (original.condicionVenta ?? 'contado') as CondicionVenta;
   const cliente = buildCliente({ ...socio, condicionVenta: condVenta });
 
+  // Sin prefijo NC/ND: ya se muestra en "Tipo de comprobante" (pedido 2026-08-05).
   const descripcionNota =
     data.descripcion?.trim() ||
-    `${tipoNota} — ${MOTIVO_NOTA_LABEL[data.motivo]} de comprobante ${original.codigo}`;
+    `${MOTIVO_NOTA_LABEL[data.motivo]} de comprobante ${original.codigo}`;
 
   const asociado: TusFacturasComprobanteAsociado = {
     tipo_comprobante: TIPO_FACTURA_API[tipoOriginal],
@@ -2826,9 +2827,10 @@ export async function emitirNotaCreditoInternaAction(
     importeNota = data.importe;
   }
 
+  // Sin prefijo "NC interna": ya se muestra en "Tipo de comprobante".
   const descripcionNota =
     data.descripcion?.trim() ||
-    `NC interna — ${MOTIVO_NOTA_LABEL[data.motivo]} de comprobante ${original.codigo}`;
+    `${MOTIVO_NOTA_LABEL[data.motivo]} de comprobante ${original.codigo}`;
 
   // Sin tipo fiscal (es interno): mismo fallback de alícuota que usa
   // crearComprobanteInternoCore para lo interno.
@@ -2950,8 +2952,8 @@ export async function emitirNotaLibreAction(data: EmitirNotaLibreData): Promise<
       ? data.condicionVenta
       : 'cuenta_corriente';
   const cliente = buildCliente({ ...socio, condicionVenta });
-  const descripcionNota =
-    data.descripcion?.trim() || `${tipoNota} — ${MOTIVO_NOTA_LABEL[data.motivo]}`;
+  // Sin prefijo NC/ND: ya se muestra en "Tipo de comprobante".
+  const descripcionNota = data.descripcion?.trim() || MOTIVO_NOTA_LABEL[data.motivo];
 
   const notaId = randomUUID();
   const tipoNotaFactura = (data.esNc ? NC_TIPO_FACTURA : ND_TIPO_FACTURA)[tipoFactura];

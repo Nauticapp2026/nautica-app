@@ -306,38 +306,44 @@ function desglosarItemsUi(
   return { neto, exento, iva };
 }
 
-// Desglose de importes de los modales de emisión. SIEMPRE muestra las cuatro
-// líneas — neto, exento, IVA y bruto — sin importar la letra ni la condición
-// IVA del club (pedido 2026-08-03; antes B/C mostraban solo el bruto).
+// Desglose de importes de los modales de emisión. Para club RI muestra las
+// cuatro líneas — neto, exento, IVA y bruto (pedido 2026-08-03; antes B/C
+// mostraban solo el bruto). Club Monotributo no discrimina impuesto (no
+// factura IVA): se muestra un único monto total (`soloBruto`, pedido
+// 2026-08-05).
 function DesgloseImportes({
   neto,
   exento,
   iva,
   bruto,
   brutoLabel,
+  soloBruto,
 }: {
   neto: number;
   exento: number;
   iva: number;
   bruto: number;
   brutoLabel: string;
+  soloBruto?: boolean;
 }) {
   return (
     <div className="mb-4 rounded-[10px] bg-gray-50 px-4 py-3">
-      <div className="mb-1.5 space-y-1 border-b border-gray-200 pb-1.5">
-        <div className="flex items-center justify-between text-sm text-gray-600">
-          <p>Importe neto</p>
-          <p>{fmtMoney(neto)}</p>
+      {!soloBruto && (
+        <div className="mb-1.5 space-y-1 border-b border-gray-200 pb-1.5">
+          <div className="flex items-center justify-between text-sm text-gray-600">
+            <p>Importe neto</p>
+            <p>{fmtMoney(neto)}</p>
+          </div>
+          <div className="flex items-center justify-between text-sm text-gray-600">
+            <p>Importe exento</p>
+            <p>{fmtMoney(exento)}</p>
+          </div>
+          <div className="flex items-center justify-between text-sm text-gray-600">
+            <p>Impuestos (IVA)</p>
+            <p>{fmtMoney(iva)}</p>
+          </div>
         </div>
-        <div className="flex items-center justify-between text-sm text-gray-600">
-          <p>Importe exento</p>
-          <p>{fmtMoney(exento)}</p>
-        </div>
-        <div className="flex items-center justify-between text-sm text-gray-600">
-          <p>Impuestos (IVA)</p>
-          <p>{fmtMoney(iva)}</p>
-        </div>
-      </div>
+      )}
       <div className="flex items-center justify-between">
         <p className="text-sm font-semibold" style={{ color: '#101828' }}>
           {brutoLabel}
@@ -566,6 +572,7 @@ function NuevaFacturaModal({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const clubMonotributo = guarderiaCondicionIva === 'monotributo';
 
   function handleSocioChange(socioId: string) {
     const socio = socios.find((s) => s.id === socioId);
@@ -1393,10 +1400,9 @@ function NuevaFacturaModal({
             </div>
 
             <div className="border-t border-gray-200 p-6">
-              {/* Desglose completo + total destacado — las cuatro líneas se
-              muestran SIEMPRE, para cualquier letra y también con club
-              Monotributista (pedido 2026-08-03). El reparto neto/exento/IVA
-              es el mismo que va a guardar el server (desglosarMontos). */}
+              {/* Desglose completo (neto/exento/IVA/bruto) para club RI (pedido
+              2026-08-03); club Monotributo no discrimina impuesto, muestra
+              solo el total (pedido 2026-08-05). */}
               {!modoNota && form.socioId && selectedMovs.size > 0 && (
                 <DesgloseImportes
                   neto={desgloseSeleccionado.neto}
@@ -1404,6 +1410,7 @@ function NuevaFacturaModal({
                   iva={desgloseSeleccionado.iva}
                   bruto={totalSeleccionado}
                   brutoLabel="Importe bruto (total a emitir)"
+                  soloBruto={clubMonotributo}
                 />
               )}
               {/* Mismo desglose para NC/ND (las notas van a una sola alícuota
@@ -1431,6 +1438,7 @@ function NuevaFacturaModal({
                       iva={d.iva}
                       bruto={total}
                       brutoLabel={`Importe bruto (total ${modoNota.esNc ? 'a acreditar' : 'a debitar'})`}
+                      soloBruto={clubMonotributo}
                     />
                   );
                 })()}
@@ -2211,8 +2219,9 @@ function LoteModal({
         </div>
 
         <div className="border-t border-gray-200 p-6">
-          {/* Desglose completo + total — las cuatro líneas se muestran SIEMPRE,
-          también con club Monotributista (pedido 2026-08-03). */}
+          {/* Desglose completo (neto/exento/IVA/bruto) para club RI (pedido
+          2026-08-03); club Monotributo no discrimina impuesto, muestra solo
+          el total (pedido 2026-08-05). */}
           {!result && sociosConSel > 0 && (
             <DesgloseImportes
               neto={desgloseSeleccionado.neto}
@@ -2220,6 +2229,7 @@ function LoteModal({
               iva={desgloseSeleccionado.iva}
               bruto={totalSeleccionado}
               brutoLabel="Importe bruto (total a emitir)"
+              soloBruto={clubMonotributo}
             />
           )}
           <div className="flex gap-3">

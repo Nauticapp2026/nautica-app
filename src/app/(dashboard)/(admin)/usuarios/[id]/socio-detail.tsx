@@ -152,9 +152,10 @@ type Movimiento = {
   // true si este movimiento ES el asiento de una NC ya aplicada arriba —
   // no debe sumar al pool genérico de cobertura (ver calcularSaldoYEstado).
   esMovimientoNc: boolean;
-  // Nº de operación del Servicio Contratado que originó el cargo. Null en
-  // pagos, notas y cargos anteriores al modelo "los cargos nacen al emitir".
-  numeroOperacion: number | null;
+  // Nº de operación de los Servicios Contratados que originaron el cargo —
+  // más de uno si el comprobante agrupa varios SC. Null en pagos, notas y
+  // cargos anteriores al modelo "los cargos nacen al emitir".
+  numeroOperacion: number[] | null;
 };
 
 type Servicio = {
@@ -2635,8 +2636,10 @@ export function SocioDetail({
                               </div>
                             </td>
                             <td className="px-4 py-3 text-gray-500">
-                              {m.numeroOperacion != null
-                                ? String(m.numeroOperacion).padStart(6, '0')
+                              {m.numeroOperacion != null && m.numeroOperacion.length > 0
+                                ? m.numeroOperacion
+                                    .map((n) => String(n).padStart(6, '0'))
+                                    .join(', ')
                                 : '—'}
                             </td>
                             <td className="px-4 py-3 font-medium" style={{ color: '#175861' }}>

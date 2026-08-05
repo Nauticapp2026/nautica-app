@@ -644,7 +644,14 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
               `${base.concepto ?? 'Varios servicios'} (+${miembros.length - 1})`)
             : base.concepto,
           servicioNombre: consolidado ? null : base.servicioNombre,
-          numeroOperacion: consolidado ? null : base.numeroOperacion,
+          // Consolidado: listar los Nº de operación de TODOS los Servicios
+          // Contratados agrupados en el comprobante (trazabilidad 1 a 1),
+          // no perderlos como antes al mostrar la fila fusionada.
+          numeroOperacion: consolidado
+            ? [...new Set(miembros.map((x) => x.numeroOperacion).filter((n) => n != null))]
+            : base.numeroOperacion != null
+              ? [base.numeroOperacion]
+              : null,
           fecha: base.fecha?.toISOString() ?? null,
           facturaCodigo: fac?.codigo ?? null,
           facturaArchivo: fac?.archivo ?? null,

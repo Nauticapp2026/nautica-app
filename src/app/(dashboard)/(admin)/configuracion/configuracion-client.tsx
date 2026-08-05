@@ -1742,12 +1742,28 @@ function ConfiguracionCobranzasSection({ initial }: { initial: string[] }) {
     });
   };
 
+  const todosSeleccionados = medios.length === MEDIOS_PAGO.length;
+
+  const toggleTodos = () => {
+    setMedios(todosSeleccionados ? [] : MEDIOS_PAGO.map((m) => m.value));
+    setFeedback(null);
+  };
+
   return (
     <div>
       {/* Título pedido por el cliente 2026-08-03 (ex "Configuración de cobranzas"). */}
-      <h3 className="mb-1 text-sm font-bold" style={{ color: '#101828' }}>
-        Gestión de cobranza (comprobantes internos)
-      </h3>
+      <div className="mb-1 flex items-center justify-between gap-3">
+        <h3 className="text-sm font-bold" style={{ color: '#101828' }}>
+          Gestión de cobranza (comprobantes internos)
+        </h3>
+        <button
+          type="button"
+          onClick={toggleTodos}
+          className="shrink-0 text-sm font-semibold text-[#175861] hover:underline"
+        >
+          {todosSeleccionados ? 'Quitar todos' : 'Seleccionar todos'}
+        </button>
+      </div>
       <p className="mb-4 text-sm text-gray-500">
         Medios de pago que el club admite para cobrar comprobantes internos. Al no ser comprobantes
         legales, lo ideal es admitir solo Efectivo.
