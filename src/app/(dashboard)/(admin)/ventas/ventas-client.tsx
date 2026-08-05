@@ -566,6 +566,8 @@ function NuevaFacturaModal({
   const [movimientos, setMovimientos] = useState<PendienteEmision[]>([]);
   const [selectedMovs, setSelectedMovs] = useState<Set<string>>(() => new Set());
   const [loadingMovs, setLoadingMovs] = useState(false);
+  // Adelantar la cuota Fija del mes que viene (acción opt-in del club).
+  const [adelantarSig, setAdelantarSig] = useState(false);
   // true apenas el admin toca el campo Vencimiento a mano: a partir de ahí
   // dejamos de pisarlo con el sugerido por tarifario.
   const [vencEditado, setVencEditado] = useState(false);
@@ -573,6 +575,23 @@ function NuevaFacturaModal({
   const [success, setSuccess] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const clubMonotributo = guarderiaCondicionIva === 'monotributo';
+
+  // Trae los pendientes del socio. Los ítems de adelanto (mes siguiente)
+  // llegan sin tildar: el club los marca a mano si quiere cobrarlos ahora.
+  function cargarPendientes(socioId: string, adelantar: boolean) {
+    setLoadingMovs(true);
+    getPendientesEmisionAction(socioId, 'fiscal', adelantar)
+      .then((res) => {
+        if (res.error) {
+          setError(res.error);
+        } else {
+          const movs = res.pendientes ?? [];
+          setMovimientos(movs);
+          setSelectedMovs(new Set(movs.filter((m) => !m.esAdelanto).map((m) => m.id)));
+        }
+      })
+      .finally(() => setLoadingMovs(false));
+  }
 
   function handleSocioChange(socioId: string) {
     const socio = socios.find((s) => s.id === socioId);
@@ -583,22 +602,18 @@ function NuevaFacturaModal({
     setForm((f) => ({ ...f, socioId, tipoFactura }));
     setMovimientos([]);
     setSelectedMovs(new Set());
+    setAdelantarSig(false);
     setVencEditado(false);
     setNotaFacturaId('');
     setError(null);
     if (!socioId) return;
-    setLoadingMovs(true);
-    getPendientesEmisionAction(socioId, 'fiscal')
-      .then((res) => {
-        if (res.error) {
-          setError(res.error);
-        } else {
-          const movs = res.pendientes ?? [];
-          setMovimientos(movs);
-          setSelectedMovs(new Set(movs.map((m) => m.id)));
-        }
-      })
-      .finally(() => setLoadingMovs(false));
+    cargarPendientes(socioId, false);
+  }
+
+  function handleToggleAdelantar() {
+    const next = !adelantarSig;
+    setAdelantarSig(next);
+    if (form.socioId) cargarPendientes(form.socioId, next);
   }
 
   const totalSeleccionado = useMemo(
@@ -1225,6 +1240,11 @@ function NuevaFacturaModal({
                           <div className="min-w-0 flex-1">
                             <p className="truncate font-medium" style={{ color: '#101828' }}>
                               {m.concepto ?? 'Servicio'}
+                              {m.esAdelanto && (
+                                <span className="ml-2 rounded-full bg-[#EFF8F7] px-2 py-0.5 text-[10px] font-semibold text-[#175861]">
+                                  Adelanto
+                                </span>
+                              )}
                             </p>
                             <p className="text-xs text-gray-400">{etiquetaPendiente(m)}</p>
                           </div>
@@ -1235,6 +1255,24 @@ function NuevaFacturaModal({
                       ))}
                     </div>
                   )}
+                  {/* Adelantar la cuota Fija del mes que viene (opt-in). */}
+                  <label className="flex cursor-pointer items-center gap-3 border-t border-gray-100 px-4 py-3 text-sm hover:bg-gray-50">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 cursor-pointer rounded accent-[#175861]"
+                      checked={adelantarSig}
+                      onChange={handleToggleAdelantar}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium" style={{ color: '#101828' }}>
+                        Adelantar la cuota del mes que viene
+                      </p>
+                      <p className="text-xs text-gray-400">
+                        Suma la cuota Fija del mes siguiente (mes completo). Marcá cuáles cobrar en
+                        la lista.
+                      </p>
+                    </div>
+                  </label>
                 </div>
               )}
 
@@ -1491,6 +1529,7 @@ function ComprobanteInternoManualModal({
   const [movimientos, setMovimientos] = useState<PendienteEmision[]>([]);
   const [selectedMovs, setSelectedMovs] = useState<Set<string>>(() => new Set());
   const [loadingMovs, setLoadingMovs] = useState(false);
+  const [adelantarSig, setAdelantarSig] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -1502,24 +1541,36 @@ function ComprobanteInternoManualModal({
 
   const sociosFiltrados = useMemo(() => buscarSocios(socios, query).slice(0, 50), [socios, query]);
 
-  function handleSelectSocio(id: string) {
-    setSocioId(id);
-    setMovimientos([]);
-    setSelectedMovs(new Set());
-    setError(null);
-    setStep('detalle');
+  // Los ítems de adelanto (mes siguiente) llegan sin tildar: el club elige.
+  function cargarPendientes(id: string, adelantar: boolean) {
     setLoadingMovs(true);
-    getPendientesEmisionAction(id, 'interno')
+    getPendientesEmisionAction(id, 'interno', adelantar)
       .then((res) => {
         if (res.error) {
           setError(res.error);
         } else {
           const movs = res.pendientes ?? [];
           setMovimientos(movs);
-          setSelectedMovs(new Set(movs.map((m) => m.id)));
+          setSelectedMovs(new Set(movs.filter((m) => !m.esAdelanto).map((m) => m.id)));
         }
       })
       .finally(() => setLoadingMovs(false));
+  }
+
+  function handleSelectSocio(id: string) {
+    setSocioId(id);
+    setMovimientos([]);
+    setSelectedMovs(new Set());
+    setAdelantarSig(false);
+    setError(null);
+    setStep('detalle');
+    cargarPendientes(id, false);
+  }
+
+  function handleToggleAdelantar() {
+    const next = !adelantarSig;
+    setAdelantarSig(next);
+    if (socioId) cargarPendientes(socioId, next);
   }
 
   function volverASocio() {
@@ -1527,6 +1578,7 @@ function ComprobanteInternoManualModal({
     setSocioId('');
     setMovimientos([]);
     setSelectedMovs(new Set());
+    setAdelantarSig(false);
     setError(null);
   }
 
@@ -1716,6 +1768,11 @@ function ComprobanteInternoManualModal({
                       <div className="min-w-0 flex-1">
                         <p className="truncate font-medium" style={{ color: '#101828' }}>
                           {m.concepto ?? 'Servicio'}
+                          {m.esAdelanto && (
+                            <span className="ml-2 rounded-full bg-[#EFF8F7] px-2 py-0.5 text-[10px] font-semibold text-[#175861]">
+                              Adelanto
+                            </span>
+                          )}
                         </p>
                         <p className="text-xs text-gray-400">{etiquetaPendiente(m)}</p>
                       </div>
@@ -1726,6 +1783,24 @@ function ComprobanteInternoManualModal({
                   ))}
                 </div>
               )}
+              {/* Adelantar la cuota Fija del mes que viene (opt-in). */}
+              <label className="flex cursor-pointer items-center gap-3 border-t border-gray-100 px-4 py-3 text-sm hover:bg-gray-50">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 cursor-pointer rounded accent-[#175861]"
+                  checked={adelantarSig}
+                  onChange={handleToggleAdelantar}
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium" style={{ color: '#101828' }}>
+                    Adelantar la cuota del mes que viene
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    Suma la cuota Fija del mes siguiente (mes completo). Marcá cuáles cobrar en la
+                    lista.
+                  </p>
+                </div>
+              </label>
             </div>
           )}
 

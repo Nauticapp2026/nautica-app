@@ -67,6 +67,8 @@ export type ItemPendiente = {
   tipoMovimiento: 'mensual' | 'otro';
   /** true = contrato Variable: se cierra (fechaBaja) al emitir. */
   esVariable: boolean;
+  /** true = cuota Fija del mes siguiente facturada por adelantado (opt-in). */
+  esAdelanto?: boolean;
 };
 
 /** Serializa una key para matchear la selección del cliente con el re-cómputo. */
@@ -93,6 +95,35 @@ function periodoAnterior(periodo: string): string {
   return periodoDe(prev);
 }
 
+function periodoSiguiente(periodo: string): string {
+  const [y, m] = periodo.split('-').map(Number);
+  // m es 1-based; el índice de mes de Date es 0-based, así que `m` ya apunta al
+  // mes siguiente.
+  const next = new Date(Date.UTC(y, m, 1));
+  return periodoDe(next);
+}
+
+const MESES_ES = [
+  'enero',
+  'febrero',
+  'marzo',
+  'abril',
+  'mayo',
+  'junio',
+  'julio',
+  'agosto',
+  'septiembre',
+  'octubre',
+  'noviembre',
+  'diciembre',
+];
+
+/** Etiqueta legible de un período 'YYYY-MM-01' → 'septiembre 2026'. */
+function etiquetaMes(periodo: string): string {
+  const [y, m] = periodo.split('-').map(Number);
+  return `${MESES_ES[m - 1]} ${y}`;
+}
+
 /** Mismo criterio de ventana que los generadores legacy (ver hace27Dias). */
 function hace27Dias(now: Date): Date {
   const d = new Date(now);
@@ -115,12 +146,22 @@ function importeFinal(precioNeto: number, alicuotaIva: number, interno: boolean)
 
 export async function listarPendientesFacturar(
   guarderiaId: string,
-  opts?: { socioId?: string; now?: Date; dbx?: DbExecutor },
+  opts?: {
+    socioId?: string;
+    now?: Date;
+    dbx?: DbExecutor;
+    // Suma, además del período corriente, la cuota Fija del mes siguiente
+    // (mes completo) como ítem de adelanto opt-in. Solo lo usa la emisión
+    // manual desde /ventas; el cron mensual nunca adelanta.
+    incluirMesSiguiente?: boolean;
+  },
 ): Promise<ItemPendiente[]> {
   const dbx = opts?.dbx ?? db;
   const now = opts?.now ?? new Date();
   const todayStr = now.toISOString().slice(0, 10);
   const periodoActual = periodoDe(now);
+  const periodoSig = periodoSiguiente(periodoActual);
+  const incluirMesSiguiente = opts?.incluirMesSiguiente ?? false;
   const items: ItemPendiente[] = [];
 
   // ── 1. Contratos sin espacio (Cargar Servicio) ────────────────────────────
@@ -131,6 +172,7 @@ export async function listarPendientesFacturar(
       servicioId: socioServicios.servicioId,
       fechaAsignacion: socioServicios.fechaAsignacion,
       fechaInicio: socioServicios.fechaInicio,
+      fechaBaja: socioServicios.fechaBaja,
       concepto: socioServicios.concepto,
       comprobanteInterno: socioServicios.comprobanteInterno,
       cantidadDias: socioServicios.cantidadDias,
@@ -139,6 +181,7 @@ export async function listarPendientesFacturar(
       servicioPrecio: servicios.precio,
       servicioAlicuotaIva: servicios.alicuotaIva,
       servicioPlazoPagoDias: servicios.plazoPagoDias,
+      servicioVigenciaHasta: servicios.vigenciaHasta,
       tipoCobro: servicios.tipoCobro,
       tarifaVariable: servicios.tarifaVariable,
       politicaBaja: servicios.politicaBajaAnticipada,
@@ -185,6 +228,7 @@ export async function listarPendientesFacturar(
       servicioPrecio: servicios.precio,
       servicioAlicuotaIva: servicios.alicuotaIva,
       servicioPlazoPagoDias: servicios.plazoPagoDias,
+      servicioVigenciaHasta: servicios.vigenciaHasta,
       tipoCobro: servicios.tipoCobro,
       politicaBaja: servicios.politicaBajaAnticipada,
       socioTildeInterno: memberships.comprobanteInterno,
@@ -405,49 +449,85 @@ export async function listarPendientesFacturar(
     }
 
     // Fijo mensual: un ítem por el período corriente.
-    if (facturadoPorContrato.has(`${c.contratoId}:${periodoActual}`)) continue;
-    if (legacyMensualServicio.has(`${c.socioId}:${c.servicioId}`)) continue;
+    const yaFacturadoActual =
+      facturadoPorContrato.has(`${c.contratoId}:${periodoActual}`) ||
+      legacyMensualServicio.has(`${c.socioId}:${c.servicioId}`);
 
-    // Primer ciclo iniciado este mes → proporcional desde fechaInicio, salvo
-    // que el tarifario diga 'mes_completo': esa política manda también en el
-    // alta, no solo en la baja anticipada.
-    const inicioEnMesActual = c.fechaInicio.slice(0, 8) === periodoActual.slice(0, 8);
-    let importe = importeFinal(precioNeto, alicuotaIva, c.comprobanteInterno);
-    let concepto = conceptoBase;
-    let esProporcional = false;
-    if (
-      inicioEnMesActual &&
-      !contratosConCargo.has(c.contratoId) &&
-      c.politicaBaja !== 'mes_completo'
-    ) {
-      const base = new Date(`${c.fechaInicio}T00:00:00Z`);
-      const prop = calcularProporcionalMes(importe, base);
-      if (prop.esProporcional) {
-        importe = prop.importe;
-        concepto = `${conceptoBase}${sufijoProporcional(prop.diasRestantes, prop.diasMes)}`;
-        esProporcional = true;
+    if (!yaFacturadoActual) {
+      // Primer ciclo iniciado este mes → proporcional desde fechaInicio, salvo
+      // que el tarifario diga 'mes_completo': esa política manda también en el
+      // alta, no solo en la baja anticipada.
+      const inicioEnMesActual = c.fechaInicio.slice(0, 8) === periodoActual.slice(0, 8);
+      let importe = importeFinal(precioNeto, alicuotaIva, c.comprobanteInterno);
+      let concepto = conceptoBase;
+      let esProporcional = false;
+      if (
+        inicioEnMesActual &&
+        !contratosConCargo.has(c.contratoId) &&
+        c.politicaBaja !== 'mes_completo'
+      ) {
+        const base = new Date(`${c.fechaInicio}T00:00:00Z`);
+        const prop = calcularProporcionalMes(importe, base);
+        if (prop.esProporcional) {
+          importe = prop.importe;
+          concepto = `${conceptoBase}${sufijoProporcional(prop.diasRestantes, prop.diasMes)}`;
+          esProporcional = true;
+        }
       }
+
+      items.push({
+        key: { origen: 'contrato', contratoId: c.contratoId, periodo: periodoActual },
+        origen: 'contrato',
+        socioId: c.socioId,
+        servicioId: c.servicioId,
+        contratoId: c.contratoId,
+        espacioId: null,
+        concepto,
+        importe,
+        alicuotaIva,
+        plazoPagoDias: c.servicioPlazoPagoDias,
+        servicioTipo: c.servicioTipo,
+        comprobanteInterno: c.comprobanteInterno,
+        esProporcional,
+        cantidadDias: null,
+        periodo: periodoActual,
+        tipoMovimiento: 'mensual',
+        esVariable: false,
+      });
     }
 
-    items.push({
-      key: { origen: 'contrato', contratoId: c.contratoId, periodo: periodoActual },
-      origen: 'contrato',
-      socioId: c.socioId,
-      servicioId: c.servicioId,
-      contratoId: c.contratoId,
-      espacioId: null,
-      concepto,
-      importe,
-      alicuotaIva,
-      plazoPagoDias: c.servicioPlazoPagoDias,
-      servicioTipo: c.servicioTipo,
-      comprobanteInterno: c.comprobanteInterno,
-      esProporcional,
-      cantidadDias: null,
-      periodo: periodoActual,
-      tipoMovimiento: 'mensual',
-      esVariable: false,
-    });
+    // Adelanto opt-in del mes siguiente: siempre mes completo. Se ofrece
+    // aunque el mes corriente ya esté facturado (el club puede adelantar sin
+    // haber cobrado el actual). Guardas: que no esté ya facturado ese período,
+    // que la tarifa siga vigente y que el contrato no se dé de baja antes.
+    if (incluirMesSiguiente) {
+      const yaFacturadoSig = facturadoPorContrato.has(`${c.contratoId}:${periodoSig}`);
+      const vigenteMesSig =
+        c.servicioVigenciaHasta == null || c.servicioVigenciaHasta >= periodoSig;
+      const bajaAntesDeSig = c.fechaBaja != null && c.fechaBaja < periodoSig;
+      if (!yaFacturadoSig && vigenteMesSig && !bajaAntesDeSig) {
+        items.push({
+          key: { origen: 'contrato', contratoId: c.contratoId, periodo: periodoSig },
+          origen: 'contrato',
+          socioId: c.socioId,
+          servicioId: c.servicioId,
+          contratoId: c.contratoId,
+          espacioId: null,
+          concepto: `${conceptoBase} (adelanto ${etiquetaMes(periodoSig)})`,
+          importe: importeFinal(precioNeto, alicuotaIva, c.comprobanteInterno),
+          alicuotaIva,
+          plazoPagoDias: c.servicioPlazoPagoDias,
+          servicioTipo: c.servicioTipo,
+          comprobanteInterno: c.comprobanteInterno,
+          esProporcional: false,
+          cantidadDias: null,
+          periodo: periodoSig,
+          tipoMovimiento: 'mensual',
+          esVariable: false,
+          esAdelanto: true,
+        });
+      }
+    }
   }
 
   // ── Armar ítems: espacios ────────────────────────────────────────────────
@@ -482,6 +562,7 @@ export async function listarPendientesFacturar(
       esProporcional: boolean;
       tipoMovimiento: 'mensual' | 'otro';
       esVariable: boolean;
+      esAdelanto?: boolean;
     }) => {
       items.push({
         key: {
@@ -506,6 +587,7 @@ export async function listarPendientesFacturar(
         periodo: params.periodo,
         tipoMovimiento: params.tipoMovimiento,
         esVariable: params.esVariable,
+        esAdelanto: params.esAdelanto,
       });
     };
 
@@ -537,6 +619,27 @@ export async function listarPendientesFacturar(
       facturadoPorEspacio.has(`${pair}:${periodoActual}`) ||
       espacioPairLegacyReciente.has(pair) ||
       (f.contratoId != null && facturadoPorContrato.has(`${f.contratoId}:${periodoActual}`));
+
+    // Adelanto opt-in del mes siguiente: siempre mes completo. Independiente
+    // del mes corriente; guardas por ya-facturado y vigencia de la tarifa.
+    if (incluirMesSiguiente) {
+      const yaSig =
+        facturadoPorEspacio.has(`${pair}:${periodoSig}`) ||
+        (f.contratoId != null && facturadoPorContrato.has(`${f.contratoId}:${periodoSig}`));
+      const vigenteMesSig =
+        f.servicioVigenciaHasta == null || f.servicioVigenciaHasta >= periodoSig;
+      if (!yaSig && vigenteMesSig) {
+        pushEspacio({
+          periodo: periodoSig,
+          importe: importeMes,
+          concepto: `${conceptoBase} (adelanto ${etiquetaMes(periodoSig)})`,
+          esProporcional: false,
+          tipoMovimiento: 'mensual',
+          esVariable: false,
+          esAdelanto: true,
+        });
+      }
+    }
 
     if (primerCiclo && alta && altaPeriodo != null) {
       if (altaPeriodo === periodoActual) {

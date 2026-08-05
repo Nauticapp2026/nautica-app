@@ -298,7 +298,15 @@ async function materializarItemsPendientes(
   },
 ): Promise<FuenteDetalle[]> {
   const { guarderiaId, socioId, keys, canal, now } = params;
-  const vigentes = await listarPendientesFacturar(guarderiaId, { socioId, now, dbx: tx });
+  // Incluye siempre el mes siguiente en el re-cómputo: si el cliente eligió
+  // adelantar, sus keys tienen el período del mes que viene y tienen que
+  // matchear. Los ítems de adelanto no seleccionados se ignoran igual.
+  const vigentes = await listarPendientesFacturar(guarderiaId, {
+    socioId,
+    now,
+    dbx: tx,
+    incluirMesSiguiente: true,
+  });
   const porClave = new Map(vigentes.map((i) => [claveItem(i.key), i]));
   const todayStr = now.toISOString().slice(0, 10);
   const fuentes: FuenteDetalle[] = [];
@@ -1254,6 +1262,8 @@ export type PendienteEmision = {
   alicuotaIva: number | null;
   /** Plazo de cobro (días) de la tarifa — para sugerir el vencimiento. */
   plazoPagoDias: number | null;
+  /** true = cuota Fija del mes siguiente ofrecida como adelanto opt-in. */
+  esAdelanto: boolean;
 };
 
 function itemPendienteARow(item: ItemPendiente): PendienteEmision {
@@ -1269,12 +1279,14 @@ function itemPendienteARow(item: ItemPendiente): PendienteEmision {
     origen: item.origen,
     alicuotaIva: item.alicuotaIva,
     plazoPagoDias: item.plazoPagoDias,
+    esAdelanto: item.esAdelanto ?? false,
   };
 }
 
 export async function getPendientesEmisionAction(
   socioId: string,
   canal: 'fiscal' | 'interno',
+  incluirMesSiguiente = false,
 ): Promise<{ error?: string; pendientes?: PendienteEmision[] }> {
   const ctx = await getActiveMarina();
   if (!ctx) return { error: 'No autenticado' };
@@ -1293,7 +1305,7 @@ export async function getPendientesEmisionAction(
     );
   if (!m) return { error: 'Socio no pertenece a esta guardería.' };
 
-  const items = await listarPendientesFacturar(gId, { socioId });
+  const items = await listarPendientesFacturar(gId, { socioId, incluirMesSiguiente });
   const computados = items
     .filter((i) => (canal === 'interno' ? i.comprobanteInterno : !i.comprobanteInterno))
     .map(itemPendienteARow);
@@ -1341,6 +1353,7 @@ export async function getPendientesEmisionAction(
         esProporcional: false,
         esVariable: false,
         origen: 'legacy' as const,
+        esAdelanto: false,
         alicuotaIva: r.alicuotaIva != null ? Number(r.alicuotaIva) : null,
         plazoPagoDias: r.plazoPagoDias,
       })),
