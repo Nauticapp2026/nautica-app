@@ -30,7 +30,7 @@ import {
   UserCheck,
   X,
 } from 'lucide-react';
-import { cargarServicioAction } from '@/app/actions/facturacion';
+import { cargarServicioAction, obtenerPdfFacturaAction } from '@/app/actions/facturacion';
 import {
   createEmbarcacionAction,
   deleteEmbarcacionAction,
@@ -130,6 +130,7 @@ type Movimiento = {
   servicioTipoCobro: 'fijo' | 'variable' | null;
   servicioAlicuotaIva: string | null;
   plazoPagoDias: number | null;
+  facturaId: string | null;
   facturaCodigo: string | null;
   facturaArchivo: string | null;
   facturaTipo: string | null;
@@ -427,6 +428,22 @@ function tipoComprobanteLabel(m: {
     return m.facturaTipoRecibo === 'fiscal' ? 'Recibo fiscal' : 'Recibo interno';
   }
   return TIPO_COMPROBANTE_LABEL[m.facturaTipo ?? ''] ?? m.facturaTipo ?? '—';
+}
+
+// El link de PDF que TusFacturas devuelve al emitir es temporal y vence (su
+// página muestra "no se ha encontrado información…"). Igual que en Ventas
+// (abrirPdfFactura), pedimos uno fresco en cada click. La pestaña se abre
+// ANTES del await para que el bloqueador de popups no la frene.
+async function abrirPdfFacturaFiscal(facturaId: string) {
+  const win = window.open('about:blank', '_blank');
+  const res = await obtenerPdfFacturaAction(facturaId);
+  if (res.error || !res.url) {
+    win?.close();
+    toast.error(res.error ?? 'No se pudo obtener el PDF.');
+    return;
+  }
+  if (win) win.location.href = res.url;
+  else window.open(res.url, '_blank');
 }
 
 // Categorías del Tarifario (tipoServicioEnum) — mismos labels que tarifario-client.tsx.
@@ -2620,19 +2637,32 @@ export function SocioDetail({
                                   : '—'}
                             </td>
                             <td className="px-4 py-3 text-gray-500">
-                              <div className="flex items-center gap-1.5">
+                              <div className="flex items-center justify-between gap-1.5">
                                 <span>{m.facturaCodigo ?? '—'}</span>
-                                {m.facturaArchivo && (
-                                  <a
-                                    href={m.facturaArchivo}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    title="Ver comprobante"
-                                    className="shrink-0 text-gray-400 hover:text-[#175861]"
-                                  >
-                                    <Eye className="h-4 w-4" />
-                                  </a>
-                                )}
+                                {m.facturaArchivo &&
+                                  // Interno (link a página propia, empieza con
+                                  // '/') o sin id: link directo. Fiscal: el PDF
+                                  // de TusFacturas vence, se pide fresco.
+                                  (m.facturaArchivo.startsWith('/') || !m.facturaId ? (
+                                    <a
+                                      href={m.facturaArchivo}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      title="Ver comprobante"
+                                      className="shrink-0 text-gray-400 hover:text-[#175861]"
+                                    >
+                                      <Eye className="h-4 w-4" />
+                                    </a>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() => abrirPdfFacturaFiscal(m.facturaId!)}
+                                      title="Ver comprobante"
+                                      className="shrink-0 text-gray-400 hover:text-[#175861]"
+                                    >
+                                      <Eye className="h-4 w-4" />
+                                    </button>
+                                  ))}
                               </div>
                             </td>
                             <td className="px-4 py-3 text-gray-500">

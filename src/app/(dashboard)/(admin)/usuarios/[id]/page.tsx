@@ -653,6 +653,7 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
               ? [base.numeroOperacion]
               : null,
           fecha: base.fecha?.toISOString() ?? null,
+          facturaId: fac?.facturacionId ?? null,
           facturaCodigo: fac?.codigo ?? null,
           facturaArchivo: fac?.archivo ?? null,
           facturaTipo: fac?.tipo ?? null,
