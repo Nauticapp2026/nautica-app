@@ -173,17 +173,26 @@ function descripcionConCategoria(concepto: string | null, tipo: string | null): 
  * con IVA incluido, como se cobra al socio) en neto/exento/IVA, para
  * mostrar en la tabla de Ventas. Un ítem sin alícuota propia usa
  * `fallbackAlicuota` (mismo default que ya usa `alicuotaPara` al armar el
- * detalle de TusFacturas). Alícuota 0 → todo el ítem es "exento", no neto.
+ * detalle de TusFacturas). Alícuota 0 → todo el ítem es "exento", no neto —
+ * salvo `esMonotributo`: ese club nunca discrimina IVA (el Tarifario le
+ * fuerza alícuota 0 a todos sus servicios), así que su alícuota 0 no es la
+ * categoría fiscal "Exento" sino simplemente "sin IVA": el importe entero va
+ * a Neto (pedido del cliente 2026-08-06).
  */
 function desglosarMontos(
   items: { importeUnitario: number; cantidad: number; alicuotaIva?: number | null }[],
   fallbackAlicuota: string,
+  esMonotributo = false,
 ): { montoNeto: number; montoExento: number; montoIva: number } {
   let montoNeto = 0;
   let montoExento = 0;
   let montoIva = 0;
   for (const it of items) {
     const total = it.importeUnitario * it.cantidad;
+    if (esMonotributo) {
+      montoNeto += total;
+      continue;
+    }
     const alicuota = it.alicuotaIva != null ? String(it.alicuotaIva) : fallbackAlicuota;
     if (parseFloat(alicuota) === 0) {
       montoExento += total;
@@ -709,7 +718,11 @@ export async function crearFacturaCore(
       descripcionFactura =
         data.descripcion?.trim() ||
         `${fuentes[0].descripcion}${fuentes.length > 1 ? ` (+${fuentes.length - 1})` : ''}`;
-      montos = desglosarMontos(fuentes, alicuotaPara(data.tipoFactura));
+      montos = desglosarMontos(
+        fuentes,
+        alicuotaPara(data.tipoFactura),
+        guarderia.condicionIva === 'monotributo',
+      );
 
       await tx.insert(facturacion).values({
         id: facturaId,
@@ -1033,7 +1046,11 @@ export async function reenviarFacturaRechazadaAction(
     data.descripcion?.trim() ||
     `${detalleItems[0].descripcion}${detalleItems.length > 1 ? ` (+${detalleItems.length - 1})` : ''}`;
   const folioLocal = await nextFolioLocal(gId, 'FM');
-  const montos = desglosarMontos(detalleItems, alicuotaPara(data.tipoFactura));
+  const montos = desglosarMontos(
+    detalleItems,
+    alicuotaPara(data.tipoFactura),
+    guarderia.condicionIva === 'monotributo',
+  );
 
   await db
     .update(facturacion)
@@ -1883,7 +1900,12 @@ export async function crearComprobanteInternoCore(
       }`;
       // Sin tipo fiscal (es interno): fallback '21' si el ítem no viene de un
       // servicio del tarifario con alícuota propia. Mismo criterio que fiscal.
-      const montos = desglosarMontos(fuentes, '21');
+      const [guarderiaRow] = await tx
+        .select({ condicionIva: guarderias.condicionIva })
+        .from(guarderias)
+        .where(eq(guarderias.id, gId))
+        .limit(1);
+      const montos = desglosarMontos(fuentes, '21', guarderiaRow?.condicionIva === 'monotributo');
 
       const codigo = await nextComprobanteInternoCodigo(tx, gId, prefix);
 
@@ -2620,6 +2642,7 @@ export async function emitirNotaAsociadaAction(
   const montos = desglosarMontos(
     [{ importeUnitario: importeNota, cantidad: 1 }],
     alicuotaPara(tipoOriginal),
+    guarderia.condicionIva === 'monotributo',
   );
 
   let apiResponse;
@@ -2847,7 +2870,16 @@ export async function emitirNotaCreditoInternaAction(
 
   // Sin tipo fiscal (es interno): mismo fallback de alícuota que usa
   // crearComprobanteInternoCore para lo interno.
-  const montos = desglosarMontos([{ importeUnitario: importeNota, cantidad: 1 }], '21');
+  const [guarderiaRow] = await db
+    .select({ condicionIva: guarderias.condicionIva })
+    .from(guarderias)
+    .where(eq(guarderias.id, gId))
+    .limit(1);
+  const montos = desglosarMontos(
+    [{ importeUnitario: importeNota, cantidad: 1 }],
+    '21',
+    guarderiaRow?.condicionIva === 'monotributo',
+  );
 
   const notaId = randomUUID();
   const codigo = await nextNotaCreditoInternaCodigo(gId);
@@ -2973,6 +3005,7 @@ export async function emitirNotaLibreAction(data: EmitirNotaLibreData): Promise<
   const montos = desglosarMontos(
     [{ importeUnitario: data.importe, cantidad: 1 }],
     alicuotaPara(tipoFactura),
+    guarderia.condicionIva === 'monotributo',
   );
 
   let apiResponse;
