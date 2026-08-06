@@ -44,6 +44,9 @@ export async function middleware(request: NextRequest) {
   // (marina, solicitud de lavado, tarea guardada). Auth propia: Bearer JWT de
   // Supabase. Sin esta excepción el gate los bloquea con 401 y el push nunca
   // sale (la campanita in-app igual llega porque la escribe el trigger).
+  // /api/facturas/pdf: endpoint que consume la app mobile para regenerar el
+  // link fresco del PDF de un comprobante fiscal del socio (el guardado en
+  // `archivo` vence). Auth propia: Bearer JWT de Supabase; valida socio_id.
   // /auth/*: páginas puente que abre el mail de Supabase (confirm signup,
   // callback OAuth/OTP/PKCE). El socio que se autorregistra desde mobile
   // llega acá desde el mail — si lo bloqueamos con Basic Auth, no puede
@@ -59,6 +62,7 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/api/marineros/notify') ||
     pathname.startsWith('/api/lavado/notify') ||
     pathname.startsWith('/api/tareas/notify-guardada') ||
+    pathname.startsWith('/api/facturas/pdf') ||
     pathname.startsWith('/auth/') ||
     pathname.startsWith('/api/delete-account') ||
     pathname.startsWith('/eliminar-cuenta') ||
