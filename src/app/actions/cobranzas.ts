@@ -16,6 +16,7 @@ import {
 import { getActiveMarina } from '@/lib/auth/session';
 import { getPendientePorComprobante } from '@/lib/cobranza-cobertura';
 import { fechaCalendariaArg } from '@/lib/dates';
+import { getEstadoFifo } from '@/lib/reconciliar-cuenta';
 
 type Ctx = NonNullable<Awaited<ReturnType<typeof getActiveMarina>>>;
 
@@ -61,6 +62,28 @@ const TIPOS_COBRABLES = [
   'nota_debito_c',
   'recibo',
 ] as const;
+
+// Saldo a favor disponible del socio: el mismo "poolRestante" que ya usa
+// reconciliar-cuenta.ts para decidir qué cargos están saldados — NO es el
+// saldo neto crudo (haber − debe de TODO), que da $0 en cuanto hay más deuda
+// pendiente que crédito aunque ese crédito siga sin usar. poolRestante ya
+// descuenta lo que el FIFO general "reservó" para cargos viejos, así que no
+// se duplica plata entre el uso automático y este uso explícito (pedido
+// 2026-08-06).
+async function getSaldoAFavorDisponible(socioId: string): Promise<number> {
+  const { poolRestante } = await getEstadoFifo(socioId);
+  return poolRestante;
+}
+
+export async function getSaldoAFavorAction(
+  socioId: string,
+): Promise<{ error?: string; disponible?: number }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+  const m = await assertSocioEnGuarderia(ctx, socioId);
+  if (!m) return { error: 'El socio no pertenece a esta guardería.' };
+  return { disponible: await getSaldoAFavorDisponible(socioId) };
+}
 
 export type ComprobantePendiente = {
   id: string;
@@ -205,6 +228,8 @@ export type RegistrarCobranzaData = {
   socioId: string;
   comprobanteIds: string[];
   fecha: string;
+  // Plata REAL a cobrar (la que respaldan las formas de pago) — puede ser 0
+  // si el saldo a favor cubre el total solo.
   montoAPagar: string;
   formas: FormaCobranzaInput[];
   // Sin comprobantes seleccionados (adelanto) no hay de dónde derivar el
@@ -215,6 +240,11 @@ export type RegistrarCobranzaData = {
   // pedido del cliente 2026-08-05). Ausente = reparto automático del más viejo
   // al más nuevo (caso de un solo comprobante o adelanto).
   aplicaciones?: { comprobanteId: string; monto: string }[];
+  // Cuánto del saldo a favor del socio se aplica en esta cobranza, además de
+  // `montoAPagar` (pedido 2026-08-06). No es plata nueva: no se suma al haber
+  // del movimiento (eso duplicaría el crédito) — solo amplía lo que el recibo
+  // declara cubierto en `aplicaciones`. Requiere 1+ comprobantes seleccionados.
+  montoSaldoAFavor?: string;
 };
 
 export async function registrarCobranzaAction(data: RegistrarCobranzaData): Promise<{
@@ -225,21 +255,46 @@ export async function registrarCobranzaAction(data: RegistrarCobranzaData): Prom
   const ctx = await getActiveMarina();
   if (!ctx) return { error: 'No autenticado' };
   if (!isAdmin(ctx)) return { error: 'Solo administradores pueden registrar cobranzas.' };
-  if (!data.formas?.length) return { error: 'Cargá al menos una forma de pago.' };
 
   const montoAPagar = parseFloat(data.montoAPagar);
-  if (!Number.isFinite(montoAPagar) || montoAPagar <= 0)
-    return { error: 'El monto a cobrar debe ser mayor a 0.' };
+  if (!Number.isFinite(montoAPagar) || montoAPagar < 0)
+    return { error: 'El monto a cobrar no puede ser negativo.' };
 
-  // La suma de las formas tiene que dar el monto a pagar (no se confía en el cliente).
-  const sumaFormas = data.formas.reduce((acc, f) => acc + (parseFloat(f.monto) || 0), 0);
-  if (Math.abs(sumaFormas - montoAPagar) > 0.01)
-    return { error: 'La suma de las formas de pago no coincide con el monto a cobrar.' };
+  const montoSaldoAFavor = parseFloat(data.montoSaldoAFavor ?? '0');
+  if (!Number.isFinite(montoSaldoAFavor) || montoSaldoAFavor < 0) {
+    return { error: 'El saldo a favor a aplicar no puede ser negativo.' };
+  }
+  if (montoSaldoAFavor > 0 && (data.comprobanteIds ?? []).length === 0) {
+    return { error: 'El saldo a favor solo se puede aplicar a comprobantes seleccionados.' };
+  }
+
+  const montoTotalAplicar = montoAPagar + montoSaldoAFavor;
+  if (montoTotalAplicar <= 0) return { error: 'El monto a cobrar debe ser mayor a 0.' };
+
+  // Formas de pago solo son obligatorias si hay plata real de por medio — si
+  // el saldo a favor cubre el total, no hace falta ninguna.
+  if (montoAPagar > 0.005) {
+    if (!data.formas?.length) return { error: 'Cargá al menos una forma de pago.' };
+    // La suma de las formas tiene que dar la plata real a cobrar (no se
+    // confía en el cliente).
+    const sumaFormas = data.formas.reduce((acc, f) => acc + (parseFloat(f.monto) || 0), 0);
+    if (Math.abs(sumaFormas - montoAPagar) > 0.01)
+      return { error: 'La suma de las formas de pago no coincide con el monto a cobrar.' };
+  }
 
   const gId = ctx.activeMembership.guarderiaId;
 
   const m = await assertSocioEnGuarderia(ctx, data.socioId);
   if (!m) return { error: 'El socio no pertenece a esta guardería.' };
+
+  if (montoSaldoAFavor > 0.005) {
+    const disponible = await getSaldoAFavorDisponible(data.socioId);
+    if (montoSaldoAFavor > disponible + 0.01) {
+      return {
+        error: `El saldo a favor disponible es $${disponible.toFixed(2)}, no se puede aplicar más que eso.`,
+      };
+    }
+  }
 
   // Comprobantes seleccionados, ordenados del más viejo al más nuevo (FIFO).
   // Puede no haber ninguno: cobranza sin comprobante = adelanto, el monto
@@ -369,11 +424,11 @@ export async function registrarCobranzaAction(data: RegistrarCobranzaData): Prom
       sumaAplicada += monto;
       if (monto >= restante - 0.005) pagados.push(c);
     }
-    if (sumaAplicada > montoAPagar + 0.01) {
+    if (sumaAplicada > montoTotalAplicar + 0.01) {
       return { error: 'La suma de los montos por comprobante supera el monto a cobrar.' };
     }
   } else {
-    let remaining = montoAPagar;
+    let remaining = montoTotalAplicar;
     for (const c of comprobantes) {
       if (remaining <= 0.005) break;
       const restante = restanteDe(c);
@@ -389,10 +444,21 @@ export async function registrarCobranzaAction(data: RegistrarCobranzaData): Prom
   const aplicadosIds = aplicaciones.map((a) => a.comprobanteId);
   const pagadosIds = pagados.map((c) => c.id);
 
-  const importe = montoAPagar.toFixed(2);
+  // El recibo declara cubierto el TOTAL aplicado (plata real + saldo a favor);
+  // el movimiento de cuenta corriente (haber real) solo refleja la plata que
+  // realmente entró hoy — así no se duplica el crédito ya cobrado antes (ver
+  // getSaldoAFavorDisponible: es una suma cruda de debe/haber, y el crédito
+  // usado ya estaba contado en el haber de un pago viejo).
+  const haberReal = montoAPagar.toFixed(2);
+  const importe = montoTotalAplicar.toFixed(2);
   const fecha = data.fecha ? fechaCalendariaArg(data.fecha) : new Date();
-  const medioPago = medioPagoDeFormas(data.formas) as never;
-  const datosPago = { montoAPagar: importe, formas: data.formas, aplicaciones };
+  const medioPago = data.formas?.length ? (medioPagoDeFormas(data.formas) as never) : null;
+  const datosPago = {
+    montoAPagar: haberReal,
+    montoSaldoAFavor: montoSaldoAFavor > 0 ? montoSaldoAFavor.toFixed(2) : undefined,
+    formas: data.formas ?? [],
+    aplicaciones,
+  };
   const esAdelanto = comprobantes.length === 0;
 
   try {
@@ -422,8 +488,8 @@ export async function registrarCobranzaAction(data: RegistrarCobranzaData): Prom
           tipo: 'otro',
           estado: 'pagado',
           debe: '0',
-          haber: importe,
-          importeSigned: `-${importe}`,
+          haber: haberReal,
+          importeSigned: `-${haberReal}`,
           fecha,
           formaDePago: medioPago,
           datosPago,

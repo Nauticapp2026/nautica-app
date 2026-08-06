@@ -15,6 +15,7 @@ import { buscarSocios } from '@/lib/buscador';
 import { formatArgentinaDate } from '@/lib/dates';
 import {
   getComprobantesPendientesAction,
+  getSaldoAFavorAction,
   registrarCobranzaAction,
   type ComprobantePendiente,
 } from '@/app/actions/cobranzas';
@@ -117,6 +118,10 @@ function NuevaCobranzaModal({
   const [comprobantes, setComprobantes] = useState<ComprobantePendiente[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [loadingComps, setLoadingComps] = useState(false);
+  // Saldo a favor disponible del socio (adelantos/excedentes sin usar) — se
+  // ofrece como opción para cubrir parte del cobro (pedido 2026-08-06).
+  const [saldoDisponible, setSaldoDisponible] = useState(0);
+  const [usarSaldoAFavor, setUsarSaldoAFavor] = useState(false);
 
   // Paso pago
   const [fecha, setFecha] = useState(todayISODate);
@@ -167,12 +172,17 @@ function NuevaCobranzaModal({
   // lo muestra FormasDePago).
   const hayMediosManuales = tiposCobranzaPermitidos(tiposPermitidos).length > 0;
 
+  // montoNum = total a aplicar a los comprobantes (casilleros de reparto, o el
+  // campo único en modo simple). El saldo a favor cubre hasta ese total; lo
+  // que sobra (montoEfectivo) es lo que hay que cobrar con formas de pago.
   const montoNum = parseFloat(montoToNumberStr(montoAPagar)) || 0;
+  const montoCredito = usarSaldoAFavor ? Math.min(saldoDisponible, montoNum) : 0;
+  const montoEfectivo = Math.max(0, montoNum - montoCredito);
   const totalCargado = useMemo(
     () => formas.reduce((acc, f) => acc + (parseFloat(montoToNumberStr(f.monto)) || 0), 0),
     [formas],
   );
-  const cuadra = Math.abs(totalCargado - montoNum) < 0.01;
+  const cuadra = Math.abs(totalCargado - montoEfectivo) < 0.01;
   // En modo reparto ningún comprobante puede recibir más de lo que debe (el
   // excedente no tiene dónde ir: un comprobante no se sobre-cobra).
   const repartoValido = useMemo(() => {
@@ -182,16 +192,26 @@ function NuevaCobranzaModal({
       return monto >= 0 && monto <= pendienteDe(c) + 0.01;
     });
   }, [modoReparto, seleccionados, montosPorComp]);
+  // Con el total ya cubierto por saldo a favor no hace falta ninguna forma de
+  // pago (montoEfectivo = 0); si falta plata real, sí.
   const pagoValido =
-    montoNum > 0 && cuadra && formas.length > 0 && hayMediosManuales && repartoValido;
+    montoNum > 0 &&
+    cuadra &&
+    (montoEfectivo <= 0.005 || (formas.length > 0 && hayMediosManuales)) &&
+    repartoValido;
 
   function handleSelectSocio(s: SocioOption) {
     setSocio(s);
     setError(null);
     setLoadingComps(true);
+    setSaldoDisponible(0);
+    setUsarSaldoAFavor(false);
     setStep('comprobantes');
     startTransition(async () => {
-      const res = await getComprobantesPendientesAction(s.id);
+      const [res, saldoRes] = await Promise.all([
+        getComprobantesPendientesAction(s.id),
+        getSaldoAFavorAction(s.id),
+      ]);
       setLoadingComps(false);
       if (res.error) {
         setError(res.error);
@@ -201,6 +221,7 @@ function NuevaCobranzaModal({
       setComprobantes(res.comprobantes ?? []);
       setTarjetaGuardada(res.tarjeta ?? null);
       setSelected(new Set());
+      setSaldoDisponible(saldoRes.disponible ?? 0);
     });
   }
 
@@ -221,11 +242,20 @@ function NuevaCobranzaModal({
     );
   }
 
+  // Cuánto de un total a aplicar queda cubierto en efectivo (formas de pago)
+  // una vez descontado el saldo a favor que el admin eligió usar.
+  function efectivoDe(total: number): number {
+    const credito = usarSaldoAFavor ? Math.min(saldoDisponible, total) : 0;
+    return Math.max(0, total - credito);
+  }
+
   function irAPago() {
     // Pre-llenar el monto a pagar con el total seleccionado, y la única forma
     // de pago con el mismo importe (se mantienen sincronizados mientras haya
     // una sola forma — ver `handleMontoAPagarChange`). Si el admin agrega más
-    // formas para partir el pago, cada una se edita por separado.
+    // formas para partir el pago, cada una se edita por separado. El saldo a
+    // favor recién se puede tildar en este paso, así que acá todavía no hay
+    // crédito aplicado — el monto inicial de la forma es el total tal cual.
     const inicial = totalSeleccionado > 0 ? totalSeleccionado.toFixed(2) : '';
     setMontoAPagar(inicial);
     // Reparto inicial: cada comprobante arranca con su saldo pendiente entero.
@@ -237,17 +267,26 @@ function NuevaCobranzaModal({
     setStep('pago');
   }
 
-  function sincronizarConMonto(total: string) {
+  function sincronizarConMonto(montoEfectivoStr: string) {
     // Con una sola forma de pago no tiene sentido pedirle al admin que
-    // escriba el mismo importe dos veces — se sigue el monto a pagar
-    // (incluye el caso de pago parcial: si lo baja, la forma lo acompaña).
-    setFormas((prev) => (prev.length === 1 ? [{ ...prev[0], monto: total }] : prev));
+    // escriba el mismo importe dos veces — se sigue el monto efectivo a
+    // cobrar (total menos el saldo a favor aplicado).
+    setFormas((prev) => (prev.length === 1 ? [{ ...prev[0], monto: montoEfectivoStr }] : prev));
   }
 
   function handleMontoAPagarChange(value: string) {
     const limpio = sanitizeMontoInput(value);
     setMontoAPagar(limpio);
-    sincronizarConMonto(limpio);
+    const efectivo = efectivoDe(parseFloat(montoToNumberStr(limpio)) || 0);
+    sincronizarConMonto(efectivo > 0.005 ? efectivo.toFixed(2) : '');
+  }
+
+  function handleToggleSaldoAFavor() {
+    const next = !usarSaldoAFavor;
+    setUsarSaldoAFavor(next);
+    const credito = next ? Math.min(saldoDisponible, montoNum) : 0;
+    const efectivo = Math.max(0, montoNum - credito);
+    sincronizarConMonto(efectivo > 0.005 ? efectivo.toFixed(2) : '');
   }
 
   function handleMontoCompChange(compId: string, value: string) {
@@ -261,7 +300,8 @@ function NuevaCobranzaModal({
     );
     const totalStr = suma > 0 ? suma.toFixed(2) : '';
     setMontoAPagar(totalStr);
-    sincronizarConMonto(totalStr);
+    const efectivo = efectivoDe(suma);
+    sincronizarConMonto(efectivo > 0.005 ? efectivo.toFixed(2) : '');
   }
 
   function handleRegistrar() {
@@ -272,7 +312,8 @@ function NuevaCobranzaModal({
         socioId: socio.id,
         comprobanteIds: [...selected],
         fecha,
-        montoAPagar: montoToNumberStr(montoAPagar),
+        montoAPagar: montoEfectivo.toFixed(2),
+        montoSaldoAFavor: montoCredito > 0.005 ? montoCredito.toFixed(2) : undefined,
         formas: formas.map((f) => ({
           tipo: f.tipo,
           monto: montoToNumberStr(f.monto),
@@ -475,6 +516,32 @@ function NuevaCobranzaModal({
                 </div>
               )}
 
+              {/* Usar saldo a favor: cubre hasta el total a aplicar y reduce
+                  lo que hace falta cobrar con formas de pago (pedido 2026-08-06). */}
+              {selected.size > 0 && saldoDisponible > 0 && (
+                <label className="flex cursor-pointer items-center gap-3 rounded-[10px] border border-gray-200 px-4 py-3 hover:bg-gray-50">
+                  <input
+                    type="checkbox"
+                    checked={usarSaldoAFavor}
+                    onChange={handleToggleSaldoAFavor}
+                    className="h-4 w-4 accent-[#175861]"
+                  />
+                  <div className="flex-1">
+                    <span className="text-sm font-medium text-[#101828]">
+                      Usar saldo a favor disponible
+                    </span>
+                    <span className="ml-1 text-sm text-gray-400">
+                      ({fmtMoney(saldoDisponible)})
+                    </span>
+                  </div>
+                  {usarSaldoAFavor && montoCredito > 0 && (
+                    <span className="text-sm font-semibold" style={{ color: '#175861' }}>
+                      −{fmtMoney(montoCredito)}
+                    </span>
+                  )}
+                </label>
+              )}
+
               {modoReparto ? (
                 <>
                   {/* Reparto por comprobante: el club decide cuánto le paga a
@@ -530,8 +597,12 @@ function NuevaCobranzaModal({
                     />
                   </Field>
                   <div className="flex items-center justify-between rounded-[10px] bg-gray-50 px-4 py-3">
-                    <span className="text-sm font-medium text-gray-600">Total a cobrar</span>
-                    <span className="text-base font-bold text-[#101828]">{fmtMoney(montoNum)}</span>
+                    <span className="text-sm font-medium text-gray-600">
+                      {montoCredito > 0 ? 'A cobrar en efectivo' : 'Total a cobrar'}
+                    </span>
+                    <span className="text-base font-bold text-[#101828]">
+                      {fmtMoney(montoEfectivo)}
+                    </span>
                   </div>
                 </>
               ) : (
@@ -580,32 +651,43 @@ function NuevaCobranzaModal({
                 </>
               )}
 
-              <div className="border-t border-gray-100 pt-3">
-                <p className="mb-2 text-xs font-semibold text-gray-500">Formas de pago</p>
-                <FormasDePago
-                  formas={formas}
-                  setFormas={setFormas}
-                  montoAPagar={montoAPagar}
-                  tarjetaGuardada={tarjetaGuardada}
-                  tiposPermitidos={tiposPermitidos}
-                />
-              </div>
+              {usarSaldoAFavor && montoNum > 0.005 && montoEfectivo <= 0.005 ? (
+                <p
+                  className="rounded-[10px] bg-teal-50 px-4 py-3 text-sm"
+                  style={{ color: '#175861' }}
+                >
+                  Cubierto por completo con saldo a favor — no hace falta ninguna forma de pago.
+                </p>
+              ) : (
+                <>
+                  <div className="border-t border-gray-100 pt-3">
+                    <p className="mb-2 text-xs font-semibold text-gray-500">Formas de pago</p>
+                    <FormasDePago
+                      formas={formas}
+                      setFormas={setFormas}
+                      montoAPagar={montoEfectivo.toFixed(2)}
+                      tarjetaGuardada={tarjetaGuardada}
+                      tiposPermitidos={tiposPermitidos}
+                    />
+                  </div>
 
-              <div
-                className={`flex items-center justify-between rounded-[10px] px-4 py-3 ${
-                  cuadra ? 'bg-gray-50' : 'bg-amber-50'
-                }`}
-              >
-                <span className="text-sm font-medium text-gray-600">Cargado</span>
-                <span className="text-sm font-bold text-[#101828]">
-                  {fmtMoney(totalCargado)}
-                  {!cuadra && (
-                    <span className="ml-2 text-xs font-normal text-amber-600">
-                      ≠ {fmtMoney(montoNum)}
+                  <div
+                    className={`flex items-center justify-between rounded-[10px] px-4 py-3 ${
+                      cuadra ? 'bg-gray-50' : 'bg-amber-50'
+                    }`}
+                  >
+                    <span className="text-sm font-medium text-gray-600">Cargado</span>
+                    <span className="text-sm font-bold text-[#101828]">
+                      {fmtMoney(totalCargado)}
+                      {!cuadra && (
+                        <span className="ml-2 text-xs font-normal text-amber-600">
+                          ≠ {fmtMoney(montoEfectivo)}
+                        </span>
+                      )}
                     </span>
-                  )}
-                </span>
-              </div>
+                  </div>
+                </>
+              )}
             </>
           )}
 
