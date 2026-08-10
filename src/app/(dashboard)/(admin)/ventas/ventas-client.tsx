@@ -44,6 +44,7 @@ import { buscarSocios, normalizarBusqueda } from '@/lib/buscador';
 import { formatArgentinaDate } from '@/lib/dates';
 import { EmptyState } from '@/components/shared/empty-state';
 import { Pagination } from '@/components/shared/pagination';
+import { TablaScrollX } from '@/components/shared/tabla-scroll-x';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -4311,7 +4312,7 @@ export function VentasClient({
                     </button>
                   </div>
                 )}
-                <div className="overflow-x-auto">
+                <TablaScrollX>
                   <table className="w-full min-w-[2300px] text-sm">
                     <thead>
                       <tr className="bg-gray-50 text-left text-xs font-semibold text-gray-500">
@@ -4520,7 +4521,7 @@ export function VentasClient({
                       })}
                     </tbody>
                   </table>
-                </div>
+                </TablaScrollX>
                 <Pagination
                   page={afipPage}
                   totalItems={filtradosAfip.length}
@@ -4541,7 +4542,7 @@ export function VentasClient({
             />
           ) : (
             <>
-              <div className="overflow-x-auto">
+              <TablaScrollX>
                 <table className="w-full min-w-[1700px] text-sm">
                   <thead>
                     <tr className="bg-gray-50 text-left text-xs font-semibold text-gray-500">
@@ -4633,7 +4634,7 @@ export function VentasClient({
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </TablaScrollX>
               <Pagination
                 page={recibosPage}
                 totalItems={filtradosRecibos.length}
