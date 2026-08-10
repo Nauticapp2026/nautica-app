@@ -356,6 +356,44 @@ function DesgloseImportes({
   );
 }
 
+/**
+ * Desglose de una NC/ND, para el footer de los modales que las emiten. Las notas
+ * van a una sola alícuota (21%, o 0 en comprobante C — ver `alicuotaPara()` en
+ * facturacion.ts), así que alcanza el total: no hacen falta los ítems.
+ *
+ * Lo usan los cuatro caminos de emisión (Nueva NC/ND del header, el botón de la
+ * fila, la NC interna y la anulación en lote) para que muestren lo mismo que la
+ * factura. `soloBruto` respeta la regla del club Monotributo: no discrimina
+ * impuesto, va un único total (pedido 2026-08-05).
+ */
+function DesgloseNota({
+  total,
+  tipoFactura,
+  esNc,
+  soloBruto,
+}: {
+  total: number;
+  tipoFactura: string | null;
+  esNc: boolean;
+  soloBruto?: boolean;
+}) {
+  if (!(total > 0)) return null;
+  const d = desglosarItemsUi(
+    [{ bruto: total, alicuotaIva: null }],
+    tipoFactura === 'factura_c' ? 0 : 21,
+  );
+  return (
+    <DesgloseImportes
+      neto={d.neto}
+      exento={d.exento}
+      iva={d.iva}
+      bruto={total}
+      brutoLabel={`Importe bruto (total ${esNc ? 'a acreditar' : 'a debitar'})`}
+      soloBruto={soloBruto}
+    />
+  );
+}
+
 const fmtDate = formatArgentinaDate;
 
 // Detalle del socio en UNA línea para los buscadores de comprobantes:
@@ -1451,35 +1489,25 @@ function NuevaFacturaModal({
                   soloBruto={clubMonotributo}
                 />
               )}
-              {/* Mismo desglose para NC/ND (las notas van a una sola alícuota
-              — 21%, o 0 en comprobante C — ver alicuotaPara() en
-              facturacion.ts). */}
-              {modoNota &&
-                (() => {
-                  const total = notaNeedsImporte
-                    ? Number.isFinite(notaImporteNum)
-                      ? notaImporteNum
-                      : 0
-                    : parseFloat(notaFacturaSel?.importe ?? '0');
-                  if (!(total > 0)) return null;
-                  const tipoNota = notaRelacionada
-                    ? (notaFacturaSel?.tipoFactura ?? form.tipoFactura)
-                    : form.tipoFactura;
-                  const d = desglosarItemsUi(
-                    [{ bruto: total, alicuotaIva: null }],
-                    tipoNota === 'factura_c' ? 0 : 21,
-                  );
-                  return (
-                    <DesgloseImportes
-                      neto={d.neto}
-                      exento={d.exento}
-                      iva={d.iva}
-                      bruto={total}
-                      brutoLabel={`Importe bruto (total ${modoNota.esNc ? 'a acreditar' : 'a debitar'})`}
-                      soloBruto={clubMonotributo}
-                    />
-                  );
-                })()}
+              {/* Mismo desglose para NC/ND (ver DesgloseNota). */}
+              {modoNota && (
+                <DesgloseNota
+                  total={
+                    notaNeedsImporte
+                      ? Number.isFinite(notaImporteNum)
+                        ? notaImporteNum
+                        : 0
+                      : parseFloat(notaFacturaSel?.importe ?? '0')
+                  }
+                  tipoFactura={
+                    notaRelacionada
+                      ? (notaFacturaSel?.tipoFactura ?? form.tipoFactura)
+                      : form.tipoFactura
+                  }
+                  esNc={modoNota.esNc}
+                  soloBruto={clubMonotributo}
+                />
+              )}
               <div className="flex gap-3">
                 <button
                   onClick={handleClose}
@@ -2802,12 +2830,15 @@ function NotaCreditoModal({
   onClose,
   factura,
   acreditado,
+  guarderiaCondicionIva,
 }: {
   open: boolean;
   onClose: () => void;
   factura: Factura | null;
   // Total ya acreditado por NC anteriores (no rechazadas) sobre esta factura.
   acreditado: number;
+  // Para el desglose del footer: Monotributo no discrimina impuesto.
+  guarderiaCondicionIva?: string | null;
 }) {
   const router = useRouter();
   const [esNc, setEsNc] = useState(true);
@@ -2999,6 +3030,20 @@ function NotaCreditoModal({
             </div>
 
             <div className="border-t border-gray-200 p-6">
+              {/* Mismo desglose que la factura (pedido 2026-08-10): este modal
+              es el camino habitual y era el único sin el cuadro. */}
+              <DesgloseNota
+                total={
+                  needsImporte
+                    ? Number.isFinite(parseFloat(importe.replace(',', '.')))
+                      ? parseFloat(importe.replace(',', '.'))
+                      : 0
+                    : disponible
+                }
+                tipoFactura={factura.tipoFactura}
+                esNc={esNc}
+                soloBruto={guarderiaCondicionIva === 'monotributo'}
+              />
               <div className="flex gap-3">
                 <button
                   onClick={handleClose}
@@ -3034,12 +3079,15 @@ function NotaCreditoInternaModal({
   onClose,
   factura,
   acreditado,
+  guarderiaCondicionIva,
 }: {
   open: boolean;
   onClose: () => void;
   factura: Factura | null;
   // Total ya acreditado por NC internas anteriores sobre este comprobante.
   acreditado: number;
+  // Para el desglose del footer: Monotributo no discrimina impuesto.
+  guarderiaCondicionIva?: string | null;
 }) {
   const router = useRouter();
   const [motivo, setMotivo] = useState<MotivoNota>('anulacion_total');
@@ -3195,6 +3243,21 @@ function NotaCreditoInternaModal({
             </div>
 
             <div className="border-t border-gray-200 p-6">
+              {/* Mismo desglose que la factura (pedido 2026-08-10). El
+              comprobante interno no tiene letra fiscal: rige la alícuota
+              general, igual que emitirNotaCreditoInternaAction. */}
+              <DesgloseNota
+                total={
+                  needsImporte
+                    ? Number.isFinite(parseFloat(importe.replace(',', '.')))
+                      ? parseFloat(importe.replace(',', '.'))
+                      : 0
+                    : disponible
+                }
+                tipoFactura={null}
+                esNc
+                soloBruto={guarderiaCondicionIva === 'monotributo'}
+              />
               <div className="flex gap-3">
                 <button
                   onClick={handleClose}
@@ -3468,10 +3531,13 @@ function LoteNotaCreditoModal({
   open,
   onClose,
   facturas,
+  guarderiaCondicionIva,
 }: {
   open: boolean;
   onClose: () => void;
   facturas: Factura[];
+  // Para el desglose del footer: Monotributo no discrimina impuesto.
+  guarderiaCondicionIva?: string | null;
 }) {
   const router = useRouter();
   const [running, setRunning] = useState(false);
@@ -3518,6 +3584,17 @@ function LoteNotaCreditoModal({
 
   const okCount = resultados?.filter((r) => r.ok).length ?? 0;
   const failCount = resultados?.filter((r) => !r.ok).length ?? 0;
+
+  // Desglose del lote: cada factura aporta con la alícuota de SU letra (C → 0,
+  // resto 21 — mismo criterio que alicuotaPara), así una selección mezclada no
+  // queda mal discriminada.
+  const desgloseLote = desglosarItemsUi(
+    facturas.map((f) => ({
+      bruto: parseFloat(f.importe ?? '0'),
+      alicuotaIva: f.tipoFactura === 'factura_c' ? 0 : 21,
+    })),
+    21,
+  );
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -3613,6 +3690,18 @@ function LoteNotaCreditoModal({
         </div>
 
         <div className="border-t border-gray-200 p-6">
+          {/* Mismo desglose que la factura (pedido 2026-08-10), sobre el total
+          del lote. Ya emitido no aplica: el resultado manda. */}
+          {!resultados && (
+            <DesgloseImportes
+              neto={desgloseLote.neto}
+              exento={desgloseLote.exento}
+              iva={desgloseLote.iva}
+              bruto={total}
+              brutoLabel="Importe bruto (total a acreditar)"
+              soloBruto={guarderiaCondicionIva === 'monotributo'}
+            />
+          )}
           {resultados ? (
             <button
               onClick={handleClose}
@@ -3958,6 +4047,7 @@ export function VentasClient({
         onClose={() => setNcFactura(null)}
         factura={ncFactura}
         acreditado={ncFactura ? (acreditadoNcPorFactura.get(ncFactura.id) ?? 0) : 0}
+        guarderiaCondicionIva={guarderiaCondicionIva}
       />
       <NotaCreditoInternaModal
         open={!!ncInternaComprobante}
@@ -3966,6 +4056,7 @@ export function VentasClient({
         acreditado={
           ncInternaComprobante ? (acreditadoNcPorFactura.get(ncInternaComprobante.id) ?? 0) : 0
         }
+        guarderiaCondicionIva={guarderiaCondicionIva}
       />
       {reenviarFactura && (
         <ReenviarFacturaModal
@@ -3982,6 +4073,7 @@ export function VentasClient({
           setSelectedNc(new Set());
         }}
         facturas={facturasSeleccionadas}
+        guarderiaCondicionIva={guarderiaCondicionIva}
       />
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
