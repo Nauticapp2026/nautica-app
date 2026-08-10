@@ -2828,11 +2828,13 @@ export function SocioDetail({
                                   ))}
                               </div>
                             </td>
+                            {/* Sin relleno de ceros: se muestra el número tal
+                                cual (pedido 2026-08-10). Servicios Contratados
+                                y el listado de Ventas siguen mostrándolo
+                                completado a 6 dígitos. */}
                             <td className="px-4 py-3 text-gray-500">
                               {m.numeroOperacion != null && m.numeroOperacion.length > 0
-                                ? m.numeroOperacion
-                                    .map((n) => String(n).padStart(6, '0'))
-                                    .join(', ')
+                                ? m.numeroOperacion.join(', ')
                                 : '—'}
                             </td>
                             <td className="px-4 py-3 font-medium" style={{ color: '#175861' }}>
