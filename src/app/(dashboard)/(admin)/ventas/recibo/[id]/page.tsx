@@ -69,8 +69,26 @@ const FORMA_COBRANZA_LABEL: Record<string, string> = {
   otro: 'Otro',
 };
 
-export default async function ReciboPage({ params }: { params: Promise<{ id: string }> }) {
+// A dónde vuelve el link de arriba. El visor se abre desde Ventas, desde Registro
+// de Cobranza y desde el ojito de la Cuenta Corriente del socio, siempre en una
+// pestaña nueva (target="_blank"), así que no hay historial al que volver: el
+// origen viaja en la query. Sin `from` se mantiene el destino histórico (Ventas).
+const ORIGEN_VUELTA: Record<string, { href: string; label: string }> = {
+  cobranzas: { href: '/cobranzas', label: 'Volver a Cobranzas' },
+  ventas: { href: '/ventas', label: 'Volver a Ventas' },
+};
+const VUELTA_DEFAULT = ORIGEN_VUELTA.ventas;
+
+export default async function ReciboPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ from?: string }>;
+}) {
   const { id } = await params;
+  const { from } = await searchParams;
+  const vuelta = (from && ORIGEN_VUELTA[from]) || VUELTA_DEFAULT;
   const ctx = await getActiveMarina();
   if (!ctx) notFound();
 
@@ -212,8 +230,8 @@ export default async function ReciboPage({ params }: { params: Promise<{ id: str
       <div className="min-h-screen bg-gray-50 p-6 print:bg-white print:p-0">
         {/* Botones de acción — ocultos en impresión */}
         <div className="no-print mb-6 flex items-center justify-between">
-          <a href="/ventas" className="text-sm text-gray-500 hover:text-gray-700">
-            ← Volver a Ventas
+          <a href={vuelta.href} className="text-sm text-gray-500 hover:text-gray-700">
+            ← {vuelta.label}
           </a>
           <div className="flex items-center gap-2">
             <EnviarReciboMailButton

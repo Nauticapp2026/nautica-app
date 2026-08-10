@@ -141,7 +141,9 @@ export function CobranzaTabla({ cobranzas }: { cobranzas: CobranzaRow[] }) {
               <td className="px-4 py-3">
                 <div className="flex items-center justify-end gap-2">
                   <a
-                    href={`/ventas/recibo/${c.id}`}
+                    // `from` para que el visor ofrezca volver a Cobranzas y no a
+                    // Ventas (se abre en pestaña nueva: no hay historial).
+                    href={`/ventas/recibo/${c.id}?from=cobranzas`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1 rounded-[8px] border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50"
