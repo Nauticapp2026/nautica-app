@@ -19,7 +19,7 @@
  * una de estas NC (`movimientosDeNc`) para no contar esa plata dos veces.
  */
 
-import { and, eq, inArray, isNotNull } from 'drizzle-orm';
+import { and, inArray, isNotNull } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import {
@@ -36,15 +36,35 @@ const TIPOS_NC_ASOCIABLES = [
   'nota_credito_interna',
 ] as const;
 
-export async function calcularCoberturaNotasCredito(socioId: string): Promise<{
-  montoPorMovimiento: Map<string, number>;
-  movimientosDeNc: Set<string>;
-}> {
-  const montoPorMovimiento = new Map<string, number>();
-  const movimientosDeNc = new Set<string>();
+/**
+ * Resuelve la cobertura de NC de uno o varios socios en las mismas queries. El
+ * batch existe porque el listado de socios muestra el saldo a favor de cientos
+ * de socios y no puede disparar una tanda de queries por cada uno.
+ *
+ * Cada NC solo cubre los cargos de SU factura original, y el acumulado es por
+ * socio: dos socios nunca comparten cargos.
+ */
+export async function calcularCoberturaNotasCreditoBatch(socioIds: string[]): Promise<
+  Map<
+    string,
+    {
+      montoPorMovimiento: Map<string, number>;
+      movimientosDeNc: Set<string>;
+    }
+  >
+> {
+  const out = new Map<
+    string,
+    { montoPorMovimiento: Map<string, number>; movimientosDeNc: Set<string> }
+  >();
+  for (const id of socioIds) {
+    out.set(id, { montoPorMovimiento: new Map(), movimientosDeNc: new Set() });
+  }
+  if (socioIds.length === 0) return out;
 
   const notas = await db
     .select({
+      socioId: facturacion.socioId,
       importe: facturacion.importe,
       facturaOriginalId: facturacion.facturaOriginalId,
       movimientoId: facturacion.movimientoId,
@@ -52,16 +72,16 @@ export async function calcularCoberturaNotasCredito(socioId: string): Promise<{
     .from(facturacion)
     .where(
       and(
-        eq(facturacion.socioId, socioId),
+        inArray(facturacion.socioId, socioIds),
         inArray(facturacion.tipoFactura, [...TIPOS_NC_ASOCIABLES]),
         isNotNull(facturacion.facturaOriginalId),
       ),
     );
 
-  if (notas.length === 0) return { montoPorMovimiento, movimientosDeNc };
+  if (notas.length === 0) return out;
 
   for (const n of notas) {
-    if (n.movimientoId) movimientosDeNc.add(n.movimientoId);
+    if (n.movimientoId && n.socioId) out.get(n.socioId)?.movimientosDeNc.add(n.movimientoId);
   }
 
   const originalIds = [...new Set(notas.map((n) => n.facturaOriginalId!).filter(Boolean))];
@@ -69,7 +89,7 @@ export async function calcularCoberturaNotasCredito(socioId: string): Promise<{
     .select({ id: facturacionItems.id, facturacionId: facturacionItems.facturacionId })
     .from(facturacionItems)
     .where(inArray(facturacionItems.facturacionId, originalIds));
-  if (items.length === 0) return { montoPorMovimiento, movimientosDeNc };
+  if (items.length === 0) return out;
 
   const itemToFac = new Map(items.map((i) => [i.id, i.facturacionId]));
   const links = await db
@@ -94,7 +114,7 @@ export async function calcularCoberturaNotasCredito(socioId: string): Promise<{
   }
 
   const candidatoIds = [...new Set([...movsPorFactura.values()].flat())];
-  if (candidatoIds.length === 0) return { montoPorMovimiento, movimientosDeNc };
+  if (candidatoIds.length === 0) return out;
 
   const movsInfo = await db
     .select({
@@ -107,7 +127,11 @@ export async function calcularCoberturaNotasCredito(socioId: string): Promise<{
   const movInfoById = new Map(movsInfo.map((m) => [m.id, m]));
 
   for (const nota of notas) {
-    if (!nota.facturaOriginalId) continue;
+    if (!nota.facturaOriginalId || !nota.socioId) continue;
+    // El acumulado de cobertura es por socio: dos socios no comparten cargos, y
+    // mezclarlos haría que la NC de uno "consuma" el cupo de otro.
+    const montoPorMovimiento = out.get(nota.socioId)?.montoPorMovimiento;
+    if (!montoPorMovimiento) continue;
     const movIds = movsPorFactura.get(nota.facturaOriginalId) ?? [];
     const ordenados = movIds
       .map((id) => movInfoById.get(id))
@@ -128,5 +152,5 @@ export async function calcularCoberturaNotasCredito(socioId: string): Promise<{
     }
   }
 
-  return { montoPorMovimiento, movimientosDeNc };
+  return out;
 }

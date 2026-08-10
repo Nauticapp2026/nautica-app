@@ -58,6 +58,8 @@ type Socio = {
   deuda: string | null;
   // Saldo neto: positivo = nos debe, negativo = saldo a favor.
   saldoNeto: string | null;
+  /** Crédito sin usar (pool FIFO). Puede convivir con deuda. */
+  saldoAFavor?: string | null;
   estadoSocio: 'activo' | 'moroso' | null;
   membershipStatus: 'active' | 'inactivo';
   numeroSocio: number | null;
@@ -1115,6 +1117,10 @@ export function UsuariosClient({
                         const nombre = [s.nombre, s.apellido].filter(Boolean).join(' ') || '—';
                         const saldoNeto = parseFloat(s.saldoNeto ?? s.deuda ?? '0');
                         const aFavor = saldoNeto < 0;
+                        // Crédito sin usar. Con deuda pendiente el neto no lo
+                        // muestra (queda tapado), así que se informa aparte —
+                        // es el mismo importe que Cobranzas ofrece aplicar.
+                        const creditoSinUsar = parseFloat(s.saldoAFavor ?? '0');
                         const isExpanded = expandedIds.has(s.profileId);
                         return (
                           <Fragment key={s.membresiaId}>
@@ -1187,6 +1193,14 @@ export function UsuariosClient({
                                 {aFavor && (
                                   <span className="ml-1 text-xs font-normal text-green-600">
                                     a favor
+                                  </span>
+                                )}
+                                {!aFavor && creditoSinUsar > 0.005 && (
+                                  <span
+                                    className="block text-xs font-normal text-green-600"
+                                    title="Crédito sin usar disponible para aplicar en una cobranza"
+                                  >
+                                    +${creditoSinUsar.toLocaleString('es-AR')} a favor
                                   </span>
                                 )}
                               </td>

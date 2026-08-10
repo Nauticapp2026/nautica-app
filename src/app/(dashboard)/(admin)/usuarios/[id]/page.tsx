@@ -27,6 +27,7 @@ import { eq, and, desc, gte, inArray, isNull, asc, lte } from 'drizzle-orm';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { addDiasYmd, argYmd } from '@/lib/dates';
 import { calcularCoberturaTargeted } from '@/lib/cobranza-cobertura';
+import { getEstadoFifo } from '@/lib/reconciliar-cuenta';
 import { SocioDetail } from './socio-detail';
 
 export default async function SocioPage({ params }: { params: Promise<{ id: string }> }) {
@@ -568,8 +569,14 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
   const { montoNcPorMovimiento, montoReciboPorMovimiento, movimientosDeNc, haberComprometido } =
     await calcularCoberturaTargeted(id);
 
+  // Saldo a favor disponible: el mismo pool FIFO que ofrece Cobranzas al cobrar.
+  // La card lo calculaba como neto crudo (haber − debe), que da $0 en cuanto hay
+  // más deuda que crédito — mostraba un número distinto al del modal.
+  const { poolRestante: saldoAFavorDisponible } = await getEstadoFifo(id);
+
   return (
     <SocioDetail
+      saldoAFavorDisponible={saldoAFavorDisponible}
       paywayPublicKey={guarderiaRow[0]?.paywayPublicKey ?? null}
       internosHabilitados={(guarderiaRow[0]?.mediosCobroInternos ?? []).length > 0}
       debitoInternoHabilitado={(guarderiaRow[0]?.mediosCobroInternos ?? []).includes(

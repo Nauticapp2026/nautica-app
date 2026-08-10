@@ -31,7 +31,7 @@ import {
   facturacionItems,
   movimientosCuentaCorriente,
 } from '@/lib/db/schema';
-import { calcularCoberturaNotasCredito } from '@/lib/nc-cobertura';
+import { calcularCoberturaNotasCreditoBatch } from '@/lib/nc-cobertura';
 
 export type AplicacionCobranza = { comprobanteId: string; monto: string };
 
@@ -50,8 +50,20 @@ async function getRecibosConAplicaciones(socioId: string): Promise<
     aplicaciones: AplicacionCobranza[];
   }[]
 > {
+  return (await getRecibosConAplicacionesBatch([socioId])).get(socioId) ?? [];
+}
+
+/** Igual que `getRecibosConAplicaciones` para varios socios, en una sola query. */
+async function getRecibosConAplicacionesBatch(
+  socioIds: string[],
+): Promise<Map<string, { movimientoId: string; aplicaciones: AplicacionCobranza[] }[]>> {
+  const out = new Map<string, { movimientoId: string; aplicaciones: AplicacionCobranza[] }[]>();
+  for (const id of socioIds) out.set(id, []);
+  if (socioIds.length === 0) return out;
+
   const rows = await db
     .select({
+      socioId: facturacion.socioId,
       movimientoId: facturacion.movimientoId,
       datosPago: movimientosCuentaCorriente.datosPago,
     })
@@ -62,7 +74,7 @@ async function getRecibosConAplicaciones(socioId: string): Promise<
     )
     .where(
       and(
-        eq(facturacion.socioId, socioId),
+        inArray(facturacion.socioId, socioIds),
         eq(facturacion.tipoFactura, 'recibo'),
         eq(facturacion.anulada, false),
         or(like(facturacion.codigo, 'RC-%'), like(facturacion.codigo, 'CI-%')),
@@ -70,12 +82,11 @@ async function getRecibosConAplicaciones(socioId: string): Promise<
     )
     .orderBy(asc(facturacion.emision), asc(facturacion.createdAt));
 
-  const out: { movimientoId: string; aplicaciones: AplicacionCobranza[] }[] = [];
   for (const r of rows) {
-    if (!r.movimientoId) continue;
+    if (!r.movimientoId || !r.socioId) continue;
     const dp = r.datosPago as { aplicaciones?: AplicacionCobranza[] } | null;
     if (!dp?.aplicaciones?.length) continue;
-    out.push({ movimientoId: r.movimientoId, aplicaciones: dp.aplicaciones });
+    out.get(r.socioId)?.push({ movimientoId: r.movimientoId, aplicaciones: dp.aplicaciones });
   }
   return out;
 }
@@ -246,27 +257,57 @@ export async function getPendientePorComprobante(
  *   ya está aplicado a comprobantes puntuales. El pool genérico debe sumar
  *   solo `haber − comprometido` (el excedente es adelanto / saldo a favor).
  */
-export async function calcularCoberturaTargeted(socioId: string): Promise<{
+export async function calcularCoberturaTargeted(
+  socioId: string,
+): Promise<CoberturaTargeted> {
+  const porSocio = await calcularCoberturaTargetedBatch([socioId]);
+  return porSocio.get(socioId) ?? coberturaVacia();
+}
+
+export type CoberturaTargeted = {
   montoPorMovimiento: Map<string, number>;
   montoNcPorMovimiento: Map<string, number>;
   montoReciboPorMovimiento: Map<string, number>;
   movimientosDeNc: Set<string>;
   haberComprometido: Map<string, number>;
-}> {
-  const { montoPorMovimiento: montoNcPorMovimiento, movimientosDeNc } =
-    await calcularCoberturaNotasCredito(socioId);
+};
 
-  const montoReciboPorMovimiento = new Map<string, number>();
-  const haberComprometido = new Map<string, number>();
+function coberturaVacia(): CoberturaTargeted {
+  return {
+    montoPorMovimiento: new Map(),
+    montoNcPorMovimiento: new Map(),
+    montoReciboPorMovimiento: new Map(),
+    movimientosDeNc: new Set(),
+    haberComprometido: new Map(),
+  };
+}
 
-  const recibos = await getRecibosConAplicaciones(socioId);
+/**
+ * Igual que `calcularCoberturaTargeted` pero resolviendo varios socios con las
+ * mismas queries — lo usa el listado de socios (ver `getPoolRestanteBatch`).
+ * El criterio por socio es idéntico; solo se agrupa distinto.
+ */
+export async function calcularCoberturaTargetedBatch(
+  socioIds: string[],
+): Promise<Map<string, CoberturaTargeted>> {
+  const out = new Map<string, CoberturaTargeted>();
+  if (socioIds.length === 0) return out;
 
-  if (recibos.length > 0) {
-    // Cargos de cada comprobante aplicado, por las dos vías de vínculo
-    // (directo facturacion.movimientoId + M:N vía items) — mismo criterio que
-    // nc-cobertura y el resto del sistema.
+  const [ncPorSocio, recibosPorSocio] = await Promise.all([
+    calcularCoberturaNotasCreditoBatch(socioIds),
+    getRecibosConAplicacionesBatch(socioIds),
+  ]);
+
+  // Los cargos de cada comprobante se resuelven UNA vez para todos los socios:
+  // los ids de comprobante son únicos, así que el mapa comprobante → cargos se
+  // puede compartir sin riesgo de cruzar socios.
+  const todosLosRecibos = [...recibosPorSocio.values()].flat();
+  const movsPorComprobante = new Map<string, Set<string>>();
+  const movInfoById = new Map<string, { id: string; debe: string | null; fecha: Date | null }>();
+
+  if (todosLosRecibos.length > 0) {
     const comprobanteIds = [
-      ...new Set(recibos.flatMap((r) => r.aplicaciones.map((a) => a.comprobanteId))),
+      ...new Set(todosLosRecibos.flatMap((r) => r.aplicaciones.map((a) => a.comprobanteId))),
     ];
 
     const facs = await db
@@ -294,7 +335,6 @@ export async function calcularCoberturaTargeted(socioId: string): Promise<{
           )
       : [];
 
-    const movsPorComprobante = new Map<string, Set<string>>();
     for (const f of facs) {
       const s = new Set<string>();
       if (f.movimientoId) s.add(f.movimientoId);
@@ -306,66 +346,101 @@ export async function calcularCoberturaTargeted(socioId: string): Promise<{
     }
 
     const candidatoIds = [...new Set([...movsPorComprobante.values()].flatMap((s) => [...s]))];
-    const movsInfo = candidatoIds.length
-      ? await db
-          .select({
-            id: movimientosCuentaCorriente.id,
-            debe: movimientosCuentaCorriente.debe,
-            fecha: movimientosCuentaCorriente.fecha,
-          })
-          .from(movimientosCuentaCorriente)
-          .where(inArray(movimientosCuentaCorriente.id, candidatoIds))
-      : [];
-    const movInfoById = new Map(movsInfo.map((m) => [m.id, m]));
-
-    // Cubierto acumulado por cargo (NC primero — tienen prioridad, ya estaban
-    // aplicadas — y encima los recibos en orden cronológico).
-    const cubierto = new Map<string, number>(montoNcPorMovimiento);
-
-    for (const r of recibos) {
-      let comprometido = 0;
-      for (const a of r.aplicaciones) {
-        let disponible = parseFloat(a.monto || '0');
-        if (!(disponible > 0)) continue;
-        const movIds = movsPorComprobante.get(a.comprobanteId) ?? new Set<string>();
-        const ordenados = [...movIds]
-          .map((id) => movInfoById.get(id))
-          .filter((m): m is NonNullable<typeof m> => Boolean(m))
-          .sort((x, y) => (x.fecha && y.fecha ? x.fecha.getTime() - y.fecha.getTime() : 0));
-        for (const m of ordenados) {
-          if (disponible <= 0.001) break;
-          const debe = parseFloat(m.debe ?? '0');
-          if (debe <= 0) continue;
-          const ya = cubierto.get(m.id) ?? 0;
-          const restante = debe - ya;
-          if (restante <= 0.001) continue;
-          const aplicar = Math.min(disponible, restante);
-          cubierto.set(m.id, ya + aplicar);
-          montoReciboPorMovimiento.set(m.id, (montoReciboPorMovimiento.get(m.id) ?? 0) + aplicar);
-          comprometido += aplicar;
-          disponible -= aplicar;
-        }
-      }
-      if (comprometido > 0) {
-        haberComprometido.set(
-          r.movimientoId,
-          (haberComprometido.get(r.movimientoId) ?? 0) + comprometido,
-        );
-      }
+    if (candidatoIds.length > 0) {
+      const movsInfo = await db
+        .select({
+          id: movimientosCuentaCorriente.id,
+          debe: movimientosCuentaCorriente.debe,
+          fecha: movimientosCuentaCorriente.fecha,
+        })
+        .from(movimientosCuentaCorriente)
+        .where(inArray(movimientosCuentaCorriente.id, candidatoIds));
+      for (const m of movsInfo) movInfoById.set(m.id, m);
     }
   }
 
-  const montoPorMovimiento = new Map<string, number>();
-  for (const [id, monto] of montoNcPorMovimiento) montoPorMovimiento.set(id, monto);
-  for (const [id, monto] of montoReciboPorMovimiento) {
-    montoPorMovimiento.set(id, (montoPorMovimiento.get(id) ?? 0) + monto);
+  for (const socioId of socioIds) {
+    const nc = ncPorSocio.get(socioId);
+    const montoNcPorMovimiento = nc?.montoPorMovimiento ?? new Map<string, number>();
+    const movimientosDeNc = nc?.movimientosDeNc ?? new Set<string>();
+    const recibos = recibosPorSocio.get(socioId) ?? [];
+
+    const { montoReciboPorMovimiento, haberComprometido } = repartirRecibos(
+      recibos,
+      montoNcPorMovimiento,
+      movsPorComprobante,
+      movInfoById,
+    );
+
+    const montoPorMovimiento = new Map<string, number>();
+    for (const [id, monto] of montoNcPorMovimiento) montoPorMovimiento.set(id, monto);
+    for (const [id, monto] of montoReciboPorMovimiento) {
+      montoPorMovimiento.set(id, (montoPorMovimiento.get(id) ?? 0) + monto);
+    }
+
+    out.set(socioId, {
+      montoPorMovimiento,
+      montoNcPorMovimiento,
+      montoReciboPorMovimiento,
+      movimientosDeNc,
+      haberComprometido,
+    });
   }
 
-  return {
-    montoPorMovimiento,
-    montoNcPorMovimiento,
-    montoReciboPorMovimiento,
-    movimientosDeNc,
-    haberComprometido,
-  };
+  return out;
+}
+
+/**
+ * Reparte las aplicaciones de los recibos de UN socio entre los cargos de cada
+ * comprobante, en orden cronológico y arrancando de lo que ya cubrieron las NC.
+ */
+function repartirRecibos(
+  recibos: { movimientoId: string; aplicaciones: AplicacionCobranza[] }[],
+  montoNcPorMovimiento: Map<string, number>,
+  movsPorComprobante: Map<string, Set<string>>,
+  movInfoById: Map<string, { id: string; debe: string | null; fecha: Date | null }>,
+): {
+  montoReciboPorMovimiento: Map<string, number>;
+  haberComprometido: Map<string, number>;
+} {
+  const montoReciboPorMovimiento = new Map<string, number>();
+  const haberComprometido = new Map<string, number>();
+
+  // Cubierto acumulado por cargo (NC primero — tienen prioridad, ya estaban
+  // aplicadas — y encima los recibos en orden cronológico).
+  const cubierto = new Map<string, number>(montoNcPorMovimiento);
+
+  for (const r of recibos) {
+    let comprometido = 0;
+    for (const a of r.aplicaciones) {
+      let disponible = parseFloat(a.monto || '0');
+      if (!(disponible > 0)) continue;
+      const movIds = movsPorComprobante.get(a.comprobanteId) ?? new Set<string>();
+      const ordenados = [...movIds]
+        .map((id) => movInfoById.get(id))
+        .filter((m): m is NonNullable<typeof m> => Boolean(m))
+        .sort((x, y) => (x.fecha && y.fecha ? x.fecha.getTime() - y.fecha.getTime() : 0));
+      for (const m of ordenados) {
+        if (disponible <= 0.001) break;
+        const debe = parseFloat(m.debe ?? '0');
+        if (debe <= 0) continue;
+        const ya = cubierto.get(m.id) ?? 0;
+        const restante = debe - ya;
+        if (restante <= 0.001) continue;
+        const aplicar = Math.min(disponible, restante);
+        cubierto.set(m.id, ya + aplicar);
+        montoReciboPorMovimiento.set(m.id, (montoReciboPorMovimiento.get(m.id) ?? 0) + aplicar);
+        comprometido += aplicar;
+        disponible -= aplicar;
+      }
+    }
+    if (comprometido > 0) {
+      haberComprometido.set(
+        r.movimientoId,
+        (haberComprometido.get(r.movimientoId) ?? 0) + comprometido,
+      );
+    }
+  }
+
+  return { montoReciboPorMovimiento, haberComprometido };
 }

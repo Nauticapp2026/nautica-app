@@ -56,6 +56,10 @@ import {
   eliminarTarjetaSocioAction,
   type GuardarTarjetaData,
 } from '@/app/actions/payway';
+import {
+  getLedgerSaldoAFavorAction,
+  type LedgerSaldoAFavorEntry,
+} from '@/app/actions/movimientos';
 import { buscarRankeado } from '@/lib/buscador';
 import { formatArgentinaDate, formatArgentinaDateTime, formatNaiveDateTime } from '@/lib/dates';
 import { precioConIva, precioSinIva } from '@/lib/iva';
@@ -337,7 +341,14 @@ const ESTADO_LABEL: Record<string, string> = {
 // del pool: su pago ya está comprometido con ese cargo. Si no se descontara, ese
 // haber quedaría como "crédito fantasma" cubriendo otros cargos más nuevos y
 // mostrándolos pagados de más (doble conteo). Así el total de cargos que figuran
-// impagos queda consistente con el saldo neto (Σdebe − Σhaber).
+// impagos queda consistente con el saldo neto (Σdebe − Σhaber). Ojo: lo que ya le
+// acreditó una NC de su propia factura NO sale del pool (es crédito puntual), y
+// una NC emitida DESPUÉS del cobro reescribe el estado a Parcial/Anulado — si no,
+// la fila quedaba "Cobrado" para siempre ignorando la acreditación.
+//
+// Devuelve además `pendiente` por fila: lo que falta cobrar de ese cargo una vez
+// descontada la cobertura (NC + pagos targeted + pool). Es la columna "Importe
+// pendiente"; en un cargo cancelado al 100% da 0.
 function calcularSaldoYEstado<
   T extends {
     tipo: string | null;
@@ -349,7 +360,7 @@ function calcularSaldoYEstado<
     haberComprometido: string | null;
     esMovimientoNc: boolean;
   },
->(movimientos: T[]): (T & { saldo: number; estadoDisplay: string | null })[] {
+>(movimientos: T[]): (T & { saldo: number; estadoDisplay: string | null; pendiente: number })[] {
   const asc = [...movimientos].reverse();
   let acum = 0;
   let poolHaber = 0;
@@ -370,12 +381,20 @@ function calcularSaldoYEstado<
     let estadoDisplay = m.estado;
     const montoNc = parseFloat(m.montoCubiertoNc ?? '0');
     const montoRecibo = parseFloat(m.montoCubiertoRecibo ?? '0');
+    // Lo que falta cobrar de ESTE cargo. Las filas que no son un cargo (pagos,
+    // asientos de NC, contraasientos) no deben nada.
+    let pendiente = 0;
     if (venta > 0 && m.tipo !== 'anulacion_recibo') {
       if (m.estado === 'pagado') {
         // Ya pagado: consume el pool (su pago ya está comprometido con ese
-        // cargo), no se reescribe. Lo que le aplicó un recibo targeted no
-        // está en el pool (quedó comprometido en su pago): solo el resto.
-        poolHaber -= Math.max(0, venta - montoRecibo);
+        // cargo), no se reescribe. Lo que le aplicó una NC de su factura o un
+        // recibo targeted no está en el pool: solo el resto.
+        poolHaber -= Math.max(0, venta - montoNc - montoRecibo);
+        // Una NC parcial emitida DESPUÉS de que el cargo se cobró le acredita
+        // una parte: la fila tiene que mostrarlo en vez de quedar "Cobrado"
+        // para siempre.
+        if (montoNc >= venta - 0.001) estadoDisplay = 'anulado_nc';
+        else if (montoNc > 0.001) estadoDisplay = 'parcial';
       } else if (montoNc >= venta - 0.001) {
         // Cubierto puntualmente por la NC de su propia factura.
         estadoDisplay = 'anulado_nc';
@@ -391,12 +410,129 @@ function calcularSaldoYEstado<
         // Cubierto solo en parte: consume todo lo que queda y no alcanza
         // para el resto de este cargo ni para otro más nuevo.
         estadoDisplay = 'parcial';
+        pendiente = venta - montoNc - montoRecibo - poolHaber;
         poolHaber = 0;
+      } else {
+        // Sin nada asignado todavía: debe todo.
+        pendiente = venta;
       }
     }
-    return { ...m, saldo: acum, estadoDisplay };
+    return { ...m, saldo: acum, estadoDisplay, pendiente: Math.max(0, pendiente) };
   });
   return conSaldo.reverse();
+}
+
+/**
+ * Historial del saldo a favor: de dónde salió cada peso de crédito y en qué se
+ * usó. Panel lateral y no un tab nuevo — el tab de cuenta corriente ya es denso
+ * y esto es una consulta puntual sobre la card de saldo.
+ */
+function LedgerSaldoAFavorPanel({
+  socioId,
+  socioNombre,
+  disponible,
+  onClose,
+}: {
+  socioId: string;
+  socioNombre: string;
+  disponible: number;
+  onClose: () => void;
+}) {
+  const [entradas, setEntradas] = useState<LedgerSaldoAFavorEntry[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let vigente = true;
+    getLedgerSaldoAFavorAction(socioId).then((res) => {
+      if (!vigente) return;
+      if (res.error) setError(res.error);
+      else setEntradas(res.entradas ?? []);
+    });
+    return () => {
+      vigente = false;
+    };
+  }, [socioId]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end bg-black/40" onClick={onClose}>
+      <div
+        className="flex h-full w-full max-w-xl flex-col bg-white shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between p-6 pb-4">
+          <div>
+            <h2 className="text-[18px] font-bold" style={{ color: '#101828' }}>
+              Historial de saldo a favor
+            </h2>
+            <p className="mt-0.5 text-sm" style={{ color: '#669E9D' }}>
+              {socioNombre} — disponible hoy: {fmt(disponible)}
+            </p>
+          </div>
+          <button onClick={onClose} className="rounded-[8px] p-1 text-gray-400 hover:bg-gray-100">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="border-t border-gray-200" />
+
+        <div className="flex-1 overflow-y-auto p-6">
+          {error ? (
+            <p className="text-sm text-red-600">{error}</p>
+          ) : entradas == null ? (
+            <p className="py-8 text-center text-sm text-gray-400">Cargando historial…</p>
+          ) : entradas.length === 0 ? (
+            <EmptyState
+              icon={<DollarSign className="h-7 w-7 opacity-40" />}
+              text="Este socio todavía no generó saldo a favor."
+            />
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 text-left text-xs font-semibold text-gray-500">
+                  <th className="px-3 py-3">Fecha</th>
+                  <th className="px-3 py-3">Concepto</th>
+                  <th className="px-3 py-3 text-right">Monto</th>
+                  <th className="px-3 py-3 text-right">Saldo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {entradas.map((e, i) => (
+                  <tr key={`${e.movimientoId}-${i}`} className="border-t border-gray-100">
+                    <td className="px-3 py-3 whitespace-nowrap text-gray-500">
+                      {e.fecha ? formatArgentinaDate(e.fecha) : '—'}
+                    </td>
+                    <td className="px-3 py-3">
+                      <span className="font-medium" style={{ color: '#175861' }}>
+                        {e.concepto}
+                      </span>
+                      <span
+                        className={`ml-2 inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
+                          e.tipo === 'generado'
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-gray-100 text-gray-500'
+                        }`}
+                      >
+                        {e.tipo === 'generado' ? 'Generado' : 'Usado'}
+                      </span>
+                    </td>
+                    <td
+                      className="px-3 py-3 text-right font-medium whitespace-nowrap"
+                      style={{ color: e.tipo === 'generado' ? '#15803d' : '#B42318' }}
+                    >
+                      {e.tipo === 'generado' ? '+' : '−'}
+                      {fmt(e.monto)}
+                    </td>
+                    <td className="px-3 py-3 text-right font-semibold whitespace-nowrap text-[#101828]">
+                      {fmt(e.saldoResultante)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // Etiquetas de tipo de comprobante para la columna/filtro de cuenta corriente.
@@ -1793,6 +1929,7 @@ export function SocioDetail({
   paywayToken = null,
   internosHabilitados = true,
   debitoInternoHabilitado = true,
+  saldoAFavorDisponible = 0,
 }: {
   socio: SocioData;
   embarcaciones: Embarcacion[];
@@ -1814,9 +1951,15 @@ export function SocioDetail({
   // Gestión de cobranza (comprobantes internos): el tilde de débito de un
   // Servicio Contratado Interno queda bloqueado (ej. club solo-Efectivo).
   debitoInternoHabilitado?: boolean;
+  // Crédito sin usar del socio (pool FIFO, calculado en el server). Es el mismo
+  // número que Cobranzas ofrece aplicar al cobrar — no el neto crudo
+  // (haber − debe), que da $0 en cuanto hay más deuda que crédito.
+  saldoAFavorDisponible?: number;
 }) {
   const [activeTab, setActiveTab] = useState<TabId>('generales');
   const [modalServicioOpen, setModalServicioOpen] = useState(false);
+  // Historial del saldo a favor: se carga al abrirlo (recorre toda la cuenta).
+  const [ledgerOpen, setLedgerOpen] = useState(false);
 
   // Filtros de la tabla de cuenta corriente.
   const [ccFechaDesde, setCcFechaDesde] = useState('');
@@ -1966,7 +2109,10 @@ export function SocioDetail({
     movimientos.reduce((sum, m) => sum + parseFloat(m.debe ?? '0'), 0) -
     movimientos.reduce((sum, m) => sum + parseFloat(m.haber ?? '0'), 0);
   const totalPendiente = Math.max(0, saldoBruto);
-  const totalAFavor = saldoBruto < 0 ? Math.abs(saldoBruto) : 0;
+  // Crédito sin usar: viene del server (pool FIFO), NO del neto crudo. Con el
+  // neto, un socio con deuda vieja y un adelanto sin aplicar mostraba $0 acá
+  // mientras el modal de cobranza le ofrecía usar ese crédito.
+  const totalAFavor = saldoAFavorDisponible;
 
   // Predicado de filtros de la tabla de cuenta corriente.
   function pasaFiltrosCC(m: Movimiento, estadoEf?: string | null): boolean {
@@ -2522,21 +2668,38 @@ export function SocioDetail({
               <div className="flex items-center gap-4 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
                 <div
                   className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl"
-                  style={{ background: totalAFavor > 0 ? '#E6F8EC' : '#FEF0E6' }}
+                  style={{ background: totalPendiente > 0.005 ? '#FEF0E6' : '#E6F8EC' }}
                 >
-                  {totalAFavor > 0 ? (
-                    <DollarSign className="h-5 w-5" style={{ color: '#15803d' }} />
-                  ) : (
+                  {totalPendiente > 0.005 ? (
                     <AlertTriangle className="h-5 w-5" style={{ color: '#E87040' }} />
+                  ) : (
+                    <DollarSign className="h-5 w-5" style={{ color: '#15803d' }} />
                   )}
                 </div>
                 <div>
                   <p className="text-xs font-semibold tracking-wide text-gray-400 uppercase">
-                    {totalAFavor > 0 ? 'Saldo a favor' : 'Saldo cliente'}
+                    {totalPendiente > 0.005 ? 'Saldo cliente' : 'Saldo a favor'}
                   </p>
                   <p className="text-[18px] font-bold" style={{ color: '#101828' }}>
-                    {totalAFavor > 0 ? fmt(totalAFavor) : fmt(totalPendiente)}
+                    {totalPendiente > 0.005 ? fmt(totalPendiente) : fmt(totalAFavor)}
                   </p>
+                  {/* Deuda y crédito sin usar pueden convivir: un adelanto
+                      aplicado a un comprobante nuevo no cancela una deuda
+                      vieja. Con deuda, el crédito se informa aparte. */}
+                  {totalPendiente > 0.005 && totalAFavor > 0.005 && (
+                    <p className="text-xs font-medium text-green-600">
+                      + {fmt(totalAFavor)} a favor sin usar
+                    </p>
+                  )}
+                  {totalAFavor > 0.005 && (
+                    <button
+                      type="button"
+                      onClick={() => setLedgerOpen(true)}
+                      className="mt-0.5 text-xs font-medium text-[#175861] hover:underline"
+                    >
+                      Ver historial
+                    </button>
+                  )}
                 </div>
               </div>
             )}
@@ -2551,7 +2714,7 @@ export function SocioDetail({
           ) : (
             <>
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[820px] text-sm">
+                <table className="w-full min-w-[940px] text-sm">
                   <thead>
                     <tr className="bg-gray-50 text-left text-xs font-semibold text-gray-500">
                       <th className="px-4 py-3">
@@ -2582,6 +2745,9 @@ export function SocioDetail({
                       <th className="px-4 py-3 text-right">Ventas</th>
                       <th className="px-4 py-3 text-right">Cobranzas</th>
                       <th className="px-4 py-3 text-right">Saldo</th>
+                      {/* Cuánto falta cobrar de ESE comprobante (clave con
+                          pagos parciales). Cancelado al 100% → $0. */}
+                      <th className="px-4 py-3 text-right">Importe pendiente</th>
                       <th className="px-4 py-3 text-right">Estado</th>
                     </tr>
                   </thead>
@@ -2599,7 +2765,7 @@ export function SocioDetail({
                         return (
                           <tr>
                             <td
-                              colSpan={11}
+                              colSpan={12}
                               className="px-4 py-8 text-center text-sm text-gray-400"
                             >
                               No hay movimientos que coincidan con los filtros.
@@ -2726,6 +2892,20 @@ export function SocioDetail({
                                 </span>
                               )}
                             </td>
+                            {/* Importe pendiente: lo que falta cobrar de este
+                                comprobante. Solo aplica a cargos — un pago o
+                                una anulación no deben nada. */}
+                            <td className="px-4 py-3 text-right font-medium">
+                              {venta > 0 && m.tipo !== 'anulacion_recibo' ? (
+                                <span
+                                  style={{ color: m.pendiente > 0.005 ? '#B42318' : '#1B9A5A' }}
+                                >
+                                  {fmt(m.pendiente)}
+                                </span>
+                              ) : (
+                                <span className="text-gray-400">—</span>
+                              )}
+                            </td>
                             <td className="px-4 py-3 text-right">
                               <div className="flex items-center justify-end gap-2">
                                 {m.tipo === 'anulacion_recibo' ? (
@@ -2758,6 +2938,15 @@ export function SocioDetail({
                 />
               </div>
             </>
+          )}
+
+          {ledgerOpen && (
+            <LedgerSaldoAFavorPanel
+              socioId={socio.id}
+              socioNombre={nombre}
+              disponible={totalAFavor}
+              onClose={() => setLedgerOpen(false)}
+            />
           )}
         </div>
       )}

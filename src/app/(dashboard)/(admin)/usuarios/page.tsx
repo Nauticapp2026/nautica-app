@@ -14,6 +14,7 @@ import {
   profiles,
 } from '@/lib/db/schema';
 import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
+import { getPoolRestanteBatch } from '@/lib/reconciliar-cuenta';
 import { UsuariosClient, type FiltroSocios } from './usuarios-client';
 
 export default async function UsuariosPage({
@@ -280,10 +281,17 @@ export default async function UsuariosPage({
     }
   }
 
+  // Saldo a favor real: el mismo pool FIFO que ofrece Cobranzas al cobrar. El
+  // neto crudo (haber − debe) daba $0 en cuanto el socio tenía más deuda que
+  // crédito, aunque ese crédito siguiera sin usar — por eso la lista mostraba un
+  // número distinto al del modal de cobranza.
+  const poolPorSocio = await getPoolRestanteBatch(socios.map((s) => s.profileId));
+
   const sociosData = socios.map((s) => {
     const debe = debeBySocio.get(s.profileId) ?? 0;
     const haber = haberBySocio.get(s.profileId) ?? 0;
     const deuda = Math.max(0, debe - haber);
+    const saldoAFavor = poolPorSocio.get(s.profileId) ?? 0;
     const tipos = tiposPorSocio.get(s.profileId);
     const docsCompletos = (tipos?.size ?? 0) >= TIPOS_REQUERIDOS.size;
     const tieneEmbarcacion = Boolean(s.profileId && embByProfile[s.profileId]);
@@ -302,6 +310,10 @@ export default async function UsuariosPage({
       // Saldo neto real (debe − haber): positivo = nos debe, negativo = saldo a
       // favor. Permite mostrar el "a favor" en la lista (deuda lo recorta a 0).
       saldoNeto: (debe - haber).toFixed(2),
+      // Crédito sin usar (pool FIFO). Puede convivir con deuda: un adelanto
+      // targeteado a un comprobante nuevo no cancela una deuda vieja. Es el
+      // mismo número que Cobranzas ofrece aplicar.
+      saldoAFavor: saldoAFavor.toFixed(2),
       // Moroso solo si además tiene saldo neto positivo: si pagó (aunque sea con
       // "Registrar pago", que deja los cargos viejos en no_pagado), deuda = 0 y
       // deja de figurar como moroso.

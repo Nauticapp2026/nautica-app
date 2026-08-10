@@ -122,6 +122,11 @@ function NuevaCobranzaModal({
   // ofrece como opción para cubrir parte del cobro (pedido 2026-08-06).
   const [saldoDisponible, setSaldoDisponible] = useState(0);
   const [usarSaldoAFavor, setUsarSaldoAFavor] = useState(false);
+  // Cuánto del saldo a favor aplicar. Editable: el club puede usar solo una
+  // parte del crédito disponible y cobrar el resto (pedido 2026-08-10). Al
+  // tildar arranca en el máximo aplicable y se puede bajar; nunca puede superar
+  // ni el disponible ni el total a cobrar.
+  const [saldoAFavorInput, setSaldoAFavorInput] = useState('');
 
   // Paso pago
   const [fecha, setFecha] = useState(todayISODate);
@@ -176,7 +181,13 @@ function NuevaCobranzaModal({
   // campo único en modo simple). El saldo a favor cubre hasta ese total; lo
   // que sobra (montoEfectivo) es lo que hay que cobrar con formas de pago.
   const montoNum = parseFloat(montoToNumberStr(montoAPagar)) || 0;
-  const montoCredito = usarSaldoAFavor ? Math.min(saldoDisponible, montoNum) : 0;
+  const creditoPedido = usarSaldoAFavor ? parseFloat(montoToNumberStr(saldoAFavorInput)) || 0 : 0;
+  // No se puede aplicar más crédito del que el socio tiene. Que el pedido supere
+  // el total a cobrar no es un error (significa "cubrilo todo"): se acota solo.
+  const creditoExcedeDisponible = creditoPedido > saldoDisponible + 0.01;
+  const montoCredito = usarSaldoAFavor
+    ? Math.min(creditoPedido, saldoDisponible, montoNum)
+    : 0;
   const montoEfectivo = Math.max(0, montoNum - montoCredito);
   const totalCargado = useMemo(
     () => formas.reduce((acc, f) => acc + (parseFloat(montoToNumberStr(f.monto)) || 0), 0),
@@ -198,7 +209,8 @@ function NuevaCobranzaModal({
     montoNum > 0 &&
     cuadra &&
     (montoEfectivo <= 0.005 || (formas.length > 0 && hayMediosManuales)) &&
-    repartoValido;
+    repartoValido &&
+    !creditoExcedeDisponible;
 
   function handleSelectSocio(s: SocioOption) {
     setSocio(s);
@@ -206,6 +218,7 @@ function NuevaCobranzaModal({
     setLoadingComps(true);
     setSaldoDisponible(0);
     setUsarSaldoAFavor(false);
+    setSaldoAFavorInput('');
     setStep('comprobantes');
     startTransition(async () => {
       const [res, saldoRes] = await Promise.all([
@@ -245,24 +258,39 @@ function NuevaCobranzaModal({
   // Cuánto de un total a aplicar queda cubierto en efectivo (formas de pago)
   // una vez descontado el saldo a favor que el admin eligió usar.
   function efectivoDe(total: number): number {
-    const credito = usarSaldoAFavor ? Math.min(saldoDisponible, total) : 0;
+    const credito = usarSaldoAFavor
+      ? Math.min(parseFloat(montoToNumberStr(saldoAFavorInput)) || 0, saldoDisponible, total)
+      : 0;
     return Math.max(0, total - credito);
   }
 
   function irAPago() {
-    // Pre-llenar el monto a pagar con el total seleccionado, y la única forma
-    // de pago con el mismo importe (se mantienen sincronizados mientras haya
-    // una sola forma — ver `handleMontoAPagarChange`). Si el admin agrega más
-    // formas para partir el pago, cada una se edita por separado. El saldo a
-    // favor recién se puede tildar en este paso, así que acá todavía no hay
-    // crédito aplicado — el monto inicial de la forma es el total tal cual.
-    const inicial = totalSeleccionado > 0 ? totalSeleccionado.toFixed(2) : '';
-    setMontoAPagar(inicial);
-    // Reparto inicial: cada comprobante arranca con su saldo pendiente entero.
+    // Pre-llenar el monto a pagar y la única forma de pago (se mantienen
+    // sincronizados mientras haya una sola forma — ver
+    // `handleMontoAPagarChange`). Si el admin agrega más formas para partir el
+    // pago, cada una se edita por separado. Si ya venía crédito a favor tildado
+    // (volvió Atrás y siguió), la forma arranca por el efectivo, no por el total.
+    //
+    // Reparto: cada comprobante arranca con su saldo pendiente entero, pero si
+    // el admin ya había escrito un monto para ese comprobante se respeta —
+    // volver Atrás a corregir la selección no debe borrar el reparto cargado.
     const montos: Record<string, string> = {};
-    for (const c of seleccionados) montos[c.id] = pendienteDe(c).toFixed(2);
+    for (const c of seleccionados) {
+      montos[c.id] = montosPorComp[c.id] ?? pendienteDe(c).toFixed(2);
+    }
     setMontosPorComp(montos);
-    setFormas([{ ...nuevaForma(tiposPermitidos), monto: inicial }]);
+    // El monto a cobrar es la suma del reparto (no el total pendiente), para que
+    // coincida con los casilleros cuando vienen de una edición previa.
+    const suma = seleccionados.reduce(
+      (acc, c) => acc + (parseFloat(montoToNumberStr(montos[c.id] ?? '0')) || 0),
+      0,
+    );
+    const inicial = suma > 0 ? suma.toFixed(2) : '';
+    setMontoAPagar(inicial);
+    const efectivo = efectivoDe(suma);
+    setFormas([
+      { ...nuevaForma(tiposPermitidos), monto: efectivo > 0.005 ? efectivo.toFixed(2) : '' },
+    ]);
     setError(null);
     setStep('pago');
   }
@@ -284,7 +312,22 @@ function NuevaCobranzaModal({
   function handleToggleSaldoAFavor() {
     const next = !usarSaldoAFavor;
     setUsarSaldoAFavor(next);
+    // Al tildar arranca en el máximo aplicable (lo más común es usar todo el
+    // crédito); el admin lo puede bajar. Al destildar se limpia.
     const credito = next ? Math.min(saldoDisponible, montoNum) : 0;
+    setSaldoAFavorInput(next && credito > 0 ? credito.toFixed(2) : '');
+    const efectivo = Math.max(0, montoNum - credito);
+    sincronizarConMonto(efectivo > 0.005 ? efectivo.toFixed(2) : '');
+  }
+
+  function handleSaldoAFavorChange(value: string) {
+    const limpio = sanitizeMontoInput(value);
+    setSaldoAFavorInput(limpio);
+    const credito = Math.min(
+      parseFloat(montoToNumberStr(limpio)) || 0,
+      saldoDisponible,
+      montoNum,
+    );
     const efectivo = Math.max(0, montoNum - credito);
     sincronizarConMonto(efectivo > 0.005 ? efectivo.toFixed(2) : '');
   }
@@ -519,27 +562,64 @@ function NuevaCobranzaModal({
               {/* Usar saldo a favor: cubre hasta el total a aplicar y reduce
                   lo que hace falta cobrar con formas de pago (pedido 2026-08-06). */}
               {selected.size > 0 && saldoDisponible > 0 && (
-                <label className="flex cursor-pointer items-center gap-3 rounded-[10px] border border-gray-200 px-4 py-3 hover:bg-gray-50">
-                  <input
-                    type="checkbox"
-                    checked={usarSaldoAFavor}
-                    onChange={handleToggleSaldoAFavor}
-                    className="h-4 w-4 accent-[#175861]"
-                  />
-                  <div className="flex-1">
-                    <span className="text-sm font-medium text-[#101828]">
-                      Usar saldo a favor disponible
-                    </span>
-                    <span className="ml-1 text-sm text-gray-400">
-                      ({fmtMoney(saldoDisponible)})
-                    </span>
-                  </div>
-                  {usarSaldoAFavor && montoCredito > 0 && (
-                    <span className="text-sm font-semibold" style={{ color: '#175861' }}>
-                      −{fmtMoney(montoCredito)}
-                    </span>
+                <div className="rounded-[10px] border border-gray-200">
+                  <label className="flex cursor-pointer items-center gap-3 px-4 py-3 hover:bg-gray-50">
+                    <input
+                      type="checkbox"
+                      checked={usarSaldoAFavor}
+                      onChange={handleToggleSaldoAFavor}
+                      className="h-4 w-4 accent-[#175861]"
+                    />
+                    <div className="flex-1">
+                      <span className="text-sm font-medium text-[#101828]">
+                        Usar saldo a favor disponible
+                      </span>
+                      <span className="ml-1 text-sm text-gray-400">
+                        ({fmtMoney(saldoDisponible)})
+                      </span>
+                    </div>
+                    {usarSaldoAFavor && montoCredito > 0 && (
+                      <span className="text-sm font-semibold" style={{ color: '#175861' }}>
+                        −{fmtMoney(montoCredito)}
+                      </span>
+                    )}
+                  </label>
+                  {/* Monto editable: se puede aplicar solo una parte del crédito
+                      y cobrar el resto. Tope = lo disponible. */}
+                  {usarSaldoAFavor && (
+                    <div className="border-t border-gray-100 px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <span className="flex-1 text-xs font-semibold text-[#101828]">
+                          Cuánto saldo a favor aplicar
+                        </span>
+                        <input
+                          inputMode="decimal"
+                          placeholder="0,00"
+                          value={saldoAFavorInput}
+                          onChange={(e) => handleSaldoAFavorChange(e.target.value)}
+                          className={`h-10 w-28 rounded-[10px] border bg-white px-3 text-right text-sm text-[#101828] focus:ring-1 focus:outline-none ${
+                            creditoExcedeDisponible
+                              ? 'border-red-300 focus:border-red-400 focus:ring-red-400'
+                              : 'border-gray-200 focus:border-[#175861] focus:ring-[#175861]'
+                          }`}
+                        />
+                      </div>
+                      {creditoExcedeDisponible ? (
+                        <p className="mt-1.5 text-xs text-red-600">
+                          El saldo a favor disponible es {fmtMoney(saldoDisponible)}. No se puede
+                          aplicar más que eso.
+                        </p>
+                      ) : (
+                        creditoPedido > montoNum + 0.01 && (
+                          <p className="mt-1.5 text-xs text-amber-600">
+                            El total a cobrar es {fmtMoney(montoNum)}: se aplican{' '}
+                            {fmtMoney(montoCredito)} y el resto del crédito queda disponible.
+                          </p>
+                        )
+                      )}
+                    </div>
                   )}
-                </label>
+                </div>
               )}
 
               {modoReparto ? (

@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { and, asc, count, eq, inArray, like, ne, or, sql } from 'drizzle-orm';
+import { and, count, eq, inArray, like, or, sql } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 
 import { db } from '@/lib/db';
@@ -25,6 +25,13 @@ import { comprobanteFiscalEmail } from '@/lib/email/templates/comprobante-fiscal
 import { reciboEmail } from '@/lib/email/templates/recibo';
 import { identidadFacturacion, type SocioFacturacion } from '@/lib/facturacion/identidad';
 import { getCargosSaldadosFifo } from '@/lib/reconciliar-cuenta';
+import {
+  getComprobantesCobrados,
+  getComprobantesCobradosLegacy,
+  getDatosPagoRecibo,
+  type AplicacionRecibo,
+  type ComprobanteCobrado,
+} from '@/lib/recibo-desglose';
 import {
   claveItem,
   listarPendientesFacturar,
@@ -2087,127 +2094,38 @@ export async function enviarReciboPorMailAction(
 
   // Aplicaciones targeted del pago (recibos nuevos): cuánto fue a cada
   // comprobante — en un pago parcial el mail muestra lo aplicado, no el total.
-  let aplicaciones: { comprobanteId: string; monto: string }[] | null = null;
+  let aplicaciones: AplicacionRecibo[] | null = null;
   if (esReciboCobranza && row.movimientoId) {
-    const [mov] = await db
-      .select({ datosPago: movimientosCuentaCorriente.datosPago })
-      .from(movimientosCuentaCorriente)
-      .where(eq(movimientosCuentaCorriente.id, row.movimientoId))
-      .limit(1);
-    const dp = mov?.datosPago as {
-      aplicaciones?: { comprobanteId: string; monto: string }[];
-    } | null;
-    if (dp?.aplicaciones) aplicaciones = dp.aplicaciones;
+    aplicaciones = (await getDatosPagoRecibo(row.movimientoId)).aplicaciones;
   }
-  const aplicadoPorComprobante = new Map(
-    (aplicaciones ?? []).map((a) => [a.comprobanteId, a.monto]),
-  );
 
+  // Mismo desglose que la página imprimible del recibo (ver
+  // src/lib/recibo-desglose.ts): el mail y el papel tienen que decir lo mismo.
   const comprobantes: string[] = [];
   if (row.socioId && esReciboCobranza) {
+    let cobrados: ComprobanteCobrado[] = [];
     if (row.cobranzaComprobanteIds && row.cobranzaComprobanteIds.length > 0) {
-      const cobrados = await db
-        .select({
-          id: facturacion.id,
-          codigo: facturacion.codigo,
-          tipoFactura: facturacion.tipoFactura,
-          importe: facturacion.importe,
-          descripcion: facturacion.descripcion,
-        })
-        .from(facturacion)
-        .where(
-          and(
-            inArray(facturacion.id, row.cobranzaComprobanteIds),
-            eq(facturacion.guarderiaId, gId),
-          ),
-        )
-        .orderBy(asc(facturacion.emision));
-
-      // Detalle de cargos (concepto + importe) por comprobante cobrado.
-      const detallePorComprobante = new Map<
-        string,
-        { concepto: string | null; importe: string | null }[]
-      >();
-      if (cobrados.length > 0) {
-        const itemRows = await db
-          .select({
-            facturacionId: facturacionItems.facturacionId,
-            importe: facturacionItems.importe,
-            concepto: movimientosCuentaCorriente.concepto,
-          })
-          .from(facturacionItems)
-          .innerJoin(
-            facturacionItemMovimientos,
-            eq(facturacionItemMovimientos.facturacionItemId, facturacionItems.id),
-          )
-          .innerJoin(
-            movimientosCuentaCorriente,
-            eq(movimientosCuentaCorriente.id, facturacionItemMovimientos.movimientoId),
-          )
-          .where(
-            inArray(
-              facturacionItems.facturacionId,
-              cobrados.map((c) => c.id),
-            ),
-          );
-        for (const it of itemRows) {
-          if (!detallePorComprobante.has(it.facturacionId)) {
-            detallePorComprobante.set(it.facturacionId, []);
-          }
-          detallePorComprobante
-            .get(it.facturacionId)!
-            .push({ concepto: it.concepto, importe: it.importe });
-        }
-      }
-
-      const labelDe = (t: string | null) =>
-        t === 'recibo' ? 'Comprobante interno' : (TIPO_COMPROBANTE_LABEL_MAIL[t ?? ''] ?? t ?? '');
-      for (const c of cobrados) {
-        // En un pago parcial se informa lo que aplicó ESTE recibo.
-        const aplicado = aplicadoPorComprobante.get(c.id) ?? null;
-        const esParcial =
-          aplicado != null && parseFloat(aplicado) < parseFloat(c.importe ?? '0') - 0.005;
-        comprobantes.push(
-          `${labelDe(c.tipoFactura)} ${c.codigo ?? ''} — ${fmtPesos(aplicado ?? c.importe)}${
-            esParcial ? ` (pago parcial — total ${fmtPesos(c.importe)})` : ''
-          }`,
-        );
-        const detalle =
-          detallePorComprobante.get(c.id) ??
-          (c.descripcion ? [{ concepto: c.descripcion, importe: null }] : []);
-        for (const d of detalle) {
-          comprobantes.push(
-            `· ${d.concepto ?? 'Servicio'}${d.importe != null ? ` — ${fmtPesos(d.importe)}` : ''}`,
-          );
-        }
-      }
+      cobrados = await getComprobantesCobrados(gId, row.cobranzaComprobanteIds, aplicaciones);
     } else if (aplicaciones == null) {
-      // Heurística FIFO solo para recibos viejos (sin aplicaciones
-      // guardadas): un recibo nuevo sin comprobantes es un adelanto.
-      const facturasSocio = await db
-        .select({
-          codigo: facturacion.codigo,
-          tipoFactura: facturacion.tipoFactura,
-          importe: facturacion.importe,
-        })
-        .from(facturacion)
-        .where(
-          and(
-            eq(facturacion.socioId, row.socioId),
-            eq(facturacion.guarderiaId, gId),
-            ne(facturacion.tipoFactura, 'recibo'),
-            inArray(facturacion.tipoFactura, ['factura_a', 'factura_b', 'factura_c']),
-          ),
-        )
-        .orderBy(asc(facturacion.emision));
-      const importeRecibo = parseFloat(row.importe ?? '0');
-      let acumulado = 0;
-      for (const f of facturasSocio) {
-        if (acumulado >= importeRecibo - 0.001) break;
+      // Recibo viejo sin aplicaciones guardadas: un recibo nuevo sin
+      // comprobantes es un adelanto.
+      cobrados = await getComprobantesCobradosLegacy(gId, row.socioId, row.importe);
+    }
+
+    const labelDe = (t: string | null) =>
+      t === 'recibo' ? 'Comprobante interno' : (TIPO_COMPROBANTE_LABEL_MAIL[t ?? ''] ?? t ?? '');
+    for (const c of cobrados) {
+      // En un pago parcial se informa lo que aplicó ESTE recibo; en recibos
+      // viejos (sin aplicaciones guardadas) solo se conoce el total.
+      comprobantes.push(
+        `${labelDe(c.tipoFactura)} ${c.codigo ?? ''} — ${fmtPesos(c.montoAplicado ?? c.importe)}${
+          c.parcial ? ` (pago parcial — total ${fmtPesos(c.importe)})` : ''
+        }`.trim(),
+      );
+      for (const d of c.detalle) {
         comprobantes.push(
-          `${TIPO_COMPROBANTE_LABEL_MAIL[f.tipoFactura ?? ''] ?? f.tipoFactura ?? ''} ${f.codigo ?? ''}`.trim(),
+          `· ${d.concepto ?? 'Servicio'}${d.importe != null ? ` — ${fmtPesos(d.importe)}` : ''}`,
         );
-        acumulado += parseFloat(f.importe ?? '0');
       }
     }
   }

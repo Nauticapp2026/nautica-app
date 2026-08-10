@@ -4,6 +4,10 @@ import { revalidatePath } from 'next/cache';
 import { db } from '@/lib/db';
 import { memberships, movimientosCuentaCorriente } from '@/lib/db/schema';
 import { getActiveMarina } from '@/lib/auth/session';
+import { getLedgerSaldoAFavor, type LedgerSaldoAFavor } from '@/lib/reconciliar-cuenta';
+
+/** Una fila del historial de saldo a favor, tal como la consume la ficha del socio. */
+export type LedgerSaldoAFavorEntry = LedgerSaldoAFavor;
 import { and, eq } from 'drizzle-orm';
 
 function isAdmin(ctx: NonNullable<Awaited<ReturnType<typeof getActiveMarina>>>): boolean {
@@ -58,5 +62,33 @@ export async function eliminarPagoAction(movimientoId: string): Promise<{ error?
     return {};
   } catch {
     return { error: 'Error al anular el pago.' };
+  }
+}
+
+// Historial del saldo a favor de un socio: de dónde salió cada peso de crédito y
+// en qué se usó. Se carga on-demand al abrir el detalle (no en cada render de la
+// ficha), porque recorre toda la cuenta corriente del socio.
+export async function getLedgerSaldoAFavorAction(
+  socioId: string,
+): Promise<{ error?: string; entradas?: LedgerSaldoAFavor[] }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+  if (!isAdmin(ctx)) return { error: 'Solo administradores pueden ver el saldo a favor.' };
+
+  const [m] = await db
+    .select({ id: memberships.id })
+    .from(memberships)
+    .where(
+      and(
+        eq(memberships.userId, socioId),
+        eq(memberships.guarderiaId, ctx.activeMembership.guarderiaId),
+      ),
+    );
+  if (!m) return { error: 'El socio no pertenece a esta guardería.' };
+
+  try {
+    return { entradas: await getLedgerSaldoAFavor(socioId) };
+  } catch {
+    return { error: 'Error al cargar el historial del saldo a favor.' };
   }
 }
