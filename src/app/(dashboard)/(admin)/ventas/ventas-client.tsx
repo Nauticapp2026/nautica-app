@@ -287,14 +287,25 @@ function fmtMoney(value: string | number | null): string {
 // en las columnas del listado): alícuota 0 → el ítem es "exento"; >0 → neto +
 // IVA. `fallbackAlicuota` para ítems sin tarifa: 0 en comprobantes C
 // (Monotributo), 21 en el resto (mismo criterio que `alicuotaPara`).
+//
+// `esMonotributo`: el club no factura IVA, así que su alícuota 0 no es la
+// categoría fiscal "Exento" sino simplemente "sin IVA" y el importe entero va a
+// Neto. Es la misma regla que el server (pedido 2026-08-06, commit c43fb94);
+// faltaba acá y quedaba tapada porque en Monotributo las tres líneas no se
+// mostraban. Sin esto el modal diría Exento y el comprobante emitido, Neto.
 function desglosarItemsUi(
   items: { bruto: number; alicuotaIva: number | null }[],
   fallbackAlicuota: number,
+  esMonotributo = false,
 ): { neto: number; exento: number; iva: number } {
   let neto = 0;
   let exento = 0;
   let iva = 0;
   for (const it of items) {
+    if (esMonotributo) {
+      neto += it.bruto;
+      continue;
+    }
     const ali = it.alicuotaIva ?? fallbackAlicuota;
     if (ali === 0) {
       exento += it.bruto;
@@ -307,44 +318,43 @@ function desglosarItemsUi(
   return { neto, exento, iva };
 }
 
-// Desglose de importes de los modales de emisión. Para club RI muestra las
-// cuatro líneas — neto, exento, IVA y bruto (pedido 2026-08-03; antes B/C
-// mostraban solo el bruto). Club Monotributo no discrimina impuesto (no
-// factura IVA): se muestra un único monto total (`soloBruto`, pedido
-// 2026-08-05).
+// Desglose de importes de los modales de emisión: neto, exento, IVA y bruto
+// (pedido 2026-08-03; antes B/C mostraban solo el bruto).
+//
+// Las tres líneas se muestran SIEMPRE, también en club Monotributo. Entre el
+// 2026-08-05 y el 2026-08-10 ahí se mostraba solo el total, pero el cliente
+// aclaró el criterio: no es que se oculten, es que en Monotributo Exento e IVA
+// dan $0 y el importe entero va a Neto. Es además lo que ya muestran las
+// columnas del listado de Ventas, que leen los montos guardados.
 function DesgloseImportes({
   neto,
   exento,
   iva,
   bruto,
   brutoLabel,
-  soloBruto,
 }: {
   neto: number;
   exento: number;
   iva: number;
   bruto: number;
   brutoLabel: string;
-  soloBruto?: boolean;
 }) {
   return (
     <div className="mb-4 rounded-[10px] bg-gray-50 px-4 py-3">
-      {!soloBruto && (
-        <div className="mb-1.5 space-y-1 border-b border-gray-200 pb-1.5">
-          <div className="flex items-center justify-between text-sm text-gray-600">
-            <p>Importe neto</p>
-            <p>{fmtMoney(neto)}</p>
-          </div>
-          <div className="flex items-center justify-between text-sm text-gray-600">
-            <p>Importe exento</p>
-            <p>{fmtMoney(exento)}</p>
-          </div>
-          <div className="flex items-center justify-between text-sm text-gray-600">
-            <p>Impuestos (IVA)</p>
-            <p>{fmtMoney(iva)}</p>
-          </div>
+      <div className="mb-1.5 space-y-1 border-b border-gray-200 pb-1.5">
+        <div className="flex items-center justify-between text-sm text-gray-600">
+          <p>Importe neto</p>
+          <p>{fmtMoney(neto)}</p>
         </div>
-      )}
+        <div className="flex items-center justify-between text-sm text-gray-600">
+          <p>Importe exento</p>
+          <p>{fmtMoney(exento)}</p>
+        </div>
+        <div className="flex items-center justify-between text-sm text-gray-600">
+          <p>Impuestos (IVA)</p>
+          <p>{fmtMoney(iva)}</p>
+        </div>
+      </div>
       <div className="flex items-center justify-between">
         <p className="text-sm font-semibold" style={{ color: '#101828' }}>
           {brutoLabel}
@@ -364,24 +374,25 @@ function DesgloseImportes({
  *
  * Lo usan los cuatro caminos de emisión (Nueva NC/ND del header, el botón de la
  * fila, la NC interna y la anulación en lote) para que muestren lo mismo que la
- * factura. `soloBruto` respeta la regla del club Monotributo: no discrimina
- * impuesto, va un único total (pedido 2026-08-05).
+ * factura. En club Monotributo el importe entero va a Neto, igual que en el
+ * server (ver `desglosarItemsUi`).
  */
 function DesgloseNota({
   total,
   tipoFactura,
   esNc,
-  soloBruto,
+  esMonotributo,
 }: {
   total: number;
   tipoFactura: string | null;
   esNc: boolean;
-  soloBruto?: boolean;
+  esMonotributo?: boolean;
 }) {
   if (!(total > 0)) return null;
   const d = desglosarItemsUi(
     [{ bruto: total, alicuotaIva: null }],
     tipoFactura === 'factura_c' ? 0 : 21,
+    esMonotributo,
   );
   return (
     <DesgloseImportes
@@ -390,7 +401,6 @@ function DesgloseNota({
       iva={d.iva}
       bruto={total}
       brutoLabel={`Importe bruto (total ${esNc ? 'a acreditar' : 'a debitar'})`}
-      soloBruto={soloBruto}
     />
   );
 }
@@ -672,8 +682,9 @@ function NuevaFacturaModal({
           .filter((m) => selectedMovs.has(m.id))
           .map((m) => ({ bruto: parseFloat(m.debe || '0'), alicuotaIva: m.alicuotaIva })),
         form.tipoFactura === 'factura_c' ? 0 : 21,
+        clubMonotributo,
       ),
-    [movimientos, selectedMovs, form.tipoFactura],
+    [movimientos, selectedMovs, form.tipoFactura, clubMonotributo],
   );
 
   // Vencimiento sugerido "según tarifario": fecha de emisión + el menor Plazo
@@ -1477,9 +1488,9 @@ function NuevaFacturaModal({
             </div>
 
             <div className="border-t border-gray-200 p-6">
-              {/* Desglose completo (neto/exento/IVA/bruto) para club RI (pedido
-              2026-08-03); club Monotributo no discrimina impuesto, muestra
-              solo el total (pedido 2026-08-05). */}
+              {/* Desglose completo neto/exento/IVA/bruto (pedido 2026-08-03).
+              En Monotributo las tres líneas van igual, con el importe en Neto y
+              Exento/IVA en $0 (aclaración del cliente 2026-08-10). */}
               {!modoNota && form.socioId && selectedMovs.size > 0 && (
                 <DesgloseImportes
                   neto={desgloseSeleccionado.neto}
@@ -1487,7 +1498,6 @@ function NuevaFacturaModal({
                   iva={desgloseSeleccionado.iva}
                   bruto={totalSeleccionado}
                   brutoLabel="Importe bruto (total a emitir)"
-                  soloBruto={clubMonotributo}
                 />
               )}
               {/* Mismo desglose para NC/ND (ver DesgloseNota). */}
@@ -1506,7 +1516,7 @@ function NuevaFacturaModal({
                       : form.tipoFactura
                   }
                   esNc={modoNota.esNc}
-                  soloBruto={clubMonotributo}
+                  esMonotributo={clubMonotributo}
                 />
               )}
               <div className="flex gap-3">
@@ -2030,6 +2040,7 @@ function LoteModal({
           .map((m) => ({ bruto: parseFloat(m.debe ?? '0'), alicuotaIva: m.alicuotaIva })),
       ),
       clubMonotributo ? 0 : 21,
+      clubMonotributo,
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deselected, elegibles, clubMonotributo]);
@@ -2333,7 +2344,6 @@ function LoteModal({
               iva={desgloseSeleccionado.iva}
               bruto={totalSeleccionado}
               brutoLabel="Importe bruto (total a emitir)"
-              soloBruto={clubMonotributo}
             />
           )}
           <div className="flex gap-3">
@@ -3043,7 +3053,7 @@ function NotaCreditoModal({
                 }
                 tipoFactura={factura.tipoFactura}
                 esNc={esNc}
-                soloBruto={guarderiaCondicionIva === 'monotributo'}
+                esMonotributo={guarderiaCondicionIva === 'monotributo'}
               />
               <div className="flex gap-3">
                 <button
@@ -3257,7 +3267,7 @@ function NotaCreditoInternaModal({
                 }
                 tipoFactura={null}
                 esNc
-                soloBruto={guarderiaCondicionIva === 'monotributo'}
+                esMonotributo={guarderiaCondicionIva === 'monotributo'}
               />
               <div className="flex gap-3">
                 <button
@@ -3595,6 +3605,7 @@ function LoteNotaCreditoModal({
       alicuotaIva: f.tipoFactura === 'factura_c' ? 0 : 21,
     })),
     21,
+    guarderiaCondicionIva === 'monotributo',
   );
 
   return (
@@ -3700,7 +3711,6 @@ function LoteNotaCreditoModal({
               iva={desgloseLote.iva}
               bruto={total}
               brutoLabel="Importe bruto (total a acreditar)"
-              soloBruto={guarderiaCondicionIva === 'monotributo'}
             />
           )}
           {resultados ? (
