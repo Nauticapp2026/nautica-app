@@ -56,10 +56,7 @@ import {
   eliminarTarjetaSocioAction,
   type GuardarTarjetaData,
 } from '@/app/actions/payway';
-import {
-  getLedgerSaldoAFavorAction,
-  type LedgerSaldoAFavorEntry,
-} from '@/app/actions/movimientos';
+import { getLedgerSaldoAFavorAction, type LedgerSaldoAFavorEntry } from '@/app/actions/movimientos';
 import { buscarRankeado } from '@/lib/buscador';
 import { formatArgentinaDate, formatArgentinaDateTime, formatNaiveDateTime } from '@/lib/dates';
 import { precioConIva, precioSinIva } from '@/lib/iva';

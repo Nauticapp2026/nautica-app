@@ -257,9 +257,7 @@ export async function getPendientePorComprobante(
  *   ya está aplicado a comprobantes puntuales. El pool genérico debe sumar
  *   solo `haber − comprometido` (el excedente es adelanto / saldo a favor).
  */
-export async function calcularCoberturaTargeted(
-  socioId: string,
-): Promise<CoberturaTargeted> {
+export async function calcularCoberturaTargeted(socioId: string): Promise<CoberturaTargeted> {
   const porSocio = await calcularCoberturaTargetedBatch([socioId]);
   return porSocio.get(socioId) ?? coberturaVacia();
 }

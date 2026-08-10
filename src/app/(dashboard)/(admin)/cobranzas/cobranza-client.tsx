@@ -185,9 +185,7 @@ function NuevaCobranzaModal({
   // No se puede aplicar más crédito del que el socio tiene. Que el pedido supere
   // el total a cobrar no es un error (significa "cubrilo todo"): se acota solo.
   const creditoExcedeDisponible = creditoPedido > saldoDisponible + 0.01;
-  const montoCredito = usarSaldoAFavor
-    ? Math.min(creditoPedido, saldoDisponible, montoNum)
-    : 0;
+  const montoCredito = usarSaldoAFavor ? Math.min(creditoPedido, saldoDisponible, montoNum) : 0;
   const montoEfectivo = Math.max(0, montoNum - montoCredito);
   const totalCargado = useMemo(
     () => formas.reduce((acc, f) => acc + (parseFloat(montoToNumberStr(f.monto)) || 0), 0),
@@ -323,11 +321,7 @@ function NuevaCobranzaModal({
   function handleSaldoAFavorChange(value: string) {
     const limpio = sanitizeMontoInput(value);
     setSaldoAFavorInput(limpio);
-    const credito = Math.min(
-      parseFloat(montoToNumberStr(limpio)) || 0,
-      saldoDisponible,
-      montoNum,
-    );
+    const credito = Math.min(parseFloat(montoToNumberStr(limpio)) || 0, saldoDisponible, montoNum);
     const efectivo = Math.max(0, montoNum - credito);
     sincronizarConMonto(efectivo > 0.005 ? efectivo.toFixed(2) : '');
   }

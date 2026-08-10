@@ -285,7 +285,7 @@ export default async function UsuariosPage({
   // neto crudo (haber − debe) daba $0 en cuanto el socio tenía más deuda que
   // crédito, aunque ese crédito siguiera sin usar — por eso la lista mostraba un
   // número distinto al del modal de cobranza.
-  const poolPorSocio = await getPoolRestanteBatch(socios.map((s) => s.profileId));
+  const poolPorSocio = await getPoolRestanteBatch(profileIds);
 
   const sociosData = socios.map((s) => {
     const debe = debeBySocio.get(s.profileId) ?? 0;

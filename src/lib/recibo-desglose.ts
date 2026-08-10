@@ -121,7 +121,8 @@ export async function getComprobantesCobrados(
 
   const detallePorComprobante = new Map<string, DetalleCargo[]>();
   for (const it of itemRows) {
-    if (!detallePorComprobante.has(it.facturacionId)) detallePorComprobante.set(it.facturacionId, []);
+    if (!detallePorComprobante.has(it.facturacionId))
+      detallePorComprobante.set(it.facturacionId, []);
     detallePorComprobante.get(it.facturacionId)!.push({
       concepto: it.concepto,
       importe: it.importe,
