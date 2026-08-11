@@ -234,7 +234,7 @@ Lista los servicios que el socio tiene contratados. Es un **contrato**, no un hi
 
 Muestra los movimientos del socio: facturas, cobros y saldo.
 
-Arriba de la tabla hay tres tarjetas: **Ingresos por venta**, **Cobranzas** y **Saldo** del socio.
+Arriba de la tabla hay tres tarjetas: **Ingresos por venta**, **Cobranzas** y una tercera que muestra **Saldo cliente** (lo que debe, en naranja) o **Saldo a favor** (crédito sin usar, en verde), según cuál tenga. Si el socio debe y **además** tiene algo de crédito sin usar sin alcanzar a cubrir la deuda, debajo del monto aparece la aclaración **"+ $X a favor sin usar"**. Cuando hay saldo a favor, un link **Ver historial** abre un panel con el detalle de **de dónde salió cada peso de crédito y en qué se aplicó** (por ejemplo, un adelanto que después se usó para pagar una factura puntual).
 
 > Esta pestaña es de **solo lectura** de movimientos. Para registrar un cobro del socio, andá a la sección **Cobranzas** (menú lateral) y usá **Nueva cobranza** — reemplaza al viejo botón "Registrar pago" que tenía esta pestaña. Los consumos tampoco se cargan acá: usá **Cargar Servicio** en la pestaña **Servicios Contratados**.
 
@@ -244,16 +244,18 @@ Arriba de la tabla hay tres tarjetas: **Ingresos por venta**, **Cobranzas** y **
 - **Estado** — Todos / Cobrado / Anulado (NC) / Parcial / Pendiente.
 - **Tipo de comprobante** — Factura A/B/C, Recibo, Comprobante interno, Nota de crédito o Sin comprobante.
 
-Al aplicar **cualquier filtro**, la tarjeta de **Saldo** se **oculta**: su valor es el saldo total del socio y no se corresponde con el subconjunto de movimientos filtrados. Las tarjetas de **Ingresos por venta** y **Cobranzas** se mantienen. Al limpiar los filtros, la tarjeta de Saldo vuelve a aparecer.
+Al aplicar **cualquier filtro**, la tercera tarjeta (Saldo cliente / Saldo a favor) se **oculta**: su valor es el saldo total del socio y no se corresponde con el subconjunto de movimientos filtrados. Las tarjetas de **Ingresos por venta** y **Cobranzas** se mantienen. Al limpiar los filtros, vuelve a aparecer.
 
 **Ordenar por fecha.** Hacé clic en el encabezado **Fecha** para alternar el orden de los movimientos entre **más nuevo primero** (por defecto) y **más antiguo primero**. La flechita del encabezado indica el orden actual.
 
-**Columnas de la tabla.** En orden: **Fecha**, **Tipo de comprobante**, **Nº Comprobante**, **Nº de operación**, **Detalle**, **Vencimiento**, **Situación**, **Ventas**, **Cobranzas**, **Saldo** y **Estado**.
+**Columnas de la tabla.** En orden: **Fecha**, **Tipo de comprobante**, **Nº Comprobante**, **Nº de operación**, **Detalle**, **Vencimiento**, **Situación**, **Ventas**, **Cobranzas**, **Saldo**, **Importe pendiente** y **Estado**.
 
 Cada comprobante ocupa **una sola fila**: si una factura o un comprobante interno se emitió por varios Servicios Contratados a la vez, sus cargos se muestran consolidados en una línea, con el importe total y el detalle indicando el primer servicio y cuántos más incluye (ej. "Guarda mensual (+2)").
 
 - **Vencimiento** — fecha límite de pago del cargo. En las **facturas fiscales** es el vencimiento que se eligió al emitirlas. En los **comprobantes internos** se calcula como la **fecha de emisión más el Plazo de cobro** definido en la tarifa del Tarifario (Contado, 5, 10, 15, 20 o 30 días); si la fila consolida varios servicios con plazos distintos, rige el que vence primero. Ejemplo: un comprobante del 26/06 con plazo de 30 días vence el 26/07. En cargos sin comprobante y en cobranzas muestra "—".
 - **Situación** — estado según esa fecha: **En término** (verde) o **Vencida** (rojo). Una fila pasa a **Vencida** el día siguiente al vencimiento (siguiendo el ejemplo, el 27/07). Es **puramente por fecha**: un cargo pagado tarde también puede figurar Vencida. Es independiente de la columna **Estado**, que refleja el estado de pago: **Cobrado** (cubierto por cobranzas), **Parcial** (cobrado en parte), **Pendiente** (sin cobrar), **Vencido** o **Anulado (NC)** (anulado por una nota de crédito).
+- **Saldo** — saldo acumulado de la cuenta hasta ese movimiento (en verde cuando es a favor del socio).
+- **Importe pendiente** — cuánto falta cobrar de **ese comprobante puntual**, descontando notas de crédito y pagos parciales ya aplicados. En rojo si falta cobrar algo, en verde si ese comprobante ya está cancelado al 100%. En pagos y anulaciones muestra "—" (no son cargos, no deben nada).
 
 #### Pestaña Accesos Externos
 
@@ -653,11 +655,13 @@ Las tarjetas superiores muestran:
 6. **Condición de venta** (Contado, Cuenta corriente, 30 / 60 / 90 días) y **Forma de pago** (Efectivo, Transferencia, Tarjeta de crédito, Mercado Pago, etc.).
 7. **Descripción** (opcional) y **Período facturado** — el rango de fechas del servicio que se informa a ARCA en el comprobante (por defecto, el mes en curso).
 8. Antes del botón Emitir aparece el **desglose del importe**, siempre completo con sus cuatro líneas, sin importar la letra ni la condición IVA del club:
-   - **Importe neto** — el monto gravado, sin el impuesto.
-   - **Importe exento** — el monto de los conceptos exentos / no gravados (en un club Monotributista, todo el importe va acá).
+   - **Importe neto** — el monto gravado, sin el impuesto (en un club **Monotributista**, va acá el importe entero: ese club nunca discrimina IVA, así que no corresponde tratarlo como exento).
+   - **Importe exento** — el monto de los conceptos genuinamente exentos / no gravados de un club Responsable Inscripto.
    - **Impuestos (IVA)** — el IVA de los conceptos gravados.
    - **Importe bruto** — la suma de los tres anteriores: el total a emitir.
 9. Hacé clic en **Emitir**. La factura se envía a ARCA y queda registrada.
+
+   Si el socio tiene un **contrato Fijo** vigente que ya está facturado este mes, el checkbox **"Adelantar la cuota del mes que viene"** (si aparece) te deja sumar también la cuota del mes siguiente completo, para cobrarla por adelantado. Los ítems de adelanto aparecen sin tildar y con la etiqueta **Adelanto** — vos elegís si los incluís. Una vez emitido, ese mes queda saldado: no se vuelve a facturar cuando llega.
 
 > En el selector aparecen **todos los socios del club**. Lo que define si la emisión sale bien son los **datos fiscales/personales completos** del socio (ver "Datos requeridos para emitir facturas ARCA"); si faltan, ARCA puede rechazar la emisión.
 
@@ -671,7 +675,7 @@ Emití facturas para múltiples socios al mismo tiempo.
 2. El sistema lista los socios con conceptos pendientes. Cada socio puede tener uno o más conceptos expandibles.
    - La **casilla del socio** selecciona o deselecciona todos sus conceptos de una vez.
    - Podés marcar o desmarcar conceptos individuales dentro del socio. Si solo algunos están marcados, la casilla del socio muestra el estado **intermedio** (guión) indicando selección parcial.
-3. Revisá el resumen y confirmá. Antes del botón Emitir aparece el mismo **desglose** que en la factura individual, siempre con las cuatro líneas: **Importe neto**, **Importe exento**, **Impuestos (IVA)** e **Importe bruto** del total seleccionado (en un club Monotributista todo el importe figura como exento).
+3. Revisá el resumen y confirmá. Antes del botón Emitir aparece el mismo **desglose** que en la factura individual, siempre con las cuatro líneas: **Importe neto**, **Importe exento**, **Impuestos (IVA)** e **Importe bruto** del total seleccionado (en un club Monotributista todo el importe figura como neto, no exento — ese club nunca discrimina IVA).
 
 El tipo de comprobante se determina automáticamente para cada socio según la condición IVA del club y de cada socio individualmente (igual que en la factura individual). La condición de venta es siempre **Contado**.
 
@@ -803,11 +807,16 @@ Arriba de la tabla de Cobranzas está el botón **Nueva cobranza**.
 3. Buscá al socio por nombre, número de socio o embarcación, y hacé clic sobre él en la lista.
 4. El sistema te muestra **solo los comprobantes pendientes de cobro** de ese socio (total o parcialmente), del tipo elegido en el paso 2. Los comprobantes ya cobrados enteros no aparecen; los que tuvieron un **cobro parcial** aparecen con el **saldo que falta cobrar** (y la aclaración del total original). Tampoco incluye notas de crédito.
 5. Tildá los comprobantes que estás cobrando (o usá **Seleccionar todos**). Abajo se muestra el **Total seleccionado**.
-6. Hacé clic en **Continuar**. También podés continuar **sin seleccionar ningún comprobante**: en ese caso el monto se registra como **adelanto** y queda como **saldo a favor** en la Cuenta Corriente del socio.
-7. Revisá o ajustá el **Monto a cobrar** (viene precargado con el total seleccionado) y la **Fecha** del cobro.
-   - Si el monto es **menor** al total seleccionado, es un **pago parcial**: se aplica **solo a los comprobantes seleccionados** (del más viejo al más nuevo) — nunca toca saldos de otros comprobantes. Lo que falte queda pendiente **en esos mismos comprobantes** para una próxima cobranza.
+6. Hacé clic en **Continuar**. También podés continuar **sin seleccionar ningún comprobante**: en ese caso el monto se registra como **adelanto** y queda como **saldo a favor** en la Cuenta Corriente del socio. Un adelanto **no salda ningún comprobante viejo pendiente por sí solo** — sigue disponible entero hasta que lo usés a mano (tildando un comprobante y marcando "Usar saldo a favor disponible", ver paso 7) o lo consuma el débito automático al cobrar.
+7. Si tildaste **un solo comprobante**, revisá o ajustá el **Monto a cobrar** (viene precargado con el saldo pendiente) y la **Fecha** del cobro.
+   - Si el monto es **menor** al pendiente, es un **pago parcial**: se aplica a ese comprobante y lo que falte queda pendiente en él para una próxima cobranza.
    - Si el monto es **mayor**, el excedente queda como **saldo a favor** del socio.
-8. Elegí la **forma de pago**: Efectivo (pesos), Efectivo (dólares), Tarjeta de crédito, Tarjeta de débito, Transferencia bancaria, Cheque, Mercado Pago u Otro. Cada una pide sus propios datos (por ejemplo, Efectivo en dólares pide el tipo de cambio y calcula el equivalente en pesos; si el socio ya tiene una tarjeta cargada para débito automático, podés reutilizarla con un clic). Si estás cobrando **comprobantes internos**, el desplegable muestra **solo los medios habilitados** en la Gestión de cobranza del club (Efectivo habilita también Efectivo en dólares).
+
+   Si tildaste **dos o más comprobantes**, en vez de un monto único aparece un **casillero por cada comprobante** (precargado con su saldo pendiente): escribí ahí cuánto le pagás a cada uno — así elegís vos a qué factura imputa un pago parcial, en vez de que el sistema lo aplique solo del más viejo al más nuevo. El **Total a cobrar** se calcula solo, sumando los casilleros.
+
+   Si el socio tiene **saldo a favor sin usar** (de un adelanto o de un cobro anterior), aparece el tilde **"Usar saldo a favor disponible ($X)"**: al marcarlo, ese monto se descuenta del total a cobrar y el resto se completa con las formas de pago de siempre. Se agota solo — una vez usado por completo, deja de ofrecerse en la próxima cobranza.
+
+8. Elegí la **forma de pago**: Efectivo (pesos), Efectivo (dólares), Tarjeta de crédito, Tarjeta de débito, Transferencia bancaria, Cheque, Mercado Pago u Otro. Cada una pide sus propios datos (por ejemplo, Efectivo en dólares pide el tipo de cambio y calcula el equivalente en pesos; si el socio ya tiene una tarjeta cargada para débito automático, podés reutilizarla con un clic). Si estás cobrando **comprobantes internos**, el desplegable muestra **solo los medios habilitados** en la Gestión de cobranza del club (Efectivo habilita también Efectivo en dólares). Si el saldo a favor cubre el total completo, no hace falta cargar ninguna forma de pago.
 9. **Podés combinar más de una forma de pago** en el mismo cobro: hacé clic en **Agregar forma de pago** y repetí el paso anterior para cada una. La suma de todas tiene que coincidir con el Monto a cobrar.
 10. Hacé clic en **Registrar cobranza**.
 
