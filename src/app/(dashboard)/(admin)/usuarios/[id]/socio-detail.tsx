@@ -18,6 +18,7 @@ import {
   FileText,
   Package,
   Pencil,
+  Search,
   Ship,
   Star,
   TrendingUp,
@@ -64,6 +65,7 @@ import { ASTILLEROS } from '../astilleros';
 import { EmptyState } from '@/components/shared/empty-state';
 import { Pagination } from '@/components/shared/pagination';
 import { inputCls, Field } from '@/components/shared/forma-pago';
+import { TablaScrollX } from '@/components/shared/tabla-scroll-x';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -158,6 +160,10 @@ type Movimiento = {
   // más de uno si el comprobante agrupa varios SC. Null en pagos, notas y
   // cargos anteriores al modelo "los cargos nacen al emitir".
   numeroOperacion: number[] | null;
+  // true = este pago es un adelanto sin comprobante (Cobranzas -> "Continuar
+  // sin comprobantes"). No debe saldar OTRO cargo solo en la inferencia por
+  // fila — ver calcularSaldoYEstado (pedido 2026-08-11).
+  esAdelanto: boolean;
 };
 
 type Servicio = {
@@ -356,20 +362,42 @@ function calcularSaldoYEstado<
     montoCubiertoRecibo: string | null;
     haberComprometido: string | null;
     esMovimientoNc: boolean;
+    esAdelanto: boolean;
   },
 >(movimientos: T[]): (T & { saldo: number; estadoDisplay: string | null; pendiente: number })[] {
   const asc = [...movimientos].reverse();
   let acum = 0;
-  let poolHaber = 0;
+  // Partido en dos baldes, igual que calcularPoolRestante (reconciliar-cuenta.ts,
+  // fuente de verdad de este mismo criterio): un adelanto sin comprobante suma
+  // a `poolAdelanto` pero NO se usa para inferir "Cobrado" en otro cargo — solo
+  // `poolNormal` (excedente de un cobro real) puede hacerlo. Sigue disponible
+  // entero hasta que el club lo aplique a mano o el débito automático lo
+  // consuma de verdad (pedido 2026-08-11).
+  let poolNormal = 0;
+  let poolAdelanto = 0;
   for (const m of movimientos) {
     if (m.esMovimientoNc) continue;
     // De un pago de Cobranzas targeted solo entra al pool el excedente no
     // aplicado a comprobantes puntuales (adelanto / saldo a favor).
-    poolHaber += parseFloat(m.haber ?? '0') - parseFloat(m.haberComprometido ?? '0');
+    const aporte = parseFloat(m.haber ?? '0') - parseFloat(m.haberComprometido ?? '0');
+    if (m.esAdelanto) poolAdelanto += aporte;
+    else poolNormal += aporte;
     // Contraasiento de anulación de recibo: su debe anula el haber del pago
     // anulado (que sigue sumando arriba) — el neto del par es cero y esa
-    // plata no cubre ningún cargo.
-    if (m.tipo === 'anulacion_recibo') poolHaber -= parseFloat(m.debe ?? '0');
+    // plata no cubre ningún cargo. Resta del mismo balde que sumó el pago
+    // anulado (un adelanto anulado siempre tiene esAdelanto=true).
+    if (m.tipo === 'anulacion_recibo') {
+      if (m.esAdelanto) poolAdelanto -= parseFloat(m.debe ?? '0');
+      else poolNormal -= parseFloat(m.debe ?? '0');
+    }
+  }
+  // Consume `poolNormal` primero; si no alcanza, sigue con `poolAdelanto` —
+  // solo para un cargo YA `pagado` (hecho consumado: evita inflar la
+  // cobertura de otros cargos, no depende de si eso vino de un adelanto).
+  function consumirPool(monto: number): void {
+    const deNormal = Math.min(poolNormal, monto);
+    poolNormal -= deNormal;
+    poolAdelanto -= monto - deNormal;
   }
   const conSaldo = asc.map((m) => {
     const venta = parseFloat(m.debe ?? '0');
@@ -386,7 +414,7 @@ function calcularSaldoYEstado<
         // Ya pagado: consume el pool (su pago ya está comprometido con ese
         // cargo), no se reescribe. Lo que le aplicó una NC de su factura o un
         // recibo targeted no está en el pool: solo el resto.
-        poolHaber -= Math.max(0, venta - montoNc - montoRecibo);
+        consumirPool(Math.max(0, venta - montoNc - montoRecibo));
         // Una NC parcial emitida DESPUÉS de que el cargo se cobró le acredita
         // una parte: la fila tiene que mostrarlo en vez de quedar "Cobrado"
         // para siempre.
@@ -398,17 +426,17 @@ function calcularSaldoYEstado<
       } else if (montoNc + montoRecibo >= venta - 0.001) {
         // Cubierto entero entre la NC y pagos targeted de Cobranzas.
         estadoDisplay = 'pagado';
-      } else if (montoNc + montoRecibo + poolHaber >= venta - 0.001) {
-        // La cobertura targeted cubre una parte, el pool genérico completa
-        // el resto.
+      } else if (montoNc + montoRecibo + poolNormal >= venta - 0.001) {
+        // La cobertura targeted cubre una parte, el pool genérico (sin contar
+        // adelantos) completa el resto.
         estadoDisplay = montoNc > 0.001 ? 'anulado_nc' : 'pagado';
-        poolHaber -= venta - montoNc - montoRecibo;
-      } else if (montoNc + montoRecibo + poolHaber > 0.001) {
-        // Cubierto solo en parte: consume todo lo que queda y no alcanza
-        // para el resto de este cargo ni para otro más nuevo.
+        consumirPool(venta - montoNc - montoRecibo);
+      } else if (montoNc + montoRecibo + poolNormal > 0.001) {
+        // Cubierto solo en parte: consume todo lo que queda de poolNormal y no
+        // alcanza para el resto de este cargo ni para otro más nuevo.
         estadoDisplay = 'parcial';
-        pendiente = venta - montoNc - montoRecibo - poolHaber;
-        poolHaber = 0;
+        pendiente = venta - montoNc - montoRecibo - poolNormal;
+        poolNormal = 0;
       } else {
         // Sin nada asignado todavía: debe todo.
         pendiente = venta;
@@ -1107,22 +1135,15 @@ function EspacioEmbarcacionRow({
 
   return (
     <div className="flex flex-col gap-2 border-t border-gray-100 pt-4 sm:flex-row sm:items-center">
-      <select
-        value={destinoId}
-        onChange={(e) => setDestinoId(e.target.value)}
-        disabled={pending}
-        className="h-10 flex-1 rounded-[10px] border border-gray-200 bg-white px-3 text-sm text-[#101828] focus:border-[#175861] focus:ring-1 focus:ring-[#175861] focus:outline-none disabled:opacity-50"
-      >
-        <option value="">{tieneEspacio ? 'Cambiar espacio…' : 'Asignar espacio…'}</option>
-        {espaciosFiltrados.map((e) => (
-          <option key={e.id} value={e.id}>
-            {e.label}
-            {e.precio
-              ? ` — $${precioConIva(Number(e.precio), Number(e.alicuotaIva ?? 0)).toLocaleString('es-AR')}`
-              : ''}
-          </option>
-        ))}
-      </select>
+      <div className="flex-1">
+        <EspacioCombobox
+          espacios={espaciosFiltrados}
+          value={destinoId}
+          onChange={setDestinoId}
+          disabled={pending}
+          placeholder={tieneEspacio ? 'Buscar otro espacio…' : 'Buscar un espacio…'}
+        />
+      </div>
       <button
         onClick={submit}
         disabled={!destinoId || pending}
@@ -2710,8 +2731,8 @@ export function SocioDetail({
             />
           ) : (
             <>
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[940px] text-sm">
+              <TablaScrollX>
+                <table className="w-full min-w-[1500px] text-sm">
                   <thead>
                     <tr className="bg-gray-50 text-left text-xs font-semibold text-gray-500">
                       <th className="px-4 py-3">
@@ -2878,26 +2899,27 @@ export function SocioDetail({
                                   : '—'}
                             </td>
                             <td
-                              className="px-4 py-3 text-right font-semibold"
-                              style={{
-                                color:
-                                  m.saldo < 0 ? '#1B9A5A' : m.saldo > 0 ? '#101828' : '#6B7280',
-                              }}
+                              className={`px-4 py-3 text-right font-semibold ${
+                                m.saldo < 0
+                                  ? 'text-green-700'
+                                  : m.saldo > 0
+                                    ? 'text-[#101828]'
+                                    : 'text-gray-500'
+                              }`}
                             >
                               {fmt(Math.abs(m.saldo))}
-                              {m.saldo < 0 && (
-                                <span className="ml-1 text-xs font-normal text-green-600">
-                                  a favor
-                                </span>
-                              )}
                             </td>
                             {/* Importe pendiente: lo que falta cobrar de este
                                 comprobante. Solo aplica a cargos — un pago o
-                                una anulación no deben nada. */}
+                                una anulación no deben nada. Mismo verde/rojo
+                                que Cobranzas y Vencido/Vencida, para que la
+                                tabla no mezcle dos tonos por el mismo sentido. */}
                             <td className="px-4 py-3 text-right font-medium">
                               {venta > 0 && m.tipo !== 'anulacion_recibo' ? (
                                 <span
-                                  style={{ color: m.pendiente > 0.005 ? '#B42318' : '#1B9A5A' }}
+                                  className={
+                                    m.pendiente > 0.005 ? 'text-red-700' : 'text-green-700'
+                                  }
                                 >
                                   {fmt(m.pendiente)}
                                 </span>
@@ -2929,13 +2951,13 @@ export function SocioDetail({
                     })()}
                   </tbody>
                 </table>
-                <Pagination
-                  page={ccPage}
-                  totalItems={movimientosFiltrados.length}
-                  pageSize={CC_PAGE_SIZE}
-                  onPageChange={setCcPage}
-                />
-              </div>
+              </TablaScrollX>
+              <Pagination
+                page={ccPage}
+                totalItems={movimientosFiltrados.length}
+                pageSize={CC_PAGE_SIZE}
+                onPageChange={setCcPage}
+              />
             </>
           )}
 
@@ -3130,6 +3152,103 @@ export function SocioDetail({
           socioDocType={socio.tipoDocumento}
           socioDocNumber={socio.numeroDocumento}
         />
+      )}
+    </div>
+  );
+}
+
+// ─── Combobox: buscar espacio ───────────────────────────────────────────────
+// Mismo patrón que el buscador de socio en Ventas (SocioCombobox): un input
+// con lupa que al enfocar muestra el listado filtrado, en vez de un <select>
+// nativo — pedido del cliente 2026-08-11, para no tener que scrollear un
+// dropdown largo buscando el espacio.
+
+function EspacioCombobox({
+  espacios,
+  value,
+  onChange,
+  disabled,
+  placeholder,
+}: {
+  espacios: EspacioOption[];
+  value: string;
+  onChange: (espacioId: string) => void;
+  disabled?: boolean;
+  placeholder: string;
+}) {
+  const [query, setQuery] = useState('');
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const seleccionado = espacios.find((e) => e.id === value);
+
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
+  }, []);
+
+  function subtituloDe(e: EspacioOption): string {
+    const partes: string[] = [];
+    if (e.eslora) partes.push(`${e.eslora} ${e.unidadMetraje === 'pies' ? 'pies' : 'm'}`);
+    if (e.precio) {
+      partes.push(fmt(precioConIva(Number(e.precio), Number(e.alicuotaIva ?? 0))));
+    }
+    return partes.join(' · ');
+  }
+
+  const filtrados = useMemo(
+    () => buscarRankeado(espacios, query, { textos: (e) => [e.label] }),
+    [espacios, query],
+  );
+
+  function select(espacioId: string) {
+    onChange(espacioId);
+    setQuery('');
+    setOpen(false);
+  }
+
+  return (
+    <div className="relative" ref={containerRef}>
+      <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400" />
+      <input
+        className={`${inputCls} pl-9`}
+        placeholder={placeholder}
+        value={open ? query : (seleccionado?.label ?? '')}
+        disabled={disabled}
+        onFocus={() => {
+          setOpen(true);
+          setQuery('');
+        }}
+        onChange={(e) => setQuery(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') setOpen(false);
+        }}
+      />
+      {open && (
+        <div className="absolute z-20 mt-1 max-h-60 w-full overflow-y-auto rounded-[10px] border border-gray-200 bg-white shadow-lg">
+          {filtrados.length === 0 ? (
+            <p className="px-3 py-2 text-sm text-gray-400">Sin resultados</p>
+          ) : (
+            filtrados.map((e) => (
+              <button
+                type="button"
+                key={e.id}
+                onClick={() => select(e.id)}
+                className="flex w-full items-baseline gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50"
+              >
+                <span className="shrink-0 font-medium" style={{ color: '#101828' }}>
+                  {e.label}
+                </span>
+                <span className="truncate text-xs text-gray-400">{subtituloDe(e)}</span>
+              </button>
+            ))
+          )}
+        </div>
       )}
     </div>
   );
