@@ -2867,7 +2867,7 @@ export function SocioDetail({
                             <td className="px-4 py-3">
                               {m.fechaVencimiento ? (
                                 <span
-                                  className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${
+                                  className={`inline-block rounded-full px-3 py-1 text-xs font-medium whitespace-nowrap ${
                                     m.fechaVencimiento < todayISODate()
                                       ? 'bg-red-100 text-red-700'
                                       : 'bg-green-100 text-green-700'
@@ -2930,12 +2930,12 @@ export function SocioDetail({
                             <td className="px-4 py-3 text-right">
                               <div className="flex items-center justify-end gap-2">
                                 {m.tipo === 'anulacion_recibo' ? (
-                                  <span className="inline-block rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-500">
+                                  <span className="inline-block rounded-full bg-gray-100 px-3 py-1 text-xs font-medium whitespace-nowrap text-gray-500">
                                     Anulación
                                   </span>
                                 ) : (
                                   <span
-                                    className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${
+                                    className={`inline-block rounded-full px-3 py-1 text-xs font-medium whitespace-nowrap ${
                                       ESTADO_BADGE[m.estadoDisplay ?? ''] ??
                                       'bg-gray-100 text-gray-500'
                                     }`}
