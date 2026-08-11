@@ -134,6 +134,9 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
         // (movimientos.socio_servicio_id, modelo "los cargos nacen al
         // emitir"). Null en pagos, notas y cargos pre-refactor.
         numeroOperacion: socioServicios.numeroOperacion,
+        // Adelanto sin comprobante: la fila no debe saldar otro cargo solo en
+        // la inferencia por fila (ver calcularSaldoYEstado, pedido 2026-08-11).
+        esAdelanto: movimientosCuentaCorriente.esAdelanto,
       })
       .from(movimientosCuentaCorriente)
       .leftJoin(serviciosTable, eq(serviciosTable.id, movimientosCuentaCorriente.servicioId))
@@ -572,7 +575,12 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
   // Saldo a favor disponible: el mismo pool FIFO que ofrece Cobranzas al cobrar.
   // La card lo calculaba como neto crudo (haber − debe), que da $0 en cuanto hay
   // más deuda que crédito — mostraba un número distinto al del modal.
-  const { poolRestante: saldoAFavorDisponible } = await getEstadoFifo(id);
+  // excluirAdelantos: un adelanto sin comprobante no debe saldar cargos viejos
+  // solo — sigue disponible entero hasta que el club (o el débito automático,
+  // que no usa esta opción) lo aplique a propósito (pedido 2026-08-11).
+  const { poolRestante: saldoAFavorDisponible } = await getEstadoFifo(id, {
+    excluirAdelantos: true,
+  });
 
   return (
     <SocioDetail

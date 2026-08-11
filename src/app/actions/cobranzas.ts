@@ -66,12 +66,11 @@ const TIPOS_COBRABLES = [
 // Saldo a favor disponible del socio: el mismo "poolRestante" que ya usa
 // reconciliar-cuenta.ts para decidir qué cargos están saldados — NO es el
 // saldo neto crudo (haber − debe de TODO), que da $0 en cuanto hay más deuda
-// pendiente que crédito aunque ese crédito siga sin usar. poolRestante ya
-// descuenta lo que el FIFO general "reservó" para cargos viejos, así que no
-// se duplica plata entre el uso automático y este uso explícito (pedido
-// 2026-08-06).
+// pendiente que crédito aunque ese crédito siga sin usar (pedido 2026-08-06).
+// excluirAdelantos: un adelanto sin comprobante no saldó nada solo (pedido
+// 2026-08-11) — sigue entero disponible hasta que ESTA acción lo aplique.
 async function getSaldoAFavorDisponible(socioId: string): Promise<number> {
-  const { poolRestante } = await getEstadoFifo(socioId);
+  const { poolRestante } = await getEstadoFifo(socioId, { excluirAdelantos: true });
   return poolRestante;
 }
 
@@ -494,6 +493,7 @@ export async function registrarCobranzaAction(data: RegistrarCobranzaData): Prom
           formaDePago: medioPago,
           datosPago,
           createdBy: ctx.user.id,
+          esAdelanto,
         })
         .returning({ id: movimientosCuentaCorriente.id });
 

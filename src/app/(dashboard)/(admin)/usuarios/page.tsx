@@ -284,8 +284,9 @@ export default async function UsuariosPage({
   // Saldo a favor real: el mismo pool FIFO que ofrece Cobranzas al cobrar. El
   // neto crudo (haber − debe) daba $0 en cuanto el socio tenía más deuda que
   // crédito, aunque ese crédito siguiera sin usar — por eso la lista mostraba un
-  // número distinto al del modal de cobranza.
-  const poolPorSocio = await getPoolRestanteBatch(profileIds);
+  // número distinto al del modal de cobranza. excluirAdelantos: un adelanto
+  // sin comprobante no debe saldar cargos viejos solo (pedido 2026-08-11).
+  const poolPorSocio = await getPoolRestanteBatch(profileIds, { excluirAdelantos: true });
 
   const sociosData = socios.map((s) => {
     const debe = debeBySocio.get(s.profileId) ?? 0;

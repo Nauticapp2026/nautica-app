@@ -59,15 +59,22 @@ export async function getCargosSaldadosFifo(socioId: string): Promise<Set<string
  * `coberturaParcial`: cobertura targeted (NC de su factura o pago parcial de
  * Cobranzas) que cubre un cargo SOLO en parte (el cargo no llega a `saldados`,
  * pero ese monto ya está acreditado y no debe volver a cobrarse).
+ *
+ * `opts.excluirAdelantos`: ver `calcularPoolRestante`. Default false (el
+ * débito automático y la auto-facturación llaman sin esto — su
+ * comportamiento no cambia).
  */
-export async function getEstadoFifo(socioId: string): Promise<{
+export async function getEstadoFifo(
+  socioId: string,
+  opts?: { excluirAdelantos?: boolean },
+): Promise<{
   saldados: Set<string>;
   poolRestante: number;
   coberturaParcial: Map<string, number>;
 }> {
   const cobertura = await calcularCoberturaTargeted(socioId);
   const movs = await getMovimientosOrdenados(socioId);
-  return calcularPoolRestante(movs, cobertura);
+  return calcularPoolRestante(movs, cobertura, { excluirAdelantos: opts?.excluirAdelantos });
 }
 
 /**
@@ -76,7 +83,10 @@ export async function getEstadoFifo(socioId: string): Promise<{
  * el criterio es idéntico (comparten `calcularPoolRestante`), pero resolver
  * cientos de socios de a uno serían cientos de tandas de queries.
  */
-export async function getPoolRestanteBatch(socioIds: string[]): Promise<Map<string, number>> {
+export async function getPoolRestanteBatch(
+  socioIds: string[],
+  opts?: { excluirAdelantos?: boolean },
+): Promise<Map<string, number>> {
   const out = new Map<string, number>();
   if (socioIds.length === 0) return out;
 
@@ -90,6 +100,7 @@ export async function getPoolRestanteBatch(socioIds: string[]): Promise<Map<stri
         debe: movimientosCuentaCorriente.debe,
         haber: movimientosCuentaCorriente.haber,
         estado: movimientosCuentaCorriente.estado,
+        esAdelanto: movimientosCuentaCorriente.esAdelanto,
       })
       .from(movimientosCuentaCorriente)
       .where(inArray(movimientosCuentaCorriente.socioId, socioIds))
@@ -110,7 +121,9 @@ export async function getPoolRestanteBatch(socioIds: string[]): Promise<Map<stri
       out.set(socioId, 0);
       continue;
     }
-    const { poolRestante } = calcularPoolRestante(movsPorSocio.get(socioId) ?? [], cobertura);
+    const { poolRestante } = calcularPoolRestante(movsPorSocio.get(socioId) ?? [], cobertura, {
+      excluirAdelantos: opts?.excluirAdelantos,
+    });
     out.set(socioId, poolRestante);
   }
 
@@ -126,6 +139,7 @@ type MovimientoFifo = {
   estado: string | null;
   concepto?: string | null;
   fecha?: Date | null;
+  esAdelanto?: boolean | null;
 };
 
 /** Cobertura targeted que consume el recorrido FIFO. */
@@ -147,6 +161,7 @@ async function getMovimientosOrdenados(socioId: string): Promise<MovimientoFifo[
       estado: movimientosCuentaCorriente.estado,
       concepto: movimientosCuentaCorriente.concepto,
       fecha: movimientosCuentaCorriente.fecha,
+      esAdelanto: movimientosCuentaCorriente.esAdelanto,
     })
     .from(movimientosCuentaCorriente)
     .where(eq(movimientosCuentaCorriente.socioId, socioId))
@@ -167,14 +182,24 @@ async function getMovimientosOrdenados(socioId: string): Promise<MovimientoFifo[
 export function calcularPoolRestante(
   movs: MovimientoFifo[],
   cobertura: CoberturaFifo,
-  onPoolChange?: (evento: {
-    mov: MovimientoFifo;
-    delta: number;
-    motivo: 'excedente' | 'consumo';
-    poolResultante: number;
-  }) => void,
+  opts?: {
+    // Un adelanto sin comprobante (Cobranzas -> "Continuar sin comprobantes")
+    // suma como crédito disponible pero NO se usa para saldar otro cargo
+    // solo — el club (o el débito automático, que llama sin esto) tiene que
+    // aplicarlo a propósito. Pedido cliente 2026-08-11. Default false: el
+    // débito automático y la auto-facturación no cambian su comportamiento.
+    excluirAdelantos?: boolean;
+    onPoolChange?: (evento: {
+      mov: MovimientoFifo;
+      delta: number;
+      motivo: 'excedente' | 'consumo';
+      poolResultante: number;
+    }) => void;
+  },
 ): { saldados: Set<string>; poolRestante: number; coberturaParcial: Map<string, number> } {
   const { montoPorMovimiento, movimientosDeNc } = cobertura;
+  const excluirAdelantos = opts?.excluirAdelantos ?? false;
+  const onPoolChange = opts?.onPoolChange;
 
   const saldados = new Set<string>();
   const debeById = new Map(movs.map((m) => [m.id, parseFloat(m.debe ?? '0')]));
@@ -196,9 +221,16 @@ export function calcularPoolRestante(
   // anulan exactamente el haber del pago anulado, que sigue sumando — el neto
   // del par es cero y esa plata no cubre ningún cargo.
   //
+  // Partido en dos baldes para poder excluir uno de la pasada de consumo sin
+  // duplicar todo el recorrido: `poolNormal` (excedente de un cobro real) y
+  // `poolAdelanto` (adelantos sin comprobante). Sin excluirAdelantos se
+  // tratan como uno solo (se suman en cada chequeo) — mismo resultado que la
+  // versión vieja de un solo pool.
+  //
   // El aporte de cada movimiento se calcula fila por fila (y no con un reduce
   // previo) para que el historial pueda narrar en qué momento entró cada peso.
-  let pool = 0;
+  let poolNormal = 0;
+  let poolAdelanto = 0;
   const aporteAlPool = (m: MovimientoFifo): number =>
     movimientosDeNc.has(m.id)
       ? 0
@@ -209,9 +241,24 @@ export function calcularPoolRestante(
   for (const m of movs) {
     const aporte = aporteAlPool(m);
     if (Math.abs(aporte) > 0.001) {
-      pool += aporte;
-      onPoolChange?.({ mov: m, delta: aporte, motivo: 'excedente', poolResultante: pool });
+      if (m.esAdelanto) poolAdelanto += aporte;
+      else poolNormal += aporte;
+      onPoolChange?.({
+        mov: m,
+        delta: aporte,
+        motivo: 'excedente',
+        poolResultante: poolNormal + poolAdelanto,
+      });
     }
+  }
+
+  // Consume `poolNormal` primero; si no alcanza, sigue con `poolAdelanto`.
+  // Se usa tanto para un cargo YA pagado (hecho consumado, no depende del
+  // flag) como, si no se excluyen adelantos, para saldar uno nuevo.
+  function consumir(monto: number): void {
+    const deNormal = Math.min(poolNormal, monto);
+    poolNormal -= deNormal;
+    poolAdelanto -= monto - deNormal;
   }
 
   // Segunda pasada: los cargos consumen el pool del más viejo al más nuevo.
@@ -231,24 +278,35 @@ export function calcularPoolRestante(
       saldados.add(m.id);
       const consumo = Math.max(0, debe - (montoPorMovimiento.get(m.id) ?? 0));
       if (consumo > 0.001) {
-        pool -= consumo;
-        onPoolChange?.({ mov: m, delta: -consumo, motivo: 'consumo', poolResultante: pool });
+        consumir(consumo);
+        onPoolChange?.({
+          mov: m,
+          delta: -consumo,
+          motivo: 'consumo',
+          poolResultante: poolNormal + poolAdelanto,
+        });
       }
       continue;
     }
     // La cobertura targeted parcial ya acreditó una parte: el pool solo tiene
     // que cubrir el resto.
     const resto = debe - (coberturaParcial.get(m.id) ?? 0);
-    if (pool >= resto - 0.001) {
-      pool -= resto;
+    const disponible = excluirAdelantos ? poolNormal : poolNormal + poolAdelanto;
+    if (disponible >= resto - 0.001) {
+      consumir(resto);
       saldados.add(m.id);
       if (resto > 0.001) {
-        onPoolChange?.({ mov: m, delta: -resto, motivo: 'consumo', poolResultante: pool });
+        onPoolChange?.({
+          mov: m,
+          delta: -resto,
+          motivo: 'consumo',
+          poolResultante: poolNormal + poolAdelanto,
+        });
       }
     }
   }
 
-  return { saldados, poolRestante: Math.max(0, pool), coberturaParcial };
+  return { saldados, poolRestante: Math.max(0, poolNormal + poolAdelanto), coberturaParcial };
 }
 
 /** Un movimiento del saldo a favor: de dónde salió el crédito y en qué se usó. */
@@ -284,15 +342,22 @@ export async function getLedgerSaldoAFavor(socioId: string): Promise<LedgerSaldo
   const movs = await getMovimientosOrdenados(socioId);
 
   const eventos: Omit<LedgerSaldoAFavor, 'saldoResultante'>[] = [];
-  calcularPoolRestante(movs, cobertura, ({ mov, delta, motivo }) => {
-    const generado = delta > 0;
-    eventos.push({
-      movimientoId: mov.id,
-      fecha: mov.fecha?.toISOString() ?? null,
-      concepto: describirEvento(mov, motivo, generado),
-      tipo: generado ? 'generado' : 'usado',
-      monto: Math.abs(delta),
-    });
+  // excluirAdelantos: true — mismo criterio que el disponible que muestra la
+  // ficha y que ofrece Cobranzas (ver calcularPoolRestante); si no, el
+  // historial narraría un adelanto "consumido" por un cargo viejo que el
+  // club nunca eligió pagar con eso.
+  calcularPoolRestante(movs, cobertura, {
+    excluirAdelantos: true,
+    onPoolChange: ({ mov, delta, motivo }) => {
+      const generado = delta > 0;
+      eventos.push({
+        movimientoId: mov.id,
+        fecha: mov.fecha?.toISOString() ?? null,
+        concepto: describirEvento(mov, motivo, generado),
+        tipo: generado ? 'generado' : 'usado',
+        monto: Math.abs(delta),
+      });
+    },
   });
 
   eventos.sort((a, b) => (a.fecha ?? '').localeCompare(b.fecha ?? ''));

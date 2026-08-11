@@ -1213,6 +1213,10 @@ export const movimientosCuentaCorriente = pgTable(
     // true = el cargo se documentó con un comprobante INTERNO (no fiscal) al
     // cargar el servicio → se excluye de la facturación automática y manual.
     comprobanteInterno: boolean('comprobante_interno').notNull().default(false),
+    // true = este pago es un adelanto sin comprobante (Cobranzas -> "Continuar
+    // sin comprobantes"). El pool de saldo a favor lo excluye de saldar OTROS
+    // cargos solo — mig 0140, ver reconciliar-cuenta.ts.
+    esAdelanto: boolean('es_adelanto').notNull().default(false),
     // Contrato (socio_servicios) que originó el cargo y período facturado
     // (primer día del mes; NULL en one-shots: variables, baja anticipada,
     // notas, cobranzas). Mig 0133: índices únicos parciales sobre
