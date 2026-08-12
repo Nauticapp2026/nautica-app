@@ -1,15 +1,17 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { and, count as sqlCount, eq } from 'drizzle-orm';
+import { and, count as sqlCount, eq, gte } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import { publicaciones } from '@/lib/db/schema';
-import { getPlanFeatureLimits } from '@/lib/pricing/limits';
+import {
+  getGuarderiaPlanSlug,
+  getPlanLimitsForSlug,
+  mensajeUpsellPlan,
+} from '@/lib/pricing/limits';
 import { getActiveMarina } from '@/lib/auth/session';
 import { createAdminClient } from '@/lib/supabase/admin';
-
-const EDIT_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 const TIPOS = ['amarra', 'cama'] as const;
 type Tipo = (typeof TIPOS)[number];
@@ -122,20 +124,25 @@ export async function createPublicacionAction(
 
   const guarderiaId = ctx.activeMembership.guarderiaId;
 
-  const limits = await getPlanFeatureLimits(guarderiaId, ['nautishop_publicaciones']);
+  const planSlug = await getGuarderiaPlanSlug(guarderiaId);
+  const limits = await getPlanLimitsForSlug(planSlug, ['nautishop_publicaciones']);
   const limit = limits['nautishop_publicaciones'];
   if (limit === 0) {
-    return { error: 'Tu plan no incluye publicaciones. Actualizá a Premium o Elite.' };
+    return { error: `Tu plan no incluye publicaciones. ${mensajeUpsellPlan(planSlug)}` };
   }
 
-  const [{ total }] = await db
-    .select({ total: sqlCount() })
+  // Cupo mensual (se renueva el 1° de cada mes), no un tope de por vida.
+  const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  const [{ used }] = await db
+    .select({ used: sqlCount() })
     .from(publicaciones)
-    .where(eq(publicaciones.guarderiaId, guarderiaId));
+    .where(
+      and(eq(publicaciones.guarderiaId, guarderiaId), gte(publicaciones.createdAt, startOfMonth)),
+    );
 
-  if (Number(total) >= limit) {
+  if (Number(used) >= limit) {
     return {
-      error: `Alcanzaste el límite de ${limit} publicación${limit > 1 ? 'es' : ''} de tu plan. Eliminá una para poder crear otra.`,
+      error: `Alcanzaste el límite de ${limit} publicación${limit !== 1 ? 'es' : ''} de este mes. ${mensajeUpsellPlan(planSlug)}`,
     };
   }
 
@@ -175,16 +182,12 @@ export async function updatePublicacionAction(
   const guarderiaId = ctx.activeMembership.guarderiaId;
 
   const [current] = await db
-    .select({ id: publicaciones.id, createdAt: publicaciones.createdAt })
+    .select({ id: publicaciones.id })
     .from(publicaciones)
     .where(and(eq(publicaciones.id, id), eq(publicaciones.guarderiaId, guarderiaId)))
     .limit(1);
 
   if (!current) return { error: 'Publicación no encontrada.' };
-
-  if (Date.now() - current.createdAt.getTime() > EDIT_WINDOW_MS) {
-    return { error: 'El plazo de edición de 24 horas ha vencido.' };
-  }
 
   await db
     .update(publicaciones)

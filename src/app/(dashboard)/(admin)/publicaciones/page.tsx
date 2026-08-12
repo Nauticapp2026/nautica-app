@@ -1,14 +1,12 @@
 import { redirect } from 'next/navigation';
-import { desc, eq } from 'drizzle-orm';
+import { and, desc, eq, gte } from 'drizzle-orm';
 
 import { getActiveMarina } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { guarderias, publicaciones, profiles } from '@/lib/db/schema';
-import { getPlanLimitsForSlug } from '@/lib/pricing/limits';
+import { getPlanLimitsForSlug, mensajeUpsellPlan } from '@/lib/pricing/limits';
 
 import { PublicacionesClient, type PublicacionItem } from './publicaciones-client';
-
-const EDIT_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 export default async function PublicacionesPage() {
   const ctx = await getActiveMarina();
@@ -21,10 +19,11 @@ export default async function PublicacionesPage() {
   if (!isAdmin) redirect('/dashboard');
 
   const guarderiaId = ctx.activeMembership.guarderiaId;
+  const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 
   const [guarderiaRow, rows] = await Promise.all([
     db
-      .select({ plan: guarderias.plan })
+      .select({ plan: guarderias.plan, direccion: guarderias.direccion, ciudad: guarderias.ciudad })
       .from(guarderias)
       .where(eq(guarderias.id, guarderiaId))
       .limit(1),
@@ -55,7 +54,10 @@ export default async function PublicacionesPage() {
   const plan = guarderiaRow[0]?.plan ?? 'esencial';
   const limitsMap = await getPlanLimitsForSlug(plan, ['nautishop_publicaciones']);
   const limit = limitsMap['nautishop_publicaciones'];
-  const used = rows.length;
+  // Cupo mensual: solo cuenta lo creado desde el 1° de este mes.
+  const used = rows.filter((r) => r.createdAt >= startOfMonth).length;
+  const direccionDefault =
+    [guarderiaRow[0]?.direccion, guarderiaRow[0]?.ciudad].filter(Boolean).join(', ') || '';
 
   const items: PublicacionItem[] = rows.map((r) => ({
     id: r.id,
@@ -70,11 +72,17 @@ export default async function PublicacionesPage() {
     imagenUrls: r.imagenUrls ?? [],
     estado: r.estado,
     createdAt: r.createdAt.toISOString(),
-    // eslint-disable-next-line react-hooks/purity
-    isEditable: Date.now() - r.createdAt.getTime() <= EDIT_WINDOW_MS,
     autor:
       [r.autorNombre, r.autorApellido].filter(Boolean).join(' ').trim() || r.autorEmail || null,
   }));
 
-  return <PublicacionesClient items={items} plan={plan} limit={limit} used={used} />;
+  return (
+    <PublicacionesClient
+      items={items}
+      limit={limit}
+      used={used}
+      direccionDefault={direccionDefault}
+      mensajeUpsell={limit === 0 ? mensajeUpsellPlan(plan) : null}
+    />
+  );
 }

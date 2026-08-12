@@ -14,7 +14,6 @@ import {
   Fuel,
   Home,
   Layers,
-  Lock,
   MapPin,
   Plus,
   Ruler,
@@ -66,15 +65,15 @@ export type PublicacionItem = {
   imagenUrls: string[];
   estado: 'borrador' | 'publicada';
   createdAt: string;
-  isEditable: boolean;
   autor: string | null;
 };
 
 type Props = {
   items: PublicacionItem[];
-  plan: string;
   limit: number;
   used: number;
+  direccionDefault: string;
+  mensajeUpsell: string | null;
 };
 
 type ModalState = { mode: 'create' } | { mode: 'edit'; item: PublicacionItem } | null;
@@ -120,7 +119,13 @@ function fmtNum(v: string | null, unit: 'metros' | 'pies' = 'metros'): string | 
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
-export function PublicacionesClient({ items, plan, limit, used }: Props) {
+export function PublicacionesClient({
+  items,
+  limit,
+  used,
+  direccionDefault,
+  mensajeUpsell,
+}: Props) {
   const router = useRouter();
   const [modal, setModal] = useState<ModalState>(null);
   const [tipoFilter, setTipoFilter] = useState<TipoFilter>('todos');
@@ -161,7 +166,7 @@ export function PublicacionesClient({ items, plan, limit, used }: Props) {
 
         {limit === 0 ? (
           <div className="rounded-[10px] border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-700">
-            Disponible a partir del plan <span className="font-semibold">Premium</span>
+            {mensajeUpsell}
           </div>
         ) : (
           <button
@@ -250,6 +255,7 @@ export function PublicacionesClient({ items, plan, limit, used }: Props) {
       {modal && (
         <PublicacionModal
           state={modal}
+          direccionDefault={direccionDefault}
           onClose={() => setModal(null)}
           onSaved={() => {
             setModal(null);
@@ -290,7 +296,6 @@ function Pill({
 // ─── Card ─────────────────────────────────────────────────────────────────────
 
 function PublicacionCard({ item, onEdit }: { item: PublicacionItem; onEdit: () => void }) {
-  const canEdit = item.isEditable;
   const foto = item.imagenUrls[0];
   const esAmarra = item.tipo === 'amarra';
   const eslora = fmtNum(item.eslora, item.unidadMetraje);
@@ -378,13 +383,11 @@ function PublicacionCard({ item, onEdit }: { item: PublicacionItem; onEdit: () =
       <div className="px-3 pb-3">
         <button
           type="button"
-          onClick={canEdit ? onEdit : undefined}
-          disabled={!canEdit}
-          title={canEdit ? undefined : 'El plazo de edición de 24 hs venció'}
-          className={`flex w-full items-center justify-center gap-1.5 rounded-[10px] py-2.5 text-xs font-bold tracking-wide text-white transition-colors ${canEdit ? 'bg-[#175861] hover:bg-[#0f4249]' : 'cursor-not-allowed bg-gray-300'}`}
+          onClick={onEdit}
+          className="flex w-full items-center justify-center gap-1.5 rounded-[10px] bg-[#175861] py-2.5 text-xs font-bold tracking-wide text-white transition-colors hover:bg-[#0f4249]"
         >
-          {canEdit ? <Edit3 className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}
-          {canEdit ? 'EDITAR' : 'BLOQUEADO'}
+          <Edit3 className="h-3.5 w-3.5" />
+          EDITAR
         </button>
       </div>
     </article>
@@ -400,10 +403,12 @@ const labelCls = 'mb-1 block text-sm font-semibold text-gray-700';
 
 function PublicacionModal({
   state,
+  direccionDefault,
   onClose,
   onSaved,
 }: {
   state: NonNullable<ModalState>;
+  direccionDefault: string;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -411,7 +416,7 @@ function PublicacionModal({
   const initial = isEdit ? state.item : null;
 
   const [tipo, setTipo] = useState<'amarra' | 'cama' | ''>(initial?.tipo ?? '');
-  const [ubicacion, setUbicacion] = useState(initial?.ubicacion ?? '');
+  const [ubicacion, setUbicacion] = useState(initial?.ubicacion ?? direccionDefault);
   const [eslora, setEslora] = useState(initial?.eslora ?? '');
   const [manga, setManga] = useState(initial?.manga ?? '');
   const [unidadMetraje, setUnidadMetraje] = useState<'metros' | 'pies'>(

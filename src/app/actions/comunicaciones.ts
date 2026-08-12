@@ -5,7 +5,11 @@ import { and, count as sqlCount, eq, gte } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import { comunicaciones } from '@/lib/db/schema';
-import { getPlanFeatureLimits } from '@/lib/pricing/limits';
+import {
+  getGuarderiaPlanSlug,
+  getPlanLimitsForSlug,
+  mensajeUpsellPlan,
+} from '@/lib/pricing/limits';
 import { getActiveMarina } from '@/lib/auth/session';
 import { createAdminClient } from '@/lib/supabase/admin';
 
@@ -95,16 +99,16 @@ export async function createComunicacionAction(
 
   const guarderiaId = ctx.activeMembership.guarderiaId;
   const featureId = input.tipo === 'socios' ? 'com_cerrada' : 'com_abierta';
-  const limits = await getPlanFeatureLimits(guarderiaId, [featureId]);
+  const planSlug = await getGuarderiaPlanSlug(guarderiaId);
+  const limits = await getPlanLimitsForSlug(planSlug, [featureId]);
   const tipoLimit = limits[featureId];
 
   if (tipoLimit === 0) {
-    return {
-      error:
-        input.tipo === 'publica'
-          ? 'Tu plan no incluye comunicaciones públicas. Actualizá a Premium o Elite.'
-          : 'Tu plan no incluye comunicaciones para socios.',
-    };
+    const base =
+      input.tipo === 'publica'
+        ? 'Tu plan no incluye comunicaciones públicas.'
+        : 'Tu plan no incluye comunicaciones para socios.';
+    return { error: `${base} ${mensajeUpsellPlan(planSlug)}` };
   }
 
   const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
@@ -121,7 +125,7 @@ export async function createComunicacionAction(
 
   if (Number(used) >= tipoLimit) {
     return {
-      error: `Alcanzaste el límite de ${tipoLimit} comunicación${tipoLimit !== 1 ? 'es' : ''} de este tipo para este mes.`,
+      error: `Alcanzaste el límite de ${tipoLimit} comunicación${tipoLimit !== 1 ? 'es' : ''} de este tipo para este mes. ${mensajeUpsellPlan(planSlug)}`,
     };
   }
 
