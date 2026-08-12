@@ -460,6 +460,54 @@ export async function sendPushEmbarcacionGuardada(tareaId: string): Promise<void
 }
 
 // =============================================================================
+// Push de "embarcación preparada" al socio (transaccional, solo marina).
+//
+// El trigger `notificar_embarcacion_preparada` (mig mobile) escribe la campanita
+// in-app apenas una tarea de marina (es_marina=true) pasa a 'preparar', con
+// push_sent_at NULL y payload {tarea_id, porteria_id, embarcacion_nombre}. Esta
+// función solo despacha el push a partir de esa fila. La llama el mobile del
+// marinero vía /api/tareas/notify-preparada tras marcar la lancha lista.
+// Idempotente vía push_sent_at. Gemela de sendPushEmbarcacionGuardada.
+// =============================================================================
+
+export async function sendPushEmbarcacionPreparada(tareaId: string): Promise<void> {
+  const [notif] = await db
+    .select({
+      id: notificaciones.id,
+      userId: notificaciones.userId,
+      payload: notificaciones.payload,
+    })
+    .from(notificaciones)
+    .where(
+      and(
+        eq(notificaciones.tipo, 'embarcacion_preparada'),
+        isNull(notificaciones.pushSentAt),
+        sql`${notificaciones.payload}->>'tarea_id' = ${tareaId}`,
+      ),
+    )
+    .orderBy(desc(notificaciones.createdAt))
+    .limit(1);
+
+  if (!notif) return;
+
+  const payload = (notif.payload ?? {}) as Record<string, unknown>;
+  const embarcacionNombre =
+    typeof payload.embarcacion_nombre === 'string' ? payload.embarcacion_nombre : 'Tu embarcación';
+
+  await sendPushToUser({
+    userId: notif.userId,
+    title: 'Embarcación preparada',
+    body: `${embarcacionNombre} está lista para salir.`,
+    data: { tipo: 'embarcacion_preparada', tareaId, notificacion_id: notif.id },
+  });
+
+  await db
+    .update(notificaciones)
+    .set({ pushSentAt: new Date() })
+    .where(eq(notificaciones.id, notif.id));
+}
+
+// =============================================================================
 // Push de "solicitud de lavado" al staff (transaccional).
 //
 // La función `_create_tarea_for_solicitud_lavado` (mig 0129) ya escribe una

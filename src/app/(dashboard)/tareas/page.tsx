@@ -96,6 +96,7 @@ export default async function TareasPage() {
         operarioNombre: profiles.nombre,
         operarioApellido: profiles.apellido,
         operarioEmail: profiles.email,
+        esMarina: tareas.esMarina,
         embarcacionId: tareas.embarcacionId,
         embarcacionNombre: embarcaciones.nombre,
         embUbicacion: embarcaciones.ubicacion,
@@ -185,6 +186,9 @@ export default async function TareasPage() {
     fechaHora: t.fechaHora ? t.fechaHora.toISOString() : null,
     createdAt: t.createdAt.toISOString(),
     updatedAt: t.updatedAt.toISOString(),
+    // true = barco en marina (marinero) → el estado 'preparar' se muestra como
+    // "Preparada" (lista para salir), no "Preparar".
+    esMarina: t.esMarina,
     operarioId: t.operarioId,
     operarioNombre:
       [t.operarioNombre, t.operarioApellido].filter(Boolean).join(' ') || t.operarioEmail || null,
@@ -230,6 +234,7 @@ export default async function TareasPage() {
       canEditAll={canManage}
       currentUserId={ctx.user.id}
       isOperario={isOperario}
+      isMarinero={isMarinero}
     />
   );
 }

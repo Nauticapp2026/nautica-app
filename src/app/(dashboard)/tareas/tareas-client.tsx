@@ -45,6 +45,8 @@ export type Tarea = {
   fechaHora: string | null;
   createdAt: string;
   updatedAt: string;
+  // true = barco en marina (marinero): el estado 'preparar' se rotula "Preparada".
+  esMarina: boolean;
   operarioId: string | null;
   operarioNombre: string | null;
   embarcacionId: string | null;
@@ -87,6 +89,7 @@ type Props = {
   canEditAll: boolean;
   currentUserId: string;
   isOperario: boolean;
+  isMarinero: boolean;
 };
 
 // ─── Constantes UI ──────────────────────────────────────────────────────────
@@ -144,6 +147,15 @@ const ESTADO_LABEL: Record<EstadoTarea, string> = {
   guardada: 'Guardada',
   lavado: 'Lavado',
 };
+
+// En marina el estado 'preparar' significa "lista para salir" → se muestra como
+// "Preparada". En nave sigue siendo "Preparar" (en preparación). El resto de los
+// estados no cambia. `esMarina` viene por tarea; para labels sin tarjeta (header
+// de columna, stat card) se pasa el contexto de la vista (ver `vistaMarina`).
+function estadoLabelFor(estado: EstadoTarea, esMarina: boolean): string {
+  if (estado === 'preparar') return esMarina ? 'Preparada' : 'Preparar';
+  return ESTADO_LABEL[estado];
+}
 
 const inputCls =
   'h-11 w-full rounded-[10px] border border-gray-200 bg-white px-4 text-sm text-[#101828] focus:border-[#175861] focus:outline-none focus:ring-1 focus:ring-[#175861]';
@@ -365,7 +377,7 @@ function TareaCard({
             <option value="">Mover a…</option>
             {ESTADOS_TAREA.filter((e) => e !== tarea.estado).map((e) => (
               <option key={e} value={e}>
-                {ESTADO_LABEL[e]}
+                {estadoLabelFor(e, tarea.esMarina)}
               </option>
             ))}
           </select>
@@ -601,7 +613,7 @@ function TareaModal({
               >
                 {ESTADOS_TAREA.map((e) => (
                   <option key={e} value={e}>
-                    {ESTADO_LABEL[e]}
+                    {estadoLabelFor(e, editing ? editing.esMarina : false)}
                   </option>
                 ))}
               </select>
@@ -693,6 +705,7 @@ export function TareasClient({
   canEditAll,
   currentUserId,
   isOperario,
+  isMarinero,
 }: Props) {
   const router = useRouter();
   const [modal, setModal] = useState<ModalMode | null>(null);
@@ -710,6 +723,18 @@ export function TareasClient({
 
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverState, setDragOverState] = useState<EstadoTarea | null>(null);
+
+  // Contexto marina/nave para los labels SIN tarjeta (header de columna, stat
+  // card): el marinero solo ve marina; si el admin filtra por una persona, se usa
+  // el rol de esa persona; sin filtro (admin ve marina+nave mezclados) → nave por
+  // defecto ("Preparar"). Los labels por-tarjeta usan `tarea.esMarina` directo.
+  const vistaMarina = useMemo(() => {
+    if (isMarinero) return true;
+    if (filterOperario) {
+      return operarios.find((o) => o.id === filterOperario)?.rol === 'marinero';
+    }
+    return false;
+  }, [isMarinero, filterOperario, operarios]);
 
   // Día actual en TZ Argentina (YYYY-MM-DD). Las tareas con estado
   // 'salida_programada' se filtran por este día — las del futuro no se
@@ -805,7 +830,7 @@ export function TareasClient({
             : '—'
           : cancelado
             ? 'Cancelada'
-            : ESTADO_LABEL[t.estado];
+            : estadoLabelFor(t.estado, t.esMarina);
         return {
           id: t.id,
           tipo: esLavado ? 'Lavado' : 'Salida',
@@ -957,7 +982,7 @@ export function TareasClient({
                 <div key={col.estado} className="rounded-2xl border border-gray-200 bg-white p-5">
                   <div className="flex items-center justify-between">
                     <p className="text-sm" style={{ color: '#669E9D' }}>
-                      {col.label}
+                      {estadoLabelFor(col.estado, vistaMarina)}
                     </p>
                     <Icon className="h-4 w-4" style={{ color: '#669E9D' }} />
                   </div>
@@ -1070,7 +1095,9 @@ export function TareasClient({
                       >
                         <div className="flex items-center gap-2">
                           <Icon className="h-4 w-4" />
-                          <span className="text-sm font-semibold">{col.label}</span>
+                          <span className="text-sm font-semibold">
+                            {estadoLabelFor(col.estado, vistaMarina)}
+                          </span>
                         </div>
                         <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-xs font-bold text-white">
                           {lista.length}

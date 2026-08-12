@@ -39,11 +39,15 @@ export async function middleware(request: NextRequest) {
   // auth y Basic Auth lo romperia.
   // /api/payway: endpoint que consume la app mobile para que el socio registre
   // su tarjeta de debito automatico. Auth propia: Bearer JWT de Supabase.
-  // /api/marineros/notify, /api/lavado/notify, /api/tareas/notify-guardada:
-  // puentes que consume la app mobile para despachar push transaccionales
-  // (marina, solicitud de lavado, tarea guardada). Auth propia: Bearer JWT de
-  // Supabase. Sin esta excepción el gate los bloquea con 401 y el push nunca
-  // sale (la campanita in-app igual llega porque la escribe el trigger).
+  // /api/marineros/notify, /api/lavado/notify, /api/tareas/notify-guardada,
+  // /api/tareas/notify-preparada: puentes que consume la app mobile para
+  // despachar push transaccionales (marina, solicitud de lavado, tarea guardada,
+  // embarcación preparada). Auth propia: Bearer JWT de Supabase. Sin esta
+  // excepción el gate los bloquea con 401 y el push nunca sale (la campanita
+  // in-app igual llega porque la escribe el trigger).
+  // /api/tareas/confirmar-navegando: el socio (mobile) confirma que está
+  // navegando en marina → mueve su tarea a 'navegando' (la RLS no se lo permite
+  // directo). Auth propia: Bearer JWT; valida que la tarea sea de su salida.
   // /api/facturas/pdf: endpoint que consume la app mobile para regenerar el
   // link fresco del PDF de un comprobante fiscal del socio (el guardado en
   // `archivo` vence). Auth propia: Bearer JWT de Supabase; valida socio_id.
@@ -62,6 +66,8 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/api/marineros/notify') ||
     pathname.startsWith('/api/lavado/notify') ||
     pathname.startsWith('/api/tareas/notify-guardada') ||
+    pathname.startsWith('/api/tareas/notify-preparada') ||
+    pathname.startsWith('/api/tareas/confirmar-navegando') ||
     pathname.startsWith('/api/facturas/pdf') ||
     pathname.startsWith('/auth/') ||
     pathname.startsWith('/api/delete-account') ||
