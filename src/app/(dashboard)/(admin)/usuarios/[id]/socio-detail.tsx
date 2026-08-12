@@ -2805,8 +2805,7 @@ export function SocioDetail({
                         const esPago = cobranza > 0 && venta === 0;
                         const detalle = esPago
                           ? m.concepto?.trim() || 'Pago a cuenta'
-                          : [m.servicioNombre, m.concepto?.trim()].filter(Boolean).join(' — ') ||
-                            '—';
+                          : m.concepto?.trim() || m.servicioNombre || '—';
                         return (
                           <tr
                             key={m.id}
