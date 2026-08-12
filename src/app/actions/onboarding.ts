@@ -14,6 +14,8 @@ import {
 import { enviarInvitacionEquipo } from '@/lib/equipo-invitaciones';
 import { geocodeAddress } from '@/lib/geocoding';
 import { recordPlanChange } from '@/lib/pricing/plan-historial';
+import { sendEmail } from '@/lib/email/resend';
+import { onboardingClubAvanzoEmail } from '@/lib/email/templates/onboarding-club-avanzo';
 import { eq } from 'drizzle-orm';
 
 function toSlug(name: string) {
@@ -367,6 +369,69 @@ export async function inviteTeamMembersStep(
   }
 
   return { creados, errores: errores.length > 0 ? errores : undefined };
+}
+
+// Step 5 — configuración de espacios. No persiste la cantidad (el club la
+// termina de definir de verdad en /espacios) — este paso solo dispara un mail
+// interno a NauticApp para poder contactar al club si no llega a completar la
+// reunión que agenda por Calendly más adelante en el wizard (pedido cliente
+// 2026-08-12). Se manda una sola vez por guardería (flag en `guarderias`); si
+// el mail falla no bloquea el onboarding, solo se loguea.
+export async function notificarAvanceOnboardingStep(guarderiaId: string): Promise<ActionResult> {
+  const [guarderiaRow] = await db
+    .select({
+      nombre: guarderias.nombre,
+      cuit: guarderias.cuit,
+      direccion: guarderias.direccion,
+      ciudad: guarderias.ciudad,
+      yaEnviado: guarderias.onboardingNotificacionEnviada,
+    })
+    .from(guarderias)
+    .where(eq(guarderias.id, guarderiaId))
+    .limit(1);
+
+  if (!guarderiaRow || guarderiaRow.yaEnviado) return {};
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const [profileRow] = user
+    ? await db
+        .select({
+          nombre: profiles.nombre,
+          apellido: profiles.apellido,
+          telefono: profiles.telefono,
+        })
+        .from(profiles)
+        .where(eq(profiles.id, user.id))
+        .limit(1)
+    : [undefined];
+
+  try {
+    const { subject, html } = onboardingClubAvanzoEmail({
+      nombreClub: guarderiaRow.nombre,
+      cuit: guarderiaRow.cuit,
+      direccion: guarderiaRow.direccion,
+      ciudad: guarderiaRow.ciudad,
+      adminNombre: profileRow?.nombre ?? null,
+      adminApellido: profileRow?.apellido ?? null,
+      adminEmail: user?.email ?? '—',
+      adminTelefono: profileRow?.telefono ?? null,
+    });
+    const res = await sendEmail({ to: 'hola@nauticapp.club', subject, html });
+    if (!res.ok) console.error('[notificarAvanceOnboardingStep] mail error', res.error);
+  } catch (err) {
+    console.error('[notificarAvanceOnboardingStep] mail error', err);
+  }
+
+  await db
+    .update(guarderias)
+    .set({ onboardingNotificacionEnviada: true })
+    .where(eq(guarderias.id, guarderiaId));
+
+  return {};
 }
 
 // Step 7 — plan

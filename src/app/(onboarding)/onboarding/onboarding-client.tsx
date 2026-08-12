@@ -24,6 +24,7 @@ import {
   selectPlanStep,
   inviteTeamMembersStep,
   uploadGuarderiaFotoStep,
+  notificarAvanceOnboardingStep,
 } from '@/app/actions/onboarding';
 import { aceptarTerminosAction } from '@/app/actions/terminos';
 import { MarkdownView } from '@/components/shared/markdown-view';
@@ -1371,6 +1372,19 @@ export function OnboardingClient({ planInfo, featuresByPlan, terminos }: Onboard
     });
   }
 
+  function handleStep5() {
+    if (!data.guarderiaId) {
+      next();
+      return;
+    }
+    startTransition(async () => {
+      // No bloqueamos el avance si el mail falla — es un aviso interno, no
+      // algo que el club deba resolver.
+      await notificarAvanceOnboardingStep(data.guarderiaId);
+      next();
+    });
+  }
+
   async function handleSelectPlan(plan: 'esencial' | 'premium' | 'elite') {
     set('plan', plan);
     if (data.guarderiaId) {
@@ -1470,7 +1484,7 @@ export function OnboardingClient({ planInfo, featuresByPlan, terminos }: Onboard
         />
       )}
       {step === 5 && (
-        <Step5 data={data} onChange={(k, v) => set(k, v)} onNext={next} onBack={back} />
+        <Step5 data={data} onChange={(k, v) => set(k, v)} onNext={handleStep5} onBack={back} />
       )}
       {step === 6 && (
         <Step7

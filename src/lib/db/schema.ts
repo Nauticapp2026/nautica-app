@@ -419,6 +419,12 @@ export const guarderias = pgTable(
     // una pantalla "pendiente de activación" en lugar del dashboard. El super
     // admin activa desde /super-admin/guarderias.
     activa: boolean('activa').default(false).notNull(),
+    // Mail interno a NauticApp cuando el club avanza en el onboarding (paso de
+    // espacios), para poder contactarlo si no llega a la reunión agendada.
+    // Se manda una sola vez por guardería — este flag evita duplicarlo.
+    onboardingNotificacionEnviada: boolean('onboarding_notificacion_enviada')
+      .default(false)
+      .notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
