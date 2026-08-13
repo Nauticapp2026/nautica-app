@@ -1115,7 +1115,12 @@ function EspacioEmbarcacionRow({
     }
     startTransition(async () => {
       const res = tieneEspacio
-        ? await moveOcupanteAction({ origenId: emb.espacioId!, destinoId })
+        ? await moveOcupanteAction({
+            origenId: emb.espacioId!,
+            destinoId,
+            socioId,
+            embarcacionId: emb.id,
+          })
         : await assignEspacioToSocioAction({
             socioId,
             espacioId: destinoId,

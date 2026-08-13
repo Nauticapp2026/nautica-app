@@ -602,6 +602,13 @@ export async function assignEspacioToSocioAction(input: {
 export async function moveOcupanteAction(input: {
   origenId: string;
   destinoId: string;
+  // Fallback de autocorrección: si el origen quedó con ocupanteId
+  // desincronizado de embarcaciones.espacioId (ej. una limpieza de datos que
+  // liberó el espacio sin desvincular la embarcación), en vez de fallar se
+  // asigna directo al destino usando estos datos. Los pasa siempre
+  // EspacioEmbarcacionRow — no cambia nada cuando el origen sí tiene ocupante.
+  socioId?: string;
+  embarcacionId?: string;
 }): Promise<{ error?: string }> {
   const ctx = await getActiveMarina();
   if (!ctx) return { error: 'No autenticado' };
@@ -623,7 +630,16 @@ export async function moveOcupanteAction(input: {
     .where(and(eq(espacios.id, input.origenId), eq(espacios.guarderiaId, guarderiaId)))
     .limit(1);
   if (!origen) return { error: 'Espacio origen no encontrado.' };
-  if (!origen.ocupanteId) return { error: 'El espacio origen no tiene cliente asignado.' };
+  if (!origen.ocupanteId) {
+    if (input.socioId) {
+      return assignEspacioToSocioAction({
+        socioId: input.socioId,
+        espacioId: input.destinoId,
+        embarcacionId: input.embarcacionId,
+      });
+    }
+    return { error: 'El espacio origen no tiene cliente asignado.' };
+  }
 
   const [destino] = await db
     .select({
