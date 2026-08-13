@@ -214,16 +214,24 @@ const TIPO_FACTURA_OPTS = [
   { value: 'factura_a', label: 'Factura A' },
 ];
 
-// Tipos de factura que el club puede emitir según SU condición frente al
-// IVA: un club Monotributo solo emite C; un club Responsable Inscripto
-// emite A o B (a quién le corresponde cada una lo sugiere
-// derivarTipoFactura según la condición del socio, pero el admin puede
-// elegir entre las válidas).
-function tiposFacturaEmisibles(guarderiaCondicionIva: string | null) {
-  if (guarderiaCondicionIva === 'responsable_inscripto') {
-    return TIPO_FACTURA_OPTS.filter((o) => o.value !== 'factura_c');
+// La letra del comprobante NO es opcional: la fija ARCA según la condición
+// frente al IVA del club y la del socio (mismo cuadro que derivarTipoFactura).
+// Con el socio ya elegido se ofrece únicamente la que corresponde — dejar
+// elegir entre A y B permitía emitir mal (ej. un Responsable Inscripto
+// facturado como B). Sin socio elegido todavía, se listan las que el club
+// podría llegar a emitir.
+function tiposFacturaEmisibles(
+  guarderiaCondicionIva: string | null,
+  socioCondicionIva?: string | null,
+) {
+  if (guarderiaCondicionIva !== 'responsable_inscripto') {
+    return TIPO_FACTURA_OPTS.filter((o) => o.value === 'factura_c');
   }
-  return TIPO_FACTURA_OPTS.filter((o) => o.value === 'factura_c');
+  if (socioCondicionIva) {
+    const corresponde = derivarTipoFactura(guarderiaCondicionIva, socioCondicionIva);
+    return TIPO_FACTURA_OPTS.filter((o) => o.value === corresponde);
+  }
+  return TIPO_FACTURA_OPTS.filter((o) => o.value !== 'factura_c');
 }
 
 function derivarTipoFactura(
@@ -1192,7 +1200,10 @@ function NuevaFacturaModal({
                       }
                     }}
                   >
-                    {tiposFacturaEmisibles(guarderiaCondicionIva).map((o) => (
+                    {tiposFacturaEmisibles(
+                      guarderiaCondicionIva,
+                      socioSeleccionado ? condicionIvaEfectiva(socioSeleccionado) : null,
+                    ).map((o) => (
                       <option key={o.value} value={o.value}>
                         {o.label}
                       </option>

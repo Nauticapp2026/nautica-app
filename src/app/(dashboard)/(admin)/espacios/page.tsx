@@ -6,7 +6,6 @@ export const dynamic = 'force-dynamic';
 import { and, asc, eq } from 'drizzle-orm';
 
 import { getActiveMarina } from '@/lib/auth/session';
-import { precioConIva } from '@/lib/iva';
 import { db } from '@/lib/db';
 import {
   areaMarineros,
@@ -375,7 +374,7 @@ export default async function EspaciosPage() {
   const serviciosEspacios: ServicioEspacio[] = serviciosRows.map((s) => ({
     id: s.id,
     nombre: s.nombre,
-    precio: s.precio != null ? precioConIva(Number(s.precio), Number(s.alicuotaIva ?? 0)) : 0,
+    precio: s.precio != null ? Number(s.precio) : 0,
     eslora: toNum(s.eslora),
     manga: toNum(s.manga),
     puntual: toNum(s.puntual),

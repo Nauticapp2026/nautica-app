@@ -50,7 +50,6 @@ import {
   socioServicios,
   socioServiciosCancelados,
 } from '@/lib/db/schema';
-import { precioConIva } from '@/lib/iva';
 
 function nextMonthStart(d: Date = new Date()): Date {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1, 0, 0, 0, 0));
@@ -77,9 +76,8 @@ function hace27Dias(now: Date): Date {
  * (incluye el día de asignación). Si la fecha es el día 1, devuelve el
  * mes completo. El cron mensual usa siempre el precio completo.
  *
- * `precio` tiene que venir YA con IVA sumado (lo que se le cobra al socio) —
- * `servicios.precio` se guarda neto, así que el caller debe pasarlo por
- * `precioConIva()` antes de llamar a esta función.
+ * `precio` es lo que se le cobra al socio: `servicios.precio` ya es el precio
+ * final con IVA incluido, así que se pasa tal cual (ver lib/iva.ts).
  */
 export function calcularProporcionalMes(
   precio: number,
@@ -281,9 +279,8 @@ export async function runMonthlyGeneration(now: Date = new Date()): Promise<{
 
     guarderiasProcesadas.add(r.guarderiaId);
 
-    const precioNeto = r.servicioPrecio != null ? Number(r.servicioPrecio) : 0;
-    const alicuotaIva = r.servicioAlicuotaIva != null ? Number(r.servicioAlicuotaIva) : 0;
-    const precio = precioConIva(precioNeto, alicuotaIva);
+    // El precio del tarifario ya es el final (IVA adentro): se cobra tal cual.
+    const precio = r.servicioPrecio != null ? Number(r.servicioPrecio) : 0;
     const res = await ensureMonthlyMovimiento({
       socioId: r.ocupanteId,
       espacioId: r.espacioId,
@@ -507,28 +504,22 @@ export async function runMonthlyGeneracionServiciosRecurrentes(
       continue;
     }
 
-    const precioNeto = c.servicioPrecio != null ? Number(c.servicioPrecio) : 0;
-    const alicuotaIva = c.servicioAlicuotaIva != null ? Number(c.servicioAlicuotaIva) : 0;
-    // Contratos Interno no pasan por ARCA: se cobra el precio base del
-    // tarifario tal cual, sin sumarle IVA. Solo los fiscales suman IVA.
-    const precio = c.comprobanteInterno ? precioNeto : precioConIva(precioNeto, alicuotaIva);
+    // El precio del tarifario ya es el precio final (IVA incluido): se cobra
+    // tal cual, sea el contrato interno o fiscal. El IVA se discrimina hacia
+    // adentro recién al emitir el comprobante.
+    const precio = c.servicioPrecio != null ? Number(c.servicioPrecio) : 0;
     const concepto = c.concepto ?? c.servicioNombre;
 
     if (c.tipoCobro === 'variable') {
       // Tarifa Variable diaria: el precio del tarifario es por día y el
       // contrato guarda cuántos días se contrataron — el cargo único es
-      // (precio neto × días), con IVA solo si es fiscal. Sin días (tarifa
-      // mensual o contratos viejos), se cobra el precio tal cual, como siempre.
+      // (precio × días). Sin días (tarifa mensual o contratos viejos), se
+      // cobra el precio tal cual, como siempre.
       const dias = c.tarifaVariable === 'diaria' ? c.cantidadDias : null;
       const res = await ensureOnceMovimientoServicio({
         socioId: c.socioId,
         servicioId: c.servicioId,
-        precio:
-          dias != null
-            ? c.comprobanteInterno
-              ? precioNeto * dias
-              : precioConIva(precioNeto * dias, alicuotaIva)
-            : precio,
+        precio: dias != null ? precio * dias : precio,
         concepto: dias != null ? `${concepto} (${dias} ${dias === 1 ? 'día' : 'días'})` : concepto,
         comprobanteInterno: c.comprobanteInterno,
         contratadoEn: c.fechaAsignacion,

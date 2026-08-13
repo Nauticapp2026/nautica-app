@@ -28,7 +28,7 @@ import {
   type HistorialEntry,
   type SocioConServicio,
 } from '@/app/actions/tarifario';
-import { precioConIva } from '@/lib/iva';
+import { ivaContenido, precioSinIva } from '@/lib/iva';
 import { EmptyState } from '@/components/shared/empty-state';
 
 export type TipoTarifa =
@@ -473,39 +473,24 @@ function TablaTarifas({
                   {formatDate(t.vigenciaDesde)} – {formatDate(t.vigenciaHasta)}
                 </td>
                 <td className="px-5 py-3" style={{ color: '#101828' }}>
-                  {clubMonotributo ? (
-                    // Monotributo: Factura C sin IVA — el precio va solo, sin
-                    // leyendas de IVA ni "Exento".
-                    <span className="block text-sm font-medium">{formatARS(t.precio)}</span>
-                  ) : (
-                    <>
-                      <span className="block text-sm font-medium">
-                        {formatARS(precioConIva(t.precio, t.alicuotaIva))}
-                        {t.alicuotaIva > 0 && (
-                          <span className="ml-1.5 text-xs font-normal text-gray-400">c/IVA</span>
-                        )}
+                  {/* El precio cargado ES el precio final que paga el socio.
+                      La alícuota solo define cuánto de ese monto se discrimina
+                      como IVA al emitir el comprobante (ver lib/iva.ts). */}
+                  <span className="block text-sm font-medium">{formatARS(t.precio)}</span>
+                  {!clubMonotributo &&
+                    (t.alicuotaIva > 0 ? (
+                      <span className="block text-xs text-gray-500">
+                        {formatARS(precioSinIva(t.precio, t.alicuotaIva))}
+                        <span className="ml-1 text-gray-400">neto + IVA {t.alicuotaIva}%</span>
                       </span>
-                      {t.alicuotaIva > 0 && (
-                        <span className="block text-xs text-gray-500">
-                          {formatARS(t.precio)}
-                          <span className="ml-1 text-gray-400">s/IVA · {t.alicuotaIva}%</span>
-                        </span>
-                      )}
-                      {t.alicuotaIva === 0 && (
-                        <span className="block text-xs text-gray-400">Exento / No gravado</span>
-                      )}
-                    </>
-                  )}
+                    ) : (
+                      <span className="block text-xs text-gray-400">Exento / No gravado</span>
+                    ))}
                   {t.ajusteProgramado && (
                     <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
                       <Clock className="h-3 w-3" />
-                      {formatARS(
-                        precioConIva(
-                          t.ajusteProgramado.precioNuevo,
-                          clubMonotributo ? 0 : t.alicuotaIva,
-                        ),
-                      )}{' '}
-                      desde {formatDate(t.ajusteProgramado.fechaAplicacion)}
+                      {formatARS(t.ajusteProgramado.precioNuevo)} desde{' '}
+                      {formatDate(t.ajusteProgramado.fechaAplicacion)}
                     </span>
                   )}
                 </td>
@@ -934,7 +919,9 @@ function TarifaModal({
             <div>
               <label className="mb-1 block text-sm font-semibold text-gray-700">
                 Precio
-                {!clubMonotributo && <span className="font-normal text-gray-400"> (sin IVA)</span>}
+                {!clubMonotributo && (
+                  <span className="font-normal text-gray-400"> (final, IVA incluido)</span>
+                )}
               </label>
               <input
                 className={inputCls}
@@ -945,9 +932,12 @@ function TarifaModal({
                 value={precio}
                 onChange={(e) => setPrecio(e.target.value)}
               />
+              {/* El socio paga siempre este precio. La alícuota solo define
+                  cuánto se discrimina como IVA dentro del comprobante. */}
               {!clubMonotributo && alicuotaIva > 0 && Number(precio) > 0 && (
                 <p className="mt-1 text-xs text-gray-500">
-                  Total c/IVA: {formatARS(precioConIva(Number(precio), alicuotaIva))}
+                  Neto {formatARS(precioSinIva(Number(precio), alicuotaIva))} + IVA{' '}
+                  {formatARS(ivaContenido(Number(precio), alicuotaIva))}
                 </p>
               )}
             </div>

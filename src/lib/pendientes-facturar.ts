@@ -32,7 +32,6 @@ import {
   socioServicios,
   socioServiciosCancelados,
 } from '@/lib/db/schema';
-import { precioConIva } from '@/lib/iva';
 import { calcularProporcionalMes, primerDiaHabilDelMes } from '@/lib/movimientos-mensuales';
 
 /** Executor: el `db` global o la `tx` de una transacción en curso. */
@@ -136,12 +135,13 @@ function sufijoProporcional(diasRestantes: number, diasMes: number): string {
 }
 
 /**
- * Importe final de un servicio según el canal del contrato: los internos no
- * pasan por ARCA y cobran el precio base tal cual; los fiscales suman IVA.
- * Misma regla que usaba el cron viejo (movimientos-mensuales.ts).
+ * Importe a cobrar por un servicio: el precio del tarifario tal cual, que ya
+ * es el precio final con IVA incluido (ver lib/iva.ts). El IVA se discrimina
+ * hacia adentro recién al emitir el comprobante, así que acá no se suma ni se
+ * resta nada — y da igual si el contrato es interno o fiscal.
  */
-function importeFinal(precioNeto: number, alicuotaIva: number, interno: boolean): number {
-  return interno ? precioNeto : precioConIva(precioNeto, alicuotaIva);
+function importeFinal(precioFinal: number): number {
+  return precioFinal;
 }
 
 export async function listarPendientesFacturar(
@@ -421,10 +421,7 @@ export async function listarPendientesFacturar(
       if (yaLegacy) continue;
 
       const dias = c.tarifaVariable === 'diaria' ? c.cantidadDias : null;
-      const importe =
-        dias != null
-          ? importeFinal(precioNeto * dias, alicuotaIva, c.comprobanteInterno)
-          : importeFinal(precioNeto, alicuotaIva, c.comprobanteInterno);
+      const importe = dias != null ? importeFinal(precioNeto * dias) : importeFinal(precioNeto);
       items.push({
         key: { origen: 'contrato', contratoId: c.contratoId, periodo: null },
         origen: 'contrato',
@@ -458,7 +455,7 @@ export async function listarPendientesFacturar(
       // que el tarifario diga 'mes_completo': esa política manda también en el
       // alta, no solo en la baja anticipada.
       const inicioEnMesActual = c.fechaInicio.slice(0, 8) === periodoActual.slice(0, 8);
-      let importe = importeFinal(precioNeto, alicuotaIva, c.comprobanteInterno);
+      let importe = importeFinal(precioNeto);
       let concepto = conceptoBase;
       let esProporcional = false;
       if (
@@ -514,7 +511,7 @@ export async function listarPendientesFacturar(
           contratoId: c.contratoId,
           espacioId: null,
           concepto: `${conceptoBase} (adelanto ${etiquetaMes(periodoSig)})`,
-          importe: importeFinal(precioNeto, alicuotaIva, c.comprobanteInterno),
+          importe: importeFinal(precioNeto),
           alicuotaIva,
           plazoPagoDias: c.servicioPlazoPagoDias,
           servicioTipo: c.servicioTipo,
@@ -547,7 +544,7 @@ export async function listarPendientesFacturar(
     const alicuotaIva = f.servicioAlicuotaIva != null ? Number(f.servicioAlicuotaIva) : 0;
     const interno = f.contratoInterno ?? f.socioTildeInterno ?? false;
     const conceptoBase = f.contratoConcepto ?? f.servicioNombre;
-    const importeMes = importeFinal(precioNeto, alicuotaIva, interno);
+    const importeMes = importeFinal(precioNeto);
     const primerCiclo = !espacioPairConCargo.has(pair);
     // Fecha de alta efectiva para el prorrateo del primer ciclo.
     const alta = f.contratoFechaInicio

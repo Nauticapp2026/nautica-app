@@ -14,7 +14,6 @@ import {
   socioServicios,
   socioServiciosCancelados,
 } from '@/lib/db/schema';
-import { precioConIva } from '@/lib/iva';
 import { todayArg } from '@/lib/dates';
 import { getActiveMarina } from '@/lib/auth/session';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -664,12 +663,10 @@ export async function updateSocioServicioAction(input: unknown): Promise<{ error
         // directo a cuenta corriente — queda como ítem pendiente de facturar
         // y entra al próximo comprobante del socio (manual o automático).
         // El monto se valida server-side: numérico, > 0 y con techo en el
-        // precio de un mes completo del tarifario (con IVA si es fiscal).
+        // precio de un mes completo del tarifario (que ya es el precio final,
+        // con IVA incluido — ver lib/iva.ts).
         const monto = Number.parseFloat(cobro.monto);
-        const precioNeto = current.servicioPrecio != null ? Number(current.servicioPrecio) : 0;
-        const alicuota =
-          current.servicioAlicuotaIva != null ? Number(current.servicioAlicuotaIva) : 0;
-        const techo = comprobanteInterno ? precioNeto : precioConIva(precioNeto, alicuota);
+        const techo = current.servicioPrecio != null ? Number(current.servicioPrecio) : 0;
         if (!Number.isFinite(monto) || monto <= 0) {
           return { error: 'El monto del cobro por baja debe ser mayor a 0.' };
         }

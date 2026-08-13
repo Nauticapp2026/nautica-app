@@ -60,7 +60,7 @@ import {
 import { getLedgerSaldoAFavorAction, type LedgerSaldoAFavorEntry } from '@/app/actions/movimientos';
 import { buscarRankeado } from '@/lib/buscador';
 import { formatArgentinaDate, formatArgentinaDateTime, formatNaiveDateTime } from '@/lib/dates';
-import { precioConIva, precioSinIva } from '@/lib/iva';
+import { precioSinIva } from '@/lib/iva';
 import { ASTILLEROS } from '../astilleros';
 import { EmptyState } from '@/components/shared/empty-state';
 import { Pagination } from '@/components/shared/pagination';
@@ -652,9 +652,10 @@ function ServicioCombobox({
     return () => document.removeEventListener('mousedown', onClickOutside);
   }, []);
 
+  // El precio del tarifario ya es el final (IVA incluido): se muestra tal cual,
+  // sea el contrato interno o fiscal.
   function precioMostrar(s: Servicio): number {
-    const neto = parseFloat(s.precio ?? '0');
-    return interno ? neto : precioConIva(neto, parseFloat(s.alicuotaIva ?? '0'));
+    return parseFloat(s.precio ?? '0');
   }
 
   function labelDe(s: Servicio): string {
@@ -946,12 +947,7 @@ function AgregarServicioModal({
                   <p className="mt-1.5 text-xs text-gray-400">
                     {diasValidos && seleccionado?.precio
                       ? `Total a cobrar: ${fmt(
-                          comprobante === 'interno'
-                            ? parseFloat(seleccionado.precio) * diasNum
-                            : precioConIva(
-                                parseFloat(seleccionado.precio) * diasNum,
-                                parseFloat(seleccionado.alicuotaIva ?? '0'),
-                              ),
+                          parseFloat(seleccionado.precio) * diasNum,
                         )} (tarifa diaria × ${diasNum} ${diasNum === 1 ? 'día' : 'días'})`
                       : 'Esta tarifa es por día: se cobra el precio del tarifario multiplicado por los días que indiques.'}
                   </p>
@@ -3269,7 +3265,7 @@ function EspacioCombobox({
     const partes: string[] = [];
     if (e.eslora) partes.push(`${e.eslora} ${e.unidadMetraje === 'pies' ? 'pies' : 'm'}`);
     if (e.precio) {
-      partes.push(fmt(precioConIva(Number(e.precio), Number(e.alicuotaIva ?? 0))));
+      partes.push(fmt(Number(e.precio)));
     }
     return partes.join(' · ');
   }
@@ -4023,13 +4019,9 @@ function EditServicioContratadoModal({
     .filter((m) => m.fecha)
     .sort((a, b) => (b.fecha! > a.fecha! ? 1 : -1))[0];
   const ultimoMonto = ultimoMov ? parseFloat(ultimoMov.debe ?? '0') || 0 : 0;
-  // Interno se cobra a precio base sin IVA; fiscal, con IVA.
-  const precioCompleto =
-    sc.servicioPrecio != null
-      ? sc.comprobanteInterno
-        ? Number(sc.servicioPrecio)
-        : precioConIva(Number(sc.servicioPrecio), Number(sc.servicioAlicuotaIva ?? 0))
-      : 0;
+  // El precio del tarifario ya es el final (IVA incluido), igual para interno y
+  // fiscal.
+  const precioCompleto = sc.servicioPrecio != null ? Number(sc.servicioPrecio) : 0;
   const proporcional = fechaBaja
     ? calcularProporcional(ultimoMonto || precioCompleto, fechaBaja, fechaInicio || null)
     : { monto: precioCompleto, diasUsados: 0, diasMes: 0 };

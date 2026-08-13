@@ -412,8 +412,17 @@ function buildCliente(
 
   const condicionPago = CONDICION_PAGO_API[p.condicionVenta] ?? '201';
 
+  const condicionIva = CONDICION_IVA_API[ident.condicionIva ?? ''] ?? 'CF';
+
   return {
-    codigo: p.id,
+    // Identificamos al cliente por su documento, NO por el id del perfil: la
+    // misma persona puede tener un perfil por cada club al que pertenece, y
+    // varios clubes comparten la misma cuenta de TusFacturas. Con el id del
+    // perfil, TusFacturas veía dos clientes distintos peleando por el mismo
+    // CUIT y rechazaba la emisión ("ya existe un registro con ese
+    // tipo/nro de documento"). Con el documento, la persona es un solo
+    // cliente en TF y se factura igual en los dos clubes.
+    codigo: docNro || p.id,
     documento_tipo: docTipo,
     documento_nro: docNro,
     razon_social: ident.razon,
@@ -425,8 +434,11 @@ function buildCliente(
     rg5329: 'N',
     condicion_pago: condicionPago,
     ...(condicionPago === '214' ? { condicion_pago_otra: 'Otros' } : {}),
-    condicion_iva: CONDICION_IVA_API[ident.condicionIva ?? ''] ?? 'CF',
-    condicion_iva_operacion: '1',
+    condicion_iva: condicionIva,
+    // Misma tabla de códigos que condicion_iva (RI/CF/M/E/...), no un número.
+    // Con '1' — el valor que se mandaba antes — ARCA no reconocía la condición
+    // real del socio y trataba a un Responsable Inscripto como si no lo fuera.
+    condicion_iva_operacion: condicionIva,
   };
 }
 
@@ -599,6 +611,25 @@ export async function crearFacturaCore(
       error:
         'El certificado de enlace con ARCA todavía no está confirmado. Andá a Mi perfil → Datos Impositivos, solicitá el certificado y confirmá la instalación antes de emitir facturas.',
     };
+  }
+
+  // 1.c La letra la fija ARCA según las condiciones IVA de club y socio — no es
+  // una elección del admin. El tipo llega desde el cliente, así que se valida
+  // acá contra la derivación real: sin esto se podía emitir, por ejemplo, una B
+  // a un Responsable Inscripto (le corresponde A) y ARCA la aceptaba mal.
+  if (guarderia.condicionIva) {
+    const socioCondicionIva = socio.facturaFiscal ? socio.condicionIvaPersonal : socio.condicionIva;
+    const corresponde = derivarTipoFactura(guarderia.condicionIva, socioCondicionIva);
+    if (data.tipoFactura !== corresponde) {
+      const label: Record<string, string> = {
+        factura_a: 'Factura A',
+        factura_b: 'Factura B',
+        factura_c: 'Factura C',
+      };
+      return {
+        error: `Por la condición frente al IVA del club y del socio corresponde ${label[corresponde] ?? corresponde}, no ${label[data.tipoFactura] ?? data.tipoFactura}. Actualizá la página e intentá de nuevo.`,
+      };
+    }
   }
 
   const puntoVenta = String(centro.puntoDeVenta);
@@ -1137,9 +1168,18 @@ export async function createBatchInvoicesAction(
     .limit(1);
   const guarderiaCondicion = gInfo?.condicionIva ?? null;
 
-  // Verificar que los socios pertenezcan a esta guardería
+  // Verificar que los socios pertenezcan a esta guardería.
+  // La condición IVA que manda es la del dataset con el que se factura: si el
+  // socio tiene el tilde "usar datos personales", va la personal. Sin esto el
+  // lote derivaba la letra con el campo equivocado y podía emitir A donde
+  // correspondía B (la individual y el cron ya lo hacían bien).
   const validos = await db
-    .select({ userId: memberships.userId, condicionIva: profiles.condicionIva })
+    .select({
+      userId: memberships.userId,
+      condicionIva: profiles.condicionIva,
+      condicionIvaPersonal: profiles.condicionIvaPersonal,
+      facturaFiscal: memberships.facturaFiscal,
+    })
     .from(memberships)
     .innerJoin(profiles, eq(profiles.id, memberships.userId))
     .where(
@@ -1149,7 +1189,9 @@ export async function createBatchInvoicesAction(
         eq(memberships.status, 'active'),
       ),
     );
-  const validSocioMap = new Map(validos.map((v) => [v.userId, v.condicionIva]));
+  const validSocioMap = new Map(
+    validos.map((v) => [v.userId, v.facturaFiscal ? v.condicionIvaPersonal : v.condicionIva]),
+  );
 
   const result: BatchResult = { succeeded: [], skipped: [], failed: [] };
 
