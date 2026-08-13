@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { and, desc, eq, gte } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
 
 import { getActiveMarina } from '@/lib/auth/session';
 import { db } from '@/lib/db';
@@ -19,7 +19,6 @@ export default async function PublicacionesPage() {
   if (!isAdmin) redirect('/dashboard');
 
   const guarderiaId = ctx.activeMembership.guarderiaId;
-  const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 
   const [guarderiaRow, rows] = await Promise.all([
     db
@@ -54,8 +53,9 @@ export default async function PublicacionesPage() {
   const plan = guarderiaRow[0]?.plan ?? 'esencial';
   const limitsMap = await getPlanLimitsForSlug(plan, ['nautishop_publicaciones']);
   const limit = limitsMap['nautishop_publicaciones'];
-  // Cupo mensual: solo cuenta lo creado desde el 1° de este mes.
-  const used = rows.filter((r) => r.createdAt >= startOfMonth).length;
+  // Cupo de publicaciones activas ahora mismo (no de creadas este mes) —
+  // borrar una libera lugar para otra en el momento.
+  const used = rows.length;
   const direccionDefault =
     [guarderiaRow[0]?.direccion, guarderiaRow[0]?.ciudad].filter(Boolean).join(', ') || '';
 

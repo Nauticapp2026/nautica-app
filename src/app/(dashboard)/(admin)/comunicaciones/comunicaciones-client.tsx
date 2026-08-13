@@ -7,7 +7,6 @@ import {
   Edit3,
   FilterX,
   Globe,
-  Lock,
   MessageSquare,
   Plus,
   Send,
@@ -46,7 +45,6 @@ export type Comunicacion = {
   fecha: string | null;
   imagenUrls: string[];
   createdAt: string;
-  isEditable: boolean;
   autor: string | null;
 };
 
@@ -262,7 +260,6 @@ function QuotaCard({
 }
 
 function ComunicacionCard({ c, onEdit }: { c: Comunicacion; onEdit: () => void }) {
-  const canEdit = c.isEditable;
   const categoria = c.categoria ? CATEGORIA_LABELS[c.categoria] : null;
   const tipo = TIPO_LABELS[c.tipo];
 
@@ -304,20 +301,14 @@ function ComunicacionCard({ c, onEdit }: { c: Comunicacion; onEdit: () => void }
         <p className="text-xs" style={{ color: '#669E9D' }}>
           Por: {c.autor ?? '—'}
         </p>
-        {canEdit ? (
-          <button
-            type="button"
-            onClick={onEdit}
-            title="Editar comunicación"
-            className="rounded-[8px] p-1.5 text-[#669E9D] hover:bg-gray-100"
-          >
-            <Edit3 className="h-4 w-4" />
-          </button>
-        ) : (
-          <span title="El plazo de edición de 24 hs venció" className="p-1.5 text-gray-300">
-            <Lock className="h-4 w-4" />
-          </span>
-        )}
+        <button
+          type="button"
+          onClick={onEdit}
+          title="Editar comunicación"
+          className="rounded-[8px] p-1.5 text-[#669E9D] hover:bg-gray-100"
+        >
+          <Edit3 className="h-4 w-4" />
+        </button>
       </div>
     </article>
   );

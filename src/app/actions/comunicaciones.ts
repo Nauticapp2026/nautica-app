@@ -19,8 +19,6 @@ type Tipo = (typeof TIPOS)[number];
 const CATEGORIAS = ['informacion', 'anuncio', 'evento', 'mantenimiento', 'alerta'] as const;
 type Categoria = (typeof CATEGORIAS)[number];
 
-const EDIT_WINDOW_MS = 24 * 60 * 60 * 1000;
-
 const BUCKET_COMUNICACIONES = 'comunicaciones';
 const MAX_IMAGEN_BYTES = 8 * 1024 * 1024; // 8 MB
 const TIPOS_IMAGEN_ACEPTADOS = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
@@ -163,16 +161,12 @@ export async function updateComunicacionAction(
   const guarderiaId = ctx.activeMembership.guarderiaId;
 
   const [current] = await db
-    .select({ id: comunicaciones.id, createdAt: comunicaciones.createdAt })
+    .select({ id: comunicaciones.id })
     .from(comunicaciones)
     .where(and(eq(comunicaciones.id, id), eq(comunicaciones.guarderiaId, guarderiaId)))
     .limit(1);
 
   if (!current) return { error: 'Comunicación no encontrada.' };
-
-  if (Date.now() - current.createdAt.getTime() > EDIT_WINDOW_MS) {
-    return { error: 'El plazo de edición de 24 horas ha vencido.' };
-  }
 
   await db
     .update(comunicaciones)

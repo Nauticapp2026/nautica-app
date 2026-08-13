@@ -8,8 +8,6 @@ import { getPlanFeatureLimits } from '@/lib/pricing/limits';
 
 import { ComunicacionesClient, type Comunicacion } from './comunicaciones-client';
 
-const EDIT_WINDOW_MS = 24 * 60 * 60 * 1000;
-
 export default async function ComunicacionesPage() {
   const ctx = await getActiveMarina();
   if (!ctx) return null;
@@ -71,8 +69,6 @@ export default async function ComunicacionesPage() {
     fecha: r.fecha ? r.fecha.toISOString() : null,
     imagenUrls: r.imagenUrls ?? [],
     createdAt: r.createdAt.toISOString(),
-    // eslint-disable-next-line react-hooks/purity
-    isEditable: Date.now() - r.createdAt.getTime() <= EDIT_WINDOW_MS,
     autor:
       [r.autorNombre, r.autorApellido].filter(Boolean).join(' ').trim() || r.autorEmail || null,
   }));

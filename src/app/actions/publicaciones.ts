@@ -131,18 +131,18 @@ export async function createPublicacionAction(
     return { error: `Tu plan no incluye publicaciones. ${mensajeUpsellPlan(planSlug)}` };
   }
 
-  // Cupo mensual (se renueva el 1° de cada mes), no un tope de por vida.
-  const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  // Cupo de publicaciones ACTIVAS (no de creadas este mes): cuenta lo que
+  // hay ahora mismo, así que borrar una libera lugar para otra en el momento
+  // (pedido cliente 2026-08-12 — un conteo por mes-de-creación arrancaba en 0
+  // y no reflejaba las publicaciones ya cargadas antes de este ajuste).
   const [{ used }] = await db
     .select({ used: sqlCount() })
     .from(publicaciones)
-    .where(
-      and(eq(publicaciones.guarderiaId, guarderiaId), gte(publicaciones.createdAt, startOfMonth)),
-    );
+    .where(eq(publicaciones.guarderiaId, guarderiaId));
 
   if (Number(used) >= limit) {
     return {
-      error: `Alcanzaste el límite de ${limit} publicación${limit !== 1 ? 'es' : ''} de este mes. ${mensajeUpsellPlan(planSlug)}`,
+      error: `Alcanzaste el límite de ${limit} publicación${limit !== 1 ? 'es' : ''} de tu plan. Eliminá una para poder crear otra. ${mensajeUpsellPlan(planSlug)}`,
     };
   }
 
