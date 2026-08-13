@@ -1136,7 +1136,16 @@ function EspacioEmbarcacionRow({
     });
   }
 
-  if (espaciosFiltrados.length === 0 && !tieneEspacio) return null;
+  if (espaciosFiltrados.length === 0 && !tieneEspacio) {
+    return (
+      <div className="border-t border-gray-100 pt-4 text-sm text-gray-500">
+        No hay espacios disponibles
+        {esloraBarcoM != null
+          ? ` con eslora igual o mayor a ${esloraBarcoM % 1 === 0 ? esloraBarcoM : esloraBarcoM.toFixed(2)} m (la eslora de esta embarcación).`
+          : ' para asignar.'}
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-2 border-t border-gray-100 pt-4 sm:flex-row sm:items-center">
@@ -1156,6 +1165,65 @@ function EspacioEmbarcacionRow({
         style={{ background: '#175861' }}
       >
         {pending ? 'Guardando…' : tieneEspacio ? 'Cambiar' : 'Asignar'}
+      </button>
+    </div>
+  );
+}
+
+// Cuando el socio todavía no tiene ninguna embarcación cargada, igual se le
+// puede reservar un espacio de antemano (ej. va a traer el barco después).
+// Sin embarcación no hay eslora para filtrar: se muestran todos los
+// disponibles, sin acotar por tamaño.
+function EspacioSinEmbarcacionRow({
+  socioId,
+  espaciosDisponibles,
+}: {
+  socioId: string;
+  espaciosDisponibles: EspacioOption[];
+}) {
+  const router = useRouter();
+  const [destinoId, setDestinoId] = useState('');
+  const [pending, startTransition] = useTransition();
+
+  function submit() {
+    if (!destinoId) {
+      toast.error('Seleccioná un espacio.');
+      return;
+    }
+    startTransition(async () => {
+      const res = await assignEspacioToSocioAction({ socioId, espacioId: destinoId });
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+      toast.success('Espacio asignado.');
+      setDestinoId('');
+      router.refresh();
+    });
+  }
+
+  if (espaciosDisponibles.length === 0) {
+    return <p className="mt-4 text-sm text-gray-500">No hay espacios disponibles para asignar.</p>;
+  }
+
+  return (
+    <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
+      <div className="flex-1">
+        <EspacioCombobox
+          espacios={espaciosDisponibles}
+          value={destinoId}
+          onChange={setDestinoId}
+          disabled={pending}
+          placeholder="Buscar un espacio…"
+        />
+      </div>
+      <button
+        onClick={submit}
+        disabled={!destinoId || pending}
+        className="shrink-0 rounded-[10px] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+        style={{ background: '#175861' }}
+      >
+        {pending ? 'Guardando…' : 'Asignar'}
       </button>
     </div>
   );
@@ -1604,6 +1672,7 @@ function EmbarcacionesTab({
             icon={<Ship className="h-7 w-7 opacity-40" />}
             text="Este socio no tiene embarcación registrada."
           />
+          <EspacioSinEmbarcacionRow socioId={socioId} espaciosDisponibles={espaciosDisponibles} />
         </div>
       )}
 
