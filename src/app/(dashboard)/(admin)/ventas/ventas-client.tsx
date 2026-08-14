@@ -3314,16 +3314,24 @@ function ReenviarFacturaModal({
   onClose,
   factura,
   guarderiaCondicionIva,
+  socios,
 }: {
   onClose: () => void;
   factura: Factura;
   guarderiaCondicionIva: string | null;
+  socios: Socio[];
 }) {
   const router = useRouter();
   const hoy = new Date().toISOString().slice(0, 10);
   // Si el tipo original no es emisible por la condición IVA actual del club
-  // (ej. cambió de Monotributo a RI), arrancar en el primero válido.
-  const opcionesTipo = tiposFacturaEmisibles(guarderiaCondicionIva);
+  // (ej. cambió de Monotributo a RI), arrancar en el primero válido. Se pasa
+  // la condición del socio para que ofrezca SOLO la letra que corresponde
+  // (misma regla que al emitir): reenviar no es una vía para cambiarla a mano.
+  const socioFactura = factura.socioId ? socios.find((s) => s.id === factura.socioId) : undefined;
+  const opcionesTipo = tiposFacturaEmisibles(
+    guarderiaCondicionIva,
+    socioFactura ? condicionIvaEfectiva(socioFactura) : null,
+  );
   const [tipoFactura, setTipoFactura] = useState(
     opcionesTipo.some((o) => o.value === factura.tipoFactura)
       ? (factura.tipoFactura ?? opcionesTipo[0].value)
@@ -4086,6 +4094,7 @@ export function VentasClient({
           onClose={() => setReenviarFactura(null)}
           factura={reenviarFactura}
           guarderiaCondicionIva={guarderiaCondicionIva}
+          socios={socios}
         />
       )}
       <LoteNotaCreditoModal

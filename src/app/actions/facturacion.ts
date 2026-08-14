@@ -504,6 +504,19 @@ function validarDocumentoSocio(socio: SocioFacturacion): string | null {
   const nro = (ident.numeroDocumento ?? '').replace(/[\s-]/g, '');
   const iva = ident.condicionIva ?? '';
 
+  // Sin condición frente al IVA no se puede facturar: `buildCliente` cae al
+  // default 'CF' y ARCA recibe al socio como Consumidor Final. Eso además
+  // pisa en TusFacturas la condición real del cliente en cada reintento, y
+  // hace que rechace la Factura A ("para la condición de IVA seleccionada no
+  // se permite realizar comprobantes A y/o M"). Caso real 2026-08-14: socio
+  // con la condición cargada solo en Datos Personales pero facturando con
+  // Datos Impositivos (vacíos) — se emitía como CF sin ningún aviso.
+  if (!iva) {
+    return socio.facturaFiscal
+      ? 'Falta la Condición frente al IVA en los Datos Personales del socio (pestaña Generales). Sin ese dato ARCA lo toma como Consumidor Final.'
+      : 'Falta la Condición frente al IVA en los Datos Impositivos del socio. Cargala, o tildá "Usar datos personales para facturación" si la tenés en Generales.';
+  }
+
   const requiereCuit = iva === 'responsable_inscripto' || iva === 'monotributo';
   if (requiereCuit && tipo !== 'cuit' && tipo !== 'cuil') {
     return socio.facturaFiscal
@@ -1038,6 +1051,24 @@ export async function reenviarFacturaRechazadaAction(
   const { guarderia, centro, creds: credsOverride } = credsInfo;
   if (!guarderia.certificadoAfipOk) {
     return { error: 'El certificado de enlace con ARCA todavía no está confirmado.' };
+  }
+
+  // La letra la fija ARCA, también al reenviar: reintentar una rechazada no es
+  // una vía para cambiarla a mano (si la A fue rechazada, la salida es
+  // corregir la condición IVA del socio, no emitir una B).
+  if (guarderia.condicionIva) {
+    const socioCondicionIva = socio.facturaFiscal ? socio.condicionIvaPersonal : socio.condicionIva;
+    const corresponde = derivarTipoFactura(guarderia.condicionIva, socioCondicionIva);
+    if (data.tipoFactura !== corresponde) {
+      const label: Record<string, string> = {
+        factura_a: 'Factura A',
+        factura_b: 'Factura B',
+        factura_c: 'Factura C',
+      };
+      return {
+        error: `Por la condición frente al IVA del club y del socio corresponde ${label[corresponde] ?? corresponde}, no ${label[data.tipoFactura] ?? data.tipoFactura}. Actualizá la página e intentá de nuevo.`,
+      };
+    }
   }
 
   const cliente = buildCliente({ ...socio, condicionVenta: data.condicionVenta });
