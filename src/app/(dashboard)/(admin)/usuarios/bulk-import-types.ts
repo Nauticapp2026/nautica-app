@@ -15,7 +15,9 @@ export type ImportRowRaw = {
   apellido: string;
   email: string;
   telefono: string;
+  // `direccion` es solo la calle; el número va aparte (mig 0143).
   direccion: string;
+  direccionNumero: string;
   ciudad: string;
   provincia: string;
   codigoPostal: string;

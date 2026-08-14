@@ -78,6 +78,7 @@ type SocioData = {
   tipoDocumento: string | null;
   numeroDocumento: string | null;
   direccion: string | null;
+  direccionNumero: string | null;
   ciudad: string | null;
   provincia: string | null;
   codigoPostal: string | null;
@@ -85,6 +86,9 @@ type SocioData = {
   razonSocial: string | null;
   cuit: string | null;
   direccionFiscal: string | null;
+  direccionFiscalNumero: string | null;
+  ciudadFiscal: string | null;
+  provinciaFiscal: string | null;
   condicionIva: string | null;
   condicionIvaPersonal: string | null;
   condicionIibb: string | null;
@@ -2083,6 +2087,7 @@ export function SocioDetail({
     tipoDocumento: socio.tipoDocumento ?? '',
     numeroDocumento: socio.numeroDocumento ?? '',
     direccion: socio.direccion ?? '',
+    direccionNumero: socio.direccionNumero ?? '',
     ciudad: socio.ciudad ?? '',
     provincia: socio.provincia ?? '',
     codigoPostal: socio.codigoPostal ?? '',
@@ -2090,6 +2095,9 @@ export function SocioDetail({
     razonSocial: socio.razonSocial ?? '',
     cuit: socio.cuit ?? '',
     direccionFiscal: socio.direccionFiscal ?? '',
+    direccionFiscalNumero: socio.direccionFiscalNumero ?? '',
+    ciudadFiscal: socio.ciudadFiscal ?? '',
+    provinciaFiscal: socio.provinciaFiscal ?? '',
     condicionIva: socio.condicionIva ?? '',
     condicionIvaPersonal: socio.condicionIvaPersonal ?? '',
     condicionIibb: socio.condicionIibb ?? '',
@@ -2120,6 +2128,7 @@ export function SocioDetail({
       tipoDocumento: socio.tipoDocumento ?? '',
       numeroDocumento: socio.numeroDocumento ?? '',
       direccion: socio.direccion ?? '',
+      direccionNumero: socio.direccionNumero ?? '',
       ciudad: socio.ciudad ?? '',
       provincia: socio.provincia ?? '',
       codigoPostal: socio.codigoPostal ?? '',
@@ -2127,6 +2136,9 @@ export function SocioDetail({
       razonSocial: socio.razonSocial ?? '',
       cuit: socio.cuit ?? '',
       direccionFiscal: socio.direccionFiscal ?? '',
+      direccionFiscalNumero: socio.direccionFiscalNumero ?? '',
+      ciudadFiscal: socio.ciudadFiscal ?? '',
+      provinciaFiscal: socio.provinciaFiscal ?? '',
       condicionIva: socio.condicionIva ?? '',
       condicionIvaPersonal: socio.condicionIvaPersonal ?? '',
       condicionIibb: socio.condicionIibb ?? '',
@@ -2474,14 +2486,26 @@ export function SocioDetail({
                 </p>
               </div>
             </div>
-            <div>
-              <label className="mb-1.5 block text-xs font-semibold text-gray-500">Dirección</label>
-              <input
-                className={inputCls}
-                value={editForm.direccion}
-                onChange={setField('direccion')}
-                readOnly={!editando}
-              />
+            <div className="grid grid-cols-[2fr_1fr] gap-4">
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold text-gray-500">Calle</label>
+                <input
+                  className={inputCls}
+                  value={editForm.direccion}
+                  onChange={setField('direccion')}
+                  readOnly={!editando}
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold text-gray-500">Número</label>
+                <input
+                  className={inputCls}
+                  value={editForm.direccionNumero}
+                  onChange={setField('direccionNumero')}
+                  readOnly={!editando}
+                  placeholder="—"
+                />
+              </div>
             </div>
             <div className="grid grid-cols-3 gap-4">
               <div>
@@ -3456,6 +3480,9 @@ function ImpositivosTab({
     razonSocial: string;
     cuit: string;
     direccionFiscal: string;
+    direccionFiscalNumero: string;
+    ciudadFiscal: string;
+    provinciaFiscal: string;
     condicionIva: string;
     condicionIibb: string;
     [key: string]: string;
@@ -3467,6 +3494,9 @@ function ImpositivosTab({
       | 'razonSocial'
       | 'cuit'
       | 'direccionFiscal'
+      | 'direccionFiscalNumero'
+      | 'ciudadFiscal'
+      | 'provinciaFiscal'
       | 'condicionIva'
       | 'condicionIibb'
       | 'emailFacturacion',
@@ -3665,17 +3695,53 @@ function ImpositivosTab({
             />
           </div>
         </div>
-        <div>
-          <label className="mb-1.5 block text-xs font-semibold text-gray-500">
-            Dirección fiscal
-          </label>
-          <input
-            className={inputCls}
-            value={editForm.direccionFiscal}
-            onChange={setField('direccionFiscal')}
-            readOnly={!editando}
-            placeholder="—"
-          />
+        <div className="grid grid-cols-[2fr_1fr] gap-4">
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold text-gray-500">Calle fiscal</label>
+            <input
+              className={inputCls}
+              value={editForm.direccionFiscal}
+              onChange={setField('direccionFiscal')}
+              readOnly={!editando}
+              placeholder="—"
+            />
+          </div>
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold text-gray-500">Número</label>
+            <input
+              className={inputCls}
+              value={editForm.direccionFiscalNumero}
+              onChange={setField('direccionFiscalNumero')}
+              readOnly={!editando}
+              placeholder="—"
+            />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold text-gray-500">
+              Ciudad fiscal
+            </label>
+            <input
+              className={inputCls}
+              value={editForm.ciudadFiscal}
+              onChange={setField('ciudadFiscal')}
+              readOnly={!editando}
+              placeholder="—"
+            />
+          </div>
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold text-gray-500">
+              Provincia fiscal
+            </label>
+            <input
+              className={inputCls}
+              value={editForm.provinciaFiscal}
+              onChange={setField('provinciaFiscal')}
+              readOnly={!editando}
+              placeholder="—"
+            />
+          </div>
         </div>
         <div>
           <label className="mb-1.5 block text-xs font-semibold text-gray-500">

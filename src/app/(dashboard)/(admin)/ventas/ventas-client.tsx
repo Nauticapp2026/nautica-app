@@ -125,6 +125,7 @@ type Socio = {
   email: string;
   razonSocial: string | null;
   direccion: string | null;
+  direccionNumero: string | null;
   numeroDocumento: string;
   tipoDocumento: string | null;
   cuit: string | null;
@@ -427,7 +428,7 @@ function detalleSocioRenglon(s: Socio): string {
     s.numeroSocio != null ? `#${s.numeroSocio}` : null,
     s.razonSocial?.trim() && s.razonSocial.trim() !== s.nombre ? s.razonSocial.trim() : null,
     doc,
-    s.direccion?.trim() || null,
+    [s.direccion?.trim(), s.direccionNumero?.trim()].filter(Boolean).join(' ') || null,
     s.embarcaciones.length > 0 ? s.embarcaciones.join(', ') : null,
   ]
     .filter(Boolean)

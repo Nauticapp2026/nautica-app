@@ -36,6 +36,7 @@ export type CreateSocioData = {
   email: string;
   telefono: string;
   direccion: string;
+  direccionNumero: string;
   ciudad: string;
   provincia: string;
   codigoPostal: string;
@@ -45,6 +46,9 @@ export type CreateSocioData = {
   razonSocial: string;
   cuit: string;
   direccionFiscal: string;
+  direccionFiscalNumero: string;
+  ciudadFiscal: string;
+  provinciaFiscal: string;
   condicionIva: string;
   condicionIvaPersonal: string;
   condicionIibb: string;
@@ -125,6 +129,7 @@ export async function createSocioAction(data: CreateSocioData): Promise<SocioRes
           apellido: data.apellido.trim() || null,
           telefono: data.telefono.trim() || null,
           direccion: data.direccion.trim() || null,
+          direccionNumero: data.direccionNumero.trim() || null,
           ciudad: data.ciudad.trim() || null,
           provincia: data.provincia.trim() || null,
           codigoPostal: data.codigoPostal.trim() || null,
@@ -134,6 +139,9 @@ export async function createSocioAction(data: CreateSocioData): Promise<SocioRes
           razonSocial: data.razonSocial.trim() || null,
           cuit: data.cuit.trim() || null,
           direccionFiscal: data.direccionFiscal.trim() || null,
+          direccionFiscalNumero: data.direccionFiscalNumero.trim() || null,
+          ciudadFiscal: data.ciudadFiscal.trim() || null,
+          provinciaFiscal: data.provinciaFiscal.trim() || null,
           condicionIva: (data.condicionIva || null) as never,
           condicionIvaPersonal: (data.condicionIvaPersonal || null) as never,
           condicionIibb: (data.condicionIibb || null) as never,
@@ -148,6 +156,7 @@ export async function createSocioAction(data: CreateSocioData): Promise<SocioRes
             apellido: data.apellido.trim() || null,
             telefono: data.telefono.trim() || null,
             direccion: data.direccion.trim() || null,
+            direccionNumero: data.direccionNumero.trim() || null,
             ciudad: data.ciudad.trim() || null,
             provincia: data.provincia.trim() || null,
             codigoPostal: data.codigoPostal.trim() || null,
@@ -157,6 +166,9 @@ export async function createSocioAction(data: CreateSocioData): Promise<SocioRes
             razonSocial: data.razonSocial.trim() || null,
             cuit: data.cuit.trim() || null,
             direccionFiscal: data.direccionFiscal.trim() || null,
+            direccionFiscalNumero: data.direccionFiscalNumero.trim() || null,
+            ciudadFiscal: data.ciudadFiscal.trim() || null,
+            provinciaFiscal: data.provinciaFiscal.trim() || null,
             condicionIva: (data.condicionIva || null) as never,
             condicionIvaPersonal: (data.condicionIvaPersonal || null) as never,
             condicionIibb: (data.condicionIibb || null) as never,
@@ -212,6 +224,7 @@ export type UpdateSocioData = {
   tipoDocumento: string;
   numeroDocumento: string;
   direccion: string;
+  direccionNumero: string;
   ciudad: string;
   provincia: string;
   codigoPostal: string;
@@ -219,6 +232,9 @@ export type UpdateSocioData = {
   razonSocial: string;
   cuit: string;
   direccionFiscal: string;
+  direccionFiscalNumero: string;
+  ciudadFiscal: string;
+  provinciaFiscal: string;
   condicionIva: string;
   condicionIvaPersonal: string;
   condicionIibb: string;
@@ -279,6 +295,7 @@ export async function updateSocioAction(data: UpdateSocioData): Promise<{ error?
         tipoDocumento: (data.tipoDocumento || null) as never,
         numeroDocumento: data.numeroDocumento.trim() || null,
         direccion: data.direccion.trim() || null,
+        direccionNumero: data.direccionNumero.trim() || null,
         ciudad: data.ciudad.trim() || null,
         provincia: data.provincia.trim() || null,
         codigoPostal: data.codigoPostal.trim() || null,
@@ -286,6 +303,9 @@ export async function updateSocioAction(data: UpdateSocioData): Promise<{ error?
         razonSocial: data.razonSocial.trim() || null,
         cuit: data.cuit.trim() || null,
         direccionFiscal: data.direccionFiscal.trim() || null,
+        direccionFiscalNumero: data.direccionFiscalNumero.trim() || null,
+        ciudadFiscal: data.ciudadFiscal.trim() || null,
+        provinciaFiscal: data.provinciaFiscal.trim() || null,
         condicionIva: (data.condicionIva || null) as never,
         condicionIvaPersonal: (data.condicionIvaPersonal || null) as never,
         condicionIibb: (data.condicionIibb || null) as never,

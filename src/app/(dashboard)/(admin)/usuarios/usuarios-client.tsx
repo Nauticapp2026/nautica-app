@@ -132,6 +132,7 @@ const EMPTY_FORM = {
   email: '',
   telefono: '',
   direccion: '',
+  direccionNumero: '',
   ciudad: '',
   provincia: '',
   codigoPostal: '',
@@ -141,6 +142,9 @@ const EMPTY_FORM = {
   razonSocial: '',
   cuit: '',
   direccionFiscal: '',
+  direccionFiscalNumero: '',
+  ciudadFiscal: '',
+  provinciaFiscal: '',
   condicionIva: '',
   condicionIvaPersonal: '',
   condicionIibb: '',
@@ -407,14 +411,24 @@ function CrearSocioModal({ open, onClose }: { open: boolean; onClose: () => void
                   ))}
                 </select>
               </Field>
-              <Field label="Dirección" required>
-                <input
-                  className={inputCls}
-                  placeholder="Av. Libertador 1234"
-                  value={form.direccion}
-                  onChange={set('direccion')}
-                />
-              </Field>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-[2fr_1fr]">
+                <Field label="Calle" required>
+                  <input
+                    className={inputCls}
+                    placeholder="Av. Libertador"
+                    value={form.direccion}
+                    onChange={set('direccion')}
+                  />
+                </Field>
+                <Field label="Número">
+                  <input
+                    className={inputCls}
+                    placeholder="1234"
+                    value={form.direccionNumero}
+                    onChange={set('direccionNumero')}
+                  />
+                </Field>
+              </div>
               <div className="grid grid-cols-3 gap-3">
                 <Field label="Ciudad">
                   <input
@@ -525,14 +539,42 @@ function CrearSocioModal({ open, onClose }: { open: boolean; onClose: () => void
                       />
                     </Field>
                   </div>
-                  <Field label="Dirección fiscal">
-                    <input
-                      className={inputCls}
-                      placeholder="Av. Corrientes 1234, CABA"
-                      value={form.direccionFiscal}
-                      onChange={set('direccionFiscal')}
-                    />
-                  </Field>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-[2fr_1fr]">
+                    <Field label="Calle fiscal">
+                      <input
+                        className={inputCls}
+                        placeholder="Av. Corrientes"
+                        value={form.direccionFiscal}
+                        onChange={set('direccionFiscal')}
+                      />
+                    </Field>
+                    <Field label="Número">
+                      <input
+                        className={inputCls}
+                        placeholder="1234"
+                        value={form.direccionFiscalNumero}
+                        onChange={set('direccionFiscalNumero')}
+                      />
+                    </Field>
+                  </div>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <Field label="Ciudad fiscal">
+                      <input
+                        className={inputCls}
+                        placeholder="CABA"
+                        value={form.ciudadFiscal}
+                        onChange={set('ciudadFiscal')}
+                      />
+                    </Field>
+                    <Field label="Provincia fiscal">
+                      <input
+                        className={inputCls}
+                        placeholder="Buenos Aires"
+                        value={form.provinciaFiscal}
+                        onChange={set('provinciaFiscal')}
+                      />
+                    </Field>
+                  </div>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <Field label="Condición frente IVA">
                       <select

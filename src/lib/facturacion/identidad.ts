@@ -18,12 +18,34 @@ export type SocioFacturacion = {
   tipoDocumento: string | null;
   numeroDocumento: string | null;
   cuit: string | null;
+  // Direcciones desglosadas (mig 0143): `direccion`/`direccionFiscal` son solo
+  // la calle. El domicilio que va a ARCA se compone con `armarDomicilio`.
   direccion: string | null;
+  direccionNumero: string | null;
+  ciudad: string | null;
+  provincia: string | null;
   direccionFiscal: string | null;
+  direccionFiscalNumero: string | null;
+  ciudadFiscal: string | null;
+  provinciaFiscal: string | null;
   condicionIva: string | null;
   condicionIvaPersonal: string | null;
   facturaFiscal: boolean;
 };
+
+/**
+ * Une las partes de una dirección en el string de una línea que espera
+ * TusFacturas: "Calle 1234, Ciudad, Provincia" (omite las partes vacías).
+ */
+export function armarDomicilio(p: {
+  calle: string | null;
+  numero: string | null;
+  ciudad: string | null;
+  provincia: string | null;
+}): string {
+  const calleYNro = [p.calle?.trim(), p.numero?.trim()].filter(Boolean).join(' ');
+  return [calleYNro, p.ciudad?.trim(), p.provincia?.trim()].filter(Boolean).join(', ');
+}
 
 /**
  * Identidad fiscal efectiva del socio según el modo de facturación. Usada
@@ -40,6 +62,13 @@ export function identidadFacturacion(p: SocioFacturacion): {
 } {
   const nombreCompleto = [p.nombre, p.apellido].filter(Boolean).join(' ').trim();
 
+  const domicilioPersonal = armarDomicilio({
+    calle: p.direccion,
+    numero: p.direccionNumero,
+    ciudad: p.ciudad,
+    provincia: p.provincia,
+  });
+
   if (p.facturaFiscal) {
     // Datos personales (Generales).
     return {
@@ -47,16 +76,24 @@ export function identidadFacturacion(p: SocioFacturacion): {
       tipoDocumento: p.tipoDocumento,
       numeroDocumento: p.numeroDocumento,
       condicionIva: p.condicionIvaPersonal,
-      domicilio: p.direccion?.trim() || '',
+      domicilio: domicilioPersonal,
     };
   }
 
   // Datos impositivos. Si tiene CUIT cargado, es el documento de facturación.
+  const domicilioFiscal = armarDomicilio({
+    calle: p.direccionFiscal,
+    numero: p.direccionFiscalNumero,
+    ciudad: p.ciudadFiscal,
+    provincia: p.provinciaFiscal,
+  });
+
   return {
     razon: p.razonSocial?.trim() || nombreCompleto || p.email,
     tipoDocumento: p.cuit?.trim() ? 'cuit' : p.tipoDocumento,
     numeroDocumento: p.cuit?.trim() || p.numeroDocumento,
     condicionIva: p.condicionIva,
-    domicilio: p.direccionFiscal?.trim() || p.direccion?.trim() || '',
+    // Sin dirección fiscal cargada cae a la personal (como antes).
+    domicilio: domicilioFiscal || domicilioPersonal,
   };
 }
