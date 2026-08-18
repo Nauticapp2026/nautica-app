@@ -1874,6 +1874,9 @@ export const platformNotificaciones = pgTable('platform_notificaciones', {
   // Momento a partir del cual el cron puede enviarla. NULL = enviar en el acto
   // (mig 0145). Una programada queda en 'pendiente' hasta que sale.
   programadaPara: timestamp('programada_para', { withTimezone: true }),
+  // Se sella ANTES de despachar y funciona como reserva: garantiza que una
+  // push no salga dos veces si el proceso muere a mitad de camino (mig 0146).
+  intentoIniciadoEn: timestamp('intento_iniciado_en', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });

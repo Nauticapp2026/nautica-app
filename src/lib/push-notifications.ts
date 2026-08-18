@@ -77,13 +77,18 @@ export async function processPendingNotifications(
     lte(platformNotificaciones.programadaPara, cutoff),
   );
 
+  // `intento_iniciado_en IS NULL` excluye las que ya se despacharon una vez,
+  // aunque no se sepa cómo terminaron (ver claimNotificacion).
+  const sinIntentoPrevio = isNull(platformNotificaciones.intentoIniciadoEn);
+
   const whereClause = opts.notifId
     ? and(
         eq(platformNotificaciones.id, opts.notifId),
         eq(platformNotificaciones.estado, 'pendiente'),
+        sinIntentoPrevio,
         enHorario,
       )
-    : and(eq(platformNotificaciones.estado, 'pendiente'), enHorario);
+    : and(eq(platformNotificaciones.estado, 'pendiente'), sinIntentoPrevio, enHorario);
 
   const pendientes = await db
     .select({
@@ -106,12 +111,21 @@ export async function processPendingNotifications(
   };
 
   for (const notif of pendientes) {
+    // Reservar ANTES de mandar cualquier push. Si esta corrida se muere en el
+    // medio, los push que ya salieron no se repiten: la fila deja de estar
+    // disponible para la corrida siguiente. También evita que el envío inline
+    // y el cron se pisen si coinciden en el tiempo.
+    if (!(await claimNotificacion(notif.id))) {
+      result.procesadas--;
+      continue;
+    }
+
     // Todo el trabajo de cada notificación va dentro del try, incluidas las
     // queries de audiencia y tokens. Si alguna excepción escapara de acá, la
-    // fila quedaría en 'pendiente' y el cron la reintentaría en cada corrida
-    // para siempre — además de cortar la corrida y dejar sin procesar a las
-    // que vienen detrás en el mismo lote. Cualquier error la deja 'fallida',
-    // que es un estado terminal: no se reintenta (decisión de producto).
+    // fila quedaría a medio camino y cortaría la corrida, dejando sin procesar
+    // a las que vienen detrás en el mismo lote. Cualquier error la deja
+    // 'fallida', que es un estado terminal: no se reintenta (decisión de
+    // producto).
     let tokensDelIntento = 0;
 
     try {
@@ -293,6 +307,32 @@ async function sendExpoPushes(messages: ExpoMessage[]): Promise<ExpoTicket[]> {
     tickets.push(...json.data);
   }
   return tickets;
+}
+
+/**
+ * Reserva una notificación para esta corrida, sellando `intento_iniciado_en`.
+ *
+ * El UPDATE condicional es la garantía de "sale una sola vez": Postgres resuelve
+ * un `UPDATE ... WHERE intento_iniciado_en IS NULL` de forma atómica, así que si
+ * dos procesos intentan reservar la misma fila, solo uno recibe la fila de
+ * vuelta. El otro obtiene un array vacío y la saltea.
+ *
+ * Devuelve false si ya estaba tomada (o si dejó de estar 'pendiente' entre la
+ * consulta del lote y este momento).
+ */
+async function claimNotificacion(id: string): Promise<boolean> {
+  const rows = await db
+    .update(platformNotificaciones)
+    .set({ intentoIniciadoEn: new Date(), updatedAt: new Date() })
+    .where(
+      and(
+        eq(platformNotificaciones.id, id),
+        eq(platformNotificaciones.estado, 'pendiente'),
+        isNull(platformNotificaciones.intentoIniciadoEn),
+      ),
+    )
+    .returning({ id: platformNotificaciones.id });
+  return rows.length > 0;
 }
 
 async function markEnviada(id: string): Promise<void> {

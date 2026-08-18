@@ -48,6 +48,8 @@ export type PlatformNotificacion = {
   enviadoEn: string | null;
   /** Horario de envío elegido, o null si salió (o sale) en el acto. */
   programadaPara: string | null;
+  /** Sellado al empezar a despachar. Si está y sigue 'pendiente', se cortó. */
+  intentoIniciadoEn: string | null;
   createdAt: string;
   autor: string | null;
 };
@@ -92,7 +94,17 @@ const inputCls =
  */
 function estaProgramada(n: PlatformNotificacion): boolean {
   if (n.estado !== 'pendiente' || !n.programadaPara) return false;
+  if (n.intentoIniciadoEn) return false;
   return new Date(n.programadaPara).getTime() > Date.now();
+}
+
+/**
+ * Se empezó a despachar y nunca se supo cómo terminó: el proceso se cortó
+ * después de reservarla (timeout, deploy, crash). No se reintenta a propósito
+ * — algunos push pueden haber salido y reintentar los duplicaría.
+ */
+function estaInterrumpida(n: PlatformNotificacion): boolean {
+  return n.estado === 'pendiente' && Boolean(n.intentoIniciadoEn);
 }
 
 type ModalState = { mode: 'create' } | null;
@@ -113,12 +125,18 @@ export function PlatformNotificacionesClient({
     const total = notificaciones.length;
     const programadas = notificaciones.filter(estaProgramada).length;
     // "Pendientes" son las que deberían haber salido y no salieron; las que
-    // esperan su turno se cuentan aparte para no leerse como un problema.
+    // esperan su turno o quedaron interrumpidas se cuentan aparte para no
+    // leerse como un problema del mismo tipo.
     const pendientes = notificaciones.filter(
-      (n) => n.estado === 'pendiente' && !estaProgramada(n),
+      (n) => n.estado === 'pendiente' && !estaProgramada(n) && !estaInterrumpida(n),
     ).length;
     const enviadas = notificaciones.filter((n) => n.estado === 'enviada').length;
-    const fallidas = notificaciones.filter((n) => n.estado === 'fallida').length;
+    // Las interrumpidas se suman a fallidas en el contador: para el que mira, es
+    // "esto no salió como esperaba y hay que revisarlo". El detalle se ve en la
+    // tarjeta, que las distingue.
+    const fallidas =
+      notificaciones.filter((n) => n.estado === 'fallida').length +
+      notificaciones.filter(estaInterrumpida).length;
     return { total, programadas, pendientes, enviadas, fallidas };
   }, [notificaciones]);
 
@@ -167,10 +185,13 @@ export function PlatformNotificacionesClient({
               se vuelve a tomar.
             </p>
             <p className="mt-1.5">
-              Una que quedó en <span className="font-semibold">pendiente</span> (nunca se intentó, o
-              el envío se cortó) se reintenta sola en esos tres horarios. Una{' '}
+              Una que quedó en <span className="font-semibold">pendiente</span> todavía no se
+              intentó, así que se reintenta sola en esos tres horarios. Una{' '}
               <span className="font-semibold">fallida</span> no: ya se intentó y los push fueron
-              rechazados, así que hay que revisar el error y cargarla de nuevo.
+              rechazados, así que hay que revisar el error y cargarla de nuevo. Una{' '}
+              <span className="font-semibold">interrumpida</span> tampoco: el envío se cortó a mitad
+              de camino y no se sabe cuántos salieron, así que reintentarla podría mandar la misma
+              push dos veces.
             </p>
           </div>
         </div>
@@ -315,6 +336,7 @@ function NotificacionCard({
   const router = useRouter();
   const [deleting, startDelete] = useTransition();
   const programada = estaProgramada(n);
+  const interrumpida = estaInterrumpida(n);
   const estado = ESTADO_LABELS[n.estado];
 
   const handleDelete = () => {
@@ -347,6 +369,14 @@ function NotificacionCard({
               <span className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">
                 <CalendarClock className="h-3 w-3" />
                 Programada para {formatArgentinaDateTime(n.programadaPara)}
+              </span>
+            ) : interrumpida ? (
+              <span
+                className="inline-flex items-center gap-1 rounded-md bg-orange-50 px-2 py-0.5 text-xs font-semibold text-orange-700"
+                title="El envío se cortó a mitad de camino. No se reintenta para no mandar la misma push dos veces."
+              >
+                <AlertTriangle className="h-3 w-3" />
+                Interrumpida
               </span>
             ) : (
               <span

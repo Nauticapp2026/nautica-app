@@ -26,6 +26,7 @@ export default async function SuperAdminNotificacionesPage() {
       error: platformNotificaciones.error,
       enviadoEn: platformNotificaciones.enviadoEn,
       programadaPara: platformNotificaciones.programadaPara,
+      intentoIniciadoEn: platformNotificaciones.intentoIniciadoEn,
       createdAt: platformNotificaciones.createdAt,
       autorNombre: profiles.nombre,
       autorApellido: profiles.apellido,
@@ -44,6 +45,7 @@ export default async function SuperAdminNotificacionesPage() {
     error: r.error,
     enviadoEn: r.enviadoEn ? r.enviadoEn.toISOString() : null,
     programadaPara: r.programadaPara ? r.programadaPara.toISOString() : null,
+    intentoIniciadoEn: r.intentoIniciadoEn ? r.intentoIniciadoEn.toISOString() : null,
     createdAt: r.createdAt.toISOString(),
     autor:
       [r.autorNombre, r.autorApellido].filter(Boolean).join(' ').trim() || r.autorEmail || null,
