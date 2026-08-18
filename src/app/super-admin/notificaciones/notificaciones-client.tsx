@@ -162,10 +162,15 @@ export function PlatformNotificacionesClient({
               instalada y hayan dado permiso de notificaciones. Podés enviarla{' '}
               <span className="font-semibold">en el momento</span> o{' '}
               <span className="font-semibold">programarla</span> para un día y un turno (mañana
-              8:00, tarde 14:00 o noche 20:00). Si alguna queda en{' '}
-              <span className="font-semibold">pendiente</span> o{' '}
-              <span className="font-semibold">fallida</span>, se reintenta sola en esos mismos tres
-              horarios.
+              8:00, tarde 14:00 o noche 20:00). Cada notificación sale{' '}
+              <span className="font-semibold">una sola vez</span>: al enviarse queda marcada y ya no
+              se vuelve a tomar.
+            </p>
+            <p className="mt-1.5">
+              Una que quedó en <span className="font-semibold">pendiente</span> (nunca se intentó, o
+              el envío se cortó) se reintenta sola en esos tres horarios. Una{' '}
+              <span className="font-semibold">fallida</span> no: ya se intentó y los push fueron
+              rechazados, así que hay que revisar el error y cargarla de nuevo.
             </p>
           </div>
         </div>
