@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition, useMemo, Fragment } from 'react';
+import { useState, useTransition, useMemo, useEffect, useRef, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -87,8 +87,12 @@ function buildWhatsappUrl(telefono: string | null): string | null {
   return `https://wa.me/${normalized}`;
 }
 
-type SortKey = 'numero' | 'socio' | 'embarcacion' | 'ubicacion' | 'deuda';
+const SORT_KEYS = ['numero', 'socio', 'embarcacion', 'ubicacion', 'deuda'] as const;
+type SortKey = (typeof SORT_KEYS)[number];
 type SortDir = 'asc' | 'desc';
+
+// Preferencia de orden de la tabla de Socios, recordada por navegador.
+const ORDEN_STORAGE_KEY = 'socios-orden-v1';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -879,7 +883,10 @@ export function UsuariosClient({
   const [modalOpen, setModalOpen] = useState(false);
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [importEmbModalOpen, setImportEmbModalOpen] = useState(false);
-  const [sortKey, setSortKey] = useState<SortKey | null>(null);
+  // Orden por defecto: Nº de socio ascendente. Antes arrancaba sin ordenar y
+  // quedaba el orden que trae el server (alta más reciente primero), que no se
+  // entendía desde la UI (pedido cliente 2026-08-18).
+  const [sortKey, setSortKey] = useState<SortKey>('numero');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [filtro, setFiltro] = useState<FiltroSocios | null>(initialFiltro);
   // Filtros por columna (Nº socio / Nombre / Embarcación).
@@ -913,6 +920,46 @@ export function UsuariosClient({
     }
   }
 
+  // El orden elegido se recuerda entre visitas (pedido cliente 2026-08-18):
+  // antes volvía al default en cada entrada. Va en localStorage — es una
+  // preferencia de pantalla, por navegador, no un dato del club.
+  const ordenHidratadoRef = useRef(false);
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(ORDEN_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as { key?: unknown; dir?: unknown };
+        // Se valida contra los valores conocidos: una key vieja o inventada
+        // dejaría la tabla ordenando por algo que ya no existe.
+        if (SORT_KEYS.includes(parsed.key as SortKey)) {
+          // eslint-disable-next-line react-hooks/set-state-in-effect
+          setSortKey(parsed.key as SortKey);
+        }
+        if (parsed.dir === 'asc' || parsed.dir === 'desc') {
+          setSortDir(parsed.dir);
+        }
+      }
+    } catch {
+      // storage deshabilitado o JSON corrupto: se sigue con el default.
+    }
+    ordenHidratadoRef.current = true;
+  }, []);
+
+  useEffect(() => {
+    // No escribir antes de hidratar: pisaría la preferencia guardada con el
+    // default en el primer render.
+    if (!ordenHidratadoRef.current) return;
+    try {
+      window.localStorage.setItem(
+        ORDEN_STORAGE_KEY,
+        JSON.stringify({ key: sortKey, dir: sortDir }),
+      );
+    } catch {
+      // quota / storage deshabilitado: el orden sigue funcionando en la sesión.
+    }
+  }, [sortKey, sortDir]);
+
   const filtered = useMemo(() => {
     const q = normalizarBusqueda(search.trim());
     let base = q
@@ -945,8 +992,6 @@ export function UsuariosClient({
     if (fEmb) {
       base = base.filter((s) => normalizarBusqueda(s.embarcacion ?? '').includes(fEmb));
     }
-
-    if (!sortKey) return base;
 
     const cmp = (a: Socio, b: Socio): number => {
       if (sortKey === 'numero') {
