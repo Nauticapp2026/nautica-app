@@ -180,19 +180,34 @@ export function PlatformNotificacionesClient({
               instalada y hayan dado permiso de notificaciones. Podés enviarla{' '}
               <span className="font-semibold">en el momento</span> o{' '}
               <span className="font-semibold">programarla</span> para un día y un turno (mañana
-              8:00, tarde 14:00 o noche 20:00). Cada notificación sale{' '}
-              <span className="font-semibold">una sola vez</span>: al enviarse queda marcada y ya no
-              se vuelve a tomar.
+              8:00, tarde 14:00 o noche 20:00).{' '}
+              <span className="font-semibold">Cada notificación sale una sola vez</span>: al
+              despacharla queda marcada y nadie la vuelve a tomar.
             </p>
-            <p className="mt-1.5">
-              Una que quedó en <span className="font-semibold">pendiente</span> todavía no se
-              intentó, así que se reintenta sola en esos tres horarios. Una{' '}
-              <span className="font-semibold">fallida</span> no: ya se intentó y los push fueron
-              rechazados, así que hay que revisar el error y cargarla de nuevo. Una{' '}
-              <span className="font-semibold">interrumpida</span> tampoco: el envío se cortó a mitad
-              de camino y no se sabe cuántos salieron, así que reintentarla podría mandar la misma
-              push dos veces.
-            </p>
+            <p className="mt-1.5">Qué significa cada etiqueta:</p>
+            <ul className="mt-1 space-y-0.5">
+              <li>
+                <span className="font-semibold">Programada</span> — está esperando su turno. Va a
+                salir ese día a esa hora.
+              </li>
+              <li>
+                <span className="font-semibold">Pendiente</span> — quedó en la cola sin salir (por
+                ejemplo, el envío inmediato no llegó a arrancar). Sale en la próxima revisión de la
+                cola, que es a las 8, a las 14 o a las 20.
+              </li>
+              <li>
+                <span className="font-semibold">Enviada</span> — ya salió.
+              </li>
+              <li>
+                <span className="font-semibold">Fallida</span> — se intentó y los push fueron
+                rechazados. No se vuelve a intentar: hay que ver el error y cargarla de nuevo.
+              </li>
+              <li>
+                <span className="font-semibold">Interrumpida</span> — el envío se cortó a mitad de
+                camino y no se sabe cuántos salieron. No se vuelve a intentar, para no mandarle la
+                misma push dos veces a la misma persona.
+              </li>
+            </ul>
           </div>
         </div>
       </div>
