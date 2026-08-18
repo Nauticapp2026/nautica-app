@@ -102,7 +102,10 @@ export default async function SuperAdminSalidasPage() {
 
   const clubes = [...new Set(salidas.map((s) => s.club))].sort((a, b) => a.localeCompare(b, 'es'));
 
+  // El padding lo pone cada sección: el layout de /super-admin no lo aporta.
   return (
-    <SalidasClient salidas={salidas} clubes={clubes} truncado={filas.length >= LIMITE_PANTALLA} />
+    <div className="p-4 md:p-8">
+      <SalidasClient salidas={salidas} clubes={clubes} truncado={filas.length >= LIMITE_PANTALLA} />
+    </div>
   );
 }

@@ -147,77 +147,88 @@ export function SalidasClient({
         </a>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <div className="relative lg:col-span-2">
-          <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400" />
-          <input
-            className={`${inputCls} pl-9`}
-            placeholder="Socio, embarcación, matrícula…"
-            value={query}
+      {/* Dos filas: buscador + selectores arriba, rango de fechas abajo. Meter
+          las dos fechas y el botón de limpiar en una sola celda de la grilla los
+          dejaba ilegibles. */}
+      <div className="space-y-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="relative lg:col-span-2">
+            <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <input
+              className={`${inputCls} pl-9`}
+              placeholder="Socio, embarcación, matrícula…"
+              value={query}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setPage(1);
+              }}
+            />
+          </div>
+          <select
+            className={inputCls}
+            value={club}
             onChange={(e) => {
-              setQuery(e.target.value);
+              setClub(e.target.value);
               setPage(1);
             }}
-          />
+          >
+            <option value="">Todos los clubes</option>
+            {clubes.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+          <select
+            className={inputCls}
+            value={estado}
+            onChange={(e) => {
+              setEstado(e.target.value);
+              setPage(1);
+            }}
+          >
+            {ESTADO_OPTS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
         </div>
-        <select
-          className={inputCls}
-          value={club}
-          onChange={(e) => {
-            setClub(e.target.value);
-            setPage(1);
-          }}
-        >
-          <option value="">Todos los clubes</option>
-          {clubes.map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
-        </select>
-        <select
-          className={inputCls}
-          value={estado}
-          onChange={(e) => {
-            setEstado(e.target.value);
-            setPage(1);
-          }}
-        >
-          {ESTADO_OPTS.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-        <div className="flex gap-2">
-          <input
-            type="date"
-            className={inputCls}
-            value={desde}
-            onChange={(e) => {
-              setDesde(e.target.value);
-              setPage(1);
-            }}
-            title="Desde"
-          />
-          <input
-            type="date"
-            className={inputCls}
-            value={hasta}
-            onChange={(e) => {
-              setHasta(e.target.value);
-              setPage(1);
-            }}
-            title="Hasta"
-          />
+
+        <div className="flex flex-wrap items-end gap-3">
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold text-gray-500">Desde</label>
+            <input
+              type="date"
+              className={inputCls}
+              value={desde}
+              onChange={(e) => {
+                setDesde(e.target.value);
+                setPage(1);
+              }}
+            />
+          </div>
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold text-gray-500">Hasta</label>
+            <input
+              type="date"
+              className={inputCls}
+              value={hasta}
+              onChange={(e) => {
+                setHasta(e.target.value);
+                setPage(1);
+              }}
+            />
+          </div>
           {hayFiltros && (
             <button
               type="button"
               onClick={limpiar}
               title="Limpiar filtros"
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] border border-gray-200 text-gray-500 hover:bg-gray-50"
+              className="flex h-11 items-center gap-2 rounded-[10px] border border-gray-200 px-3 text-sm font-medium text-gray-600 hover:bg-gray-50"
             >
               <FilterX className="h-4 w-4" />
+              Limpiar
             </button>
           )}
         </div>
