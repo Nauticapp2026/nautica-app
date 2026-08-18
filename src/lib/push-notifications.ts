@@ -106,39 +106,48 @@ export async function processPendingNotifications(
   };
 
   for (const notif of pendientes) {
-    const userIds = await resolveAudienceUserIds(notif.audiencia);
-
-    if (userIds.length === 0) {
-      // No hay miembros que cumplan la audiencia. Marcamos como 'enviada' con
-      // 0 destinatarios — no es un error, simplemente no había a quién mandar.
-      await markEnviada(notif.id);
-      result.sinDestinatarios++;
-      result.detalle.push({ id: notif.id, estado: 'sin_destinatarios', tokens: 0 });
-      continue;
-    }
-
-    const tokens = await db
-      .select({ expoPushToken: deviceTokens.expoPushToken })
-      .from(deviceTokens)
-      .where(inArray(deviceTokens.userId, userIds));
-
-    if (tokens.length === 0) {
-      // Hay miembros pero ninguno tiene la app instalada / registrada.
-      await markEnviada(notif.id);
-      result.sinDestinatarios++;
-      result.detalle.push({ id: notif.id, estado: 'sin_destinatarios', tokens: 0 });
-      continue;
-    }
-
-    const messages: ExpoMessage[] = tokens.map((t) => ({
-      to: t.expoPushToken,
-      title: notif.titulo,
-      body: notif.cuerpo,
-      sound: 'default',
-      data: { notificacionId: notif.id },
-    }));
+    // Todo el trabajo de cada notificación va dentro del try, incluidas las
+    // queries de audiencia y tokens. Si alguna excepción escapara de acá, la
+    // fila quedaría en 'pendiente' y el cron la reintentaría en cada corrida
+    // para siempre — además de cortar la corrida y dejar sin procesar a las
+    // que vienen detrás en el mismo lote. Cualquier error la deja 'fallida',
+    // que es un estado terminal: no se reintenta (decisión de producto).
+    let tokensDelIntento = 0;
 
     try {
+      const userIds = await resolveAudienceUserIds(notif.audiencia);
+
+      if (userIds.length === 0) {
+        // No hay miembros que cumplan la audiencia. Marcamos como 'enviada' con
+        // 0 destinatarios — no es un error, simplemente no había a quién mandar.
+        await markEnviada(notif.id);
+        result.sinDestinatarios++;
+        result.detalle.push({ id: notif.id, estado: 'sin_destinatarios', tokens: 0 });
+        continue;
+      }
+
+      const tokens = await db
+        .select({ expoPushToken: deviceTokens.expoPushToken })
+        .from(deviceTokens)
+        .where(inArray(deviceTokens.userId, userIds));
+      tokensDelIntento = tokens.length;
+
+      if (tokens.length === 0) {
+        // Hay miembros pero ninguno tiene la app instalada / registrada.
+        await markEnviada(notif.id);
+        result.sinDestinatarios++;
+        result.detalle.push({ id: notif.id, estado: 'sin_destinatarios', tokens: 0 });
+        continue;
+      }
+
+      const messages: ExpoMessage[] = tokens.map((t) => ({
+        to: t.expoPushToken,
+        title: notif.titulo,
+        body: notif.cuerpo,
+        sound: 'default',
+        data: { notificacionId: notif.id },
+      }));
+
       const tickets = await sendExpoPushes(messages);
 
       // Limpiar tokens que Expo reportó como muertos.
@@ -188,7 +197,12 @@ export async function processPendingNotifications(
       const msg = err instanceof Error ? err.message : String(err);
       await markFallida(notif.id, msg);
       result.fallidas++;
-      result.detalle.push({ id: notif.id, estado: 'fallida', tokens: tokens.length, error: msg });
+      result.detalle.push({
+        id: notif.id,
+        estado: 'fallida',
+        tokens: tokensDelIntento,
+        error: msg,
+      });
     }
   }
 
