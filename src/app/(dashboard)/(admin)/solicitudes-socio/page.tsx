@@ -3,8 +3,15 @@ import { getActiveMarina } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { embarcaciones, profiles, solicitudesMembership } from '@/lib/db/schema';
 import { SolicitudesSocioClient } from './solicitudes-socio-client';
+import { SOLICITUDES_TAB_IDS, tabDesdeUrl } from '@/lib/tab-url';
 
-export default async function SolicitudesSocioPage() {
+export default async function SolicitudesSocioPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>;
+}) {
+  // Pestaña activa desde la URL: refrescar (F5) mantiene la vista.
+  const { tab } = await searchParams;
   const ctx = await getActiveMarina();
   if (!ctx) return null;
 
@@ -66,5 +73,10 @@ export default async function SolicitudesSocioPage() {
     embarcacion: embarcacionPorSocio.get(r.solicitanteId) ?? null,
   }));
 
-  return <SolicitudesSocioClient solicitudes={solicitudes} />;
+  return (
+    <SolicitudesSocioClient
+      initialTab={tabDesdeUrl(tab, SOLICITUDES_TAB_IDS, 'pendientes')}
+      solicitudes={solicitudes}
+    />
+  );
 }

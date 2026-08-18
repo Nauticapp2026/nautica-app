@@ -22,6 +22,7 @@ import {
 } from '@/app/actions/super-admin/moderacion';
 import { formatArgentinaDate } from '@/lib/dates';
 import { EmptyState } from '@/components/shared/empty-state';
+import { escribirTabEnUrl, type ModeracionTab } from '@/lib/tab-url';
 
 export type ComunicacionClub = {
   id: string;
@@ -90,7 +91,7 @@ const SERVICIO_LABELS: Record<string, string> = {
 const inputCls =
   'h-11 w-full rounded-[10px] border border-gray-200 bg-white px-4 text-sm text-[#101828] focus:border-[#175861] focus:outline-none focus:ring-1 focus:ring-[#175861]';
 
-type Tab = 'comunicaciones' | 'publicaciones';
+type Tab = ModeracionTab;
 type DetailModal =
   | { kind: 'comunicacion'; item: ComunicacionClub }
   | { kind: 'publicacion'; item: PublicacionClub }
@@ -99,12 +100,15 @@ type DetailModal =
 export function ModeracionClient({
   comunicaciones,
   publicaciones,
+  initialTab = 'comunicaciones',
 }: {
   comunicaciones: ComunicacionClub[];
   publicaciones: PublicacionClub[];
+  // Pestaña inicial desde el ?tab= (refrescar mantiene la vista).
+  initialTab?: Tab;
 }) {
   const router = useRouter();
-  const [tab, setTab] = useState<Tab>('comunicaciones');
+  const [tab, setTab] = useState<Tab>(initialTab);
   const [query, setQuery] = useState('');
   const [clubFiltro, setClubFiltro] = useState('');
   const [detail, setDetail] = useState<DetailModal>(null);
@@ -145,6 +149,7 @@ export function ModeracionClient({
 
   const onTabChange = (t: Tab) => {
     setTab(t);
+    escribirTabEnUrl(t, 'comunicaciones');
     setQuery('');
     setClubFiltro('');
   };

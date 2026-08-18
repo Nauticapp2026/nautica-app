@@ -60,6 +60,7 @@ import {
 import { getLedgerSaldoAFavorAction, type LedgerSaldoAFavorEntry } from '@/app/actions/movimientos';
 import { buscarRankeado } from '@/lib/buscador';
 import { formatArgentinaDate, formatArgentinaDateTime, formatNaiveDateTime } from '@/lib/dates';
+import { escribirTabEnUrl, type SocioTabId } from '@/lib/tab-url';
 import { precioSinIva } from '@/lib/iva';
 import { ASTILLEROS } from '../astilleros';
 import { EmptyState } from '@/components/shared/empty-state';
@@ -277,7 +278,8 @@ const TABS = [
   { id: 'payway', label: 'Débito automático', icon: CreditCard },
 ] as const;
 
-type TabId = (typeof TABS)[number]['id'];
+type TabId = SocioTabId;
+const TAB_POR_DEFECTO: TabId = 'generales';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -2022,6 +2024,7 @@ export function SocioDetail({
   internosHabilitados = true,
   debitoInternoHabilitado = true,
   saldoAFavorDisponible = 0,
+  initialTab = TAB_POR_DEFECTO,
 }: {
   socio: SocioData;
   embarcaciones: Embarcacion[];
@@ -2047,8 +2050,16 @@ export function SocioDetail({
   // número que Cobranzas ofrece aplicar al cobrar — no el neto crudo
   // (haber − debe), que da $0 en cuanto hay más deuda que crédito.
   saldoAFavorDisponible?: number;
+  // Pestaña inicial leída del `?tab=` por el Server Component: refrescar (F5)
+  // vuelve a la misma vista en vez de saltar a Generales.
+  initialTab?: TabId;
 }) {
-  const [activeTab, setActiveTab] = useState<TabId>('generales');
+  const [activeTab, setActiveTab] = useState<TabId>(initialTab);
+
+  function cambiarTab(id: TabId) {
+    setActiveTab(id);
+    escribirTabEnUrl(id, TAB_POR_DEFECTO);
+  }
   const [modalServicioOpen, setModalServicioOpen] = useState(false);
   // Historial del saldo a favor: se carga al abrirlo (recorre toda la cuenta).
   const [ledgerOpen, setLedgerOpen] = useState(false);
@@ -2327,7 +2338,7 @@ export function SocioDetail({
           {TABS.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
-              onClick={() => setActiveTab(id)}
+              onClick={() => cambiarTab(id)}
               className={`flex shrink-0 items-center gap-2 px-4 pb-3 text-sm font-medium transition ${
                 activeTab === id
                   ? 'border-b-2 border-[#175861] text-[#175861]'
@@ -3078,12 +3089,17 @@ export function SocioDetail({
               {navegantes.map((n) => {
                 const nombreCompleto = [n.nombre, n.apellido].filter(Boolean).join(' ') || '—';
                 const inicial = (n.nombre?.[0] ?? '?').toUpperCase();
+                // Este badge es el ESTADO del acceso, no el permiso de navegar.
+                // Decía "Autorizado a Navegar" para todo acceso vigente, así que
+                // se lo atribuía también a quien el socio NO autorizó a navegar
+                // (y se duplicaba con la pastilla "Navega" en los que sí).
+                // El permiso de navegar lo dice `esNavegante` y nada más.
                 const estadoLabel =
                   n.estado === 'usado'
                     ? 'Ingresó'
                     : n.estado === 'revocado'
                       ? 'Cancelado'
-                      : 'Autorizado a Navegar';
+                      : 'Autorizado';
                 const estadoCls =
                   n.estado === 'usado'
                     ? 'bg-blue-50 text-blue-700'
@@ -3107,8 +3123,8 @@ export function SocioDetail({
                           {nombreCompleto}
                         </p>
                         {n.esNavegante && (
-                          <span className="shrink-0 rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
-                            Navega
+                          <span className="shrink-0 rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium whitespace-nowrap text-blue-700">
+                            Autorizado a navegar
                           </span>
                         )}
                       </div>
@@ -3149,6 +3165,10 @@ export function SocioDetail({
                 const nombreCompleto = [iv.nombre, iv.apellido].filter(Boolean).join(' ') || '—';
                 const inicial = (iv.nombre?.[0] ?? '?').toUpperCase();
                 const tipoLabel = iv.tipo === 'titular' ? 'Invitado' : 'Autorizado';
+                // La autorización caducó: se sigue listando (es historial del
+                // socio) pero se distingue de un pantallazo.
+                const vencido =
+                  iv.validoHasta != null && iv.validoHasta.slice(0, 10) < todayISODate();
                 return (
                   <div
                     key={iv.id}
@@ -3165,15 +3185,26 @@ export function SocioDetail({
                         {nombreCompleto}
                       </p>
                       <div className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-gray-500">
-                        {iv.validoHasta && <span>Válido hasta {fmtDate(iv.validoHasta)}</span>}
+                        {iv.validoHasta && (
+                          <span className={vencido ? 'text-gray-400' : undefined}>
+                            Válido hasta {fmtDate(iv.validoHasta)}
+                          </span>
+                        )}
                         {iv.telefono && <span>Tel. {iv.telefono}</span>}
                         {iv.dni && <span>DNI {iv.dni}</span>}
                       </div>
                       {iv.motivo && <p className="mt-0.5 text-xs text-gray-400">{iv.motivo}</p>}
                     </div>
-                    <span className="inline-block rounded-full bg-teal-50 px-3 py-1 text-xs font-medium text-[#175861]">
-                      {tipoLabel}
-                    </span>
+                    <div className="flex shrink-0 items-center gap-2">
+                      {vencido && (
+                        <span className="inline-block rounded-full bg-gray-100 px-3 py-1 text-xs font-medium whitespace-nowrap text-gray-500">
+                          Vencido
+                        </span>
+                      )}
+                      <span className="inline-block rounded-full bg-teal-50 px-3 py-1 text-xs font-medium whitespace-nowrap text-[#175861]">
+                        {tipoLabel}
+                      </span>
+                    </div>
                   </div>
                 );
               })}

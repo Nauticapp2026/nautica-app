@@ -23,15 +23,24 @@ import {
   servicios as serviciosTable,
   socioServicios,
 } from '@/lib/db/schema';
-import { eq, and, desc, gte, inArray, isNull, asc, lte } from 'drizzle-orm';
+import { eq, and, desc, gte, inArray, isNull, asc, lte, notExists, sql } from 'drizzle-orm';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { addDiasYmd, argYmd } from '@/lib/dates';
 import { calcularCoberturaTargeted } from '@/lib/cobranza-cobertura';
 import { getEstadoFifo } from '@/lib/reconciliar-cuenta';
 import { SocioDetail } from './socio-detail';
+import { SOCIO_TAB_IDS, tabDesdeUrl } from '@/lib/tab-url';
 
-export default async function SocioPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function SocioPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ tab?: string }>;
+}) {
   const { id } = await params;
+  // Pestaña activa desde la URL: refrescar (F5) mantiene la vista.
+  const { tab } = await searchParams;
   const ctx = await getActiveMarina();
   if (!ctx) return null;
 
@@ -211,16 +220,29 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
         createdAt: invitados.createdAt,
       })
       .from(invitados)
-      // Excluir los que son acceso externo (tienen porteria_invitados): esos van
-      // a la solapa "Accesos Externos". Misma regla que el desplegable de la
-      // lista de socios.
-      .leftJoin(porteriaInvitados, eq(porteriaInvitados.invitadoId, invitados.id))
+      // Excluir SOLO los accesos externos (técnicos/proveedores), que tienen su
+      // propia solapa. Antes se excluía a todo invitado con fila en
+      // `porteria_invitados`, pero ese puente también se crea cuando el socio
+      // lo suma a una salida normal — así 73 invitados quedaban invisibles en
+      // el panel (no salían en ninguna de las dos solapas) aunque el socio sí
+      // los veía en su app. Bug reportado 2026-08-17.
       .where(
         and(
           eq(invitados.socioId, id),
           eq(invitados.guarderiaId, gId),
           eq(invitados.estado, 'activo'),
-          isNull(porteriaInvitados.id),
+          notExists(
+            db
+              .select({ x: sql`1` })
+              .from(porteriaInvitados)
+              .innerJoin(porteria, eq(porteria.id, porteriaInvitados.porteriaId))
+              .where(
+                and(
+                  eq(porteriaInvitados.invitadoId, invitados.id),
+                  eq(porteria.tipo, 'acceso_externo'),
+                ),
+              ),
+          ),
         ),
       )
       .orderBy(desc(invitados.createdAt)),
@@ -588,6 +610,7 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
 
   return (
     <SocioDetail
+      initialTab={tabDesdeUrl(tab, SOCIO_TAB_IDS, 'generales')}
       saldoAFavorDisponible={saldoAFavorDisponible}
       paywayPublicKey={guarderiaRow[0]?.paywayPublicKey ?? null}
       internosHabilitados={(guarderiaRow[0]?.mediosCobroInternos ?? []).length > 0}

@@ -4,10 +4,17 @@ import { requireSuperAdmin } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { comunicaciones, guarderias, profiles, publicaciones } from '@/lib/db/schema';
 import { ModeracionClient, type ComunicacionClub, type PublicacionClub } from './moderacion-client';
+import { MODERACION_TAB_IDS, tabDesdeUrl } from '@/lib/tab-url';
 
 export const dynamic = 'force-dynamic';
 
-export default async function SuperAdminModeracionPage() {
+export default async function SuperAdminModeracionPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>;
+}) {
+  // Pestaña activa desde la URL: refrescar (F5) mantiene la vista.
+  const { tab } = await searchParams;
   await requireSuperAdmin();
 
   const [comunicacionesRows, publicacionesRows] = await Promise.all([
@@ -99,7 +106,11 @@ export default async function SuperAdminModeracionPage() {
           las normas.
         </p>
       </div>
-      <ModeracionClient comunicaciones={comData} publicaciones={pubData} />
+      <ModeracionClient
+        initialTab={tabDesdeUrl(tab, MODERACION_TAB_IDS, 'comunicaciones')}
+        comunicaciones={comData}
+        publicaciones={pubData}
+      />
     </div>
   );
 }

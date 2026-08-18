@@ -45,6 +45,7 @@ import { formatArgentinaDate } from '@/lib/dates';
 import { EmptyState } from '@/components/shared/empty-state';
 import { Pagination } from '@/components/shared/pagination';
 import { TablaScrollX } from '@/components/shared/tabla-scroll-x';
+import { escribirTabEnUrl, type VentasTab } from '@/lib/tab-url';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -3778,6 +3779,7 @@ export function VentasClient({
   guarderiaCondicionIva,
   centrosEmisores,
   internosHabilitados,
+  initialTab = 'afip',
 }: {
   facturas: Factura[];
   socios: Socio[];
@@ -3790,8 +3792,15 @@ export function VentasClient({
   // false = el club no habilitó medios de cobro para comprobantes internos
   // (Mi Perfil → Configuración de cobranzas): se apaga la emisión de internos.
   internosHabilitados: boolean;
+  // Pestaña inicial desde el ?tab= (refrescar mantiene la vista).
+  initialTab?: VentasTab;
 }) {
-  const [activeTab, setActiveTab] = useState<'afip' | 'recibos'>('afip');
+  const [activeTab, setActiveTab] = useState<VentasTab>(initialTab);
+
+  function cambiarTab(t: VentasTab) {
+    setActiveTab(t);
+    escribirTabEnUrl(t, 'afip');
+  }
   const [search, setSearch] = useState('');
   const [filterEstado, setFilterEstado] = useState('');
   const [filterTipo, setFilterTipo] = useState('');
@@ -4205,7 +4214,7 @@ export function VentasClient({
       {/* Tabs */}
       <div className="flex gap-1 border-b border-gray-200">
         <button
-          onClick={() => setActiveTab('afip')}
+          onClick={() => cambiarTab('afip')}
           className={`px-4 py-2.5 text-sm font-semibold transition ${
             activeTab === 'afip'
               ? 'border-b-2 border-[#175861] text-[#175861]'
@@ -4218,7 +4227,7 @@ export function VentasClient({
           </span>
         </button>
         <button
-          onClick={() => setActiveTab('recibos')}
+          onClick={() => cambiarTab('recibos')}
           className={`px-4 py-2.5 text-sm font-semibold transition ${
             activeTab === 'recibos'
               ? 'border-b-2 border-[#175861] text-[#175861]'

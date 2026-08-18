@@ -261,12 +261,13 @@ Cada comprobante ocupa **una sola fila**: si una factura o un comprobante intern
 
 Historial de accesos externos registrados por el socio. Muestra todas las personas que ingresaron al club bajo la autorización del socio como acceso externo.
 
-Cada registro muestra el nombre de la persona, el período autorizado (desde / hasta) y un badge de estado:
+Cada registro muestra el nombre de la persona, el período autorizado (desde / hasta) y un badge con el **estado del acceso**:
 
-- **Autorizado a Navegar** — el acceso está activo.
+- **Autorizado** — el acceso está vigente, la persona todavía no ingresó.
 - **Ingresó** — la persona ya registró entrada en portería.
 - **Cancelado** — el acceso fue revocado desde la app.
-- **Navega** — la persona está autorizada a navegar con la embarcación del socio.
+
+Aparte del estado, junto al nombre aparece la pastilla **Autorizado a navegar** **solo** en las personas a las que el socio les dio permiso para navegar con su embarcación. Si no la tiene, es un acceso al club nada más.
 
 #### Pestaña Invitados
 

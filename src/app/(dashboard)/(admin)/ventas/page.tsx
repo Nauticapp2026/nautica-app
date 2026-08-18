@@ -20,6 +20,7 @@ import { claveItem, listarPendientesFacturar } from '@/lib/pendientes-facturar';
 import { getCargosSaldadosFifo } from '@/lib/reconciliar-cuenta';
 
 import { VentasClient } from './ventas-client';
+import { VENTAS_TAB_IDS, tabDesdeUrl } from '@/lib/tab-url';
 
 // "factura_a" → "A", "nota_credito_b" → "B", "recibo" → "—".
 function letraDeComprobante(tipoFactura: string | null): string {
@@ -148,7 +149,13 @@ async function resolverNumeroOperacionPorFactura(
   return resultado;
 }
 
-export default async function VentasPage() {
+export default async function VentasPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>;
+}) {
+  // Pestaña activa desde la URL: refrescar (F5) mantiene la vista.
+  const { tab } = await searchParams;
   const ctx = await getActiveMarina();
   if (!ctx) return null;
 
@@ -592,6 +599,7 @@ export default async function VentasPage() {
 
   return (
     <VentasClient
+      initialTab={tabDesdeUrl(tab, VENTAS_TAB_IDS, 'afip')}
       facturas={facturas}
       socios={socios}
       sociosInterno={sociosInterno}

@@ -16,8 +16,15 @@ import { identidadFacturacion } from '@/lib/facturacion/identidad';
 import { CobranzaClient, type SocioOption } from './cobranza-client';
 import { CobranzasTabsClient } from './cobranzas-tabs-client';
 import { type CobranzaRow } from './cobranza-tabla';
+import { COBRANZAS_TAB_IDS, tabDesdeUrl } from '@/lib/tab-url';
 
-export default async function CobranzasPage() {
+export default async function CobranzasPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>;
+}) {
+  // Pestaña activa desde la URL: refrescar (F5) mantiene la vista.
+  const { tab } = await searchParams;
   const ctx = await getActiveMarina();
   if (!ctx) return null;
 
@@ -212,7 +219,11 @@ export default async function CobranzasPage() {
           mediosInternos={guarderiaInfo?.mediosCobroInternos ?? []}
         />
       </div>
-      <CobranzasTabsClient cobranzas={cobranzas} cobrosPayway={cobrosPayway} />
+      <CobranzasTabsClient
+        initialTab={tabDesdeUrl(tab, COBRANZAS_TAB_IDS, 'todas')}
+        cobranzas={cobranzas}
+        cobrosPayway={cobrosPayway}
+      />
     </div>
   );
 }

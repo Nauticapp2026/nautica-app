@@ -9,6 +9,7 @@ import {
   rechazarSolicitudAction,
 } from '@/app/actions/solicitudes-membership';
 import { EmptyState } from '@/components/shared/empty-state';
+import { escribirTabEnUrl, type SolicitudesTab } from '@/lib/tab-url';
 
 type EstadoSolicitud = 'pendiente' | 'aprobada' | 'rechazada';
 
@@ -27,11 +28,23 @@ type Solicitud = {
   embarcacion: { modelo: string | null; esloraM: string | null } | null;
 };
 
-type Tab = 'pendientes' | 'resueltas';
+type Tab = SolicitudesTab;
 
-export function SolicitudesSocioClient({ solicitudes }: { solicitudes: Solicitud[] }) {
+export function SolicitudesSocioClient({
+  solicitudes,
+  initialTab = 'pendientes',
+}: {
+  solicitudes: Solicitud[];
+  // Pestaña inicial desde el ?tab= (refrescar mantiene la vista).
+  initialTab?: Tab;
+}) {
   const router = useRouter();
-  const [tab, setTab] = useState<Tab>('pendientes');
+  const [tab, setTab] = useState<Tab>(initialTab);
+
+  function cambiarTab(t: Tab) {
+    setTab(t);
+    escribirTabEnUrl(t, 'pendientes');
+  }
   const [rechazando, setRechazando] = useState<Solicitud | null>(null);
   const [errorBanner, setErrorBanner] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -101,12 +114,12 @@ export function SolicitudesSocioClient({ solicitudes }: { solicitudes: Solicitud
         <TabButton
           label={`Pendientes${pendientes.length > 0 ? ` · ${pendientes.length}` : ''}`}
           active={tab === 'pendientes'}
-          onClick={() => setTab('pendientes')}
+          onClick={() => cambiarTab('pendientes')}
         />
         <TabButton
           label={`Resueltas${resueltas.length > 0 ? ` · ${resueltas.length}` : ''}`}
           active={tab === 'resueltas'}
-          onClick={() => setTab('resueltas')}
+          onClick={() => cambiarTab('resueltas')}
         />
       </div>
 

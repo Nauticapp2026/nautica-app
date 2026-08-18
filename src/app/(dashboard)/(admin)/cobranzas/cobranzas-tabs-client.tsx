@@ -7,8 +7,9 @@ import { formatArgentinaDate } from '@/lib/dates';
 import { EmptyState } from '@/components/shared/empty-state';
 import { CobranzaTabla, type CobranzaRow } from './cobranza-tabla';
 import { PaywayCobrosList, type CobroPayway } from './payway-cobros-list';
+import { escribirTabEnUrl, type CobranzasTab } from '@/lib/tab-url';
 
-type TabKey = 'todas' | 'cobranzas' | 'payway';
+type TabKey = CobranzasTab;
 
 // Fila de la vista unificada "Todas": recibos manuales (RC-) y cobros por
 // débito automático juntos, ordenados por fecha. Para el detalle completo de
@@ -38,11 +39,19 @@ const PAYWAY_ESTADO: Record<string, { label: string; cls: string }> = {
 export function CobranzasTabsClient({
   cobranzas,
   cobrosPayway,
+  initialTab = 'todas',
 }: {
   cobranzas: CobranzaRow[];
   cobrosPayway: CobroPayway[];
+  // Pestaña inicial desde el ?tab= (refrescar mantiene la vista).
+  initialTab?: TabKey;
 }) {
-  const [activeTab, setActiveTab] = useState<TabKey>('todas');
+  const [activeTab, setActiveTab] = useState<TabKey>(initialTab);
+
+  function cambiarTab(t: TabKey) {
+    setActiveTab(t);
+    escribirTabEnUrl(t, 'todas');
+  }
 
   const filasTodas = useMemo<FilaTodas[]>(() => {
     const deRecibos = cobranzas.map<FilaTodas>((c) => ({
@@ -82,7 +91,7 @@ export function CobranzasTabsClient({
         {tabs.map((t) => (
           <button
             key={t.key}
-            onClick={() => setActiveTab(t.key)}
+            onClick={() => cambiarTab(t.key)}
             className={`px-4 py-2.5 text-sm font-semibold transition ${
               activeTab === t.key
                 ? 'border-b-2 border-[#175861] text-[#175861]'

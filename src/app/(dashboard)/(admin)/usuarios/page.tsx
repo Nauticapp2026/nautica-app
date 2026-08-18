@@ -13,7 +13,7 @@ import {
   porteriaInvitados,
   profiles,
 } from '@/lib/db/schema';
-import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, notExists, sql } from 'drizzle-orm';
 import { getPoolRestanteBatch } from '@/lib/reconciliar-cuenta';
 import { UsuariosClient, type FiltroSocios } from './usuarios-client';
 
@@ -144,15 +144,27 @@ export default async function UsuariosPage({
               validoHasta: invitados.validoHasta,
             })
             .from(invitados)
-            // Excluir personas que son acceso externo: si tienen registro en
-            // porteria_invitados van a la sección "Accesos externos", no a "Invitados".
-            .leftJoin(porteriaInvitados, eq(porteriaInvitados.invitadoId, invitados.id))
+            // Excluir SOLO los accesos externos (van a su propia sección). El
+            // puente `porteria_invitados` también existe cuando el invitado se
+            // sumó a una salida normal, así que filtrar por su mera existencia
+            // escondía invitados válidos. Mismo criterio que la ficha del socio.
             .where(
               and(
                 inArray(invitados.socioId, profileIds as string[]),
                 eq(invitados.guarderiaId, gId),
                 eq(invitados.estado, 'activo'),
-                isNull(porteriaInvitados.id),
+                notExists(
+                  db
+                    .select({ x: sql`1` })
+                    .from(porteriaInvitados)
+                    .innerJoin(porteria, eq(porteria.id, porteriaInvitados.porteriaId))
+                    .where(
+                      and(
+                        eq(porteriaInvitados.invitadoId, invitados.id),
+                        eq(porteria.tipo, 'acceso_externo'),
+                      ),
+                    ),
+                ),
               ),
             )
         : Promise.resolve(
