@@ -30,6 +30,7 @@ import {
   savePuntoVentaAction,
   savePaywayCredsAction,
   solicitarCertificadoAfipAction,
+  toggleBajaCentroEmisorAction,
   updateGuarderiaFeaturesAction,
   updateGuarderiaGeneralAction,
   cancelPendingPlanAction,
@@ -95,6 +96,9 @@ export type CentroEmisor = {
   nombre: string;
   puntoDeVenta: number;
   esPrincipal: boolean;
+  // false = dado de baja: no se ofrece al emitir, pero sus comprobantes
+  // emitidos siguen intactos (trazabilidad ARCA).
+  activo: boolean;
 };
 
 export type PuntoVentaData = {
@@ -1877,6 +1881,18 @@ function CentrosEmisoresSection({ centros }: { centros: CentroEmisor[] }) {
     });
   }
 
+  function handleBaja(id: string, darDeBaja: boolean) {
+    startTransition(async () => {
+      const res = await toggleBajaCentroEmisorAction(id, darDeBaja);
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+      toast.success(darDeBaja ? 'Centro emisor dado de baja.' : 'Centro emisor reactivado.');
+      router.refresh();
+    });
+  }
+
   return (
     <div className="mt-2 border-t border-gray-200 pt-6">
       <div className="mb-3 flex items-center justify-between">
@@ -1925,20 +1941,28 @@ function CentrosEmisoresSection({ centros }: { centros: CentroEmisor[] }) {
               </p>
             )}
             <span className="text-xs text-gray-500">N.º {c.puntoDeVenta}</span>
+            {!c.activo && (
+              <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold whitespace-nowrap text-gray-500">
+                De baja
+              </span>
+            )}
             {c.esPrincipal ? (
               <span className="rounded-full bg-[#ECFDF3] px-2 py-0.5 text-xs font-semibold text-[#175861]">
                 Principal
               </span>
             ) : (
-              <button
-                type="button"
-                disabled={pending}
-                onClick={() => handlePrincipal(c.id)}
-                className="text-xs font-medium underline underline-offset-2 disabled:opacity-50"
-                style={{ color: '#175861' }}
-              >
-                Hacer principal
-              </button>
+              // Un centro de baja no puede pasar a principal: primero se reactiva.
+              c.activo && (
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={() => handlePrincipal(c.id)}
+                  className="text-xs font-medium underline underline-offset-2 disabled:opacity-50"
+                  style={{ color: '#175861' }}
+                >
+                  Hacer principal
+                </button>
+              )
             )}
             {editandoId === c.id ? (
               <button
@@ -1963,6 +1987,25 @@ function CentrosEmisoresSection({ centros }: { centros: CentroEmisor[] }) {
                 <Edit3 className="h-4 w-4" />
               </button>
             )}
+            {/* El principal no se da de baja: lo usa la facturación automática.
+                Se avisa con el título en vez de esconder el botón, para que se
+                entienda por qué no está disponible. */}
+            <button
+              type="button"
+              disabled={pending || (c.activo && c.esPrincipal)}
+              onClick={() => handleBaja(c.id, c.activo)}
+              title={
+                c.activo && c.esPrincipal
+                  ? 'El centro emisor principal no se puede dar de baja. Designá otro como principal primero.'
+                  : c.activo
+                    ? 'Dar de baja'
+                    : 'Reactivar'
+              }
+              className="text-xs font-medium underline underline-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
+              style={{ color: c.activo ? '#B42318' : '#175861' }}
+            >
+              {c.activo ? 'Dar de baja' : 'Reactivar'}
+            </button>
           </div>
         ))}
       </div>

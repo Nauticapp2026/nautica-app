@@ -1149,6 +1149,10 @@ export const guarderiaCentrosEmisores = pgTable(
     // El principal es el que usan el cron de auto-emisión y todo flujo que
     // no elige centro emisor a mano. Único por guardería (índice parcial).
     esPrincipal: boolean('es_principal').notNull().default(false),
+    // Baja lógica (mig 0144): un centro dado de baja no se ofrece al emitir,
+    // pero los comprobantes ya emitidos siguen apuntando a él (trazabilidad
+    // ARCA). El principal nunca se da de baja: hay que designar otro antes.
+    activo: boolean('activo').notNull().default(true),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },

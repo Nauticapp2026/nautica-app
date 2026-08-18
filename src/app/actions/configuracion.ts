@@ -471,7 +471,7 @@ export async function agregarCentroEmisorAction(
   }
 
   const [duplicado] = await db
-    .select({ id: guarderiaCentrosEmisores.id })
+    .select({ id: guarderiaCentrosEmisores.id, activo: guarderiaCentrosEmisores.activo })
     .from(guarderiaCentrosEmisores)
     .where(
       and(
@@ -480,7 +480,15 @@ export async function agregarCentroEmisorAction(
       ),
     )
     .limit(1);
-  if (duplicado) return { error: 'Ya existe un centro emisor con ese número.' };
+  if (duplicado) {
+    // Si el que choca está dado de baja, el alta sería un callejón sin salida
+    // ("ya existe" pero no se ve en el selector): se indica reactivarlo.
+    return {
+      error: duplicado.activo
+        ? 'Ya existe un centro emisor con ese número.'
+        : 'Ya existe un centro emisor con ese número, dado de baja. Reactivalo desde la lista en vez de crearlo de nuevo.',
+    };
+  }
 
   const ivaCode = CONDICION_IVA_API[guarderia.condicionIva];
   if (!ivaCode) return { error: 'No se pudo mapear la condición IVA de la guardería.' };
@@ -614,6 +622,81 @@ export async function renombrarCentroEmisorAction(
   if (result.length === 0) return { error: 'Centro emisor no encontrado.' };
 
   revalidatePath('/configuracion');
+  return {};
+}
+
+/**
+ * Da de baja (o reactiva) un centro emisor.
+ *
+ * Es baja LÓGICA a propósito: los comprobantes ya emitidos tienen que seguir
+ * apuntando a su punto de venta para la trazabilidad ante ARCA, así que nunca
+ * se borra la fila. Un centro de baja deja de ofrecerse al emitir; reimprimir
+ * o reenviar un comprobante viejo sigue funcionando por su POS original.
+ *
+ * Dos guardas:
+ *  - El PRINCIPAL no se da de baja: lo usa la facturación automática mensual.
+ *    Primero hay que designar otro principal.
+ *  - No se puede quedar sin ningún centro activo (dejaría al club sin poder
+ *    facturar). Redundante con la guarda del principal, pero explícita.
+ */
+export async function toggleBajaCentroEmisorAction(
+  centroEmisorId: string,
+  darDeBaja: boolean,
+): Promise<{ error?: string }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+  if (!isAdmin(ctx)) return { error: 'Solo administradores pueden editar la configuración.' };
+
+  const guarderiaId = ctx.activeMembership.guarderiaId;
+
+  const [centro] = await db
+    .select({
+      id: guarderiaCentrosEmisores.id,
+      nombre: guarderiaCentrosEmisores.nombre,
+      esPrincipal: guarderiaCentrosEmisores.esPrincipal,
+      activo: guarderiaCentrosEmisores.activo,
+    })
+    .from(guarderiaCentrosEmisores)
+    .where(
+      and(
+        eq(guarderiaCentrosEmisores.id, centroEmisorId),
+        eq(guarderiaCentrosEmisores.guarderiaId, guarderiaId),
+      ),
+    )
+    .limit(1);
+  if (!centro) return { error: 'Centro emisor no encontrado.' };
+  if (centro.activo !== darDeBaja) return {}; // ya está como se pide
+
+  if (darDeBaja) {
+    if (centro.esPrincipal) {
+      return {
+        error:
+          'No se puede dar de baja el centro emisor principal, porque es el que usa la facturación automática. Designá otro como principal y volvé a intentar.',
+      };
+    }
+    const activos = await db
+      .select({ id: guarderiaCentrosEmisores.id })
+      .from(guarderiaCentrosEmisores)
+      .where(
+        and(
+          eq(guarderiaCentrosEmisores.guarderiaId, guarderiaId),
+          eq(guarderiaCentrosEmisores.activo, true),
+        ),
+      );
+    if (activos.length <= 1) {
+      return {
+        error: 'Es el único centro emisor activo. Sin centros activos el club no podría facturar.',
+      };
+    }
+  }
+
+  await db
+    .update(guarderiaCentrosEmisores)
+    .set({ activo: !darDeBaja, updatedAt: new Date() })
+    .where(eq(guarderiaCentrosEmisores.id, centro.id));
+
+  revalidatePath('/configuracion');
+  revalidatePath('/ventas');
   return {};
 }
 

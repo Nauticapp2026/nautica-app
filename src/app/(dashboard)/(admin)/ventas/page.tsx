@@ -376,7 +376,15 @@ export default async function VentasPage({
         esPrincipal: guarderiaCentrosEmisores.esPrincipal,
       })
       .from(guarderiaCentrosEmisores)
-      .where(eq(guarderiaCentrosEmisores.guarderiaId, gId))
+      // Solo los activos: un centro dado de baja no se ofrece para emitir
+      // (los comprobantes que ya emitió siguen resolviendo por su POS, ver
+      // cargarCredsGuarderia).
+      .where(
+        and(
+          eq(guarderiaCentrosEmisores.guarderiaId, gId),
+          eq(guarderiaCentrosEmisores.activo, true),
+        ),
+      )
       .orderBy(desc(guarderiaCentrosEmisores.esPrincipal), guarderiaCentrosEmisores.puntoDeVenta),
   ]);
 

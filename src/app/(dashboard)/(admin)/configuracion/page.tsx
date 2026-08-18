@@ -201,6 +201,7 @@ export default async function ConfiguracionPage({ searchParams }: Props) {
       nombre: guarderiaCentrosEmisores.nombre,
       puntoDeVenta: guarderiaCentrosEmisores.puntoDeVenta,
       esPrincipal: guarderiaCentrosEmisores.esPrincipal,
+      activo: guarderiaCentrosEmisores.activo,
     })
     .from(guarderiaCentrosEmisores)
     .where(eq(guarderiaCentrosEmisores.guarderiaId, guarderiaId))
