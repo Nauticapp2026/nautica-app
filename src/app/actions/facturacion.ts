@@ -932,8 +932,9 @@ export async function crearFacturaCore(
 
 export type ReenviarFacturaData = {
   tipoFactura: TipoFactura;
-  condicionVenta: CondicionVenta;
-  medioPago: MedioPago;
+  // Sin condicionVenta ni medioPago a propósito: reenviar reintenta EL MISMO
+  // comprobante, así que se reusan los del intento original (pedido cliente
+  // 2026-08-19 — no tenían sentido como campos editables en esa instancia).
   descripcion?: string;
   fecha: string;
   vencimiento: string;
@@ -964,6 +965,9 @@ export async function reenviarFacturaRechazadaAction(
       desde: facturacion.desde,
       hasta: facturacion.hasta,
       centroEmisorId: facturacion.centroEmisorId,
+      // Se reusan del intento original: el modal ya no los pide.
+      condicionVenta: facturacion.condicionVenta,
+      medioPago: facturacion.medioPago,
     })
     .from(facturacion)
     .where(and(eq(facturacion.id, facturaId), eq(facturacion.guarderiaId, gId)))
@@ -972,6 +976,11 @@ export async function reenviarFacturaRechazadaAction(
   if (!rechazada) return { error: 'Factura no encontrada.' };
   if (!rechazada.rechazada) return { error: 'Esta factura no está rechazada.' };
   if (!rechazada.socioId) return { error: 'La factura no tiene socio asociado.' };
+
+  // Condición de venta y medio de pago del intento original. El fallback cubre
+  // comprobantes viejos que quedaron sin el dato (las columnas son nullable).
+  const condicionVentaOriginal: CondicionVenta = rechazada.condicionVenta ?? 'contado';
+  const medioPagoOriginal: MedioPago = rechazada.medioPago ?? 'efectivo';
 
   // Cargos ya linkeados al intento original — no se vuelven a elegir.
   const items = await db
@@ -1083,7 +1092,7 @@ export async function reenviarFacturaRechazadaAction(
     }
   }
 
-  const cliente = buildCliente({ ...socio, condicionVenta: data.condicionVenta });
+  const cliente = buildCliente({ ...socio, condicionVenta: condicionVentaOriginal });
   const comprobante: TusFacturasComprobante = {
     fecha: toTusFecha(data.fecha),
     vencimiento: toTusFecha(data.vencimiento),
@@ -1101,7 +1110,7 @@ export async function reenviarFacturaRechazadaAction(
     detalle: buildDetalle(detalleItems, data.tipoFactura),
     total: total.toFixed(2),
     pagos: {
-      formas_pago: buildPagos(total, data.medioPago),
+      formas_pago: buildPagos(total, medioPagoOriginal),
       total,
     },
   };
@@ -1143,8 +1152,8 @@ export async function reenviarFacturaRechazadaAction(
       caeVencimiento: parseTusFecha(apiResponse.vencimiento_cae),
       descripcion: descripcionFactura,
       tipoFactura: data.tipoFactura,
-      condicionVenta: data.condicionVenta,
-      medioPago: data.medioPago,
+      condicionVenta: condicionVentaOriginal,
+      medioPago: medioPagoOriginal,
       importe: total.toFixed(2),
       montoNeto: montos.montoNeto.toFixed(2),
       montoExento: montos.montoExento.toFixed(2),

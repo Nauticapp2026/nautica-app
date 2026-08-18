@@ -3339,8 +3339,6 @@ function ReenviarFacturaModal({
       ? (factura.tipoFactura ?? opcionesTipo[0].value)
       : opcionesTipo[0].value,
   );
-  const [condicionVenta, setCondicionVenta] = useState(factura.condicionVenta ?? 'contado');
-  const [medioPago, setMedioPago] = useState(factura.medioPago ?? 'efectivo');
   const [descripcion, setDescripcion] = useState(factura.descripcion ?? '');
   const [fecha, setFecha] = useState(hoy);
   const [vencimiento, setVencimiento] = useState(hoy);
@@ -3357,8 +3355,6 @@ function ReenviarFacturaModal({
     startTransition(async () => {
       const res = await reenviarFacturaRechazadaAction(factura.id, {
         tipoFactura: tipoFactura as never,
-        condicionVenta: condicionVenta as never,
-        medioPago: medioPago as never,
         descripcion: descripcion || undefined,
         fecha,
         vencimiento,
@@ -3388,7 +3384,7 @@ function ReenviarFacturaModal({
         <div className="flex items-start justify-between p-6 pb-4">
           <div>
             <h2 className="text-[18px] font-bold" style={{ color: '#101828' }}>
-              Reenviar factura rechazada
+              Reenviar comprobante legal rechazado
             </h2>
             <p className="mt-0.5 text-sm" style={{ color: '#669E9D' }}>
               {fmtMoney(factura.importe)}
@@ -3463,46 +3459,10 @@ function ReenviarFacturaModal({
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label
-                    className="mb-1.5 block text-xs font-semibold"
-                    style={{ color: '#101828' }}
-                  >
-                    Condición de venta
-                  </label>
-                  <select
-                    className={inputCls}
-                    value={condicionVenta}
-                    onChange={(e) => setCondicionVenta(e.target.value)}
-                  >
-                    {CONDICION_VENTA_OPTS.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label
-                    className="mb-1.5 block text-xs font-semibold"
-                    style={{ color: '#101828' }}
-                  >
-                    Medio de pago
-                  </label>
-                  <select
-                    className={inputCls}
-                    value={medioPago}
-                    onChange={(e) => setMedioPago(e.target.value)}
-                  >
-                    {MEDIO_PAGO_OPTS.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
+              {/* Sin Condición de venta ni Medio de pago: reenviar es reintentar
+                  EL MISMO comprobante, así que esos datos se toman del intento
+                  original en el server y no se eligen de nuevo (pedido cliente
+                  2026-08-19). */}
 
               <div>
                 <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
@@ -4536,7 +4496,7 @@ export function VentasClient({
                                   f.tipoFactura === 'factura_c') ? (
                                   <button
                                     onClick={() => setReenviarFactura(f)}
-                                    title="Reenviar factura rechazada"
+                                    title="Reenviar comprobante legal rechazado"
                                     className="rounded-[6px] p-1.5 text-gray-400 transition hover:bg-red-50 hover:text-red-600"
                                   >
                                     <RefreshCw className="h-4 w-4" />

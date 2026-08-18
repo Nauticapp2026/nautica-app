@@ -253,7 +253,7 @@ Al aplicar **cualquier filtro**, la tercera tarjeta (Saldo cliente / Saldo a fav
 Cada comprobante ocupa **una sola fila**: si una factura o un comprobante interno se emitió por varios Servicios Contratados a la vez, sus cargos se muestran consolidados en una línea, con el importe total y el detalle indicando el primer servicio y cuántos más incluye (ej. "Guarda mensual (+2)").
 
 - **Vencimiento** — fecha límite de pago del cargo. En las **facturas fiscales** es el vencimiento que se eligió al emitirlas. En los **comprobantes internos** se calcula como la **fecha de emisión más el Plazo de cobro** definido en la tarifa del Tarifario (Contado, 5, 10, 15, 20 o 30 días); si la fila consolida varios servicios con plazos distintos, rige el que vence primero. Ejemplo: un comprobante del 26/06 con plazo de 30 días vence el 26/07. En cargos sin comprobante y en cobranzas muestra "—".
-- **Situación** — estado según esa fecha: **En término** (verde) o **Vencida** (rojo). Una fila pasa a **Vencida** el día siguiente al vencimiento (siguiendo el ejemplo, el 27/07). Es **puramente por fecha**: un cargo pagado tarde también puede figurar Vencida. Es independiente de la columna **Estado**, que refleja el estado de pago: **Cobrado** (cubierto por cobranzas), **Parcial** (cobrado en parte), **Pendiente** (sin cobrar), **Vencido** o **Anulado (NC)** (anulado por una nota de crédito).
+- **Situación** — estado según esa fecha: **En término** (verde) o **Vencida** (rojo). Una fila pasa a **Vencida** el día siguiente al vencimiento (siguiendo el ejemplo, el 27/07). Es **puramente por fecha**: un cargo pagado tarde también puede figurar Vencida. Es independiente de la columna **Estado**, que refleja el estado de pago: **Cobrado** (cubierto por cobranzas), **Parcial** (cobrado en parte), **Pendiente** (sin cobrar), **Vencido** o **Anulado (NC)** (anulado por una nota de crédito). El Estado aplica solo a los **cargos**: en las filas de **recibo** muestra "—", porque un recibo _es_ el cobro (el estado de lo cobrado se ve en la factura que ese recibo pagó).
 - **Saldo** — saldo acumulado de la cuenta hasta ese movimiento (en verde cuando es a favor del socio).
 - **Importe pendiente** — cuánto falta cobrar de **ese comprobante puntual**, descontando notas de crédito y pagos parciales ya aplicados. En rojo si falta cobrar algo, en verde si ese comprobante ya está cancelado al 100%. En pagos y anulaciones muestra "—" (no son cargos, no deben nada).
 
@@ -774,7 +774,9 @@ Para exportar los comprobantes actualmente visibles (respetando los filtros acti
 
 **Columnas de la tabla Comprobantes internos.** En orden: Ente emisor, CUIT emisor, Número, Tipo, Nº Op. SC, Nº Socio, Razón social, CUIT/CUIL, Fecha, Neto, Exento, IVA, Total y Acciones.
 
-**Acciones por fila (Comprobantes ARCA).** El **lápiz (✏️)** marca la factura como cobrada, el **avión de papel (➤)** envía el comprobante por email al socio con el PDF de ARCA adjunto, y la **flecha de descarga (⬇)** abre el PDF para verlo o descargarlo.
+**Acciones por fila (Comprobantes ARCA).** El **lápiz (✏️)** marca la factura como cobrada, el **avión de papel (➤)** envía el comprobante por email al socio con el PDF de ARCA adjunto, y la **flecha de descarga (⬇)** abre el PDF para verlo o descargarlo. En las filas con **Estado envío ARCA = Rechazado** aparece además la **flecha circular (↻)**, que abre **Reenviar comprobante legal rechazado**.
+
+**Reenviar un comprobante rechazado por ARCA.** El modal muestra el **motivo del rechazo** que devolvió ARCA. Corregí lo que haga falta (normalmente un dato del socio: CUIT, condición frente al IVA, domicilio) y reintentá; el sistema toma los datos del socio frescos, así que la corrección se aplica sola. Podés ajustar la **fecha** y el **vencimiento**. La **condición de venta**, el **medio de pago** y los **cargos incluidos** no se piden de nuevo: se reintenta el mismo comprobante con los datos del intento original, por su mismo punto de venta. La **letra** tampoco se elige: es la que corresponde según las condiciones frente al IVA del club y del socio (si ARCA rechazó la letra, corregí la condición IVA del socio en su ficha).
 
 ### Marcar una factura como pagada
 
@@ -993,7 +995,14 @@ Cómo se comporta la emisión con varios centros:
 - Las **NC/ND sobre un comprobante emitido**, el **Reenviar** de rechazadas y la descarga de **PDF** usan siempre el punto de venta del comprobante original.
 - En la tabla de Ventas, el punto de venta de cada comprobante se ve en el prefijo del **Número de comprobante legal** (formato PPPPP-NNNNNNNN).
 
-> Los centros emisores no se pueden eliminar desde el panel (solo renombrar y cambiar el principal): borrar un punto de venta con comprobantes emitidos afectaría la trazabilidad fiscal. Si necesitás dar de baja uno, contactá a soporte.
+**Dar de baja un centro emisor.** Si dejás de usar un punto de venta, tocá **Dar de baja** en su fila. Deja de aparecer al emitir, pero **los comprobantes que ya emitió quedan intactos** y se pueden seguir consultando, reimprimiendo y reenviando por ese mismo punto de venta — por eso el centro nunca se borra del todo (la trazabilidad ante ARCA lo exige). Queda marcado como **De baja** y podés **Reactivarlo** cuando quieras.
+
+Dos casos en los que el sistema no te va a dejar darlo de baja:
+
+- **Es el principal** — es el que usa la facturación mensual automática. Designá otro como principal y recién entonces dalo de baja.
+- **Es el único activo** — el club quedaría sin poder facturar.
+
+> Si intentás agregar un centro emisor con un número que ya usaste y diste de baja, el sistema te avisa para que lo **reactives** en vez de crearlo de nuevo.
 
 _Gestión de cobranza (comprobantes internos):_
 

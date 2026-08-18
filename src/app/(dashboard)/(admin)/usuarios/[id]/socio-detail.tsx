@@ -597,6 +597,18 @@ function tipoComprobanteLabel(m: {
   return TIPO_COMPROBANTE_LABEL[m.facturaTipo ?? ''] ?? m.facturaTipo ?? '—';
 }
 
+/**
+ * ¿La fila es un recibo de cobranza (RC-/CI-)? Mismo criterio que
+ * `tipoComprobanteLabel`: un `facturaTipo='recibo'` con otro código es en
+ * realidad un comprobante interno (CM-/CL-/CA-), o sea un cargo.
+ */
+function esRecibo(m: { facturaTipo: string | null; facturaCodigo: string | null }): boolean {
+  return (
+    m.facturaTipo === 'recibo' &&
+    (m.facturaCodigo?.startsWith('RC-') === true || m.facturaCodigo?.startsWith('CI-') === true)
+  );
+}
+
 // El link de PDF que TusFacturas devuelve al emitir es temporal y vence (su
 // página muestra "no se ha encontrado información…"). Igual que en Ventas
 // (abrirPdfFactura), pedimos uno fresco en cada click. La pestaña se abre
@@ -3037,6 +3049,16 @@ export function SocioDetail({
                                   <span className="inline-block rounded-full bg-gray-100 px-3 py-1 text-xs font-medium whitespace-nowrap text-gray-500">
                                     Anulación
                                   </span>
+                                ) : esRecibo(m) ? (
+                                  // Un recibo ES el cobro: la pastilla "Cobrado"
+                                  // no aportaba nada y se duplicaba con la de la
+                                  // factura que ese recibo pagó (pedido cliente
+                                  // 2026-08-19). Se detecta por el tipo de
+                                  // comprobante y no por el importe cobrado: una
+                                  // cobranza cubierta 100% con saldo a favor no
+                                  // mueve plata nueva (haber = 0) y seguía
+                                  // mostrando "Cobrado".
+                                  <span className="text-gray-400">—</span>
                                 ) : (
                                   <span
                                     className={`inline-block rounded-full px-3 py-1 text-xs font-medium whitespace-nowrap ${
