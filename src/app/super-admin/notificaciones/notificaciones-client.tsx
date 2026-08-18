@@ -6,6 +6,7 @@ import {
   AlertTriangle,
   Bell,
   Calendar,
+  CalendarClock,
   CheckCircle2,
   Clock,
   Eye,
@@ -24,8 +25,9 @@ import {
   type PlatformNotificacionInput,
 } from '@/app/actions/super-admin/notificaciones';
 import { normalizarBusqueda } from '@/lib/buscador';
-import { formatArgentinaDate } from '@/lib/dates';
+import { formatArgentinaDate, formatArgentinaDateTime, todayArg } from '@/lib/dates';
 import { EmptyState } from '@/components/shared/empty-state';
+import { TURNOS, TURNO_LABELS, type Turno } from './turnos';
 
 export type NotificacionAudiencia =
   | 'todos'
@@ -44,6 +46,8 @@ export type PlatformNotificacion = {
   estado: NotificacionEstado;
   error: string | null;
   enviadoEn: string | null;
+  /** Horario de envío elegido, o null si salió (o sale) en el acto. */
+  programadaPara: string | null;
   createdAt: string;
   autor: string | null;
 };
@@ -81,6 +85,16 @@ const ESTADO_LABELS: Record<NotificacionEstado, { label: string; cls: string }> 
 const inputCls =
   'h-11 w-full rounded-[10px] border border-gray-200 bg-white px-4 text-sm text-[#101828] focus:border-[#175861] focus:outline-none focus:ring-1 focus:ring-[#175861]';
 
+/**
+ * Una notificación programada vive en estado 'pendiente' hasta que sale, pero
+ * no es lo mismo que una pendiente por error: está esperando su turno. Se
+ * distinguen mirando si el horario elegido todavía no llegó.
+ */
+function estaProgramada(n: PlatformNotificacion): boolean {
+  if (n.estado !== 'pendiente' || !n.programadaPara) return false;
+  return new Date(n.programadaPara).getTime() > Date.now();
+}
+
 type ModalState = { mode: 'create' } | null;
 
 export function PlatformNotificacionesClient({
@@ -97,10 +111,15 @@ export function PlatformNotificacionesClient({
 
   const stats = useMemo(() => {
     const total = notificaciones.length;
-    const pendientes = notificaciones.filter((n) => n.estado === 'pendiente').length;
+    const programadas = notificaciones.filter(estaProgramada).length;
+    // "Pendientes" son las que deberían haber salido y no salieron; las que
+    // esperan su turno se cuentan aparte para no leerse como un problema.
+    const pendientes = notificaciones.filter(
+      (n) => n.estado === 'pendiente' && !estaProgramada(n),
+    ).length;
     const enviadas = notificaciones.filter((n) => n.estado === 'enviada').length;
     const fallidas = notificaciones.filter((n) => n.estado === 'fallida').length;
-    return { total, pendientes, enviadas, fallidas };
+    return { total, programadas, pendientes, enviadas, fallidas };
   }, [notificaciones]);
 
   const filtered = useMemo(() => {
@@ -139,18 +158,26 @@ export function PlatformNotificacionesClient({
           <div className="text-sm text-[#175861]">
             <p className="font-semibold">Cómo funcionan</p>
             <p className="mt-0.5">
-              Al apretar enviar, la notificación sale en el momento a los usuarios de la audiencia
-              que tengan la app mobile instalada y hayan dado permiso de notificaciones. Si alguna
-              queda en <span className="font-semibold">pendiente</span> o{' '}
-              <span className="font-semibold">fallida</span>, hay un job que reintenta una vez por
-              día.
+              La notificación llega a los usuarios de la audiencia que tengan la app mobile
+              instalada y hayan dado permiso de notificaciones. Podés enviarla{' '}
+              <span className="font-semibold">en el momento</span> o{' '}
+              <span className="font-semibold">programarla</span> para un día y un turno (mañana
+              8:00, tarde 14:00 o noche 20:00). Si alguna queda en{' '}
+              <span className="font-semibold">pendiente</span> o{' '}
+              <span className="font-semibold">fallida</span>, se reintenta sola en esos mismos tres
+              horarios.
             </p>
           </div>
         </div>
       </div>
 
-      <div className="mb-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="mb-4 grid grid-cols-2 gap-4 lg:grid-cols-5">
         <StatCard icon={<Bell className="h-5 w-5" />} label="Total" value={stats.total} />
+        <StatCard
+          icon={<CalendarClock className="h-5 w-5" />}
+          label="Programadas"
+          value={stats.programadas}
+        />
         <StatCard
           icon={<Clock className="h-5 w-5" />}
           label="Pendientes"
@@ -282,10 +309,14 @@ function NotificacionCard({
 }) {
   const router = useRouter();
   const [deleting, startDelete] = useTransition();
+  const programada = estaProgramada(n);
   const estado = ESTADO_LABELS[n.estado];
 
   const handleDelete = () => {
-    if (!confirm(`¿Eliminar la notificación "${n.titulo}"?`)) return;
+    const aviso = programada
+      ? `¿Eliminar la notificación "${n.titulo}"? Está programada y todavía no salió, así que no se va a enviar.`
+      : `¿Eliminar la notificación "${n.titulo}"?`;
+    if (!confirm(aviso)) return;
     onError(null);
     startDelete(async () => {
       const res = await deletePlatformNotificacionAction(n.id);
@@ -307,11 +338,18 @@ function NotificacionCard({
           </h3>
           <p className="mt-1 text-sm whitespace-pre-line text-gray-600">{n.cuerpo}</p>
           <div className="mt-3 flex flex-wrap gap-2">
-            <span
-              className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-semibold ${estado.cls}`}
-            >
-              {estado.label}
-            </span>
+            {programada ? (
+              <span className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">
+                <CalendarClock className="h-3 w-3" />
+                Programada para {formatArgentinaDateTime(n.programadaPara)}
+              </span>
+            ) : (
+              <span
+                className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-semibold ${estado.cls}`}
+              >
+                {estado.label}
+              </span>
+            )}
             <span className="inline-flex items-center gap-1 rounded-md bg-[#D9EBE9] px-2 py-0.5 text-xs font-semibold text-[#175861]">
               <Globe className="h-3 w-3" />
               {audienciaLabel}
@@ -352,6 +390,9 @@ function NotificacionModal({ onClose, onSaved }: { onClose: () => void; onSaved:
   const [titulo, setTitulo] = useState('');
   const [cuerpo, setCuerpo] = useState('');
   const [audiencia, setAudiencia] = useState<NotificacionAudiencia>('todos');
+  const [programar, setProgramar] = useState(false);
+  const [fecha, setFecha] = useState(todayArg());
+  const [turno, setTurno] = useState<Turno>('manana');
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -365,11 +406,16 @@ function NotificacionModal({ onClose, onSaved }: { onClose: () => void; onSaved:
       setError('El cuerpo es obligatorio.');
       return;
     }
+    if (programar && !fecha) {
+      setError('Elegí el día del envío.');
+      return;
+    }
 
     const input: PlatformNotificacionInput = {
       titulo: titulo.trim(),
       cuerpo: cuerpo.trim(),
       audiencia,
+      ...(programar ? { programadaFecha: fecha, programadaTurno: turno } : {}),
     };
 
     startTransition(async () => {
@@ -444,6 +490,75 @@ function NotificacionModal({ onClose, onSaved }: { onClose: () => void; onSaved:
             </div>
           </div>
 
+          <div>
+            <label className="mb-1 block text-sm font-semibold text-gray-700">
+              Cuándo enviarla
+            </label>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <label
+                className={`flex cursor-pointer items-center gap-2 rounded-[10px] border px-3 py-2.5 text-sm ${
+                  !programar
+                    ? 'border-[#175861] bg-[#D9EBE9] text-[#175861]'
+                    : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="cuando"
+                  className="accent-[#175861]"
+                  checked={!programar}
+                  onChange={() => setProgramar(false)}
+                />
+                Ahora
+              </label>
+              <label
+                className={`flex cursor-pointer items-center gap-2 rounded-[10px] border px-3 py-2.5 text-sm ${
+                  programar
+                    ? 'border-[#175861] bg-[#D9EBE9] text-[#175861]'
+                    : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="cuando"
+                  className="accent-[#175861]"
+                  checked={programar}
+                  onChange={() => setProgramar(true)}
+                />
+                Programar
+              </label>
+            </div>
+          </div>
+
+          {programar && (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-gray-700">Día</label>
+                <input
+                  type="date"
+                  className={inputCls}
+                  value={fecha}
+                  min={todayArg()}
+                  onChange={(e) => setFecha(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-gray-700">Turno</label>
+                <select
+                  className={inputCls}
+                  value={turno}
+                  onChange={(e) => setTurno(e.target.value as Turno)}
+                >
+                  {TURNOS.map((t) => (
+                    <option key={t} value={t}>
+                      {TURNO_LABELS[t]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
+
           {error && <p className="text-sm text-red-600">{error}</p>}
         </div>
 
@@ -462,7 +577,13 @@ function NotificacionModal({ onClose, onSaved }: { onClose: () => void; onSaved:
             disabled={pending || !titulo.trim() || !cuerpo.trim()}
             className="rounded-[10px] bg-[#175861] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#0f4249] disabled:opacity-60"
           >
-            {pending ? 'Enviando…' : 'Enviar notificación'}
+            {pending
+              ? programar
+                ? 'Programando…'
+                : 'Enviando…'
+              : programar
+                ? 'Programar envío'
+                : 'Enviar notificación'}
           </button>
         </div>
       </div>

@@ -1871,6 +1871,9 @@ export const platformNotificaciones = pgTable('platform_notificaciones', {
   estado: notificacionEstadoEnum('estado').notNull().default('pendiente'),
   error: text('error'),
   enviadoEn: timestamp('enviado_en', { withTimezone: true }),
+  // Momento a partir del cual el cron puede enviarla. NULL = enviar en el acto
+  // (mig 0145). Una programada queda en 'pendiente' hasta que sale.
+  programadaPara: timestamp('programada_para', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });

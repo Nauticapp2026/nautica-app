@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNull, like, notExists, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, like, lte, notExists, or, sql } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import {
@@ -68,12 +68,22 @@ type ProcessResult = {
 export async function processPendingNotifications(
   opts: { notifId?: string } = {},
 ): Promise<ProcessResult> {
+  // Una notificación programada no puede salir antes de su horario. El margen
+  // de 10 minutos evita que un cron que arranca unos segundos antes de la hora
+  // la deje pasar de largo hasta la corrida siguiente (varias horas después).
+  const cutoff = new Date(Date.now() + 10 * 60 * 1000);
+  const enHorario = or(
+    isNull(platformNotificaciones.programadaPara),
+    lte(platformNotificaciones.programadaPara, cutoff),
+  );
+
   const whereClause = opts.notifId
     ? and(
         eq(platformNotificaciones.id, opts.notifId),
         eq(platformNotificaciones.estado, 'pendiente'),
+        enHorario,
       )
-    : eq(platformNotificaciones.estado, 'pendiente');
+    : and(eq(platformNotificaciones.estado, 'pendiente'), enHorario);
 
   const pendientes = await db
     .select({
