@@ -1,11 +1,12 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Anchor, Download, FilterX, Search } from 'lucide-react';
+import { Download, FilterX } from 'lucide-react';
 
-import { EmptyState } from '@/components/shared/empty-state';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Pagination } from '@/components/shared/pagination';
-import { TablaScrollX } from '@/components/shared/tabla-scroll-x';
 import { normalizarBusqueda } from '@/lib/buscador';
 import { formatArgentinaDateTime, formatNaiveDateTime } from '@/lib/dates';
 
@@ -31,8 +32,11 @@ export type SalidaRow = {
 
 const PAGE_SIZE = 25;
 
-const inputCls =
-  'h-11 w-full rounded-[10px] border border-gray-200 bg-white px-4 text-sm text-[#101828] focus:border-[#175861] focus:outline-none focus:ring-1 focus:ring-[#175861]';
+// Mismo estilo que un Input shadcn pero para <select> nativo — igual que en
+// super-admin/usuarios: mantiene los tokens del design system sin traer los
+// wrappers de radix.
+const selectCls =
+  'border-input focus-visible:border-ring focus-visible:ring-ring/50 dark:bg-input/30 h-9 w-full rounded-md border bg-transparent px-2 py-1 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:ring-[3px]';
 
 /**
  * Estado de la salida tal como lo necesita Prefectura: importa si la
@@ -130,47 +134,28 @@ export function SalidasClient({
   })();
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="page-title">Salidas</h1>
-          <p className="page-subtitle mt-1">
-            Todas las salidas registradas en los clubes de la plataforma.
-          </p>
-        </div>
-        <a
-          href={urlExport}
-          className="flex shrink-0 items-center justify-center gap-2 rounded-[10px] bg-[#175861] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#0f4249]"
-        >
-          <Download className="h-4 w-4" />
-          Descargar Excel
-        </a>
-      </div>
-
-      {/* Dos filas: buscador + selectores arriba, rango de fechas abajo. Meter
-          las dos fechas y el botón de limpiar en una sola celda de la grilla los
-          dejaba ilegibles. */}
+    <div className="space-y-4">
+      {/* Buscador + selectores arriba, rango de fechas y acciones abajo. */}
       <div className="space-y-3">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="relative lg:col-span-2">
-            <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400" />
-            <input
-              className={`${inputCls} pl-9`}
-              placeholder="Socio, embarcación, matrícula…"
-              value={query}
-              onChange={(e) => {
-                setQuery(e.target.value);
-                setPage(1);
-              }}
-            />
-          </div>
+          <Input
+            type="search"
+            placeholder="Buscar por socio, embarcación o matrícula..."
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setPage(1);
+            }}
+            className="lg:col-span-2"
+          />
           <select
-            className={inputCls}
+            className={selectCls}
             value={club}
             onChange={(e) => {
               setClub(e.target.value);
               setPage(1);
             }}
+            aria-label="Filtrar por club"
           >
             <option value="">Todos los clubes</option>
             {clubes.map((c) => (
@@ -180,12 +165,13 @@ export function SalidasClient({
             ))}
           </select>
           <select
-            className={inputCls}
+            className={selectCls}
             value={estado}
             onChange={(e) => {
               setEstado(e.target.value);
               setPage(1);
             }}
+            aria-label="Filtrar por estado"
           >
             {ESTADO_OPTS.map((o) => (
               <option key={o.value} value={o.value}>
@@ -195,99 +181,101 @@ export function SalidasClient({
           </select>
         </div>
 
-        <div className="flex flex-wrap items-end gap-3">
-          <div>
-            <label className="mb-1.5 block text-xs font-semibold text-gray-500">Desde</label>
-            <input
-              type="date"
-              className={inputCls}
-              value={desde}
-              onChange={(e) => {
-                setDesde(e.target.value);
-                setPage(1);
-              }}
-            />
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div className="flex flex-wrap items-end gap-3">
+            <div>
+              <label className="text-muted-foreground mb-1.5 block text-xs font-semibold">
+                Desde
+              </label>
+              <Input
+                type="date"
+                value={desde}
+                onChange={(e) => {
+                  setDesde(e.target.value);
+                  setPage(1);
+                }}
+                className="w-[160px]"
+              />
+            </div>
+            <div>
+              <label className="text-muted-foreground mb-1.5 block text-xs font-semibold">
+                Hasta
+              </label>
+              <Input
+                type="date"
+                value={hasta}
+                onChange={(e) => {
+                  setHasta(e.target.value);
+                  setPage(1);
+                }}
+                className="w-[160px]"
+              />
+            </div>
+            {hayFiltros && (
+              <Button type="button" variant="outline" onClick={limpiar}>
+                <FilterX />
+                Limpiar
+              </Button>
+            )}
           </div>
-          <div>
-            <label className="mb-1.5 block text-xs font-semibold text-gray-500">Hasta</label>
-            <input
-              type="date"
-              className={inputCls}
-              value={hasta}
-              onChange={(e) => {
-                setHasta(e.target.value);
-                setPage(1);
-              }}
-            />
-          </div>
-          {hayFiltros && (
-            <button
-              type="button"
-              onClick={limpiar}
-              title="Limpiar filtros"
-              className="flex h-11 items-center gap-2 rounded-[10px] border border-gray-200 px-3 text-sm font-medium text-gray-600 hover:bg-gray-50"
-            >
-              <FilterX className="h-4 w-4" />
-              Limpiar
-            </button>
-          )}
+
+          <Button asChild>
+            <a href={urlExport}>
+              <Download />
+              Descargar Excel
+            </a>
+          </Button>
         </div>
       </div>
 
-      <p className="text-xs text-gray-500">
+      <p className="text-muted-foreground text-xs">
         {filtradas.length} {filtradas.length === 1 ? 'salida' : 'salidas'}
-        {hayFiltros && ` (de ${salidas.length})`}
+        {hayFiltros && ` de ${salidas.length}`}
         {truncado && ' · se muestran las más recientes; el Excel trae todas'}
       </p>
 
-      {filtradas.length === 0 ? (
-        <div className="rounded-2xl border border-gray-200 bg-white p-6">
-          <EmptyState
-            icon={<Anchor className="h-7 w-7 opacity-40" />}
-            text={
-              salidas.length === 0
-                ? 'Todavía no hay salidas registradas.'
-                : 'Sin resultados con los filtros aplicados.'
-            }
-          />
-        </div>
-      ) : (
-        <div className="rounded-2xl border border-gray-200 bg-white">
-          <TablaScrollX>
-            <table className="w-full min-w-[1200px] text-sm">
-              <thead>
-                <tr className="border-b border-gray-200 text-left text-xs text-gray-500">
-                  <th className="px-4 py-3">Club</th>
-                  <th className="px-4 py-3">Socio</th>
-                  <th className="px-4 py-3">Embarcación</th>
-                  <th className="px-4 py-3">Matrícula</th>
-                  <th className="px-4 py-3">Salida</th>
-                  <th className="px-4 py-3">Regreso previsto</th>
-                  <th className="px-4 py-3">Arribo</th>
-                  <th className="px-4 py-3">A bordo</th>
-                  <th className="px-4 py-3">Teléfono</th>
-                  <th className="px-4 py-3 text-right">Estado</th>
+      <Card className="overflow-hidden p-0">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200 text-sm">
+            <thead className="text-muted-foreground bg-gray-50 text-left text-xs font-semibold tracking-wider uppercase">
+              <tr>
+                <th className="px-4 py-3">Club</th>
+                <th className="px-4 py-3">Socio</th>
+                <th className="px-4 py-3">Embarcación</th>
+                <th className="px-4 py-3">Matrícula</th>
+                <th className="px-4 py-3">Salida</th>
+                <th className="px-4 py-3">Regreso previsto</th>
+                <th className="px-4 py-3">Arribo</th>
+                <th className="px-4 py-3">A bordo</th>
+                <th className="px-4 py-3">Teléfono</th>
+                <th className="px-4 py-3 text-right">Estado</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {visibles.length === 0 ? (
+                <tr>
+                  <td colSpan={10} className="text-muted-foreground px-4 py-6 text-center text-sm">
+                    {salidas.length === 0
+                      ? 'Todavía no hay salidas registradas.'
+                      : 'Sin resultados.'}
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {visibles.map((s) => {
+              ) : (
+                visibles.map((s) => {
                   const est = estadoSalida(s);
                   return (
-                    <tr
-                      key={s.id}
-                      className="border-t border-gray-100 transition hover:bg-gray-50/50"
-                    >
+                    <tr key={s.id}>
                       <td className="px-4 py-3 text-gray-600">{s.club}</td>
                       <td className="px-4 py-3">
-                        <span className="font-medium" style={{ color: '#101828' }}>
-                          {s.socio}
-                        </span>
+                        <span className="font-semibold text-[#101828]">{s.socio}</span>
                         {s.numeroSocio != null && (
-                          <span className="ml-1.5 text-xs text-gray-400">#{s.numeroSocio}</span>
+                          <span className="text-muted-foreground ml-1.5 text-xs">
+                            #{s.numeroSocio}
+                          </span>
                         )}
                       </td>
                       <td className="px-4 py-3 text-gray-600">{s.embarcacion ?? '—'}</td>
-                      <td className="px-4 py-3 text-gray-500">{s.matricula ?? '—'}</td>
+                      <td className="text-muted-foreground px-4 py-3">{s.matricula ?? '—'}</td>
                       {/* Naive: se muestran los dígitos tal cual se cargaron. */}
                       <td className="px-4 py-3 whitespace-nowrap text-gray-600">
                         {s.desde ? formatNaiveDateTime(s.desde) : '—'}
@@ -299,33 +287,35 @@ export function SalidasClient({
                       <td className="px-4 py-3 whitespace-nowrap text-gray-600">
                         {s.arribadaEn ? formatArgentinaDateTime(s.arribadaEn) : '—'}
                       </td>
-                      <td className="px-4 py-3 text-gray-500">
+                      <td className="text-muted-foreground px-4 py-3">
                         {s.acompanantes.length > 0 ? s.acompanantes.join(', ') : '—'}
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-gray-500">
+                      <td className="text-muted-foreground px-4 py-3 whitespace-nowrap">
                         {s.telefono ?? '—'}
                       </td>
                       <td className="px-4 py-3 text-right">
                         <span
-                          className={`inline-block rounded-full px-3 py-1 text-xs font-medium whitespace-nowrap ${est.cls}`}
+                          className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap ${est.cls}`}
                         >
                           {est.label}
                         </span>
                       </td>
                     </tr>
                   );
-                })}
-              </tbody>
-            </table>
-          </TablaScrollX>
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+        {filtradas.length > PAGE_SIZE && (
           <Pagination
             page={pageSafe}
             totalItems={filtradas.length}
             pageSize={PAGE_SIZE}
             onPageChange={setPage}
           />
-        </div>
-      )}
+        )}
+      </Card>
     </div>
   );
 }
