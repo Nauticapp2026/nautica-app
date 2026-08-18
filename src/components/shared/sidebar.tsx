@@ -72,6 +72,7 @@ const NAV_BY_VARIANT: Record<SidebarVariant, SidebarItem[]> = {
     { href: '/super-admin', label: 'Inicio', icon: LayoutDashboard },
     { href: '/super-admin/guarderias', label: 'Guarderías', icon: Building2 },
     { href: '/super-admin/usuarios', label: 'Usuarios', icon: Users },
+    { href: '/super-admin/salidas', label: 'Salidas', icon: Anchor },
     { href: '/super-admin/comunicaciones', label: 'Comunicaciones', icon: MessageSquare },
     { href: '/super-admin/publicidades', label: 'Publicidades', icon: Megaphone },
     { href: '/super-admin/notificaciones', label: 'Notificaciones', icon: Bell },
