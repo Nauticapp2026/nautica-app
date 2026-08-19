@@ -3,12 +3,13 @@
 import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { CreditCard, RefreshCw } from 'lucide-react';
+import { AlertTriangle, CreditCard, RefreshCw } from 'lucide-react';
 
 import { reintentarCobroPaywayAction } from '@/app/actions/payway';
 import { normalizarBusqueda } from '@/lib/buscador';
 import { formatArgentinaDate } from '@/lib/dates';
 import { EmptyState } from '@/components/shared/empty-state';
+import { PaywayRechazadosModal } from './payway-rechazados-modal';
 
 export type CobroPayway = {
   id: string;
@@ -46,7 +47,15 @@ export function PaywayCobrosList({ cobros }: { cobros: CobroPayway[] }) {
   const [filterEstado, setFilterEstado] = useState('');
   const [isPending, startTransition] = useTransition();
   const [retryingId, setRetryingId] = useState<string | null>(null);
+  const [verRechazados, setVerRechazados] = useState(false);
   const router = useRouter();
+
+  // Rechazados/con error, sin aplicar los filtros de la tabla: el modal es para
+  // resolverlos todos.
+  const rechazados = useMemo(
+    () => cobros.filter((c) => c.estado === 'rechazado' || c.estado === 'error'),
+    [cobros],
+  );
 
   const filtrados = useMemo(() => {
     return cobros.filter((c) => {
@@ -82,6 +91,9 @@ export function PaywayCobrosList({ cobros }: { cobros: CobroPayway[] }) {
 
   return (
     <div className="space-y-4">
+      {verRechazados && (
+        <PaywayRechazadosModal cobros={rechazados} onClose={() => setVerRechazados(false)} />
+      )}
       {/* KPIs rápidos */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
         <div className="rounded-2xl border border-gray-200 bg-white p-4">
@@ -122,6 +134,21 @@ export function PaywayCobrosList({ cobros }: { cobros: CobroPayway[] }) {
             <option value="error">Error</option>
             <option value="pendiente">Pendiente</option>
           </select>
+          {/* Atajo a los rechazados agrupados por motivo, con reintento en
+              tanda. Solo aparece si hay alguno. */}
+          {rechazados.length > 0 && (
+            <button
+              onClick={() => setVerRechazados(true)}
+              title="Ver los cobros rechazados agrupados por motivo y reintentar"
+              className="flex h-10 shrink-0 items-center gap-1.5 rounded-[10px] border border-red-200 bg-white px-3 text-sm font-medium text-red-600 transition hover:bg-red-50"
+            >
+              <AlertTriangle className="h-4 w-4" />
+              <span className="hidden sm:inline">Rechazados</span>
+              <span className="rounded-full bg-red-100 px-1.5 text-xs font-bold">
+                {rechazados.length}
+              </span>
+            </button>
+          )}
         </div>
 
         {filtrados.length === 0 ? (
