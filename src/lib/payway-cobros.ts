@@ -18,7 +18,7 @@
  *     comprobantes que quedaron 100% cubiertos.
  */
 
-import { and, asc, eq, inArray } from 'drizzle-orm';
+import { and, asc, count, eq, inArray, like } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 
 import { db } from '@/lib/db';
@@ -34,6 +34,7 @@ import {
   profiles,
   socioServicios,
 } from '@/lib/db/schema';
+import { enviarReciboPorMail } from '@/lib/email/recibo-mail';
 import { formatPaywayError } from '@/lib/payway/format-error';
 import { getEstadoFifo, marcarComprobantesSaldados } from '@/lib/reconciliar-cuenta';
 
@@ -178,26 +179,31 @@ async function cobrarCargos(args: {
   const paywayPaymentId = paywayResult.id != null ? String(paywayResult.id) : null;
 
   if (approved) {
-    // Asiento del pago (haber) por el total del canal.
-    await db.insert(movimientosCuentaCorriente).values({
-      socioId: token.socioId,
-      concepto: 'Pago — Débito automático',
-      tipo: 'otro',
-      estado: 'pagado',
-      debe: '0',
-      haber: totalPesos.toFixed(2),
-      importeSigned: `-${totalPesos.toFixed(2)}`,
-      fecha: new Date(),
-      formaDePago: 'debito_automatico',
-      datosPago: null,
-      comprobanteInterno: canal === 'interno',
-    });
+    // Asiento del pago (haber) por el total del canal. Se guarda el id porque
+    // el recibo cuelga de este movimiento.
+    const [pago] = await db
+      .insert(movimientosCuentaCorriente)
+      .values({
+        socioId: token.socioId,
+        concepto: 'Pago — Débito automático',
+        tipo: 'otro',
+        estado: 'pagado',
+        debe: '0',
+        haber: totalPesos.toFixed(2),
+        importeSigned: `-${totalPesos.toFixed(2)}`,
+        fecha: new Date(),
+        formaDePago: 'debito_automatico',
+        datosPago: null,
+        comprobanteInterno: canal === 'interno',
+      })
+      .returning({ id: movimientosCuentaCorriente.id });
 
     // Los cargos cobrados quedan pagados: se cobró exactamente su resto (el
     // descuento del crédito FIFO previo los deja cubiertos enteros). Después,
     // saldar los comprobantes que quedaron 100% cubiertos — para el canal
     // interno eso incluye los comprobantes internos (tipo 'recibo'), que acá
     // no pasan por Cobranza. Si falla, no abortar (el cobro ya está aprobado).
+    let comprobantesSaldados: string[] = [];
     try {
       await db
         .update(movimientosCuentaCorriente)
@@ -208,9 +214,69 @@ async function cobrarCargos(args: {
             cargos.map((c) => c.id),
           ),
         );
-      await marcarComprobantesSaldados(token.socioId, guarderiaId, canal === 'interno');
+      comprobantesSaldados = await marcarComprobantesSaldados(
+        token.socioId,
+        guarderiaId,
+        canal === 'interno',
+      );
     } catch (err) {
       console.error(`[payway-cobros] reconciliación falló socio=${token.socioId}`, err);
+    }
+
+    // Recibo del cobro. Antes el débito automático no dejaba comprobante: el
+    // socio veía el cargo pagado en su cuenta pero no tenía el papel del pago
+    // (pedido cliente 2026-08-19). Se numera en la MISMA serie que las
+    // cobranzas manuales (RC- fiscal / CI- interno) porque es una cobranza más,
+    // solo que la disparó el cron. La app mobile lista `facturacion` sin
+    // filtrar por tipo, así que con esta fila el recibo ya le aparece al socio.
+    //
+    // Si falla, no se aborta: el cobro en Payway ya pasó y la plata ya está
+    // registrada — quedaría sin recibo, no sin cobrar.
+    let reciboId: string | null = null;
+    try {
+      const prefijo = canal === 'interno' ? 'CI' : 'RC';
+      const [{ n }] = await db
+        .select({ n: count() })
+        .from(facturacion)
+        .where(
+          and(
+            eq(facturacion.guarderiaId, guarderiaId),
+            eq(facturacion.tipoFactura, 'recibo'),
+            like(facturacion.codigo, `${prefijo}-%`),
+          ),
+        );
+      const codigo = `${prefijo}-${String(Number(n) + 1).padStart(6, '0')}`;
+
+      const [recibo] = await db
+        .insert(facturacion)
+        .values({
+          guarderiaId,
+          socioId: token.socioId,
+          tipoFactura: 'recibo',
+          tipoRecibo: canal === 'interno' ? 'interno' : 'fiscal',
+          estado: 'pagada',
+          importe: totalPesos.toFixed(2),
+          descripcion: 'Cobranza por débito automático',
+          medioPago: 'debito_automatico',
+          emision: new Date(),
+          movimientoId: pago.id,
+          codigo,
+          cobranzaComprobanteIds: comprobantesSaldados,
+        })
+        .returning({ id: facturacion.id });
+      reciboId = recibo.id;
+    } catch (err) {
+      console.error(`[payway-cobros] no se pudo crear el recibo socio=${token.socioId}`, err);
+    }
+
+    // Mail al socio con el recibo. Tampoco aborta: el recibo ya existe en la app
+    // aunque el mail no salga.
+    if (reciboId) {
+      try {
+        await enviarReciboPorMail(reciboId, guarderiaId);
+      } catch (err) {
+        console.error(`[payway-cobros] no se pudo mandar el mail socio=${token.socioId}`, err);
+      }
     }
 
     await db
