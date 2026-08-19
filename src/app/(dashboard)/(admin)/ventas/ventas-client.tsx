@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   AlertCircle,
+  AlertTriangle,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
@@ -46,6 +47,7 @@ import { EmptyState } from '@/components/shared/empty-state';
 import { Pagination } from '@/components/shared/pagination';
 import { TablaScrollX } from '@/components/shared/tabla-scroll-x';
 import { escribirTabEnUrl, type VentasTab } from '@/lib/tab-url';
+import { RechazadosModal } from './rechazados-modal';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -3777,6 +3779,11 @@ export function VentasClient({
   // Selección para NC en lote (anulación total) sobre la tabla AFIP.
   const [selectedNc, setSelectedNc] = useState<Set<string>>(() => new Set());
   const [loteNcOpen, setLoteNcOpen] = useState(false);
+  const [verRechazados, setVerRechazados] = useState(false);
+
+  // Rechazados por ARCA, sin filtrar por la búsqueda de la tabla: el modal es
+  // para resolverlos todos, no para mirar un subconjunto.
+  const facturasRechazadas = useMemo(() => facturas.filter((f) => f.rechazada), [facturas]);
 
   const puedeFacturar = posConfigurado && certificadoOk;
   const hasFiltrosAfip = Boolean(
@@ -4076,6 +4083,32 @@ export function VentasClient({
         facturas={facturasSeleccionadas}
         guarderiaCondicionIva={guarderiaCondicionIva}
       />
+      {verRechazados && (
+        <RechazadosModal
+          facturas={facturasRechazadas.map((f) => ({
+            id: f.id,
+            tipoFactura: f.tipoFactura,
+            importe: f.importe,
+            emision: f.emision,
+            descripcion: f.descripcion,
+            socioId: f.socioId,
+            socioNombre: f.socioNombre,
+            motivoError: f.motivoError,
+          }))}
+          socios={socios.map((s) => ({
+            id: s.id,
+            nombre: s.nombre,
+            razonSocial: s.razonSocial,
+            numeroDocumento: s.numeroDocumento,
+            tipoDocumento: s.tipoDocumento,
+            cuit: s.cuit,
+            condicionIva: s.condicionIva,
+            condicionIvaPersonal: s.condicionIvaPersonal,
+            facturaFiscal: s.facturaFiscal,
+          }))}
+          onClose={() => setVerRechazados(false)}
+        />
+      )}
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
@@ -4217,6 +4250,22 @@ export function VentasClient({
                 placeholder="Buscar por número, cliente o descripción..."
                 className="h-10 flex-1 rounded-[10px] border border-gray-200 bg-white px-4 text-sm focus:border-[#175861] focus:ring-1 focus:ring-[#175861] focus:outline-none"
               />
+              {/* Atajo a los rechazados por ARCA: agrupados por causa, con los
+                  datos del socio editables y reenvío en tanda. Solo aparece si
+                  hay alguno. */}
+              {activeTab === 'afip' && facturasRechazadas.length > 0 && (
+                <button
+                  onClick={() => setVerRechazados(true)}
+                  title="Ver y reenviar los comprobantes rechazados por ARCA"
+                  className="flex h-10 items-center gap-1.5 rounded-[10px] border border-red-200 bg-white px-3 text-sm font-medium text-red-600 transition hover:bg-red-50"
+                >
+                  <AlertTriangle className="h-4 w-4" />
+                  <span className="hidden sm:inline">Rechazados</span>
+                  <span className="rounded-full bg-red-100 px-1.5 text-xs font-bold">
+                    {facturasRechazadas.length}
+                  </span>
+                </button>
+              )}
               <button
                 onClick={exportarCSV}
                 disabled={(activeTab === 'afip' ? filtradosAfip : filtradosRecibos).length === 0}

@@ -320,6 +320,103 @@ export async function updateSocioAction(data: UpdateSocioData): Promise<{ error?
   }
 }
 
+// ─── Datos fiscales: update parcial ──────────────────────────────────────────
+
+const datosFiscalesSchema = z.object({
+  socioId: z.string().uuid(),
+  tipoDocumento: z.enum(['dni', 'cuit', 'pasaporte', 'cdi', 'cuil']).nullable(),
+  numeroDocumento: z.string().trim().max(32),
+  cuit: z.string().trim().max(32),
+  razonSocial: z.string().trim().max(200),
+  condicionIva: z
+    .enum([
+      'consumidor_final',
+      'responsable_inscripto',
+      'monotributo',
+      'exento',
+      'cliente_exterior',
+      'iva_no_alcanzado',
+      'proveedor_exterior',
+    ])
+    .nullable(),
+  condicionIvaPersonal: z
+    .enum([
+      'consumidor_final',
+      'responsable_inscripto',
+      'monotributo',
+      'exento',
+      'cliente_exterior',
+      'iva_no_alcanzado',
+      'proveedor_exterior',
+    ])
+    .nullable(),
+  /** true = facturar con los datos personales; false = con los impositivos. */
+  facturaFiscal: z.boolean(),
+});
+
+export type DatosFiscalesSocioData = z.infer<typeof datosFiscalesSchema>;
+
+/**
+ * Update acotado a los datos que ARCA rechaza. Existe aparte de
+ * `updateSocioAction` a propósito: esa escribe TODOS los campos del perfil, así
+ * que llamarla desde una pantalla que no tiene el socio completo en memoria (el
+ * modal de comprobantes rechazados, en Ventas) borraría ciudad, provincia,
+ * domicilio fiscal y demás. Acá se tocan solo estos campos.
+ */
+export async function updateDatosFiscalesSocioAction(
+  input: DatosFiscalesSocioData,
+): Promise<{ error?: string }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'Tu sesión expiró. Recargá la página e intentá de nuevo.' };
+  const gId = ctx.activeMembership.guarderiaId;
+
+  const parsed = datosFiscalesSchema.safeParse(input);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? 'Datos inválidos.' };
+  }
+  const data = parsed.data;
+
+  // Scope por guardería: el socio tiene que ser de la guardería activa.
+  const [membership] = await db
+    .select({ id: memberships.id })
+    .from(memberships)
+    .where(
+      and(
+        eq(memberships.userId, data.socioId),
+        eq(memberships.guarderiaId, gId),
+        eq(memberships.rol, 'socio'),
+      ),
+    )
+    .limit(1);
+  if (!membership) return { error: 'Socio no pertenece a esta guardería.' };
+
+  try {
+    await db
+      .update(profiles)
+      .set({
+        tipoDocumento: data.tipoDocumento as never,
+        numeroDocumento: data.numeroDocumento || null,
+        cuit: data.cuit || null,
+        razonSocial: data.razonSocial || null,
+        condicionIva: data.condicionIva as never,
+        condicionIvaPersonal: data.condicionIvaPersonal as never,
+      })
+      .where(eq(profiles.id, data.socioId));
+
+    // El tilde vive en la membership: es por club, no global.
+    await db
+      .update(memberships)
+      .set({ facturaFiscal: data.facturaFiscal })
+      .where(eq(memberships.id, membership.id));
+
+    revalidatePath(`/usuarios/${data.socioId}`);
+    revalidatePath('/ventas');
+    return {};
+  } catch {
+    return { error: 'Error al actualizar los datos fiscales.' };
+  }
+}
+
 // ─── Eliminar socio (soft delete) ────────────────────────────────────────────
 
 /**
