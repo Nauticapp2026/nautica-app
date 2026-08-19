@@ -198,8 +198,13 @@ function NuevaCobranzaModal({
     [seleccionados, ncDeComprobante],
   );
 
+  // Lo que queda por COBRAR de un comprobante en esta cobranza: su pendiente
+  // menos lo que le resta una nota de crédito que se junte acá. Tiene que
+  // coincidir con el tope que valida el server (`restanteDe` en
+  // actions/cobranzas.ts), o el reparto dejaría cargar más de lo que se debe.
   function pendienteDe(c: ComprobantePendiente): number {
-    return parseFloat(c.importePendiente ?? c.importe ?? '0');
+    const pendiente = parseFloat(c.importePendiente ?? c.importe ?? '0');
+    return Math.max(0, pendiente - (ncDeComprobante.get(c.id) ?? 0));
   }
 
   // Cobrando internos, el dropdown de formas solo muestra los medios que el
