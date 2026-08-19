@@ -67,6 +67,7 @@ export default async function SuperAdminSalidasPage() {
             porteriaId: porteriaInvitados.porteriaId,
             nombre: invitados.nombre,
             apellido: invitados.apellido,
+            cantidadAcompanantes: porteriaInvitados.cantidadAcompanantes,
           })
           .from(porteriaInvitados)
           .innerJoin(invitados, eq(invitados.id, porteriaInvitados.invitadoId))
@@ -77,8 +78,11 @@ export default async function SuperAdminSalidasPage() {
   for (const a of acompRows) {
     const nombre = [a.nombre, a.apellido].filter(Boolean).join(' ').trim();
     if (!nombre) continue;
+    // Un invitado puede venir con gente sin nombrar ("Pedro + 5"): Prefectura
+    // necesita saber cuánta gente subió, no solo quién estaba anotado.
+    const extra = a.cantidadAcompanantes ?? 0;
     const arr = acompPorSalida.get(a.porteriaId) ?? [];
-    arr.push(nombre);
+    arr.push(extra > 0 ? `${nombre} + ${extra}` : nombre);
     acompPorSalida.set(a.porteriaId, arr);
   }
 

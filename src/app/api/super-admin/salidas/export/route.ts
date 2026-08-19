@@ -81,18 +81,25 @@ export async function GET(req: Request) {
             porteriaId: porteriaInvitados.porteriaId,
             nombre: invitados.nombre,
             apellido: invitados.apellido,
+            cantidadAcompanantes: porteriaInvitados.cantidadAcompanantes,
           })
           .from(porteriaInvitados)
           .innerJoin(invitados, eq(invitados.id, porteriaInvitados.invitadoId))
           .where(inArray(porteriaInvitados.porteriaId, porteriaIds))
       : [];
   const acompPorSalida = new Map<string, string[]>();
+  // Cuántas personas subieron en total por salida (invitados anotados + los
+  // acompañantes sin nombrar de cada uno). Va como columna aparte en el Excel:
+  // es el número que a Prefectura le interesa de un vistazo.
+  const personasPorSalida = new Map<string, number>();
   for (const a of acompRows) {
     const nombre = [a.nombre, a.apellido].filter(Boolean).join(' ').trim();
     if (!nombre) continue;
+    const extra = a.cantidadAcompanantes ?? 0;
     const arr = acompPorSalida.get(a.porteriaId) ?? [];
-    arr.push(nombre);
+    arr.push(extra > 0 ? `${nombre} + ${extra}` : nombre);
     acompPorSalida.set(a.porteriaId, arr);
+    personasPorSalida.set(a.porteriaId, (personasPorSalida.get(a.porteriaId) ?? 0) + 1 + extra);
   }
 
   function estadoLabel(f: (typeof filas)[number]): string {
@@ -142,6 +149,9 @@ export async function GET(req: Request) {
     { header: 'Ingreso al club', width: 18 },
     { header: 'Arribo confirmado', width: 18 },
     { header: 'Estado', width: 14 },
+    // Suma de invitados anotados + sus acompañantes sin nombrar. NO incluye al
+    // socio: no siempre es él quien navega (un invitado puede estar autorizado).
+    { header: 'Invitados a bordo', width: 16 },
     { header: 'A bordo', width: 40 },
   ];
   ws.columns = columnas.map((c) => ({ header: c.header, width: c.width }));
@@ -168,6 +178,7 @@ export async function GET(req: Request) {
       f.socioIngresoEn ? formatArgentinaDateTime(f.socioIngresoEn) : '',
       f.arribadaEn ? formatArgentinaDateTime(f.arribadaEn) : '',
       estadoLabel(f),
+      personasPorSalida.get(f.id) ?? 0,
       (acompPorSalida.get(f.id) ?? []).join(', '),
     ]);
   }
