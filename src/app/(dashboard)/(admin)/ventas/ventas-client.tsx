@@ -3780,6 +3780,9 @@ export function VentasClient({
   const [selectedNc, setSelectedNc] = useState<Set<string>>(() => new Set());
   const [loteNcOpen, setLoteNcOpen] = useState(false);
   const [verRechazados, setVerRechazados] = useState(false);
+  // Estado ante ARCA: '' | 'aceptado' | 'rechazado'. Independiente del estado de
+  // cobro (filterEstado), que es otra dimensión.
+  const [filterArca, setFilterArca] = useState('');
 
   // Rechazados por ARCA, sin filtrar por la búsqueda de la tabla: el modal es
   // para resolverlos todos, no para mirar un subconjunto.
@@ -3787,7 +3790,7 @@ export function VentasClient({
 
   const puedeFacturar = posConfigurado && certificadoOk;
   const hasFiltrosAfip = Boolean(
-    search || filterEstado || filterTipo || filterDesde || filterHasta,
+    search || filterEstado || filterTipo || filterArca || filterDesde || filterHasta,
   );
   const hasFiltrosRecibos = Boolean(search || filterDesde || filterHasta);
 
@@ -3808,6 +3811,8 @@ export function VentasClient({
           if (!ok) return false;
         }
         if (filterEstado && f.estado !== filterEstado) return false;
+        if (filterArca === 'aceptado' && f.rechazada) return false;
+        if (filterArca === 'rechazado' && !f.rechazada) return false;
         if (filterTipo) {
           const t = f.tipoFactura ?? '';
           if (filterTipo === 'afip' && !['factura_a', 'factura_b', 'factura_c'].includes(t))
@@ -3818,7 +3823,7 @@ export function VentasClient({
         if (filterHasta && f.emision && f.emision.slice(0, 10) > filterHasta) return false;
         return true;
       });
-  }, [facturas, search, filterEstado, filterTipo, filterDesde, filterHasta]);
+  }, [facturas, search, filterEstado, filterTipo, filterArca, filterDesde, filterHasta]);
 
   // NC en lote: una factura es elegible si es AFIP (A/B/C), tiene CAE y todavía
   // no tiene una NC asociada (otra factura cuyo facturaOriginalId la apunta).
@@ -3951,6 +3956,7 @@ export function VentasClient({
     setSearch('');
     setFilterEstado('');
     setFilterTipo('');
+    setFilterArca('');
     setFilterDesde('');
     setFilterHasta('');
   }
@@ -4298,6 +4304,20 @@ export function VentasClient({
                     <option value="">Todos los tipos</option>
                     <option value="afip">Facturas ARCA</option>
                     <option value="nc">Notas de Crédito</option>
+                  </select>
+                  {/* Estado ANTE ARCA, distinto del estado de cobro del select
+                      de al lado. Solo hay dos valores porque la emisión es
+                      sincrónica: o TusFacturas devuelve el CAE (aceptado) o la
+                      fila se guarda como rechazada. No existe un limbo. */}
+                  <select
+                    value={filterArca}
+                    onChange={(e) => setFilterArca(e.target.value)}
+                    title="Estado del comprobante ante ARCA"
+                    className="h-9 rounded-[8px] border border-gray-200 bg-white px-3 text-sm text-gray-600 focus:border-[#175861] focus:outline-none"
+                  >
+                    <option value="">ARCA: todos</option>
+                    <option value="aceptado">ARCA: aceptados</option>
+                    <option value="rechazado">ARCA: rechazados</option>
                   </select>
                 </>
               )}
