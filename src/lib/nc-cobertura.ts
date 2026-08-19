@@ -19,7 +19,7 @@
  * una de estas NC (`movimientosDeNc`) para no contar esa plata dos veces.
  */
 
-import { and, inArray, isNotNull } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import {
@@ -61,6 +61,31 @@ export async function calcularCoberturaNotasCreditoBatch(socioIds: string[]): Pr
     out.set(id, { montoPorMovimiento: new Map(), movimientosDeNc: new Set() });
   }
   if (socioIds.length === 0) return out;
+
+  // NC SUELTAS todavía sin juntar: su crédito existe como movimiento (haber)
+  // pero el club no eligió a qué factura va, así que no puede saldar nada por su
+  // cuenta ni inflar el saldo a favor — se ofrece explícitamente en Cobranzas,
+  // igual que un adelanto. Van a `movimientosDeNc` (que aporta 0 al pool) sin
+  // entrar en `montoPorMovimiento`: crédito existente pero no aplicado. Cuando
+  // el club la junta, la NC recibe su `facturaOriginalId` y pasa a resolverse
+  // por el camino de abajo, como cualquier NC asociada.
+  const libresPendientes = await db
+    .select({ socioId: facturacion.socioId, movimientoId: facturacion.movimientoId })
+    .from(facturacion)
+    .where(
+      and(
+        inArray(facturacion.socioId, socioIds),
+        inArray(facturacion.tipoFactura, [...TIPOS_NC_ASOCIABLES]),
+        isNull(facturacion.facturaOriginalId),
+        eq(facturacion.estado, 'pendiente'),
+        eq(facturacion.anulada, false),
+        eq(facturacion.rechazada, false),
+        isNotNull(facturacion.movimientoId),
+      ),
+    );
+  for (const n of libresPendientes) {
+    if (n.movimientoId && n.socioId) out.get(n.socioId)?.movimientosDeNc.add(n.movimientoId);
+  }
 
   const notas = await db
     .select({

@@ -18,6 +18,7 @@ import {
   getSaldoAFavorAction,
   registrarCobranzaAction,
   type ComprobantePendiente,
+  type NotaCreditoSuelta,
 } from '@/app/actions/cobranzas';
 import {
   FormasDePago,
@@ -122,6 +123,10 @@ function NuevaCobranzaModal({
   // ofrece como opción para cubrir parte del cobro (pedido 2026-08-06).
   const [saldoDisponible, setSaldoDisponible] = useState(0);
   const [usarSaldoAFavor, setUsarSaldoAFavor] = useState(false);
+  // Notas de crédito sueltas del socio (crédito emitido sin factura asignada) y
+  // la factura que el club eligió para cada una.
+  const [notasCredito, setNotasCredito] = useState<NotaCreditoSuelta[]>([]);
+  const [ncDestino, setNcDestino] = useState<Record<string, string>>({});
   // Cuánto del saldo a favor aplicar. Editable: el club puede usar solo una
   // parte del crédito disponible y cobrar el resto (pedido 2026-08-10). Al
   // tildar arranca en el máximo aplicable y se puede bajar; nunca puede superar
@@ -157,12 +162,40 @@ function NuevaCobranzaModal({
   );
   const modoReparto = seleccionados.length >= 2;
 
+  // Notas de crédito sueltas que el club junta en esta cobranza: notaId -> id de
+  // la factura elegida. Sin elegir factura, la nota no se aplica.
+  const ncAplicadas = useMemo(
+    () =>
+      notasCredito
+        .filter((n) => ncDestino[n.id] && selected.has(ncDestino[n.id]))
+        .map((n) => ({ nota: n, comprobanteId: ncDestino[n.id] })),
+    [notasCredito, ncDestino, selected],
+  );
+
+  const totalNc = useMemo(
+    () => ncAplicadas.reduce((acc, x) => acc + parseFloat(x.nota.importe ?? '0'), 0),
+    [ncAplicadas],
+  );
+
+  /** Cuánto le resta una NC a un comprobante puntual en esta cobranza. */
+  const ncDeComprobante = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const x of ncAplicadas) {
+      m.set(x.comprobanteId, (m.get(x.comprobanteId) ?? 0) + parseFloat(x.nota.importe ?? '0'));
+    }
+    return m;
+  }, [ncAplicadas]);
+
   // Lo seleccionado se suma por el saldo PENDIENTE de cada comprobante (si ya
-  // tuvo un cobro parcial o una NC, se cobra solo lo que falta).
+  // tuvo un cobro parcial o una NC, se cobra solo lo que falta), menos lo que le
+  // resta una nota de crédito que se junte en esta misma cobranza.
   const totalSeleccionado = useMemo(
     () =>
-      seleccionados.reduce((acc, c) => acc + parseFloat(c.importePendiente ?? c.importe ?? '0'), 0),
-    [seleccionados],
+      seleccionados.reduce((acc, c) => {
+        const pendiente = parseFloat(c.importePendiente ?? c.importe ?? '0');
+        return acc + Math.max(0, pendiente - (ncDeComprobante.get(c.id) ?? 0));
+      }, 0),
+    [seleccionados, ncDeComprobante],
   );
 
   function pendienteDe(c: ComprobantePendiente): number {
@@ -230,6 +263,8 @@ function NuevaCobranzaModal({
         return;
       }
       setComprobantes(res.comprobantes ?? []);
+      setNotasCredito(res.notasCredito ?? []);
+      setNcDestino({});
       setTarjetaGuardada(res.tarjeta ?? null);
       setSelected(new Set());
       setSaldoDisponible(saldoRes.disponible ?? 0);
@@ -364,6 +399,9 @@ function NuevaCobranzaModal({
               comprobanteId: c.id,
               monto: montoToNumberStr(montosPorComp[c.id] ?? '0'),
             }))
+          : undefined,
+        notasCredito: ncAplicadas.length
+          ? ncAplicadas.map((x) => ({ notaId: x.nota.id, comprobanteId: x.comprobanteId }))
           : undefined,
       });
       if (res.error) {
@@ -550,6 +588,56 @@ function NuevaCobranzaModal({
                   <span className="text-base font-bold text-[#101828]">
                     {fmtMoney(totalSeleccionado)}
                   </span>
+                </div>
+              )}
+
+              {/* Notas de crédito sueltas: crédito ya emitido que todavía no
+                  está asignado a ninguna factura. El club elige con cuál de las
+                  facturas seleccionadas la junta (pedido cliente 2026-08-19). */}
+              {selected.size > 0 && notasCredito.length > 0 && (
+                <div className="rounded-[10px] border border-gray-200">
+                  <div className="border-b border-gray-100 px-4 py-2.5">
+                    <p className="text-sm font-semibold text-[#101828]">
+                      Notas de crédito sin usar
+                    </p>
+                    <p className="mt-0.5 text-xs text-gray-500">
+                      Elegí con qué factura juntás cada una. La nota resta de esa factura.
+                    </p>
+                  </div>
+                  <ul className="divide-y divide-gray-100">
+                    {notasCredito.map((n) => (
+                      <li key={n.id} className="flex flex-wrap items-center gap-2 px-4 py-2.5">
+                        <span className="text-sm font-medium text-[#101828]">
+                          {n.codigo ?? 'Nota de crédito'}
+                        </span>
+                        <span className="text-sm font-semibold" style={{ color: '#175861' }}>
+                          −{fmtMoney(parseFloat(n.importe ?? '0'))}
+                        </span>
+                        <select
+                          value={ncDestino[n.id] ?? ''}
+                          onChange={(e) =>
+                            setNcDestino((prev) => ({ ...prev, [n.id]: e.target.value }))
+                          }
+                          className="ml-auto h-9 rounded-[8px] border border-gray-200 bg-white px-2 text-sm focus:border-[#175861] focus:ring-1 focus:ring-[#175861] focus:outline-none"
+                        >
+                          <option value="">No usar en esta cobranza</option>
+                          {seleccionados.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              Juntar con {c.codigo ?? 'comprobante'}
+                            </option>
+                          ))}
+                        </select>
+                      </li>
+                    ))}
+                  </ul>
+                  {totalNc > 0 && (
+                    <div className="flex items-center justify-between border-t border-gray-100 bg-gray-50 px-4 py-2 text-sm">
+                      <span className="text-gray-600">Aplicado en notas de crédito</span>
+                      <span className="font-semibold" style={{ color: '#175861' }}>
+                        −{fmtMoney(totalNc)}
+                      </span>
+                    </div>
+                  )}
                 </div>
               )}
 

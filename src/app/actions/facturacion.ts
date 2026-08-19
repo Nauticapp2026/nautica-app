@@ -3084,9 +3084,12 @@ export async function emitirNotaLibreAction(data: EmitirNotaLibreData): Promise<
       guarderiaId: gId,
       socioId: data.socioId,
       tipoFactura: tipoNotaFactura as never,
-      // Igual que en la nota asociada: NC 'pagada', ND 'pendiente' (deuda
-      // nueva a cobrar, como una factura).
-      estado: data.esNc ? 'pagada' : 'pendiente',
+      // Nota SUELTA: nace 'pendiente' tanto la NC como la ND. La ND es deuda
+      // nueva a cobrar (como una factura); la NC es crédito que todavía no está
+      // asignado a ninguna factura, así que queda esperando que el club la junte
+      // desde Cobranzas (pedido cliente 2026-08-19). Ojo: la nota ASOCIADA sí
+      // nace 'pagada' — ahí el club ya eligió la factura al emitirla.
+      estado: 'pendiente',
       codigo: apiResponse.comprobante_nro ?? null,
       folioLocal,
       archivo: apiResponse.comprobante_pdf_url ?? null,
