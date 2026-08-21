@@ -174,77 +174,35 @@ function NuevaCobranzaModal({
     [notasCredito, canal],
   );
 
-  /**
-   * A qué factura va cada nota tildada. El club no la elige: se asigna a la
-   * primera factura seleccionada que la pueda absorber entera, del más viejo al
-   * más nuevo. Una nota va contra UNA sola factura (el modelo guarda un único
-   * `facturaOriginalId`), así que una nota más grande que cualquiera de las
-   * facturas tildadas queda sin asignar y se avisa en su fila.
-   */
-  const ncAsignadas = useMemo(() => {
-    const elegidas = notasCreditoCanal.filter((n) => ncSeleccionadas.has(n.id));
-    if (elegidas.length === 0) return [];
-
-    // Cupo restante de cada factura tildada, en el orden en que se listan.
-    const cupo = new Map<string, number>();
-    for (const c of seleccionados) {
-      cupo.set(c.id, parseFloat(c.importePendiente ?? c.importe ?? '0'));
-    }
-
-    const out: Array<{ nota: NotaCreditoSuelta; comprobanteId: string; codigo: string | null }> =
-      [];
-    for (const n of elegidas) {
-      const monto = parseFloat(n.importe ?? '0');
-      const destino = seleccionados.find((c) => (cupo.get(c.id) ?? 0) >= monto - 0.005);
-      if (!destino) continue;
-      cupo.set(destino.id, (cupo.get(destino.id) ?? 0) - monto);
-      out.push({ nota: n, comprobanteId: destino.id, codigo: destino.codigo });
-    }
-    return out;
-  }, [notasCreditoCanal, ncSeleccionadas, seleccionados]);
-
-  const ncAplicadas = ncAsignadas;
+  // Notas tildadas y su total. NO se atan a ninguna factura: el total resta de
+  // lo que hay que cobrar, igual que el saldo a favor, y el server lo reparte
+  // entre los comprobantes elegidos con el mismo criterio que la plata.
+  const ncAplicadas = useMemo(
+    () => notasCreditoCanal.filter((n) => ncSeleccionadas.has(n.id)),
+    [notasCreditoCanal, ncSeleccionadas],
+  );
 
   const totalNc = useMemo(
-    () => ncAsignadas.reduce((acc, x) => acc + parseFloat(x.nota.importe ?? '0'), 0),
-    [ncAsignadas],
+    () => ncAplicadas.reduce((acc, n) => acc + parseFloat(n.importe ?? '0'), 0),
+    [ncAplicadas],
   );
-
-  /** Cuánto le resta una NC a un comprobante puntual en esta cobranza. */
-  const ncDeComprobante = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const x of ncAsignadas) {
-      m.set(x.comprobanteId, (m.get(x.comprobanteId) ?? 0) + parseFloat(x.nota.importe ?? '0'));
-    }
-    return m;
-  }, [ncAsignadas]);
 
   // Lo seleccionado se suma por el saldo PENDIENTE de cada comprobante (si ya
-  // tuvo un cobro parcial o una NC, se cobra solo lo que falta), menos lo que le
-  // resta una nota de crédito que se junte en esta misma cobranza.
-  const totalSeleccionado = useMemo(
-    () =>
-      seleccionados.reduce((acc, c) => {
-        const pendiente = parseFloat(c.importePendiente ?? c.importe ?? '0');
-        return acc + Math.max(0, pendiente - (ncDeComprobante.get(c.id) ?? 0));
-      }, 0),
-    [seleccionados, ncDeComprobante],
-  );
+  // tuvo un cobro parcial o una NC vieja, se cobra solo lo que falta) menos las
+  // notas de crédito tildadas, que restan del total como el saldo a favor.
+  const totalSeleccionado = useMemo(() => {
+    const bruto = seleccionados.reduce(
+      (acc, c) => acc + parseFloat(c.importePendiente ?? c.importe ?? '0'),
+      0,
+    );
+    return Math.max(0, bruto - totalNc);
+  }, [seleccionados, totalNc]);
 
-  // Lo que queda por COBRAR de un comprobante en esta cobranza: su pendiente
-  // menos lo que le resta una nota de crédito que se junte acá. Tiene que
-  // coincidir con el tope que valida el server (`restanteDe` en
-  // actions/cobranzas.ts), o el reparto dejaría cargar más de lo que se debe.
-  // useCallback y no una función suelta: depende de `ncDeComprobante`, así que
-  // tildar una nota tiene que recalcular lo que la usa (el reparto valida contra
-  // esto). Como función suelta el linter no podía verificarlo y la validación
-  // podía quedar con el tope viejo.
+  // useCallback con deps vacías: solo lee su argumento, así que es estable y
+  // puede figurar en el array de dependencias de los useMemo que la usan.
   const pendienteDe = useCallback(
-    (c: ComprobantePendiente): number => {
-      const pendiente = parseFloat(c.importePendiente ?? c.importe ?? '0');
-      return Math.max(0, pendiente - (ncDeComprobante.get(c.id) ?? 0));
-    },
-    [ncDeComprobante],
+    (c: ComprobantePendiente): number => parseFloat(c.importePendiente ?? c.importe ?? '0'),
+    [],
   );
 
   // Cobrando internos, el dropdown de formas solo muestra los medios que el
@@ -454,9 +412,7 @@ function NuevaCobranzaModal({
               monto: montoToNumberStr(montosPorComp[c.id] ?? '0'),
             }))
           : undefined,
-        notasCredito: ncAplicadas.length
-          ? ncAplicadas.map((x) => ({ notaId: x.nota.id, comprobanteId: x.comprobanteId }))
-          : undefined,
+        notasCredito: ncAplicadas.length ? ncAplicadas.map((n) => n.id) : undefined,
       });
       if (res.error) {
         setError(res.error);
@@ -621,12 +577,11 @@ function NuevaCobranzaModal({
                     ))}
 
                     {/* Notas de crédito sueltas: un ítem más del listado, con el
-                        importe en NEGATIVO. Tildarlas las resta del total; a qué
-                        factura se imputa lo resuelve `ncAsignadas` (la primera
-                        de las tildadas que la pueda absorber). */}
+                        importe en NEGATIVO. No se atan a ninguna factura —
+                        tildarlas resta del total a cobrar, igual que el saldo a
+                        favor. */}
                     {notasCreditoCanal.map((n) => {
                       const monto = parseFloat(n.importe ?? '0');
-                      const asignada = ncAsignadas.find((x) => x.nota.id === n.id);
                       const tildada = ncSeleccionadas.has(n.id);
                       return (
                         <label
@@ -648,11 +603,7 @@ function NuevaCobranzaModal({
                             </span>
                             <span className="text-xs text-gray-400">
                               {n.emision ? formatArgentinaDate(n.emision) : '—'}
-                              {tildada && asignada
-                                ? ` · Se junta con ${asignada.codigo ?? 'la factura elegida'}`
-                                : tildada
-                                  ? ' · Elegí una factura que la pueda cubrir'
-                                  : ''}
+                              {tildada ? ' · Resta de lo seleccionado' : ''}
                             </span>
                           </div>
                           <span className="text-sm font-semibold" style={{ color: '#175861' }}>

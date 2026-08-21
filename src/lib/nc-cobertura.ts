@@ -62,14 +62,19 @@ export async function calcularCoberturaNotasCreditoBatch(socioIds: string[]): Pr
   }
   if (socioIds.length === 0) return out;
 
-  // NC SUELTAS todavía sin juntar: su crédito existe como movimiento (haber)
-  // pero el club no eligió a qué factura va, así que no puede saldar nada por su
-  // cuenta ni inflar el saldo a favor — se ofrece explícitamente en Cobranzas,
-  // igual que un adelanto. Van a `movimientosDeNc` (que aporta 0 al pool) sin
-  // entrar en `montoPorMovimiento`: crédito existente pero no aplicado. Cuando
-  // el club la junta, la NC recibe su `facturaOriginalId` y pasa a resolverse
-  // por el camino de abajo, como cualquier NC asociada.
-  const libresPendientes = await db
+  // NC SUELTAS (sin factura asociada): su crédito existe como movimiento (haber)
+  // pero NUNCA es crédito genérico. Se excluye del pool SIEMPRE, sin importar si
+  // ya se usó o no:
+  //
+  //  - Mientras está sin usar, no puede saldar cargos por su cuenta ni inflar el
+  //    saldo a favor: se ofrece explícitamente en Cobranzas, igual que un
+  //    adelanto (ver project: "el adelanto no salda solo").
+  //  - Una vez usada en una cobranza, su crédito ya quedó declarado en las
+  //    `aplicaciones` de ese recibo. Si volviera al pool se contaría dos veces.
+  //
+  // Va a `movimientosDeNc` (que aporta 0 al pool) sin entrar en
+  // `montoPorMovimiento`: el crédito existe pero no cubre cargos por sí mismo.
+  const libres = await db
     .select({ socioId: facturacion.socioId, movimientoId: facturacion.movimientoId })
     .from(facturacion)
     .where(
@@ -77,13 +82,12 @@ export async function calcularCoberturaNotasCreditoBatch(socioIds: string[]): Pr
         inArray(facturacion.socioId, socioIds),
         inArray(facturacion.tipoFactura, [...TIPOS_NC_ASOCIABLES]),
         isNull(facturacion.facturaOriginalId),
-        eq(facturacion.estado, 'pendiente'),
         eq(facturacion.anulada, false),
         eq(facturacion.rechazada, false),
         isNotNull(facturacion.movimientoId),
       ),
     );
-  for (const n of libresPendientes) {
+  for (const n of libres) {
     if (n.movimientoId && n.socioId) out.get(n.socioId)?.movimientosDeNc.add(n.movimientoId);
   }
 

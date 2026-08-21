@@ -302,13 +302,13 @@ export type RegistrarCobranzaData = {
   // del movimiento (eso duplicaría el crédito) — solo amplía lo que el recibo
   // declara cubierto en `aplicaciones`. Requiere 1+ comprobantes seleccionados.
   montoSaldoAFavor?: string;
-  // Notas de crédito sueltas que el club junta en esta cobranza, cada una con la
-  // factura elegida (pedido cliente 2026-08-19). Como el saldo a favor, no es
-  // plata nueva: no suma al haber del movimiento (el haber de la NC ya existe en
-  // la cuenta) — amplía lo que el recibo declara cubierto. Al aplicarla, la NC
-  // recibe ese `facturaOriginalId` y pasa a resolverse por la maquinaria de NC
-  // asociada, que ya descuenta el crédito de los cargos de esa factura.
-  notasCredito?: { notaId: string; comprobanteId: string }[];
+  // Notas de crédito sueltas que se usan en esta cobranza. NO se atan a una
+  // factura puntual: como el saldo a favor, su importe amplía lo que el recibo
+  // declara cubierto y se reparte entre los comprobantes seleccionados con el
+  // mismo criterio que la plata (el reparto del club, o FIFO). Tampoco es plata
+  // nueva: no suma al haber del movimiento, porque el haber de la NC ya existe
+  // en la cuenta corriente.
+  notasCredito?: string[];
 };
 
 export async function registrarCobranzaAction(data: RegistrarCobranzaData): Promise<{
@@ -332,11 +332,11 @@ export async function registrarCobranzaAction(data: RegistrarCobranzaData): Prom
     return { error: 'El saldo a favor solo se puede aplicar a comprobantes seleccionados.' };
   }
 
-  // Plata (real + saldo a favor) que el recibo declara cubierta. El chequeo de
-  // "algo tiene que pasar en esta cobranza" se hace más abajo, después de
-  // validar las notas de crédito: juntar una NC que cubre la factura entera es
-  // una cobranza válida aunque no entre un peso.
-  const montoTotalAplicar = montoAPagar + montoSaldoAFavor;
+  // Lo que el recibo declara cubierto: plata real + saldo a favor + (más abajo)
+  // las notas de crédito usadas. El chequeo de "algo tiene que pasar en esta
+  // cobranza" se hace después de validar las notas, porque una nota que cubre la
+  // factura entera es una cobranza válida aunque no entre un peso.
+  let montoTotalAplicar = montoAPagar + montoSaldoAFavor;
 
   // Formas de pago solo son obligatorias si hay plata real de por medio — si
   // el saldo a favor cubre el total, no hace falta ninguna.
@@ -367,29 +367,24 @@ export async function registrarCobranzaAction(data: RegistrarCobranzaData): Prom
   // Se validan contra la DB (no se confía en el cliente): que sean del socio y
   // la guardería, que sigan sueltas y pendientes, y que la factura elegida esté
   // entre las seleccionadas.
-  const notasPedidas = data.notasCredito ?? [];
-  const notasAAplicar: { notaId: string; comprobanteId: string; importe: number }[] = [];
+  const notasPedidas = [...new Set(data.notasCredito ?? [])];
   let montoNotasCredito = 0;
 
   if (notasPedidas.length > 0) {
     if ((data.comprobanteIds ?? []).length === 0) {
       return {
-        error: 'Para aplicar una nota de crédito hay que elegir la factura con la que se junta.',
+        error: 'Una nota de crédito solo se puede aplicar a comprobantes seleccionados.',
       };
-    }
-    const idsUnicos = [...new Set(notasPedidas.map((n) => n.notaId))];
-    if (idsUnicos.length !== notasPedidas.length) {
-      return { error: 'Una nota de crédito no puede aplicarse dos veces en la misma cobranza.' };
     }
 
     const notasDb = await db
-      .select({ id: facturacion.id, codigo: facturacion.codigo, importe: facturacion.importe })
+      .select({ id: facturacion.id, importe: facturacion.importe })
       .from(facturacion)
       .where(
         and(
           eq(facturacion.guarderiaId, gId),
           eq(facturacion.socioId, data.socioId),
-          inArray(facturacion.id, idsUnicos),
+          inArray(facturacion.id, notasPedidas),
           inArray(facturacion.tipoFactura, [...TIPOS_NC_SUELTA]),
           isNull(facturacion.facturaOriginalId),
           eq(facturacion.estado, 'pendiente'),
@@ -397,29 +392,24 @@ export async function registrarCobranzaAction(data: RegistrarCobranzaData): Prom
           eq(facturacion.rechazada, false),
         ),
       );
-    if (notasDb.length !== idsUnicos.length) {
+    if (notasDb.length !== notasPedidas.length) {
       return {
-        error: 'Alguna nota de crédito ya fue aplicada o no está disponible. Recargá la página.',
+        error: 'Alguna nota de crédito ya fue usada o no está disponible. Recargá la página.',
       };
     }
-    const notaById = new Map(notasDb.map((n) => [n.id, n]));
-
-    for (const pedida of notasPedidas) {
-      const nota = notaById.get(pedida.notaId);
-      if (!nota) return { error: 'Nota de crédito no encontrada.' };
-      if (!(data.comprobanteIds ?? []).includes(pedida.comprobanteId)) {
-        return {
-          error: `La factura elegida para la nota ${nota.codigo ?? ''} no está entre las seleccionadas.`,
-        };
-      }
-      const importe = parseFloat(nota.importe ?? '0');
+    for (const n of notasDb) {
+      const importe = parseFloat(n.importe ?? '0');
       if (!(importe > 0)) return { error: 'La nota de crédito no tiene importe.' };
-      notasAAplicar.push({ notaId: pedida.notaId, comprobanteId: pedida.comprobanteId, importe });
       montoNotasCredito += importe;
     }
   }
 
-  if (montoTotalAplicar + montoNotasCredito <= 0) {
+  // El importe de las notas se suma a lo aplicable: se reparte entre los
+  // comprobantes elegidos igual que la plata. Así una nota que cubre la factura
+  // entera la deja saldada sin que entre un peso.
+  montoTotalAplicar += montoNotasCredito;
+
+  if (montoTotalAplicar <= 0) {
     return { error: 'El monto a cobrar debe ser mayor a 0.' };
   }
 
@@ -520,43 +510,11 @@ export async function registrarCobranzaAction(data: RegistrarCobranzaData): Prom
     ? await getPendientePorComprobante(data.socioId, gId, comprobantes)
     : new Map<string, number>();
 
-  // Lo que cada NC que se junta en esta cobranza le saca a su factura. Se
-  // descuenta del restante ANTES de repartir la plata: la NC cubre primero y el
-  // club paga lo que queda. La cobertura la va a resolver la maquinaria de NC
-  // asociada en cuanto la nota reciba su `facturaOriginalId` (abajo, en la
-  // transacción), así que NO se suma a `aplicaciones` — hacerlo cubriría el
-  // comprobante dos veces.
-  const ncPorComprobante = new Map<string, number>();
-  for (const n of notasAAplicar) {
-    ncPorComprobante.set(n.comprobanteId, (ncPorComprobante.get(n.comprobanteId) ?? 0) + n.importe);
-  }
-
-  const restanteDe = (c: (typeof comprobantes)[number]) => {
-    const previo = pendientePrevio.get(c.id) ?? parseFloat(c.importe ?? '0');
-    return Math.max(0, previo - (ncPorComprobante.get(c.id) ?? 0));
-  };
-
-  // Ninguna NC puede acreditar más de lo que debe su factura: el excedente no
-  // tiene dónde ir y dejaría la factura "sobrepagada".
-  for (const c of comprobantes) {
-    const nc = ncPorComprobante.get(c.id) ?? 0;
-    if (nc <= 0) continue;
-    const previo = pendientePrevio.get(c.id) ?? parseFloat(c.importe ?? '0');
-    if (nc > previo + 0.01) {
-      return {
-        error: `La nota de crédito ($${nc.toFixed(2)}) supera lo que debe la factura elegida ($${previo.toFixed(2)}). Elegí otra factura o emitila por el monto correcto.`,
-      };
-    }
-  }
+  const restanteDe = (c: (typeof comprobantes)[number]) =>
+    pendientePrevio.get(c.id) ?? parseFloat(c.importe ?? '0');
 
   const aplicaciones: { comprobanteId: string; monto: string }[] = [];
   const pagados: typeof comprobantes = [];
-
-  // Facturas que quedan saldadas por la NC sola (no les queda nada que cobrar):
-  // el reparto de plata las saltea, así que se marcan acá.
-  for (const c of comprobantes) {
-    if ((ncPorComprobante.get(c.id) ?? 0) > 0 && restanteDe(c) <= 0.005) pagados.push(c);
-  }
 
   if (data.aplicaciones?.length) {
     const porComp = new Map(
@@ -697,23 +655,22 @@ export async function registrarCobranzaAction(data: RegistrarCobranzaData): Prom
         }
       }
 
-      // 3.bis Juntar las notas de crédito sueltas con la factura elegida. Al
-      // recibir su `facturaOriginalId` dejan de estar sueltas: la maquinaria de
-      // NC asociada (nc-cobertura / getAplicadoPorComprobante) descuenta su
-      // crédito de los cargos de esa factura, y el movimiento de la nota sale
-      // del limbo en que estaba mientras esperaba (ver nc-cobertura). Pasan a
-      // 'pagada' porque ya cumplieron su función.
+      // 3.bis Marcar como usadas las notas de crédito aplicadas. NO se les pone
+      // `facturaOriginalId`: no se atan a una factura puntual, su crédito ya
+      // quedó declarado en las `aplicaciones` de este recibo y se reparte como
+      // la plata. Su movimiento sigue fuera del pool genérico (ver
+      // nc-cobertura: las NC sueltas se excluyen siempre), así que el crédito no
+      // se cuenta dos veces.
       //
-      // El WHERE repite las condiciones de disponibilidad para que dos
-      // cobranzas simultáneas no puedan aplicar la misma nota dos veces: la que
-      // llega segunda no afecta filas.
-      for (const nota of notasAAplicar) {
-        const aplicada = await tx
+      // El WHERE repite las condiciones de disponibilidad para que dos cobranzas
+      // simultáneas no usen la misma nota: la que llega segunda no afecta filas.
+      for (const notaId of notasPedidas) {
+        const usada = await tx
           .update(facturacion)
-          .set({ facturaOriginalId: nota.comprobanteId, estado: 'pagada' })
+          .set({ estado: 'pagada' })
           .where(
             and(
-              eq(facturacion.id, nota.notaId),
+              eq(facturacion.id, notaId),
               eq(facturacion.guarderiaId, gId),
               eq(facturacion.socioId, data.socioId),
               isNull(facturacion.facturaOriginalId),
@@ -721,7 +678,7 @@ export async function registrarCobranzaAction(data: RegistrarCobranzaData): Prom
             ),
           )
           .returning({ id: facturacion.id });
-        if (aplicada.length === 0) {
+        if (usada.length === 0) {
           // Otra cobranza se la llevó mientras armábamos esta: abortar todo.
           throw new Error('NOTA_YA_APLICADA');
         }
