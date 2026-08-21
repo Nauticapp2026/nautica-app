@@ -195,6 +195,8 @@ export async function listarPendientesFacturar(
         eq(memberships.guarderiaId, socioServicios.guarderiaId),
         eq(memberships.rol, 'socio'),
         eq(memberships.status, 'active'),
+        // Socio marcado "No facturar": no se le emiten comprobantes nuevos.
+        eq(memberships.noFacturar, false),
       ),
     )
     .where(
@@ -246,6 +248,8 @@ export async function listarPendientesFacturar(
         eq(memberships.guarderiaId, espacios.guarderiaId),
         eq(memberships.rol, 'socio'),
         eq(memberships.status, 'active'),
+        // Socio marcado "No facturar": no se le emiten comprobantes nuevos.
+        eq(memberships.noFacturar, false),
       ),
     )
     .leftJoin(

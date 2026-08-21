@@ -677,6 +677,52 @@ export async function updateSocioStatusAction(
   }
 }
 
+// ─── Marca "No facturar" ────────────────────────────────────────────────────
+
+const noFacturarSchema = z.object({ socioId: z.string().uuid(), valor: z.boolean() });
+
+/**
+ * Marca o desmarca al socio como "No facturar" (mig 0148). No lo da de baja: el
+ * socio sigue `active`, usa el club y se le puede cobrar lo que ya debe — solo
+ * deja de aparecer en los flujos de emisión.
+ *
+ * La deuda se sigue generando mientras está marcado (decisión del cliente), así
+ * que al desmarcarlo vuelve a aparecer todo lo acumulado.
+ */
+export async function updateSocioNoFacturarAction(
+  socioId: string,
+  valor: boolean,
+): Promise<{ error?: string }> {
+  const parsed = noFacturarSchema.safeParse({ socioId, valor });
+  if (!parsed.success) return { error: 'Datos inválidos.' };
+
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'Tu sesión expiró. Recargá la página e intentá de nuevo.' };
+  if (!isAdminSocios(ctx)) return { error: 'Solo administradores.' };
+
+  try {
+    const filas = await db
+      .update(memberships)
+      .set({ noFacturar: parsed.data.valor })
+      .where(
+        and(
+          eq(memberships.userId, parsed.data.socioId),
+          eq(memberships.guarderiaId, ctx.activeMembership.guarderiaId),
+          eq(memberships.rol, 'socio'),
+        ),
+      )
+      .returning({ id: memberships.id });
+    if (filas.length === 0) return { error: 'El socio no pertenece a esta guardería.' };
+
+    revalidatePath('/usuarios');
+    revalidatePath(`/usuarios/${parsed.data.socioId}`);
+    revalidatePath('/ventas');
+    return {};
+  } catch {
+    return { error: 'Error al actualizar la marca.' };
+  }
+}
+
 // ─── Editar servicio contratado (fecha de inicio / fecha de baja) ──────────
 
 function isAdminSocios(ctx: NonNullable<Awaited<ReturnType<typeof getActiveMarina>>>): boolean {

@@ -490,6 +490,11 @@ export const memberships = pgTable(
       .references(() => guarderias.id, { onDelete: 'cascade' }),
     rol: rolEnum('rol').notNull().default('socio'),
     status: membershipStatusEnum('status').default('active').notNull(),
+    // "No facturar" (mig 0148): el socio sigue activo — usa el club, ocupa su
+    // espacio, se le puede cobrar lo que ya debe — pero no aparece para emitir
+    // comprobantes nuevos. La deuda SÍ se sigue generando: lo que se frena es
+    // la emisión, no el cargo (decisión del cliente).
+    noFacturar: boolean('no_facturar').notNull().default(false),
     numeroSocio: integer('numero_socio'),
     // Semántica: true = facturar con los datos PERSONALES del socio (pestaña
     // Generales: nombre/apellido, DNI, dirección, condicionIvaPersonal).

@@ -595,6 +595,8 @@ export async function crearFacturaCore(
         eq(profiles.id, data.socioId),
         eq(memberships.guarderiaId, gId),
         eq(memberships.status, 'active'),
+        // Socio marcado "No facturar": no se le emiten comprobantes nuevos.
+        eq(memberships.noFacturar, false),
       ),
     );
 
@@ -1232,6 +1234,8 @@ export async function createBatchInvoicesAction(
         inArray(memberships.userId, socioIds),
         eq(memberships.guarderiaId, gId),
         eq(memberships.status, 'active'),
+        // Socio marcado "No facturar": no se le emiten comprobantes nuevos.
+        eq(memberships.noFacturar, false),
       ),
     );
   const validSocioMap = new Map(
@@ -1310,6 +1314,8 @@ export async function getSocioPendientesAction(
         eq(memberships.userId, socioId),
         eq(memberships.guarderiaId, gId),
         eq(memberships.status, 'active'),
+        // Socio marcado "No facturar": no se le emiten comprobantes nuevos.
+        eq(memberships.noFacturar, false),
       ),
     );
   if (!m) return { error: 'Socio no pertenece a esta guardería.' };
@@ -1412,6 +1418,8 @@ export async function getPendientesEmisionAction(
         eq(memberships.userId, socioId),
         eq(memberships.guarderiaId, gId),
         eq(memberships.status, 'active'),
+        // Socio marcado "No facturar": no se le emiten comprobantes nuevos.
+        eq(memberships.noFacturar, false),
       ),
     );
   if (!m) return { error: 'Socio no pertenece a esta guardería.' };
@@ -1866,6 +1874,8 @@ export async function getSocioPendientesInternoAction(
         eq(memberships.userId, socioId),
         eq(memberships.guarderiaId, gId),
         eq(memberships.status, 'active'),
+        // Socio marcado "No facturar": no se le emiten comprobantes nuevos.
+        eq(memberships.noFacturar, false),
       ),
     );
   if (!m) return { error: 'Socio no pertenece a esta guardería.' };

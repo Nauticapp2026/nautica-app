@@ -282,6 +282,8 @@ export default async function VentasPage({
           eq(memberships.guarderiaId, gId),
           eq(memberships.rol, 'socio'),
           eq(memberships.status, 'active'),
+          // Socio marcado "No facturar": no se le emiten comprobantes nuevos.
+          eq(memberships.noFacturar, false),
         ),
       )
       .orderBy(profiles.apellido, profiles.nombre),
@@ -319,6 +321,8 @@ export default async function VentasPage({
           eq(memberships.guarderiaId, gId),
           eq(memberships.rol, 'socio'),
           eq(memberships.status, 'active'),
+          // Socio marcado "No facturar": no se le emiten comprobantes nuevos.
+          eq(memberships.noFacturar, false),
         ),
       )
       .leftJoin(servicios, eq(servicios.id, movimientosCuentaCorriente.servicioId))
@@ -348,6 +352,8 @@ export default async function VentasPage({
           eq(memberships.guarderiaId, gId),
           eq(memberships.rol, 'socio'),
           eq(memberships.status, 'active'),
+          // Socio marcado "No facturar": no se le emiten comprobantes nuevos.
+          eq(memberships.noFacturar, false),
         ),
       )
       .leftJoin(servicios, eq(servicios.id, movimientosCuentaCorriente.servicioId))

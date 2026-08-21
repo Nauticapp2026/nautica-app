@@ -76,6 +76,7 @@ export default async function SocioPage({
       deuda: profiles.deuda,
       memberSince: memberships.createdAt,
       membershipStatus: memberships.status,
+      noFacturar: memberships.noFacturar,
       numeroSocio: memberships.numeroSocio,
       facturaFiscal: memberships.facturaFiscal,
       comprobanteInterno: memberships.comprobanteInterno,

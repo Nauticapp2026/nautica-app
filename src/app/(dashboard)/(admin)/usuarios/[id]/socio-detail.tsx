@@ -49,6 +49,7 @@ import {
   updateNumeroSocioAction,
   updateSocioAction,
   updateSocioServicioAction,
+  updateSocioNoFacturarAction,
   updateSocioStatusAction,
   uploadSocioDocumentoAction,
 } from '@/app/actions/socios';
@@ -98,6 +99,8 @@ type SocioData = {
   deuda: string | null;
   memberSince: string;
   membershipStatus: 'active' | 'suspended' | 'removed' | 'inactivo' | null;
+  /** Marca 'No facturar': no aparece para emitir comprobantes (mig 0148). */
+  noFacturar: boolean;
   numeroSocio: number | null;
   facturaFiscal: boolean;
   // Tilde "Comprobante interno" (Datos Impositivos): default del toggle
@@ -2135,7 +2138,33 @@ export function SocioDetail({
   const initialStatus = socio.membershipStatus === 'active' ? 'active' : 'inactivo';
   const [currentStatus, setCurrentStatus] = useState<'active' | 'inactivo'>(initialStatus);
   const [isUpdatingStatus, startUpdatingStatus] = useTransition();
+  const [noFacturar, setNoFacturar] = useState(socio.noFacturar);
+  const [isUpdatingNoFacturar, startUpdatingNoFacturar] = useTransition();
   const router = useRouter();
+
+  function handleToggleNoFacturar() {
+    const siguiente = !noFacturar;
+    if (
+      siguiente &&
+      !confirm(
+        `¿Dejar de facturarle a ${nombre}? No va a aparecer más en Ventas para emitir comprobantes. Sus cargos se siguen generando, así que al volver a facturarle va a aparecer todo lo acumulado.`,
+      )
+    ) {
+      return;
+    }
+    // Optimista: si el server falla se revierte y se avisa.
+    setNoFacturar(siguiente);
+    startUpdatingNoFacturar(async () => {
+      const res = await updateSocioNoFacturarAction(socio.id, siguiente);
+      if (res.error) {
+        setNoFacturar(!siguiente);
+        toast.error(res.error);
+      } else {
+        toast.success(siguiente ? 'El socio ya no se factura.' : 'El socio vuelve a facturarse.');
+        router.refresh();
+      }
+    });
+  }
 
   function setField(k: keyof typeof editForm) {
     return (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
@@ -2332,17 +2361,55 @@ export function SocioDetail({
             <p className="text-sm text-gray-400">Socio desde {memberDate}</p>
           </div>
         </div>
-        <select
-          value={currentStatus}
-          onChange={handleSelectChange}
-          disabled={isUpdatingStatus}
-          aria-label="Estado del socio"
-          className={`focus:border-ring focus:ring-ring/50 h-9 cursor-pointer rounded-full border px-3 text-xs font-semibold transition focus:ring-[3px] focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 ${MEMBERSHIP_STATUS_CLASSES[currentStatus]}`}
-        >
-          <option value="active">{MEMBERSHIP_STATUS_LABEL.active}</option>
-          <option value="inactivo">{MEMBERSHIP_STATUS_LABEL.inactivo}</option>
-        </select>
+        <div className="flex shrink-0 items-center gap-2">
+          {/* "No facturar" es una marca aparte del estado, no un valor más del
+              select: el socio sigue Activo (usa el club, se le puede cobrar lo
+              que ya debe) y solo deja de aparecer para emitir comprobantes. */}
+          <button
+            type="button"
+            onClick={handleToggleNoFacturar}
+            disabled={isUpdatingNoFacturar}
+            title={
+              noFacturar
+                ? 'Volver a facturarle: reaparece en Ventas con todo lo que se acumuló'
+                : 'Dejar de facturarle: no aparece más para emitir comprobantes'
+            }
+            className={`h-9 cursor-pointer rounded-full border px-3 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
+              noFacturar
+                ? 'border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100'
+                : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50'
+            }`}
+          >
+            {noFacturar ? 'No facturar' : 'Se factura'}
+          </button>
+          <select
+            value={currentStatus}
+            onChange={handleSelectChange}
+            disabled={isUpdatingStatus}
+            aria-label="Estado del socio"
+            className={`focus:border-ring focus:ring-ring/50 h-9 cursor-pointer rounded-full border px-3 text-xs font-semibold transition focus:ring-[3px] focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 ${MEMBERSHIP_STATUS_CLASSES[currentStatus]}`}
+          >
+            <option value="active">{MEMBERSHIP_STATUS_LABEL.active}</option>
+            <option value="inactivo">{MEMBERSHIP_STATUS_LABEL.inactivo}</option>
+          </select>
+        </div>
       </div>
+
+      {/* Aviso mientras está marcado: la deuda se sigue acumulando, así que
+          conviene que el club vea cuánto se junta y no se lo encuentre de golpe
+          al desmarcarlo. */}
+      {noFacturar && (
+        <div className="mb-4 flex gap-3 rounded-[10px] border border-amber-200 bg-amber-50 p-3">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+          <p className="text-sm text-amber-800">
+            <span className="font-semibold">Este socio no se factura.</span> No aparece en Ventas
+            para emitir comprobantes, pero{' '}
+            <span className="font-semibold">sus cargos se siguen generando</span>: cuando lo vuelvas
+            a facturar, va a aparecer todo lo acumulado. Cobranzas y el resto del sistema funcionan
+            normal.
+          </p>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="-mx-4 mb-6 overflow-x-auto border-b border-gray-200 md:mx-0">
