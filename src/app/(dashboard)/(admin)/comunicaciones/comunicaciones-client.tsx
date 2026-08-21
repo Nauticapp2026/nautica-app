@@ -26,6 +26,7 @@ import { normalizarBusqueda } from '@/lib/buscador';
 import { formatArgentinaDate } from '@/lib/dates';
 import { ImagesUploader } from '@/components/shared/images-uploader';
 import { EmptyState } from '@/components/shared/empty-state';
+import { MailsClient, type AreaOption, type EnvioMail } from './mails-client';
 
 export type TipoComunicacion = 'socios' | 'publica';
 export type CategoriaComunicacion =
@@ -72,6 +73,9 @@ type Props = {
   limitAbiertas: number;
   usedCerradas: number;
   usedAbiertas: number;
+  /** Áreas de espacios del club, para elegir destinatarios de los mails. */
+  areas: AreaOption[];
+  envios: EnvioMail[];
 };
 
 export function ComunicacionesClient({
@@ -80,10 +84,15 @@ export function ComunicacionesClient({
   limitAbiertas,
   usedCerradas,
   usedAbiertas,
+  areas,
+  envios,
 }: Props) {
   const router = useRouter();
   const [query, setQuery] = useState('');
   const [modal, setModal] = useState<ModalState>(null);
+  // 'tablon' = las comunicaciones que se ven en la app; 'mails' = mails masivos
+  // por área de espacios. Son dos canales distintos, de ahí las pestañas.
+  const [tab, setTab] = useState<'tablon' | 'mails'>('tablon');
 
   const handleDeleted = () => {
     setModal(null);
@@ -114,72 +123,110 @@ export function ComunicacionesClient({
           <h1 className="page-title">Comunicaciones</h1>
           <p className="page-subtitle mt-1">Gestiona anuncios y comunicados</p>
         </div>
-        <button
-          type="button"
-          onClick={() => setModal({ mode: 'create' })}
-          className="flex shrink-0 items-center justify-center gap-2 rounded-[10px] bg-[#175861] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#0f4249]"
-        >
-          <Plus className="h-4 w-4" />
-          Nueva comunicación
-        </button>
+        {tab === 'tablon' && (
+          <button
+            type="button"
+            onClick={() => setModal({ mode: 'create' })}
+            className="flex shrink-0 items-center justify-center gap-2 rounded-[10px] bg-[#175861] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#0f4249]"
+          >
+            <Plus className="h-4 w-4" />
+            Nueva comunicación
+          </button>
+        )}
       </header>
 
-      <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard icon={<MessageSquare className="h-5 w-5" />} label="Total" value={stats.total} />
-        <StatCard icon={<Send className="h-5 w-5" />} label="Publicadas" value={stats.publicadas} />
-        <QuotaCard
-          icon={<Users className="h-5 w-5" />}
-          label="Solo Socios"
-          used={usedCerradas}
-          limit={limitCerradas}
-        />
-        <QuotaCard
-          icon={<Globe className="h-5 w-5" />}
-          label="Públicas"
-          used={usedAbiertas}
-          limit={limitAbiertas}
-          zeroLabel="Solo Premium/Elite"
-        />
+      <div className="mb-6 flex gap-0 border-b border-gray-200">
+        {(
+          [
+            ['tablon', 'Tablón de la app'],
+            ['mails', 'Mails'],
+          ] as const
+        ).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setTab(id)}
+            className={`px-4 py-2.5 text-sm font-semibold transition ${
+              tab === id
+                ? 'border-b-2 border-[#175861] text-[#175861]'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
-      <div className="mb-6 flex items-center gap-3">
-        <input
-          className={inputCls}
-          placeholder="Buscar comunicaciones…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-        <button
-          type="button"
-          onClick={() => setQuery('')}
-          title="Limpiar búsqueda"
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] border border-gray-200 text-gray-500 hover:bg-gray-50"
-        >
-          <FilterX className="h-4 w-4" />
-        </button>
-      </div>
+      {tab === 'mails' && <MailsClient areas={areas} envios={envios} />}
 
-      {filtered.length === 0 ? (
-        <div className="rounded-2xl border border-gray-200 bg-white">
-          <EmptyState
-            icon={<MessageSquare className="h-7 w-7 opacity-40" />}
-            text={
-              comunicaciones.length === 0
-                ? 'Todavía no hay comunicaciones cargadas.'
-                : 'Sin resultados con esa búsqueda.'
-            }
-          />
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {filtered.map((c) => (
-            <ComunicacionCard
-              key={c.id}
-              c={c}
-              onEdit={() => setModal({ mode: 'edit', comunicacion: c })}
+      {tab === 'tablon' && (
+        <>
+          <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <StatCard
+              icon={<MessageSquare className="h-5 w-5" />}
+              label="Total"
+              value={stats.total}
             />
-          ))}
-        </div>
+            <StatCard
+              icon={<Send className="h-5 w-5" />}
+              label="Publicadas"
+              value={stats.publicadas}
+            />
+            <QuotaCard
+              icon={<Users className="h-5 w-5" />}
+              label="Solo Socios"
+              used={usedCerradas}
+              limit={limitCerradas}
+            />
+            <QuotaCard
+              icon={<Globe className="h-5 w-5" />}
+              label="Públicas"
+              used={usedAbiertas}
+              limit={limitAbiertas}
+              zeroLabel="Solo Premium/Elite"
+            />
+          </div>
+
+          <div className="mb-6 flex items-center gap-3">
+            <input
+              className={inputCls}
+              placeholder="Buscar comunicaciones…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+            <button
+              type="button"
+              onClick={() => setQuery('')}
+              title="Limpiar búsqueda"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] border border-gray-200 text-gray-500 hover:bg-gray-50"
+            >
+              <FilterX className="h-4 w-4" />
+            </button>
+          </div>
+
+          {filtered.length === 0 ? (
+            <div className="rounded-2xl border border-gray-200 bg-white">
+              <EmptyState
+                icon={<MessageSquare className="h-7 w-7 opacity-40" />}
+                text={
+                  comunicaciones.length === 0
+                    ? 'Todavía no hay comunicaciones cargadas.'
+                    : 'Sin resultados con esa búsqueda.'
+                }
+              />
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {filtered.map((c) => (
+                <ComunicacionCard
+                  key={c.id}
+                  c={c}
+                  onEdit={() => setModal({ mode: 'edit', comunicacion: c })}
+                />
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {modal && (

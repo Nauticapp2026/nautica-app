@@ -3,10 +3,11 @@ import { redirect } from 'next/navigation';
 
 import { getActiveMarina } from '@/lib/auth/session';
 import { db } from '@/lib/db';
-import { comunicaciones, profiles } from '@/lib/db/schema';
+import { areas, comunicaciones, comunicacionesMails, espacios, profiles } from '@/lib/db/schema';
 import { getPlanFeatureLimits } from '@/lib/pricing/limits';
 
 import { ComunicacionesClient, type Comunicacion } from './comunicaciones-client';
+import type { AreaOption, EnvioMail } from './mails-client';
 
 export default async function ComunicacionesPage() {
   const ctx = await getActiveMarina();
@@ -21,7 +22,7 @@ export default async function ComunicacionesPage() {
   const guarderiaId = ctx.activeMembership.guarderiaId;
   const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 
-  const [limitsMap, rows, countRows] = await Promise.all([
+  const [limitsMap, rows, countRows, areaRows, envioRows] = await Promise.all([
     getPlanFeatureLimits(guarderiaId, ['com_cerrada', 'com_abierta']),
 
     db
@@ -54,6 +55,39 @@ export default async function ComunicacionesPage() {
         ),
       )
       .groupBy(comunicaciones.tipo),
+
+    // Áreas del club con su cantidad de espacios, para elegir destinatarios.
+    db
+      .select({
+        id: areas.id,
+        nombre: areas.nombre,
+        espacios: sqlCount(espacios.id),
+      })
+      .from(areas)
+      .leftJoin(espacios, eq(espacios.areaId, areas.id))
+      .where(eq(areas.guarderiaId, guarderiaId))
+      .groupBy(areas.id, areas.nombre)
+      .orderBy(areas.nombre),
+
+    // Historial de mails enviados.
+    db
+      .select({
+        id: comunicacionesMails.id,
+        asunto: comunicacionesMails.asunto,
+        cuerpo: comunicacionesMails.cuerpo,
+        areaNombres: comunicacionesMails.areaNombres,
+        destinatarios: comunicacionesMails.destinatarios,
+        enviados: comunicacionesMails.enviados,
+        createdAt: comunicacionesMails.createdAt,
+        autorNombre: profiles.nombre,
+        autorApellido: profiles.apellido,
+        autorEmail: profiles.email,
+      })
+      .from(comunicacionesMails)
+      .leftJoin(profiles, eq(profiles.id, comunicacionesMails.autorId))
+      .where(eq(comunicacionesMails.guarderiaId, guarderiaId))
+      .orderBy(desc(comunicacionesMails.createdAt))
+      .limit(100),
   ]);
 
   const usedCerradas = Number(countRows.find((r) => r.tipo === 'socios')?.total ?? 0);
@@ -73,6 +107,24 @@ export default async function ComunicacionesPage() {
       [r.autorNombre, r.autorApellido].filter(Boolean).join(' ').trim() || r.autorEmail || null,
   }));
 
+  const areasOpts: AreaOption[] = areaRows.map((a) => ({
+    id: a.id,
+    nombre: a.nombre,
+    espacios: Number(a.espacios ?? 0),
+  }));
+
+  const envios: EnvioMail[] = envioRows.map((r) => ({
+    id: r.id,
+    asunto: r.asunto,
+    cuerpo: r.cuerpo,
+    areaNombres: r.areaNombres ?? [],
+    destinatarios: r.destinatarios,
+    enviados: r.enviados,
+    createdAt: r.createdAt.toISOString(),
+    autor:
+      [r.autorNombre, r.autorApellido].filter(Boolean).join(' ').trim() || r.autorEmail || null,
+  }));
+
   return (
     <ComunicacionesClient
       comunicaciones={items}
@@ -80,6 +132,8 @@ export default async function ComunicacionesPage() {
       limitAbiertas={limitsMap['com_abierta']}
       usedCerradas={usedCerradas}
       usedAbiertas={usedAbiertas}
+      areas={areasOpts}
+      envios={envios}
     />
   );
 }

@@ -1033,6 +1033,35 @@ export const comunicaciones = pgTable(
   (t) => [index('comunicaciones_guarderia_idx').on(t.guarderiaId)],
 );
 
+// Registro de los mails masivos que el club mandó a los socios de un área de
+// espacios (mig 0149). Canal aparte de `comunicaciones`, que es el tablón de la
+// app y no manda mails. Los nombres de área se guardan además de los ids para
+// que el historial siga siendo legible si un área se renombra o se borra.
+export const comunicacionesMails = pgTable(
+  'comunicaciones_mails',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    guarderiaId: uuid('guarderia_id')
+      .notNull()
+      .references(() => guarderias.id, { onDelete: 'cascade' }),
+    autorId: uuid('autor_id').references(() => profiles.id, { onDelete: 'set null' }),
+    areaIds: uuid('area_ids')
+      .array()
+      .notNull()
+      .default(sql`'{}'`),
+    areaNombres: text('area_nombres')
+      .array()
+      .notNull()
+      .default(sql`'{}'`),
+    asunto: text('asunto').notNull(),
+    cuerpo: text('cuerpo').notNull(),
+    destinatarios: integer('destinatarios').notNull().default(0),
+    enviados: integer('enviados').notNull().default(0),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [index('comunicaciones_mails_guarderia_idx').on(t.guarderiaId, t.createdAt)],
+);
+
 export const tareas = pgTable(
   'tareas',
   {
