@@ -228,6 +228,11 @@ function NuevaCobranzaModal({
     [formas],
   );
   const cuadra = Math.abs(totalCargado - montoEfectivo) < 0.01;
+  // Con NC tildadas no puede haber excedente: la plata de más queda como saldo
+  // a favor, pero el resto de una NC se pierde (la nota se consume entera y su
+  // crédito no vuelve al pool — el server además lo rechaza). totalSeleccionado
+  // ya descuenta la NC, así que todo lo que supere ese número es excedente.
+  const ncExcede = ncAplicadas.length > 0 && montoNum > totalSeleccionado + 0.01;
   // En modo reparto ningún comprobante puede recibir más de lo que debe (el
   // excedente no tiene dónde ir: un comprobante no se sobre-cobra).
   const repartoValido = useMemo(() => {
@@ -244,7 +249,8 @@ function NuevaCobranzaModal({
     cuadra &&
     (montoEfectivo <= 0.005 || (formas.length > 0 && hayMediosManuales)) &&
     repartoValido &&
-    !creditoExcedeDisponible;
+    !creditoExcedeDisponible &&
+    !ncExcede;
 
   function handleSelectSocio(s: SocioOption) {
     setSocio(s);
@@ -758,6 +764,13 @@ function NuevaCobranzaModal({
                         continuar.
                       </p>
                     )}
+                    {ncExcede && (
+                      <p className="mt-1.5 text-xs text-red-600">
+                        Con la nota de crédito incluida sobran{' '}
+                        {fmtMoney(montoNum - totalSeleccionado)} que no se aplican a ningún
+                        comprobante y se perderían. Bajá los montos o sumá comprobantes.
+                      </p>
+                    )}
                   </div>
                   <Field label="Fecha">
                     <input
@@ -805,11 +818,22 @@ function NuevaCobranzaModal({
                     </p>
                   ) : (
                     <>
-                      {montoNum > totalSeleccionado + 0.01 && (
-                        <p className="text-xs text-amber-600">
-                          El excedente de {fmtMoney(montoNum - totalSeleccionado)} queda como saldo
-                          a favor.
+                      {/* Con NC tildadas el excedente NO queda a favor: el
+                          resto de una nota se perdería, así que se bloquea. */}
+                      {ncExcede ? (
+                        <p className="text-xs text-red-600">
+                          Con la nota de crédito incluida sobran{' '}
+                          {fmtMoney(montoNum - totalSeleccionado)} que no se aplican a ningún
+                          comprobante y se perderían. Bajá el monto a {fmtMoney(totalSeleccionado)}{' '}
+                          o sumá comprobantes.
                         </p>
+                      ) : (
+                        montoNum > totalSeleccionado + 0.01 && (
+                          <p className="text-xs text-amber-600">
+                            El excedente de {fmtMoney(montoNum - totalSeleccionado)} queda como
+                            saldo a favor.
+                          </p>
+                        )
                       )}
                       {montoNum > 0 && montoNum < totalSeleccionado - 0.01 && (
                         <p className="text-xs text-amber-600">

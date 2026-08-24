@@ -369,6 +369,9 @@ export async function registrarCobranzaAction(data: RegistrarCobranzaData): Prom
   // entre las seleccionadas.
   const notasPedidas = [...new Set(data.notasCredito ?? [])];
   let montoNotasCredito = 0;
+  // Las NC usadas se guardan en datosPago para que la anulación del recibo
+  // pueda devolverlas a 'pendiente' (sin esto su crédito moría con el recibo).
+  let notasUsadas: { id: string; importe: string | null }[] = [];
 
   if (notasPedidas.length > 0) {
     if ((data.comprobanteIds ?? []).length === 0) {
@@ -402,6 +405,7 @@ export async function registrarCobranzaAction(data: RegistrarCobranzaData): Prom
       if (!(importe > 0)) return { error: 'La nota de crédito no tiene importe.' };
       montoNotasCredito += importe;
     }
+    notasUsadas = notasDb;
   }
 
   // El importe de las notas se suma a lo aplicable: se reparte entre los
@@ -561,6 +565,22 @@ export async function registrarCobranzaAction(data: RegistrarCobranzaData): Prom
   const aplicadosIds = aplicaciones.map((a) => a.comprobanteId);
   const pagadosIds = pagados.map((c) => c.id);
 
+  // Con NC sueltas adjuntas no puede quedar excedente sin aplicar. El excedente
+  // de plata real es un adelanto legítimo (vuelve como saldo a favor vía el
+  // pool), pero el de una NC se perdería en silencio: la nota se consume entera
+  // (pasa a 'pagada') y su crédito queda excluido del pool (nc-cobertura.ts).
+  // Caso real: RC-000003 del club IVA (2026-08-24) — factura de $2,42 cubierta
+  // entera en efectivo + NC de $1,00 adjunta → $1 quemado sin aplicarse a nada.
+  if (montoNotasCredito > 0.005) {
+    const sumaAplicada = aplicaciones.reduce((acc, a) => acc + parseFloat(a.monto), 0);
+    const sobrante = montoTotalAplicar - sumaAplicada;
+    if (sobrante > 0.01) {
+      return {
+        error: `Entre lo cobrado y la nota de crédito sobran $${sobrante.toFixed(2)} que no se aplican a ningún comprobante, y el resto de una nota de crédito no queda como saldo a favor: se perdería. Bajá el efectivo o sumá comprobantes hasta cubrir la diferencia.`,
+      };
+    }
+  }
+
   // El recibo declara cubierto el TOTAL aplicado (plata real + saldo a favor);
   // el movimiento de cuenta corriente (haber real) solo refleja la plata que
   // realmente entró hoy — así no se duplica el crédito ya cobrado antes (ver
@@ -575,6 +595,11 @@ export async function registrarCobranzaAction(data: RegistrarCobranzaData): Prom
     montoSaldoAFavor: montoSaldoAFavor > 0 ? montoSaldoAFavor.toFixed(2) : undefined,
     formas: data.formas ?? [],
     aplicaciones,
+    // Qué NC sueltas consumió este recibo: la anulación las devuelve a
+    // 'pendiente'. Recibos anteriores a 2026-08-24 no traen este campo.
+    notasCredito: notasUsadas.length
+      ? notasUsadas.map((n) => ({ id: n.id, importe: n.importe }))
+      : undefined,
   };
   const esAdelanto = comprobantes.length === 0;
 
@@ -862,10 +887,37 @@ export async function anularCobranzaAction(reciboId: string): Promise<{ error?: 
         // existe, no hay nada que revertir — un contraasiento sin su par
         // generaría deuda fantasma.
         const [pago] = await tx
-          .select({ haber: movimientosCuentaCorriente.haber })
+          .select({
+            haber: movimientosCuentaCorriente.haber,
+            datosPago: movimientosCuentaCorriente.datosPago,
+          })
           .from(movimientosCuentaCorriente)
           .where(eq(movimientosCuentaCorriente.id, recibo.movimientoId))
           .limit(1);
+
+        // Revivir las NC sueltas que este recibo consumió (datosPago.notasCredito,
+        // registrado desde 2026-08-24): su crédito vuelve a estar disponible para
+        // otra cobranza. Sin esto, anular el recibo devolvía la deuda pero la NC
+        // quedaba 'pagada' para siempre — el crédito moría con el recibo. Los
+        // recibos anteriores no registraban qué NC usaron: esos no se pueden
+        // revertir automáticamente. Ojo: esto puede correr aunque el haber sea 0
+        // (cobranza cubierta enteramente por la NC no genera contraasiento).
+        const dp = pago?.datosPago as { notasCredito?: { id: string }[] } | null;
+        const ncIds = (dp?.notasCredito ?? []).map((n) => n.id).filter(Boolean);
+        if (ncIds.length > 0) {
+          await tx
+            .update(facturacion)
+            .set({ estado: 'pendiente', updatedAt: new Date() })
+            .where(
+              and(
+                eq(facturacion.guarderiaId, gId),
+                inArray(facturacion.id, ncIds),
+                inArray(facturacion.tipoFactura, [...TIPOS_NC_SUELTA]),
+                eq(facturacion.anulada, false),
+              ),
+            );
+        }
+
         const monto = parseFloat(pago?.haber ?? '0');
         if (recibo.socioId && monto > 0.001) {
           await tx.insert(movimientosCuentaCorriente).values({
