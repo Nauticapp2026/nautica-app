@@ -37,6 +37,9 @@ export async function middleware(request: NextRequest) {
   // /api/mareas: endpoint que consume la app mobile para la pantalla Clima
   // > Mareas. Devuelve datos publicos del SHN (no sensibles); no requiere
   // auth y Basic Auth lo romperia.
+  // /api/alturas: idem para Clima > Altura de Rios. Devuelve la altura de rios
+  // de Prefectura, ya normalizada. Los datos son publicos; el token de ArcGIS
+  // queda del lado del server y nunca sale en la respuesta.
   // /api/payway: endpoint que consume la app mobile para que el socio registre
   // su tarjeta de debito automatico. Auth propia: Bearer JWT de Supabase.
   // /api/marineros/notify, /api/lavado/notify, /api/tareas/notify-guardada,
@@ -62,6 +65,7 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/api/webhooks') ||
     pathname.startsWith('/api/devices') ||
     pathname.startsWith('/api/mareas') ||
+    pathname.startsWith('/api/alturas') ||
     pathname.startsWith('/api/payway') ||
     pathname.startsWith('/api/marineros/notify') ||
     pathname.startsWith('/api/lavado/notify') ||
