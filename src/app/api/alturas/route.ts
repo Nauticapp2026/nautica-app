@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { createAdminClient } from '@/lib/supabase/admin';
 import { type AlturasPayload, fetchAlturasArcGIS } from '@/lib/arcgis-alturas';
+import { fetchAlturasPNA } from '@/lib/pna-alturas';
 
 export const dynamic = 'force-dynamic';
 
@@ -50,22 +51,32 @@ export async function GET(): Promise<Response> {
     });
   }
 
-  // 2) Miss / stale → ArcGIS.
+  // 2) Miss / stale → la web publica de Prefectura (fuente viva). La capa
+  // ArcGIS quedo congelada el 5-ene-2026 pero se mantiene como fallback por
+  // si Prefectura cambia el HTML de la pagina.
   let alturas: AlturasPayload;
   try {
-    alturas = await fetchAlturasArcGIS();
-  } catch (err) {
-    // Antes que romper la pantalla, devolvemos el cache viejo marcado stale.
-    if (existing) {
-      return NextResponse.json({
-        ...existing.payload,
-        fromCache: true,
-        stale: true,
-        fetched_at: existing.fetched_at,
-      });
+    alturas = await fetchAlturasPNA();
+  } catch (pnaErr) {
+    console.warn(
+      '[alturas] scrape de Prefectura fallo, intento ArcGIS:',
+      pnaErr instanceof Error ? pnaErr.message : pnaErr,
+    );
+    try {
+      alturas = await fetchAlturasArcGIS();
+    } catch (err) {
+      // Antes que romper la pantalla, devolvemos el cache viejo marcado stale.
+      if (existing) {
+        return NextResponse.json({
+          ...existing.payload,
+          fromCache: true,
+          stale: true,
+          fetched_at: existing.fetched_at,
+        });
+      }
+      const msg = err instanceof Error ? err.message : 'Error desconocido en ArcGIS.';
+      return NextResponse.json({ error: msg }, { status: 503 });
     }
-    const msg = err instanceof Error ? err.message : 'Error desconocido en ArcGIS.';
-    return NextResponse.json({ error: msg }, { status: 503 });
   }
 
   // 3) Upsert.
