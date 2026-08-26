@@ -187,16 +187,17 @@ function NuevaCobranzaModal({
     [ncAplicadas],
   );
 
-  // Lo seleccionado se suma por el saldo PENDIENTE de cada comprobante (si ya
-  // tuvo un cobro parcial o una NC vieja, se cobra solo lo que falta) menos las
-  // notas de crédito tildadas, que restan del total como el saldo a favor.
-  const totalSeleccionado = useMemo(() => {
-    const bruto = seleccionados.reduce(
-      (acc, c) => acc + parseFloat(c.importePendiente ?? c.importe ?? '0'),
-      0,
-    );
-    return Math.max(0, bruto - totalNc);
-  }, [seleccionados, totalNc]);
+  // Total a APLICAR a los comprobantes: su pendiente completo, sin descontar la
+  // nota de crédito. La NC no reduce la deuda a saldar — es una de las fuentes
+  // que la cubre, igual que el efectivo y el saldo a favor. Restarla acá dejaba
+  // dos cuentas incompatibles: los casilleros sumaban el pendiente completo pero
+  // el total esperaba la parte en efectivo, así que la NC terminaba cobrándose
+  // de más o aplicándose a nada (pedido 2026-08-26).
+  const totalSeleccionado = useMemo(
+    () =>
+      seleccionados.reduce((acc, c) => acc + parseFloat(c.importePendiente ?? c.importe ?? '0'), 0),
+    [seleccionados],
+  );
 
   // useCallback con deps vacías: solo lee su argumento, así que es estable y
   // puede figurar en el array de dependencias de los useMemo que la usan.
@@ -221,8 +222,13 @@ function NuevaCobranzaModal({
   // No se puede aplicar más crédito del que el socio tiene. Que el pedido supere
   // el total a cobrar no es un error (significa "cubrilo todo"): se acota solo.
   const creditoExcedeDisponible = creditoPedido > saldoDisponible + 0.01;
-  const montoCredito = usarSaldoAFavor ? Math.min(creditoPedido, saldoDisponible, montoNum) : 0;
-  const montoEfectivo = Math.max(0, montoNum - montoCredito);
+  // La NC cubre parte del total aplicado, antes que el saldo a favor. Lo que
+  // queda después de NC + saldo a favor es la plata real a cobrar.
+  const ncUsable = Math.min(totalNc, montoNum);
+  const montoCredito = usarSaldoAFavor
+    ? Math.min(creditoPedido, saldoDisponible, Math.max(0, montoNum - ncUsable))
+    : 0;
+  const montoEfectivo = Math.max(0, montoNum - ncUsable - montoCredito);
   const totalCargado = useMemo(
     () => formas.reduce((acc, f) => acc + (parseFloat(montoToNumberStr(f.monto)) || 0), 0),
     [formas],
@@ -232,7 +238,13 @@ function NuevaCobranzaModal({
   // a favor, pero el resto de una NC se pierde (la nota se consume entera y su
   // crédito no vuelve al pool — el server además lo rechaza). totalSeleccionado
   // ya descuenta la NC, así que todo lo que supere ese número es excedente.
-  const ncExcede = ncAplicadas.length > 0 && montoNum > totalSeleccionado + 0.01;
+  // Dos formas de que se pierda plata de una nota de crédito, ambas bloqueadas
+  // (el resto de una NC no vuelve como saldo a favor, a diferencia del efectivo):
+  //  - la NC es MAYOR que el total a aplicar;
+  //  - o se aplica MÁS que el pendiente, y el excedente arrastraría plata de la NC.
+  const ncMayorQueTotal = totalNc > montoNum + 0.01;
+  const ncConExcedente = ncAplicadas.length > 0 && montoNum > totalSeleccionado + 0.01;
+  const ncExcede = ncMayorQueTotal || ncConExcedente;
   // En modo reparto ningún comprobante puede recibir más de lo que debe (el
   // excedente no tiene dónde ir: un comprobante no se sobre-cobra).
   const repartoValido = useMemo(() => {
@@ -309,10 +321,14 @@ function NuevaCobranzaModal({
   // Cuánto de un total a aplicar queda cubierto en efectivo (formas de pago)
   // una vez descontado el saldo a favor que el admin eligió usar.
   function efectivoDe(total: number): number {
+    // Mismo orden que arriba: primero la NC, después el saldo a favor, y lo que
+    // queda es efectivo.
+    const nc = Math.min(totalNc, total);
+    const resto = Math.max(0, total - nc);
     const credito = usarSaldoAFavor
-      ? Math.min(parseFloat(montoToNumberStr(saldoAFavorInput)) || 0, saldoDisponible, total)
+      ? Math.min(parseFloat(montoToNumberStr(saldoAFavorInput)) || 0, saldoDisponible, resto)
       : 0;
-    return Math.max(0, total - credito);
+    return Math.max(0, resto - credito);
   }
 
   function irAPago() {
@@ -365,17 +381,25 @@ function NuevaCobranzaModal({
     setUsarSaldoAFavor(next);
     // Al tildar arranca en el máximo aplicable (lo más común es usar todo el
     // crédito); el admin lo puede bajar. Al destildar se limpia.
-    const credito = next ? Math.min(saldoDisponible, montoNum) : 0;
+    // El máximo aplicable es lo que queda DESPUÉS de la nota de crédito: la NC
+    // cubre primero, el saldo a favor completa.
+    const restoTrasNc = Math.max(0, montoNum - Math.min(totalNc, montoNum));
+    const credito = next ? Math.min(saldoDisponible, restoTrasNc) : 0;
     setSaldoAFavorInput(next && credito > 0 ? credito.toFixed(2) : '');
-    const efectivo = Math.max(0, montoNum - credito);
+    const efectivo = Math.max(0, restoTrasNc - credito);
     sincronizarConMonto(efectivo > 0.005 ? efectivo.toFixed(2) : '');
   }
 
   function handleSaldoAFavorChange(value: string) {
     const limpio = sanitizeMontoInput(value);
     setSaldoAFavorInput(limpio);
-    const credito = Math.min(parseFloat(montoToNumberStr(limpio)) || 0, saldoDisponible, montoNum);
-    const efectivo = Math.max(0, montoNum - credito);
+    const restoTrasNc = Math.max(0, montoNum - Math.min(totalNc, montoNum));
+    const credito = Math.min(
+      parseFloat(montoToNumberStr(limpio)) || 0,
+      saldoDisponible,
+      restoTrasNc,
+    );
+    const efectivo = Math.max(0, restoTrasNc - credito);
     sincronizarConMonto(efectivo > 0.005 ? efectivo.toFixed(2) : '');
   }
 
@@ -644,18 +668,6 @@ function NuevaCobranzaModal({
                 </div>
               )}
 
-              {/* Las notas de crédito ya se eligen en el listado de
-                  comprobantes, como un ítem más en negativo. Acá solo se informa
-                  cuánto restaron, para que el total cierre a la vista. */}
-              {totalNc > 0 && (
-                <div className="flex items-center justify-between rounded-[10px] border border-gray-200 px-4 py-3">
-                  <span className="text-sm text-gray-600">Notas de crédito aplicadas</span>
-                  <span className="text-sm font-semibold" style={{ color: '#175861' }}>
-                    −{fmtMoney(totalNc)}
-                  </span>
-                </div>
-              )}
-
               {/* Usar saldo a favor: cubre hasta el total a aplicar y reduce
                   lo que hace falta cobrar con formas de pago (pedido 2026-08-06). */}
               {selected.size > 0 && saldoDisponible > 0 && (
@@ -757,6 +769,30 @@ function NuevaCobranzaModal({
                           </div>
                         );
                       })}
+                      {/* Las notas de crédito tildadas van como una línea más
+                          del listado, en negativo: son una fuente que cubre
+                          parte del total, igual que el efectivo (pedido
+                          2026-08-26). No se editan acá — se tildan o destildan
+                          en el paso anterior. */}
+                      {ncAplicadas.map((n) => (
+                        <div key={n.id} className="flex items-center gap-3 px-4 py-3">
+                          <div className="flex flex-1 flex-col">
+                            <span className="text-sm font-medium" style={{ color: '#175861' }}>
+                              {n.codigo ?? 'Sin código'}
+                              <span className="ml-2 text-xs font-normal text-gray-400">
+                                Nota de crédito
+                              </span>
+                            </span>
+                            <span className="text-xs text-gray-400">cubre parte del total</span>
+                          </div>
+                          <span
+                            className="w-24 text-right text-sm font-semibold"
+                            style={{ color: '#175861' }}
+                          >
+                            −{fmtMoney(parseFloat(n.importe ?? '0'))}
+                          </span>
+                        </div>
+                      ))}
                     </div>
                     {!repartoValido && (
                       <p className="mt-1.5 text-xs text-red-600">
@@ -764,11 +800,18 @@ function NuevaCobranzaModal({
                         continuar.
                       </p>
                     )}
-                    {ncExcede && (
+                    {ncMayorQueTotal && (
                       <p className="mt-1.5 text-xs text-red-600">
-                        Con la nota de crédito incluida sobran{' '}
-                        {fmtMoney(montoNum - totalSeleccionado)} que no se aplican a ningún
-                        comprobante y se perderían. Bajá los montos o sumá comprobantes.
+                        La nota de crédito ({fmtMoney(totalNc)}) es mayor que el total a aplicar (
+                        {fmtMoney(montoNum)}): sobrarían {fmtMoney(totalNc - montoNum)} que se
+                        perderían. Sumá comprobantes o destildá la nota.
+                      </p>
+                    )}
+                    {ncConExcedente && !ncMayorQueTotal && (
+                      <p className="mt-1.5 text-xs text-red-600">
+                        Estás aplicando {fmtMoney(montoNum - totalSeleccionado)} más que lo que
+                        deben los comprobantes. Con una nota de crédito incluida ese excedente no
+                        puede quedar como saldo a favor: se perdería. Bajá los montos.
                       </p>
                     )}
                   </div>
@@ -820,12 +863,17 @@ function NuevaCobranzaModal({
                     <>
                       {/* Con NC tildadas el excedente NO queda a favor: el
                           resto de una nota se perdería, así que se bloquea. */}
-                      {ncExcede ? (
+                      {ncMayorQueTotal ? (
                         <p className="text-xs text-red-600">
-                          Con la nota de crédito incluida sobran{' '}
-                          {fmtMoney(montoNum - totalSeleccionado)} que no se aplican a ningún
-                          comprobante y se perderían. Bajá el monto a {fmtMoney(totalSeleccionado)}{' '}
-                          o sumá comprobantes.
+                          La nota de crédito ({fmtMoney(totalNc)}) es mayor que el total a aplicar (
+                          {fmtMoney(montoNum)}): sobrarían {fmtMoney(totalNc - montoNum)} que se
+                          perderían. Subí el monto o destildá la nota.
+                        </p>
+                      ) : ncConExcedente ? (
+                        <p className="text-xs text-red-600">
+                          El excedente de {fmtMoney(montoNum - totalSeleccionado)} no puede quedar
+                          como saldo a favor porque hay una nota de crédito incluida: se perdería.
+                          Bajá el monto a {fmtMoney(totalSeleccionado)}.
                         </p>
                       ) : (
                         montoNum > totalSeleccionado + 0.01 && (
