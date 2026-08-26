@@ -320,9 +320,6 @@ export default async function UsuariosPage({
     return {
       ...s,
       deuda: deuda.toFixed(2),
-      // Saldo neto real (debe − haber): positivo = nos debe, negativo = saldo a
-      // favor. Permite mostrar el "a favor" en la lista (deuda lo recorta a 0).
-      saldoNeto: (debe - haber).toFixed(2),
       // Crédito sin usar (pool FIFO). Puede convivir con deuda: un adelanto
       // targeteado a un comprobante nuevo no cancela una deuda vieja. Es el
       // mismo número que Cobranzas ofrece aplicar.

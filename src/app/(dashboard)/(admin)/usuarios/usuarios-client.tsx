@@ -56,9 +56,7 @@ type Socio = {
   telefono: string | null;
   direccion: string | null;
   deuda: string | null;
-  // Saldo neto: positivo = nos debe, negativo = saldo a favor.
-  saldoNeto: string | null;
-  /** Crédito sin usar (pool FIFO). Puede convivir con deuda. */
+  /** Crédito disponible para aplicar (pool FIFO). Mismo número que la ficha. */
   saldoAFavor?: string | null;
   estadoSocio: 'activo' | 'moroso' | null;
   membershipStatus: 'active' | 'inactivo';
@@ -1000,9 +998,13 @@ export function UsuariosClient({
         return aNum - bNum;
       }
       if (sortKey === 'deuda') {
-        return (
-          parseFloat(a.saldoNeto ?? a.deuda ?? '0') - parseFloat(b.saldoNeto ?? b.deuda ?? '0')
-        );
+        // Mismo criterio que la columna: deuda en positivo, crédito disponible
+        // en negativo. Así el orden coincide con lo que se ve.
+        const valor = (s: Socio) => {
+          const d = parseFloat(s.deuda ?? '0');
+          return d > 0.005 ? d : -parseFloat(s.saldoAFavor ?? '0');
+        };
+        return valor(a) - valor(b);
       }
       const aStr =
         sortKey === 'socio'
@@ -1202,8 +1204,11 @@ export function UsuariosClient({
                     ) : (
                       paginados.map((s) => {
                         const nombre = [s.nombre, s.apellido].filter(Boolean).join(' ') || '—';
-                        const saldoNeto = parseFloat(s.saldoNeto ?? s.deuda ?? '0');
-                        const aFavor = saldoNeto < 0;
+                        // Deuda y crédito disponible, el mismo par que muestra la
+                        // ficha del socio. `deuda` ya viene acotada a 0 desde el
+                        // server (no queda negativa cuando hay saldo a favor).
+                        const deuda = parseFloat(s.deuda ?? '0');
+                        const tieneDeuda = deuda > 0.005;
                         // Crédito sin usar. Con deuda pendiente el neto no lo
                         // muestra (queda tapado), así que se informa aparte —
                         // es el mismo importe que Cobranzas ofrece aplicar.
@@ -1272,22 +1277,22 @@ export function UsuariosClient({
                               <td className="px-4 py-3 text-center text-xs text-gray-400">
                                 {s.fechaIngreso ? formatArgentinaDate(s.fechaIngreso) : '—'}
                               </td>
+                              {/* Mismo criterio que la card de la ficha del socio y
+                                  que el modal de cobranza: si debe, la deuda; si
+                                  no, el crédito DISPONIBLE (pool FIFO, que excluye
+                                  adelantos y NC sueltas). Antes acá se mostraba el
+                                  neto crudo (Σdebe − Σhaber) rotulado "a favor", y
+                                  no coincidía con los otros dos lugares: un crédito
+                                  reservado daba "$1 a favor" en el listado y "$0
+                                  disponible" adentro (pedido 2026-08-25). */}
                               <td
                                 className="px-4 py-3 text-center font-medium"
-                                style={{ color: aFavor ? '#15803d' : '#669E9D' }}
+                                style={{ color: tieneDeuda ? '#669E9D' : '#15803d' }}
                               >
-                                ${Math.abs(saldoNeto).toLocaleString('es-AR')}
-                                {aFavor && (
+                                ${(tieneDeuda ? deuda : creditoSinUsar).toLocaleString('es-AR')}
+                                {!tieneDeuda && creditoSinUsar > 0.005 && (
                                   <span className="ml-1 text-xs font-normal text-green-600">
                                     a favor
-                                  </span>
-                                )}
-                                {!aFavor && creditoSinUsar > 0.005 && (
-                                  <span
-                                    className="block text-xs font-normal text-green-600"
-                                    title="Crédito sin usar disponible para aplicar en una cobranza"
-                                  >
-                                    +${creditoSinUsar.toLocaleString('es-AR')} a favor
                                   </span>
                                 )}
                               </td>
