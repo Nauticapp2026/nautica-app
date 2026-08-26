@@ -1456,9 +1456,15 @@ function NuevaFacturaModal({
                         Importe {modoNota.esNc ? 'a acreditar' : 'a debitar'}
                         {notaRelacionada && notaFacturaSel && (
                           <span className="ml-1 font-normal text-gray-400">
-                            {modoNota.esNc && notaAcreditadoSel > 0.001
-                              ? `(disponible ${fmtMoney(notaDisponibleSel)} de ${fmtMoney(notaFacturaSel.importe)} — ya acreditado ${fmtMoney(notaAcreditadoSel)})`
-                              : `(máx. ${fmtMoney(modoNota.esNc ? notaDisponibleSel : parseFloat(notaFacturaSel.importe ?? '0'))})`}
+                            {/* Solo la NC tiene tope. La ND agrega deuda
+                                (intereses, recargos) y puede superar el importe
+                                de la factura original: se informa el original
+                                como referencia, no como máximo. */}
+                            {!modoNota.esNc
+                              ? `(factura original ${fmtMoney(notaFacturaSel.importe)})`
+                              : notaAcreditadoSel > 0.001
+                                ? `(disponible ${fmtMoney(notaDisponibleSel)} de ${fmtMoney(notaFacturaSel.importe)} — ya acreditado ${fmtMoney(notaAcreditadoSel)})`
+                                : `(máx. ${fmtMoney(notaDisponibleSel)})`}
                           </span>
                         )}
                       </label>
@@ -3020,15 +3026,19 @@ function NotaCreditoModal({
                   >
                     Importe {esNc ? 'a acreditar' : 'a debitar'}
                     <span className="ml-1 font-normal text-gray-400">
-                      {esNc && acreditado > 0.001
-                        ? `(disponible ${fmtMoney(disponible)} de ${fmtMoney(factura.importe)} — ya acreditado ${fmtMoney(acreditado)})`
-                        : `(máx. ${fmtMoney(esNc ? disponible : importeOriginal)})`}
+                      {/* La ND puede superar el importe original: el dato va
+                          como referencia, no como tope. */}
+                      {!esNc
+                        ? `(factura original ${fmtMoney(factura.importe)})`
+                        : acreditado > 0.001
+                          ? `(disponible ${fmtMoney(disponible)} de ${fmtMoney(factura.importe)} — ya acreditado ${fmtMoney(acreditado)})`
+                          : `(máx. ${fmtMoney(disponible)})`}
                     </span>
                   </label>
                   <input
                     className={inputCls}
                     inputMode="decimal"
-                    placeholder={`0,00 (máx ${(esNc ? disponible : importeOriginal).toFixed(2)})`}
+                    placeholder={esNc ? `0,00 (máx ${disponible.toFixed(2)})` : '0,00'}
                     value={importe}
                     onChange={(e) => setImporte(e.target.value)}
                   />

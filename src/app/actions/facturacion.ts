@@ -2479,7 +2479,11 @@ export async function emitirNotaAsociadaAction(
     if (!data.importe || data.importe <= 0) {
       return { error: `Ingresá el importe de la ${tipoNota}.` };
     }
-    if (data.importe > importeOriginal) {
+    // Solo la NC tiene tope: no se puede devolver más de lo que se facturó. Una
+    // ND AGREGA deuda (intereses, recargos, ajustes), así que puede superar el
+    // importe de la factura original — antes esta validación corría para las dos
+    // y rechazaba notas de débito legítimas (pedido 2026-08-26).
+    if (data.esNc && data.importe > importeOriginal) {
       return {
         error: `El importe de la ${tipoNota} no puede superar el total de la factura original.`,
       };
