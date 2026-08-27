@@ -138,8 +138,8 @@ function NuevaCobranzaModal({
   // Paso pago
   const [fecha, setFecha] = useState(todayISODate);
   const [montoAPagar, setMontoAPagar] = useState('');
-  // Reparto por comprobante: cuánto del pago va a cada uno. Solo se usa (y se
-  // edita) cuando hay 2+ comprobantes tildados — así el club elige a qué
+  // Reparto por comprobante: cuánto del pago va a cada uno. Se usa siempre que
+  // haya comprobantes tildados — el club ve y edita ítem por ítem, y elige a qué
   // factura imputa el parcial en vez de que aplique del más viejo al más nuevo.
   const [montosPorComp, setMontosPorComp] = useState<Record<string, string>>({});
   const [formas, setFormas] = useState<FormaCobranza[]>([]);
@@ -157,12 +157,16 @@ function NuevaCobranzaModal({
   );
 
   // Comprobantes tildados, en el orden en que se muestran (del más viejo al
-  // más nuevo). Con 2+ se habilita el reparto manual por comprobante.
+  // más nuevo).
   const seleccionados = useMemo(
     () => comprobantesCanal.filter((c) => selected.has(c.id)),
     [comprobantesCanal, selected],
   );
-  const modoReparto = seleccionados.length >= 2;
+  // Item por item SIEMPRE que haya comprobantes tildados (pedido 2026-08-27:
+  // "mismo criterio de visualizacion, sin importar cuantos se hayan tildado").
+  // Antes solo con 2+; con uno solo se mostraba un resumen agrupado. El modo
+  // simple queda para la cobranza sin comprobantes (adelanto).
+  const modoReparto = seleccionados.length >= 1;
 
   // Las NC solo aplican al canal fiscal (las internas anulan comprobantes
   // internos, que se cobran por el otro canal).
@@ -643,10 +647,17 @@ function NuevaCobranzaModal({
                       );
                     })}
                   </div>
+                  {/* El total del preview es la suma de las filas visibles:
+                      pendientes MENOS las NC tildadas (que se listan en
+                      negativo). Antes mostraba el total sin descontar la NC y
+                      el numero recien cerraba en el paso siguiente (pedido
+                      2026-08-27). */}
                   <div className="flex items-center justify-between rounded-[10px] bg-gray-50 px-4 py-3">
-                    <span className="text-sm font-medium text-gray-600">Total seleccionado</span>
+                    <span className="text-sm font-medium text-gray-600">
+                      {totalNc > 0 ? 'Total a cobrar' : 'Total seleccionado'}
+                    </span>
                     <span className="text-[18px] font-bold text-[#101828]">
-                      {fmtMoney(totalSeleccionado)}
+                      {fmtMoney(Math.max(0, totalSeleccionado - totalNc))}
                     </span>
                   </div>
                 </>
