@@ -27,7 +27,7 @@ import { eq, and, desc, gte, inArray, isNull, asc, lte, notExists, sql } from 'd
 import { createAdminClient } from '@/lib/supabase/admin';
 import { addDiasYmd, argYmd } from '@/lib/dates';
 import { calcularCoberturaTargeted } from '@/lib/cobranza-cobertura';
-import { getEstadoFifo } from '@/lib/reconciliar-cuenta';
+import { fechaOperativa, getEstadoFifo } from '@/lib/reconciliar-cuenta';
 import { SocioDetail } from './socio-detail';
 import { SOCIO_TAB_IDS, tabDesdeUrl } from '@/lib/tab-url';
 
@@ -156,11 +156,13 @@ export default async function SocioPage({
       .leftJoin(serviciosTable, eq(serviciosTable.id, movimientosCuentaCorriente.servicioId))
       .leftJoin(socioServicios, eq(socioServicios.id, movimientosCuentaCorriente.socioServicioId))
       .where(eq(movimientosCuentaCorriente.socioId, id))
-      // Desempate por created_at: si varios movimientos comparten la misma fecha
-      // (típico al cargar varios el mismo día), sin este segundo criterio el orden
-      // sería arbitrario y "saltaría" en cada alta. Además fija el orden del FIFO de
-      // "Pagado por cobertura" (el creado primero = el más viejo).
-      .orderBy(desc(movimientosCuentaCorriente.fecha), desc(movimientosCuentaCorriente.createdAt)),
+      // Orden: día calendario argentino y, dentro del día, created_at — la
+      // secuencia real de creación (ver fechaOperativa en reconciliar-cuenta).
+      // Ordenar por la hora de `fecha` mezclaba recibos nacidos a medianoche
+      // con asientos con hora real y el recibo aparecía "antes" que su factura
+      // (reporte del cliente 2026-08-31). El toggle ASC del cliente invierte
+      // esta lista, así que este orden manda en las dos direcciones.
+      .orderBy(desc(fechaOperativa), desc(movimientosCuentaCorriente.createdAt)),
 
     db
       .select({

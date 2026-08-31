@@ -36,7 +36,11 @@ import {
 } from '@/lib/db/schema';
 import { enviarReciboPorMail } from '@/lib/email/recibo-mail';
 import { formatPaywayError } from '@/lib/payway/format-error';
-import { getEstadoFifo, marcarComprobantesSaldados } from '@/lib/reconciliar-cuenta';
+import {
+  fechaOperativa,
+  getEstadoFifo,
+  marcarComprobantesSaldados,
+} from '@/lib/reconciliar-cuenta';
 
 const sdkModulo = require('sdk-node-payway');
 
@@ -349,7 +353,7 @@ export async function cobrarDebitoSocio(args: {
     })
     .from(movimientosCuentaCorriente)
     .where(eq(movimientosCuentaCorriente.socioId, token.socioId))
-    .orderBy(asc(movimientosCuentaCorriente.fecha), asc(movimientosCuentaCorriente.createdAt));
+    .orderBy(asc(fechaOperativa), asc(movimientosCuentaCorriente.createdAt));
 
   // Cargos cuya factura fiscal quedó RECHAZADA por ARCA: bloqueados hasta que
   // el club la reenvíe (misma regla que Cobranzas) — no se debitan sin

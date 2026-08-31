@@ -20,7 +20,7 @@
  *    para respetar el orden FIFO.
  */
 
-import { and, asc, eq, inArray } from 'drizzle-orm';
+import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import {
@@ -33,6 +33,18 @@ import {
   calcularCoberturaTargeted,
   calcularCoberturaTargetedBatch,
 } from '@/lib/cobranza-cobertura';
+
+/**
+ * Criterio único de orden cronológico de la cuenta corriente: el DÍA calendario
+ * argentino de `fecha`, y dentro del mismo día, `created_at` (la secuencia real
+ * de creación). No se ordena por la hora de `fecha` porque llega inconsistente:
+ * los recibos de cobranza nacen a medianoche (la fecha del date-picker) y otros
+ * asientos llevan la hora real — mezclados, un recibo aparecía "antes" que la
+ * factura que cobró (reporte del cliente 2026-08-31). Lo usan el display de la
+ * ficha, el pool FIFO y el débito automático, para que los tres cuenten la misma
+ * historia.
+ */
+export const fechaOperativa = sql`(${movimientosCuentaCorriente.fecha} AT TIME ZONE 'America/Argentina/Buenos_Aires')::date`;
 
 /**
  * Read-only. Devuelve el conjunto de ids de cargos (movimientos con debe>0) que
@@ -104,7 +116,7 @@ export async function getPoolRestanteBatch(
       })
       .from(movimientosCuentaCorriente)
       .where(inArray(movimientosCuentaCorriente.socioId, socioIds))
-      .orderBy(asc(movimientosCuentaCorriente.fecha), asc(movimientosCuentaCorriente.createdAt)),
+      .orderBy(asc(fechaOperativa), asc(movimientosCuentaCorriente.createdAt)),
   ]);
 
   // Agrupar preservando el orden cronológico que trajo el query.
@@ -165,7 +177,7 @@ async function getMovimientosOrdenados(socioId: string): Promise<MovimientoFifo[
     })
     .from(movimientosCuentaCorriente)
     .where(eq(movimientosCuentaCorriente.socioId, socioId))
-    .orderBy(asc(movimientosCuentaCorriente.fecha), asc(movimientosCuentaCorriente.createdAt));
+    .orderBy(asc(fechaOperativa), asc(movimientosCuentaCorriente.createdAt));
 }
 
 /**
@@ -401,7 +413,7 @@ export async function reconciliarCuentaSocio(socioId: string): Promise<string[]>
     })
     .from(movimientosCuentaCorriente)
     .where(eq(movimientosCuentaCorriente.socioId, socioId))
-    .orderBy(asc(movimientosCuentaCorriente.fecha), asc(movimientosCuentaCorriente.createdAt));
+    .orderBy(asc(fechaOperativa), asc(movimientosCuentaCorriente.createdAt));
 
   // Excluye los asientos de NC ya aplicadas puntualmente a su propia factura,
   // y de los pagos de Cobranza targeted suma solo el excedente no aplicado —
