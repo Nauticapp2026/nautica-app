@@ -35,22 +35,28 @@ import { calcularCoberturaNotasCreditoBatch } from '@/lib/nc-cobertura';
 
 export type AplicacionCobranza = { comprobanteId: string; monto: string };
 
+/**
+ * Un recibo de cobranza tal como lo necesita el reparto: a qué comprobantes
+ * aplicó y cuánto de eso lo financió una nota de crédito (no el haber del
+ * recibo). `ncAplicado` es clave para el pool: ver `repartirRecibos`.
+ */
+type ReciboConAplicaciones = {
+  movimientoId: string;
+  aplicaciones: AplicacionCobranza[];
+  ncAplicado: number;
+};
+
 // Recibos de cobranza vigentes del socio que guardaron aplicaciones targeted,
 // del más viejo al más nuevo, con el id de su movimiento de pago.
-async function getRecibosConAplicaciones(socioId: string): Promise<
-  {
-    movimientoId: string;
-    aplicaciones: AplicacionCobranza[];
-  }[]
-> {
+async function getRecibosConAplicaciones(socioId: string): Promise<ReciboConAplicaciones[]> {
   return (await getRecibosConAplicacionesBatch([socioId])).get(socioId) ?? [];
 }
 
 /** Igual que `getRecibosConAplicaciones` para varios socios, en una sola query. */
 async function getRecibosConAplicacionesBatch(
   socioIds: string[],
-): Promise<Map<string, { movimientoId: string; aplicaciones: AplicacionCobranza[] }[]>> {
-  const out = new Map<string, { movimientoId: string; aplicaciones: AplicacionCobranza[] }[]>();
+): Promise<Map<string, ReciboConAplicaciones[]>> {
+  const out = new Map<string, ReciboConAplicaciones[]>();
   for (const id of socioIds) out.set(id, []);
   if (socioIds.length === 0) return out;
 
@@ -77,9 +83,22 @@ async function getRecibosConAplicacionesBatch(
 
   for (const r of rows) {
     if (!r.movimientoId || !r.socioId) continue;
-    const dp = r.datosPago as { aplicaciones?: AplicacionCobranza[] } | null;
+    const dp = r.datosPago as {
+      aplicaciones?: AplicacionCobranza[];
+      notasCredito?: { id: string; importe: string | null }[];
+    } | null;
     if (!dp?.aplicaciones?.length) continue;
-    out.get(r.socioId)?.push({ movimientoId: r.movimientoId, aplicaciones: dp.aplicaciones });
+    // Recibos anteriores a 2026-08-26 no registran qué NC usaron: quedan en 0
+    // (su comportamiento no cambia).
+    const ncAplicado = (dp.notasCredito ?? []).reduce(
+      (acc, n) => acc + (parseFloat(n.importe ?? '0') || 0),
+      0,
+    );
+    out.get(r.socioId)?.push({
+      movimientoId: r.movimientoId,
+      aplicaciones: dp.aplicaciones,
+      ncAplicado,
+    });
   }
   return out;
 }
@@ -368,7 +387,7 @@ export async function calcularCoberturaTargetedBatch(
  * comprobante, en orden cronológico y arrancando de lo que ya cubrieron las NC.
  */
 function repartirRecibos(
-  recibos: { movimientoId: string; aplicaciones: AplicacionCobranza[] }[],
+  recibos: ReciboConAplicaciones[],
   montoNcPorMovimiento: Map<string, number>,
   movsPorComprobante: Map<string, Set<string>>,
   movInfoById: Map<string, { id: string; debe: string | null; fecha: Date | null }>,
@@ -407,10 +426,18 @@ function repartirRecibos(
         disponible -= aplicar;
       }
     }
-    if (comprometido > 0) {
+    // `haberComprometido` mide cuánto del HABER del recibo quedó atado a cargos
+    // puntuales: el pool genérico suma `haber − comprometido`. Lo aplicado se
+    // financia con efectivo + saldo a favor + notas de crédito, pero el crédito
+    // de una NC nunca entró al pool (su asiento está en `movimientosDeNc`), así
+    // que incluirlo acá lo descontaba DOS veces y el saldo a favor quedaba corto
+    // por el importe de la nota (reporte del cliente 2026-08-31: la card decía
+    // $2,50 donde el libro daba $3,00, la diferencia era una NC de $0,50).
+    const comprometidoDelHaber = Math.max(0, comprometido - r.ncAplicado);
+    if (comprometidoDelHaber > 0) {
       haberComprometido.set(
         r.movimientoId,
-        (haberComprometido.get(r.movimientoId) ?? 0) + comprometido,
+        (haberComprometido.get(r.movimientoId) ?? 0) + comprometidoDelHaber,
       );
     }
   }
