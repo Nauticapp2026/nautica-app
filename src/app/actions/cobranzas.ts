@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { and, asc, count, eq, inArray, isNull, like, ne, notLike, or } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 
 import { db } from '@/lib/db';
 import {
@@ -84,16 +85,18 @@ export async function getSaldoAFavorAction(
   return { disponible: await getSaldoAFavorDisponible(socioId) };
 }
 
-// NC que pueden quedar "sueltas" esperando que el club las junte con una
-// factura. La interna (NCI-) también: anula un comprobante interno sin ARCA.
-const TIPOS_NC_SUELTA = [
+// Toda nota de crédito se aplica A MANO en Cobranzas — relacionada a una
+// factura o no, total o parcial, sin ningún caso automático (decisión del
+// cliente 2026-08-28). La relación con la factura original es documental. La
+// interna (NCI-) también entra: anula un comprobante interno sin ARCA.
+const TIPOS_NC_APLICABLES = [
   'nota_credito_a',
   'nota_credito_b',
   'nota_credito_c',
   'nota_credito_interna',
 ] as const;
 
-/** Nota de crédito suelta disponible para juntar con una factura al cobrar. */
+/** Nota de crédito pendiente, disponible para aplicar en una cobranza. */
 export type NotaCreditoSuelta = {
   id: string;
   codigo: string | null;
@@ -101,6 +104,9 @@ export type NotaCreditoSuelta = {
   importe: string;
   emision: string | null;
   descripcion: string | null;
+  // Código de la factura a la que se emitió relacionada (referencia
+  // documental; no ata la aplicación — puede usarse en cualquier factura).
+  facturaOriginalCodigo: string | null;
 };
 
 export type ComprobantePendiente = {
@@ -212,9 +218,11 @@ export async function getComprobantesPendientesAction(socioId: string): Promise<
   // Notas de crédito SUELTAS sin juntar: crédito emitido que todavía no está
   // asignado a ninguna factura. Se ofrecen como línea que RESTA para que el club
   // elija con qué factura las junta (pedido cliente 2026-08-19). No entran por
-  // TIPOS_COBRABLES porque eso también traería las NC ya asociadas, que se
-  // descuentan solas de su factura.
-  const ncSueltas = await db
+  // TIPOS_COBRABLES no las incluye (una NC no es deuda): van en su propia
+  // lista. Entran TODAS las pendientes, relacionadas o no — el self-join trae
+  // el código de la factura original solo como referencia visual.
+  const facturaOriginal = alias(facturacion, 'factura_original');
+  const ncPendientes = await db
     .select({
       id: facturacion.id,
       codigo: facturacion.codigo,
@@ -224,14 +232,15 @@ export async function getComprobantesPendientesAction(socioId: string): Promise<
       emision: facturacion.emision,
       vencimiento: facturacion.vencimiento,
       descripcion: facturacion.descripcion,
+      facturaOriginalCodigo: facturaOriginal.codigo,
     })
     .from(facturacion)
+    .leftJoin(facturaOriginal, eq(facturaOriginal.id, facturacion.facturaOriginalId))
     .where(
       and(
         eq(facturacion.guarderiaId, ctx.activeMembership.guarderiaId),
         eq(facturacion.socioId, socioId),
-        inArray(facturacion.tipoFactura, [...TIPOS_NC_SUELTA]),
-        isNull(facturacion.facturaOriginalId),
+        inArray(facturacion.tipoFactura, [...TIPOS_NC_APLICABLES]),
         eq(facturacion.estado, 'pendiente'),
         eq(facturacion.anulada, false),
         eq(facturacion.rechazada, false),
@@ -241,13 +250,14 @@ export async function getComprobantesPendientesAction(socioId: string): Promise<
 
   return {
     tarjeta,
-    notasCredito: ncSueltas.map((n) => ({
+    notasCredito: ncPendientes.map((n) => ({
       id: n.id,
       codigo: n.codigo,
       tipoFactura: n.tipoFactura,
       importe: n.importe ?? '0',
       emision: n.emision ? n.emision.toISOString() : null,
       descripcion: n.descripcion,
+      facturaOriginalCodigo: n.facturaOriginalCodigo,
     })),
     comprobantes: rows.flatMap((r) => {
       const importe = parseFloat(r.importe ?? '0');
@@ -388,8 +398,7 @@ export async function registrarCobranzaAction(data: RegistrarCobranzaData): Prom
           eq(facturacion.guarderiaId, gId),
           eq(facturacion.socioId, data.socioId),
           inArray(facturacion.id, notasPedidas),
-          inArray(facturacion.tipoFactura, [...TIPOS_NC_SUELTA]),
-          isNull(facturacion.facturaOriginalId),
+          inArray(facturacion.tipoFactura, [...TIPOS_NC_APLICABLES]),
           eq(facturacion.estado, 'pendiente'),
           eq(facturacion.anulada, false),
           eq(facturacion.rechazada, false),
@@ -698,7 +707,6 @@ export async function registrarCobranzaAction(data: RegistrarCobranzaData): Prom
               eq(facturacion.id, notaId),
               eq(facturacion.guarderiaId, gId),
               eq(facturacion.socioId, data.socioId),
-              isNull(facturacion.facturaOriginalId),
               eq(facturacion.estado, 'pendiente'),
             ),
           )
@@ -912,7 +920,7 @@ export async function anularCobranzaAction(reciboId: string): Promise<{ error?: 
               and(
                 eq(facturacion.guarderiaId, gId),
                 inArray(facturacion.id, ncIds),
-                inArray(facturacion.tipoFactura, [...TIPOS_NC_SUELTA]),
+                inArray(facturacion.tipoFactura, [...TIPOS_NC_APLICABLES]),
                 eq(facturacion.anulada, false),
               ),
             );

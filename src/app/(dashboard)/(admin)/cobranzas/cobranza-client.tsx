@@ -637,6 +637,11 @@ function NuevaCobranzaModal({
                             </span>
                             <span className="text-xs text-gray-400">
                               {n.emision ? formatArgentinaDate(n.emision) : '—'}
+                              {/* Referencia documental: no ata la aplicación —
+                                  la nota puede usarse en cualquier factura. */}
+                              {n.facturaOriginalCodigo
+                                ? ` · Relacionada a ${n.facturaOriginalCodigo}`
+                                : ''}
                               {tildada ? ' · Resta de lo seleccionado' : ''}
                             </span>
                           </div>
@@ -794,7 +799,11 @@ function NuevaCobranzaModal({
                                 Nota de crédito
                               </span>
                             </span>
-                            <span className="text-xs text-gray-400">cubre parte del total</span>
+                            <span className="text-xs text-gray-400">
+                              {n.facturaOriginalCodigo
+                                ? `Relacionada a ${n.facturaOriginalCodigo} · cubre parte del total`
+                                : 'cubre parte del total'}
+                            </span>
                           </div>
                           <span
                             className="w-24 text-right text-sm font-semibold"

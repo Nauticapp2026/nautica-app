@@ -3,10 +3,10 @@
  *
  * Desde 2026-08 cada recibo guarda en el `datos_pago` de su movimiento de pago
  * el detalle `aplicaciones: [{ comprobanteId, monto }]` — a qué comprobante fue
- * cada peso cobrado, incluso en pagos parciales. Igual que con las Notas de
- * Crédito (ver src/lib/nc-cobertura.ts), esa plata aplica SOLO a los cargos de
- * su comprobante: un pago parcial sobre la factura X no puede "sobrar" hacia
- * comprobantes más viejos vía el pool FIFO genérico.
+ * cada peso cobrado, incluso en pagos parciales. Esa plata aplica SOLO a los
+ * cargos de su comprobante: un pago parcial sobre la factura X no puede
+ * "sobrar" hacia comprobantes más viejos vía el pool FIFO genérico. (Las Notas
+ * de Crédito no aplican solas a nada — ver src/lib/nc-cobertura.ts.)
  *
  * Este módulo resuelve las dos vistas de esa información:
  *  - `calcularCoberturaTargeted`: por MOVIMIENTO de cuenta corriente (cargo),
@@ -14,7 +14,7 @@
  *    haber de un pago targeted queda "comprometido" por lo aplicado y solo su
  *    excedente (adelanto / saldo a favor) entra al pool genérico.
  *  - `getAplicadoPorComprobante`: por COMPROBANTE, para saber cuánto se cobró
- *    ya de cada uno (recibos + NC asociadas) — lo usa Cobranzas para listar
+ *    ya de cada uno (aplicaciones de recibos) — lo usa Cobranzas para listar
  *    solo pendientes y calcular el saldo restante de un cobro parcial.
  *
  * Los recibos anteriores a este cambio no tienen `aplicaciones`: su haber
@@ -22,7 +22,7 @@
  * cobraron enteros ya quedaron marcados 'pagada' en su momento).
  */
 
-import { and, asc, eq, inArray, isNotNull, like, or } from 'drizzle-orm';
+import { and, asc, eq, inArray, like, or } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import {
@@ -34,13 +34,6 @@ import {
 import { calcularCoberturaNotasCreditoBatch } from '@/lib/nc-cobertura';
 
 export type AplicacionCobranza = { comprobanteId: string; monto: string };
-
-const TIPOS_NC_ASOCIABLES = [
-  'nota_credito_a',
-  'nota_credito_b',
-  'nota_credito_c',
-  'nota_credito_interna',
-] as const;
 
 // Recibos de cobranza vigentes del socio que guardaron aplicaciones targeted,
 // del más viejo al más nuevo, con el id de su movimiento de pago.
@@ -93,9 +86,9 @@ async function getRecibosConAplicacionesBatch(
 
 /**
  * Cuánto de cada comprobante del socio ya está cubierto puntualmente: suma de
- * las aplicaciones de recibos vigentes + el importe de las NC asociadas a él.
- * Fallback de `getPendientePorComprobante` para comprobantes sin cargos
- * vinculados (no hay de dónde leer estados por cargo).
+ * las aplicaciones de recibos vigentes. Fallback de `getPendientePorComprobante`
+ * para comprobantes sin cargos vinculados (no hay de dónde leer estados por
+ * cargo).
  */
 async function getAplicadoPorComprobante(
   socioId: string,
@@ -112,27 +105,9 @@ async function getAplicadoPorComprobante(
     }
   }
 
-  const ncs = await db
-    .select({
-      facturaOriginalId: facturacion.facturaOriginalId,
-      importe: facturacion.importe,
-    })
-    .from(facturacion)
-    .where(
-      and(
-        eq(facturacion.socioId, socioId),
-        eq(facturacion.guarderiaId, guarderiaId),
-        inArray(facturacion.tipoFactura, [...TIPOS_NC_ASOCIABLES]),
-        isNotNull(facturacion.facturaOriginalId),
-        eq(facturacion.anulada, false),
-      ),
-    );
-  for (const n of ncs) {
-    if (!n.facturaOriginalId) continue;
-    const monto = parseFloat(n.importe ?? '0');
-    if (!(monto > 0)) continue;
-    aplicado.set(n.facturaOriginalId, (aplicado.get(n.facturaOriginalId) ?? 0) + monto);
-  }
+  // Las NC ya NO descuentan del pendiente de su factura original: toda nota se
+  // aplica a mano en Cobranzas y su valor llega por las `aplicaciones` del
+  // recibo que la usó, igual que la plata (decisión del cliente 2026-08-28).
 
   return aplicado;
 }
@@ -144,13 +119,13 @@ async function getAplicadoPorComprobante(
  * Con cargos vinculados (link directo `facturacion.movimiento_id` + M:N vía
  * items), el saldo se calcula POR CARGO: un cargo ya `pagado` no debe nada
  * (lo cobró el débito automático Payway o una cobranza previa), y a los demás
- * se les descuenta la cobertura targeted (NC de su factura + pagos parciales
- * de recibos). Esto cubre el caso del comprobante interno "mixto": un CA- que
+ * se les descuenta la cobertura targeted (pagos parciales de recibos; las NC
+ * ya no aplican solas — se usan a mano en Cobranzas). Esto cubre el caso del comprobante interno "mixto": un CA- que
  * consolida servicios con y sin débito queda 'pendiente' hasta cobrarse
  * entero, pero su saldo real es solo la parte que Payway no debitó.
  *
  * Sin cargos vinculados (comprobantes legacy o sin items) se cae al cálculo
- * por importe: total − aplicaciones de recibos − NC asociadas.
+ * por importe: total − aplicaciones de recibos.
  */
 export async function getPendientePorComprobante(
   socioId: string,

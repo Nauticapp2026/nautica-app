@@ -2595,10 +2595,12 @@ export async function emitirNotaAsociadaAction(
       guarderiaId: gId,
       socioId: original.socioId,
       tipoFactura: tipoNotaFactura as never,
-      // NC nace 'pagada' (un crédito no queda pendiente de cobro). La ND es
-      // deuda nueva del socio, igual que una factura: nace 'pendiente' para
-      // entrar al circuito de cobro (Cobranzas, KPIs, estado en Ventas).
-      estado: data.esNc ? 'pagada' : 'pendiente',
+      // NC y ND nacen 'pendiente'. La ND es deuda nueva del socio y entra al
+      // circuito de cobro como una factura. La NC nace pendiente DE APLICAR:
+      // toda nota, relacionada o no, se usa a mano en Cobranzas — sin ningún
+      // caso automático (decisión del cliente 2026-08-28). Al usarse en una
+      // cobranza pasa a 'pagada'.
+      estado: 'pendiente',
       codigo: apiResponse.comprobante_nro ?? null,
       folioLocal,
       archivo: apiResponse.comprobante_pdf_url ?? null,
@@ -2785,7 +2787,9 @@ export async function emitirNotaCreditoInternaAction(
       guarderiaId: gId,
       socioId: original.socioId,
       tipoFactura: 'nota_credito_interna',
-      estado: 'pagada',
+      // Pendiente DE APLICAR: la NCI también se usa a mano en Cobranzas, igual
+      // que las fiscales (decisión del cliente 2026-08-28).
+      estado: 'pendiente',
       codigo,
       descripcion: descripcionNota,
       importe: importeNota.toFixed(2),
