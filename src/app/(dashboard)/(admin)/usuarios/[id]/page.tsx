@@ -411,6 +411,7 @@ export default async function SocioPage({
       archivo: string | null;
       tipo: string | null;
       tipoRecibo: 'fiscal' | 'interno' | null;
+      estado: string | null;
       descripcion: string | null;
       emision: Date | null;
       vencimiento: Date | null;
@@ -425,6 +426,7 @@ export default async function SocioPage({
         archivo: facturacion.archivo,
         tipoFactura: facturacion.tipoFactura,
         tipoRecibo: facturacion.tipoRecibo,
+        estado: facturacion.estado,
         descripcion: facturacion.descripcion,
         emision: facturacion.emision,
         vencimiento: facturacion.vencimiento,
@@ -446,6 +448,7 @@ export default async function SocioPage({
           r.archivo ?? (r.tipoFactura === 'recibo' ? `/ventas/recibo/${r.facturacionId}` : null),
         tipo: r.tipoFactura,
         tipoRecibo: r.tipoRecibo,
+        estado: r.estado,
         descripcion: r.descripcion,
         emision: r.emision,
         vencimiento: r.vencimiento,
@@ -464,6 +467,7 @@ export default async function SocioPage({
         archivo: facturacion.archivo,
         tipoFactura: facturacion.tipoFactura,
         tipoRecibo: facturacion.tipoRecibo,
+        estado: facturacion.estado,
         descripcion: facturacion.descripcion,
         emision: facturacion.emision,
         vencimiento: facturacion.vencimiento,
@@ -479,6 +483,7 @@ export default async function SocioPage({
         archivo: r.archivo ?? `/ventas/recibo/${r.id}`,
         tipo: r.tipoFactura,
         tipoRecibo: r.tipoRecibo,
+        estado: r.estado,
         descripcion: r.descripcion,
         emision: r.emision,
         vencimiento: r.vencimiento,
@@ -609,10 +614,35 @@ export default async function SocioPage({
     excluirAdelantos: true,
   });
 
+  // Crédito del socio en notas de crédito sin aplicar. Va aparte del pool: la
+  // NC se usa a mano en Cobranzas, pero ES plata a favor del socio y la card
+  // tiene que mostrarla — sin esto una NC pendiente parecía "desaparecer"
+  // (reporte del cliente 2026-08-31, prueba 3).
+  const ncPendientes = await db
+    .select({ importe: facturacion.importe })
+    .from(facturacion)
+    .where(
+      and(
+        eq(facturacion.guarderiaId, gId),
+        eq(facturacion.socioId, id),
+        inArray(facturacion.tipoFactura, [
+          'nota_credito_a',
+          'nota_credito_b',
+          'nota_credito_c',
+          'nota_credito_interna',
+        ]),
+        eq(facturacion.estado, 'pendiente'),
+        eq(facturacion.anulada, false),
+        eq(facturacion.rechazada, false),
+      ),
+    );
+  const ncPorAplicar = ncPendientes.reduce((acc, n) => acc + parseFloat(n.importe ?? '0'), 0);
+
   return (
     <SocioDetail
       initialTab={tabDesdeUrl(tab, SOCIO_TAB_IDS, 'generales')}
       saldoAFavorDisponible={saldoAFavorDisponible}
+      ncPorAplicar={ncPorAplicar}
       paywayPublicKey={guarderiaRow[0]?.paywayPublicKey ?? null}
       internosHabilitados={(guarderiaRow[0]?.mediosCobroInternos ?? []).length > 0}
       debitoInternoHabilitado={(guarderiaRow[0]?.mediosCobroInternos ?? []).includes(
@@ -701,6 +731,9 @@ export default async function SocioPage({
           facturaArchivo: fac?.archivo ?? null,
           facturaTipo: fac?.tipo ?? null,
           facturaTipoRecibo: fac?.tipoRecibo ?? null,
+          // Estado del comprobante (pendiente/pagada): para las filas de NC
+          // define el badge Pendiente/Aplicada (pedido del cliente 2026-08-31).
+          facturaEstado: fac?.estado ?? null,
           fechaVencimiento,
           montoCubiertoNc: montoNc > 0 ? montoNc.toFixed(2) : null,
           montoCubiertoRecibo: montoRecibo > 0 ? montoRecibo.toFixed(2) : null,

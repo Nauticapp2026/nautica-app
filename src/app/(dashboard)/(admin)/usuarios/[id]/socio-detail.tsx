@@ -146,6 +146,9 @@ type Movimiento = {
   facturaArchivo: string | null;
   facturaTipo: string | null;
   facturaTipoRecibo: 'fiscal' | 'interno' | null;
+  // Estado del comprobante vinculado (pendiente/pagada). En las filas de NC
+  // define el badge Pendiente/Aplicada.
+  facturaEstado: string | null;
   comprobanteInterno: boolean;
   // Fecha de vencimiento (YYYY-MM-DD): la guardada en la factura fiscal, o —
   // para comprobantes internos, que no la guardan — emisión + plazo de pago
@@ -311,6 +314,8 @@ const ESTADO_BADGE: Record<string, string> = {
   no_pagado: 'bg-amber-50 text-amber-700',
   vencido: 'bg-red-100 text-red-700',
   anulado_nc: 'bg-purple-50 text-purple-700',
+  nc_pendiente: 'bg-amber-50 text-amber-700',
+  nc_aplicada: 'bg-gray-900 text-white',
 };
 
 const MEMBERSHIP_STATUS_CLASSES: Record<'active' | 'inactivo', string> = {
@@ -330,6 +335,11 @@ const ESTADO_LABEL: Record<string, string> = {
   no_pagado: 'Pendiente',
   vencido: 'Vencido',
   anulado_nc: 'Anulado (NC)',
+  // Filas de nota de crédito: el asiento del libro siempre está 'pagado', así
+  // que el estado útil es el del comprobante — sin usar o ya aplicada en una
+  // cobranza (pedido del cliente 2026-08-31).
+  nc_pendiente: 'Pendiente',
+  nc_aplicada: 'Aplicada',
 };
 
 // Agrega a cada movimiento (orden desc: más nuevo primero) el saldo acumulado y
@@ -372,6 +382,7 @@ function calcularSaldoYEstado<
     haberComprometido: string | null;
     esMovimientoNc: boolean;
     esAdelanto: boolean;
+    facturaEstado: string | null;
   },
 >(movimientos: T[]): (T & { saldo: number; estadoDisplay: string | null; pendiente: number })[] {
   const asc = [...movimientos].reverse();
@@ -413,6 +424,12 @@ function calcularSaldoYEstado<
     const cobranza = parseFloat(m.haber ?? '0');
     acum = acum + venta - cobranza;
     let estadoDisplay = m.estado;
+    // Fila de una NC: su asiento nace 'pagado' siempre, así que ese estado no
+    // dice nada. Lo que importa es si el comprobante sigue sin usar
+    // (Pendiente) o ya se aplicó en una cobranza (Aplicada).
+    if (m.esMovimientoNc) {
+      estadoDisplay = m.facturaEstado === 'pendiente' ? 'nc_pendiente' : 'nc_aplicada';
+    }
     const montoNc = parseFloat(m.montoCubiertoNc ?? '0');
     const montoRecibo = parseFloat(m.montoCubiertoRecibo ?? '0');
     // Lo que falta cobrar de ESTE cargo. Las filas que no son un cargo (pagos,
@@ -2039,6 +2056,7 @@ export function SocioDetail({
   internosHabilitados = true,
   debitoInternoHabilitado = true,
   saldoAFavorDisponible = 0,
+  ncPorAplicar = 0,
   initialTab = TAB_POR_DEFECTO,
 }: {
   socio: SocioData;
@@ -2065,6 +2083,9 @@ export function SocioDetail({
   // número que Cobranzas ofrece aplicar al cobrar — no el neto crudo
   // (haber − debe), que da $0 en cuanto hay más deuda que crédito.
   saldoAFavorDisponible?: number;
+  // Crédito en notas de crédito sin aplicar. Va aparte del disponible: no se
+  // usa solo (se aplica a mano en Cobranzas) pero ES plata a favor del socio.
+  ncPorAplicar?: number;
   // Pestaña inicial leída del `?tab=` por el Server Component: refrescar (F5)
   // vuelve a la misma vista en vez de saltar a Generales.
   initialTab?: TabId;
@@ -2265,6 +2286,10 @@ export function SocioDetail({
   // neto, un socio con deuda vieja y un adelanto sin aplicar mostraba $0 acá
   // mientras el modal de cobranza le ofrecía usar ese crédito.
   const totalAFavor = saldoAFavorDisponible;
+  // Lo que la card muestra como "a favor": disponible + NC por aplicar. Sin
+  // las NC, una nota pendiente parecía desaparecer (la card decía $0 mientras
+  // el libro daba el crédito) — reporte del cliente 2026-08-31, prueba 3.
+  const creditoTotal = totalAFavor + ncPorAplicar;
 
   // Predicado de filtros de la tabla de cuenta corriente.
   function pasaFiltrosCC(m: Movimiento, estadoEf?: string | null): boolean {
@@ -2883,14 +2908,22 @@ export function SocioDetail({
                     {totalPendiente > 0.005 ? 'Saldo cliente' : 'Saldo a favor'}
                   </p>
                   <p className="text-[18px] font-bold" style={{ color: '#101828' }}>
-                    {totalPendiente > 0.005 ? fmt(totalPendiente) : fmt(totalAFavor)}
+                    {totalPendiente > 0.005 ? fmt(totalPendiente) : fmt(creditoTotal)}
                   </p>
                   {/* Deuda y crédito sin usar pueden convivir: un adelanto
                       aplicado a un comprobante nuevo no cancela una deuda
                       vieja. Con deuda, el crédito se informa aparte. */}
-                  {totalPendiente > 0.005 && totalAFavor > 0.005 && (
+                  {totalPendiente > 0.005 && creditoTotal > 0.005 && (
                     <p className="text-xs font-medium text-green-600">
-                      + {fmt(totalAFavor)} a favor sin usar
+                      + {fmt(creditoTotal)} a favor sin usar
+                    </p>
+                  )}
+                  {/* La parte en NC no se descuenta sola: se aplica tildándola
+                      en una cobranza. Se aclara para que el número cierre
+                      contra el modal, que ofrece solo el disponible. */}
+                  {ncPorAplicar > 0.005 && (
+                    <p className="text-xs font-normal text-gray-500">
+                      incluye {fmt(ncPorAplicar)} en notas de crédito por aplicar
                     </p>
                   )}
                   {totalAFavor > 0.005 && (

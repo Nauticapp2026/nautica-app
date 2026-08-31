@@ -5,6 +5,7 @@ import {
   documentos,
   embarcaciones,
   espacios,
+  facturacion,
   invitados,
   lados,
   memberships,
@@ -300,11 +301,41 @@ export default async function UsuariosPage({
   // sin comprobante no debe saldar cargos viejos solo (pedido 2026-08-11).
   const poolPorSocio = await getPoolRestanteBatch(profileIds, { excluirAdelantos: true });
 
+  // Crédito en notas de crédito sin aplicar, por socio. Se suma al crédito que
+  // muestra la columna para que coincida con la card de la ficha: una NC
+  // pendiente ES plata a favor aunque se aplique a mano en Cobranzas (reporte
+  // del cliente 2026-08-31, prueba 3).
+  const ncPorSocio = new Map<string, number>();
+  if (profileIds.length > 0) {
+    const ncRows = await db
+      .select({ socioId: facturacion.socioId, importe: facturacion.importe })
+      .from(facturacion)
+      .where(
+        and(
+          eq(facturacion.guarderiaId, gId),
+          inArray(facturacion.socioId, profileIds as string[]),
+          inArray(facturacion.tipoFactura, [
+            'nota_credito_a',
+            'nota_credito_b',
+            'nota_credito_c',
+            'nota_credito_interna',
+          ]),
+          eq(facturacion.estado, 'pendiente'),
+          eq(facturacion.anulada, false),
+          eq(facturacion.rechazada, false),
+        ),
+      );
+    for (const n of ncRows) {
+      if (!n.socioId) continue;
+      ncPorSocio.set(n.socioId, (ncPorSocio.get(n.socioId) ?? 0) + parseFloat(n.importe ?? '0'));
+    }
+  }
+
   const sociosData = socios.map((s) => {
     const debe = debeBySocio.get(s.profileId) ?? 0;
     const haber = haberBySocio.get(s.profileId) ?? 0;
     const deuda = Math.max(0, debe - haber);
-    const saldoAFavor = poolPorSocio.get(s.profileId) ?? 0;
+    const saldoAFavor = (poolPorSocio.get(s.profileId) ?? 0) + (ncPorSocio.get(s.profileId) ?? 0);
     const tipos = tiposPorSocio.get(s.profileId);
     const docsCompletos = (tipos?.size ?? 0) >= TIPOS_REQUERIDOS.size;
     const tieneEmbarcacion = Boolean(s.profileId && embByProfile[s.profileId]);
