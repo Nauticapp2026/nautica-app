@@ -19,6 +19,12 @@ import { getPendientePorComprobante } from '@/lib/cobranza-cobertura';
 import { fechaCalendariaArg } from '@/lib/dates';
 import { getEstadoFifo } from '@/lib/reconciliar-cuenta';
 import {
+  PERIODO_ANULACION_DEFAULT,
+  esPeriodoAnulacion,
+  motivoBloqueoAnulacion,
+  puedeAnularRecibo,
+} from '@/lib/periodo-anulacion';
+import {
   PATRONES_RECIBO_COBRANZA,
   esCodigoReciboCobranza,
   prefijoReciboDeCanal,
@@ -888,6 +894,7 @@ export async function anularCobranzaAction(reciboId: string): Promise<{ error?: 
       importe: facturacion.importe,
       movimientoId: facturacion.movimientoId,
       anulada: facturacion.anulada,
+      emision: facturacion.emision,
       cobranzaComprobanteIds: facturacion.cobranzaComprobanteIds,
     })
     .from(facturacion)
@@ -900,6 +907,21 @@ export async function anularCobranzaAction(reciboId: string): Promise<{ error?: 
     return { error: 'Solo se pueden anular recibos de cobranza.' };
   }
   if (recibo.anulada) return { error: 'El recibo ya está anulado.' };
+
+  // Período de anulación configurado por el club (mig 0155). El botón de la
+  // tabla ya viene deshabilitado, pero el gate real va acá: la pantalla no es
+  // una garantía.
+  const [confClub] = await db
+    .select({ periodo: guarderias.periodoAnulacionRecibo })
+    .from(guarderias)
+    .where(eq(guarderias.id, gId))
+    .limit(1);
+  const periodo = esPeriodoAnulacion(confClub?.periodo)
+    ? confClub.periodo
+    : PERIODO_ANULACION_DEFAULT;
+  if (!puedeAnularRecibo(recibo.emision, periodo)) {
+    return { error: motivoBloqueoAnulacion(periodo) };
+  }
 
   const comprobanteIds = recibo.cobranzaComprobanteIds ?? [];
 

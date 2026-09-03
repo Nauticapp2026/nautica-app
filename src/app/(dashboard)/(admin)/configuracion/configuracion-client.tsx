@@ -27,6 +27,7 @@ import {
   marcarCentroEmisorPrincipalAction,
   renombrarCentroEmisorAction,
   saveMediosCobroInternosAction,
+  savePeriodoAnulacionReciboAction,
   savePuntoVentaAction,
   savePaywayCredsAction,
   solicitarCertificadoAfipAction,
@@ -48,6 +49,7 @@ import {
 import { normalizarBusqueda } from '@/lib/buscador';
 import { formatArgentinaDate, formatArgentinaDateTime } from '@/lib/dates';
 import { MEDIOS_PAGO } from '@/lib/medios-pago';
+import { PERIODO_ANULACION_OPCIONES, type PeriodoAnulacion } from '@/lib/periodo-anulacion';
 import { EmptyState } from '@/components/shared/empty-state';
 import { ImagesUploader } from '@/components/shared/images-uploader';
 
@@ -205,6 +207,7 @@ export function ConfiguracionClient({
   features,
   puntoVenta,
   mediosCobroInternos,
+  periodoAnulacionRecibo,
   centrosEmisores,
   payway,
   planes,
@@ -219,6 +222,7 @@ export function ConfiguracionClient({
   features: GuarderiaFeatures;
   puntoVenta: PuntoVentaData;
   mediosCobroInternos: string[];
+  periodoAnulacionRecibo: PeriodoAnulacion;
   centrosEmisores: CentroEmisor[];
   payway: PaywayData;
   planes: PlanInfo[];
@@ -290,6 +294,7 @@ export function ConfiguracionClient({
                 initial={puntoVenta}
                 centros={centrosEmisores}
                 mediosCobroInternos={mediosCobroInternos}
+                periodoAnulacionRecibo={periodoAnulacionRecibo}
               />
             </div>
           )}
@@ -300,6 +305,7 @@ export function ConfiguracionClient({
           initial={puntoVenta}
           centros={centrosEmisores}
           mediosCobroInternos={mediosCobroInternos}
+          periodoAnulacionRecibo={periodoAnulacionRecibo}
         />
       )}
       {activeTab === 'equipo' && (
@@ -1513,10 +1519,12 @@ function PuntoVentaTab({
   initial,
   centros,
   mediosCobroInternos,
+  periodoAnulacionRecibo,
 }: {
   initial: PuntoVentaData;
   centros: CentroEmisor[];
   mediosCobroInternos: string[];
+  periodoAnulacionRecibo: PeriodoAnulacion;
 }) {
   const [data, setData] = useState<PuntoVentaData>(initial);
   const [feedback, setFeedback] = useState<{ type: 'error' | 'success'; msg: string } | null>(null);
@@ -1699,6 +1707,10 @@ function PuntoVentaTab({
           <ConfiguracionCobranzasSection initial={mediosCobroInternos} />
         </div>
 
+        <div className="mt-2 border-t border-gray-200 pt-6">
+          <PeriodoAnulacionSection initial={periodoAnulacionRecibo} />
+        </div>
+
         {yaConfigurado && <CentrosEmisoresSection centros={centros} />}
 
         {yaConfigurado && (
@@ -1814,6 +1826,85 @@ function ConfiguracionCobranzasSection({ initial }: { initial: string[] }) {
           type="button"
           onClick={onGuardar}
           disabled={pending}
+          className="rounded-[10px] bg-[#175861] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#0f4249] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {pending ? 'Guardando…' : 'Guardar configuración'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Hasta cuándo el club puede anular un recibo de cobranza.
+ *
+ * Mismo criterio visual que "Gestión de cobranza" (pedido del cliente): título,
+ * bajada explicando para qué sirve, las opciones y un botón propio de guardado.
+ * Es una elección excluyente, así que van radios y no casillas.
+ */
+function PeriodoAnulacionSection({ initial }: { initial: PeriodoAnulacion }) {
+  const router = useRouter();
+  const [valor, setValor] = useState<PeriodoAnulacion>(initial);
+  const [pending, startTransition] = useTransition();
+
+  function guardar() {
+    startTransition(async () => {
+      const res = await savePeriodoAnulacionReciboAction(valor);
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+      toast.success('Período de anulación guardado.');
+      router.refresh();
+    });
+  }
+
+  return (
+    <div>
+      <h3 className="mb-1 text-sm font-bold" style={{ color: '#101828' }}>
+        Período de anulación de recibo
+      </h3>
+      <p className="mb-4 text-sm text-gray-500">
+        Hasta cuándo se puede anular un recibo de cobranza. Sirve para que no se anulen recibos de
+        períodos ya cerrados. Los recibos que queden fuera del período no se pueden anular, pero
+        siguen visibles en Cobranzas.
+      </p>
+
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        {PERIODO_ANULACION_OPCIONES.map((o) => (
+          <label
+            key={o.value}
+            className={`flex cursor-pointer items-start gap-2.5 rounded-[10px] border px-4 py-3 text-sm transition ${
+              valor === o.value
+                ? 'border-[#175861] bg-[#D9EBE9]'
+                : 'border-gray-200 bg-white hover:bg-gray-50'
+            }`}
+          >
+            <input
+              type="radio"
+              name="periodo-anulacion"
+              className="mt-0.5 h-4 w-4 shrink-0 accent-[#175861]"
+              checked={valor === o.value}
+              onChange={() => setValor(o.value)}
+            />
+            <span className="min-w-0">
+              <span
+                className="block font-medium"
+                style={{ color: valor === o.value ? '#175861' : '#101828' }}
+              >
+                {o.label}
+              </span>
+              <span className="block text-xs text-gray-500">{o.detalle}</span>
+            </span>
+          </label>
+        ))}
+      </div>
+
+      <div className="pt-4">
+        <button
+          type="button"
+          onClick={guardar}
+          disabled={pending || valor === initial}
           className="rounded-[10px] bg-[#175861] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#0f4249] disabled:cursor-not-allowed disabled:opacity-60"
         >
           {pending ? 'Guardando…' : 'Guardar configuración'}

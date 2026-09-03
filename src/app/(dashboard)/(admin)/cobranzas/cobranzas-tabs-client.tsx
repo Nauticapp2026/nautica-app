@@ -6,6 +6,7 @@ import { Receipt } from 'lucide-react';
 import { formatArgentinaDate } from '@/lib/dates';
 import { EmptyState } from '@/components/shared/empty-state';
 import { CobranzaTabla, type CobranzaRow } from './cobranza-tabla';
+import type { PeriodoAnulacion } from '@/lib/periodo-anulacion';
 import { PaywayCobrosList, type CobroPayway } from './payway-cobros-list';
 import { escribirTabEnUrl, type CobranzasTab } from '@/lib/tab-url';
 
@@ -39,10 +40,13 @@ const PAYWAY_ESTADO: Record<string, { label: string; cls: string }> = {
 export function CobranzasTabsClient({
   cobranzas,
   cobrosPayway,
+  periodoAnulacion,
   initialTab = 'todas',
 }: {
   cobranzas: CobranzaRow[];
   cobrosPayway: CobroPayway[];
+  /** Hasta cuándo el club permite anular un recibo (Configuración). */
+  periodoAnulacion: PeriodoAnulacion;
   // Pestaña inicial desde el ?tab= (refrescar mantiene la vista).
   initialTab?: TabKey;
 }) {
@@ -152,7 +156,9 @@ export function CobranzasTabsClient({
             </table>
           </div>
         ))}
-      {activeTab === 'cobranzas' && <CobranzaTabla cobranzas={cobranzas} />}
+      {activeTab === 'cobranzas' && (
+        <CobranzaTabla cobranzas={cobranzas} periodoAnulacion={periodoAnulacion} />
+      )}
       {activeTab === 'payway' && <PaywayCobrosList cobros={cobrosPayway} />}
     </div>
   );

@@ -411,6 +411,10 @@ export const guarderias = pgTable(
     // "Configuración de cobranzas" en Mi Perfil → Datos Impositivos). Valores
     // del set MEDIOS_PAGO (enum medio_pago). Vacío = comprobantes internos
     // deshabilitados en toda la app. Mig 0136.
+    // Hasta cuándo se puede anular un recibo de cobranza (mig 0155):
+    // 'misma_semana' | 'mismo_mes' | 'mes_anterior' | 'sin_limite'. El criterio
+    // vive en lib/periodo-anulacion.ts. Default 'sin_limite' = lo que había.
+    periodoAnulacionRecibo: text('periodo_anulacion_recibo').notNull().default('sin_limite'),
     mediosCobroInternos: text('medios_cobro_internos')
       .array()
       .notNull()

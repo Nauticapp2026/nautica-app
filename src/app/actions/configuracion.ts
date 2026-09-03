@@ -24,6 +24,7 @@ import {
 } from '@/lib/tusfacturas/client';
 import { CONDICION_IVA_API } from '@/lib/tusfacturas/mappers';
 import { MEDIO_PAGO_VALUES } from '@/lib/medios-pago';
+import { esPeriodoAnulacion } from '@/lib/periodo-anulacion';
 
 const DIAS = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'] as const;
 type Dia = (typeof DIAS)[number];
@@ -251,6 +252,31 @@ export async function saveMediosCobroInternosAction(medios: string[]): Promise<{
   revalidatePath('/configuracion');
   revalidatePath('/cobranzas');
   revalidatePath('/ventas');
+  return {};
+}
+
+/**
+ * Guarda el período de anulación de recibos del club (mig 0155).
+ *
+ * No se valida solo el formato: el valor tiene que ser uno de los cuatro
+ * definidos, y el CHECK de la tabla es la última red.
+ */
+export async function savePeriodoAnulacionReciboAction(
+  periodo: string,
+): Promise<{ error?: string }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+  if (!isAdmin(ctx)) return { error: 'Solo administradores pueden editar la configuración.' };
+
+  if (!esPeriodoAnulacion(periodo)) return { error: 'Período de anulación inválido.' };
+
+  await db
+    .update(guarderias)
+    .set({ periodoAnulacionRecibo: periodo, updatedAt: new Date() })
+    .where(eq(guarderias.id, ctx.activeMembership.guarderiaId));
+
+  revalidatePath('/configuracion');
+  revalidatePath('/cobranzas');
   return {};
 }
 

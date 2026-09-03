@@ -2,6 +2,7 @@ import { and, desc, eq, like, or } from 'drizzle-orm';
 
 import { getActiveMarina } from '@/lib/auth/session';
 import { PATRONES_RECIBO_COBRANZA } from '@/lib/recibo-codigos';
+import { PERIODO_ANULACION_DEFAULT, esPeriodoAnulacion } from '@/lib/periodo-anulacion';
 import { db } from '@/lib/db';
 import {
   embarcaciones,
@@ -108,6 +109,7 @@ export default async function CobranzasPage({
         nombre: guarderias.nombre,
         razonSocial: guarderias.razonSocial,
         mediosCobroInternos: guarderias.mediosCobroInternos,
+        periodoAnulacionRecibo: guarderias.periodoAnulacionRecibo,
       })
       .from(guarderias)
       .where(eq(guarderias.id, gId))
@@ -224,6 +226,11 @@ export default async function CobranzasPage({
         initialTab={tabDesdeUrl(tab, COBRANZAS_TAB_IDS, 'todas')}
         cobranzas={cobranzas}
         cobrosPayway={cobrosPayway}
+        periodoAnulacion={
+          esPeriodoAnulacion(guarderiaInfo?.periodoAnulacionRecibo)
+            ? guarderiaInfo.periodoAnulacionRecibo
+            : PERIODO_ANULACION_DEFAULT
+        }
       />
     </div>
   );

@@ -7,6 +7,11 @@ import { Eye, FileDown, Receipt } from 'lucide-react';
 
 import { formatArgentinaDate } from '@/lib/dates';
 import { descargarCsv } from '@/lib/exportar-csv';
+import {
+  motivoBloqueoAnulacion,
+  puedeAnularRecibo,
+  type PeriodoAnulacion,
+} from '@/lib/periodo-anulacion';
 import { EmptyState } from '@/components/shared/empty-state';
 import { anularCobranzaAction } from '@/app/actions/cobranzas';
 
@@ -56,7 +61,14 @@ function instrumentoCobro(formas: { tipo: string; monto: string }[], slot: 0 | 1
   return `${label} (${fmtMoney(f.monto)})`;
 }
 
-export function CobranzaTabla({ cobranzas }: { cobranzas: CobranzaRow[] }) {
+export function CobranzaTabla({
+  cobranzas,
+  periodoAnulacion,
+}: {
+  cobranzas: CobranzaRow[];
+  /** Hasta cuándo el club permite anular (Configuración → Período de anulación). */
+  periodoAnulacion: PeriodoAnulacion;
+}) {
   const router = useRouter();
   const [anulandoId, setAnulandoId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -222,9 +234,19 @@ export function CobranzaTabla({ cobranzas }: { cobranzas: CobranzaRow[] }) {
                           </button>
                         </span>
                       ) : (
+                        // Fuera del período que configuró el club, el botón
+                        // queda deshabilitado con el motivo en el tooltip. El
+                        // gate real está en el server: la pantalla solo evita
+                        // que el club se choque con el error.
                         <button
                           onClick={() => setAnulandoId(c.id)}
-                          className="rounded-[8px] border border-red-200 px-2.5 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-50 hover:text-red-700"
+                          disabled={!puedeAnularRecibo(c.fecha, periodoAnulacion)}
+                          title={
+                            puedeAnularRecibo(c.fecha, periodoAnulacion)
+                              ? undefined
+                              : motivoBloqueoAnulacion(periodoAnulacion)
+                          }
+                          className="rounded-[8px] border border-red-200 px-2.5 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:border-gray-200 disabled:text-gray-400 disabled:hover:bg-transparent"
                         >
                           Anular recibo
                         </button>

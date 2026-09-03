@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { eq, and, asc, desc, inArray } from 'drizzle-orm';
 
 import { getActiveMarina } from '@/lib/auth/session';
+import { PERIODO_ANULACION_DEFAULT, esPeriodoAnulacion } from '@/lib/periodo-anulacion';
 import { db } from '@/lib/db';
 import {
   guarderiaCentrosEmisores,
@@ -82,6 +83,7 @@ export default async function ConfiguracionPage({ searchParams }: Props) {
       paywayPublicKey: guarderias.paywayPublicKey,
       paywayPrivateKey: guarderias.paywayPrivateKey,
       mediosCobroInternos: guarderias.mediosCobroInternos,
+      periodoAnulacionRecibo: guarderias.periodoAnulacionRecibo,
     })
     .from(guarderias)
     .where(eq(guarderias.id, guarderiaId))
@@ -236,6 +238,11 @@ export default async function ConfiguracionPage({ searchParams }: Props) {
       features={features}
       puntoVenta={puntoVenta}
       mediosCobroInternos={guarderia?.mediosCobroInternos ?? ['efectivo']}
+      periodoAnulacionRecibo={
+        esPeriodoAnulacion(guarderia?.periodoAnulacionRecibo)
+          ? guarderia.periodoAnulacionRecibo
+          : PERIODO_ANULACION_DEFAULT
+      }
       centrosEmisores={centrosEmisores}
       payway={payway}
       planes={planes}
