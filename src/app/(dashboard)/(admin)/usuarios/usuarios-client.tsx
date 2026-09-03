@@ -1204,9 +1204,10 @@ export function UsuariosClient({
                     ) : (
                       paginados.map((s) => {
                         const nombre = [s.nombre, s.apellido].filter(Boolean).join(' ') || '—';
-                        // Deuda y crédito disponible, el mismo par que muestra la
-                        // ficha del socio. `deuda` ya viene acotada a 0 desde el
-                        // server (no queda negativa cuando hay saldo a favor).
+                        // Deuda y crédito disponible: el mismo par de números que
+                        // la card de la ficha del socio, calculados con el mismo
+                        // criterio por fila (ver src/lib/deuda-socio.ts). `deuda`
+                        // nunca viene negativa: es una suma de pendientes.
                         const deuda = parseFloat(s.deuda ?? '0');
                         const tieneDeuda = deuda > 0.005;
                         // Crédito sin usar. Con deuda pendiente el neto no lo

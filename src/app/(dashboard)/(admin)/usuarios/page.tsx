@@ -16,6 +16,7 @@ import {
 } from '@/lib/db/schema';
 import { and, desc, eq, inArray, isNull, notExists, sql } from 'drizzle-orm';
 import { getPoolRestanteBatch } from '@/lib/reconciliar-cuenta';
+import { getDeudaPendienteBatch } from '@/lib/deuda-socio';
 import { UsuariosClient, type FiltroSocios } from './usuarios-client';
 
 export default async function UsuariosPage({
@@ -227,32 +228,17 @@ export default async function UsuariosPage({
     ubicacionByProfile[e.ocupanteId] = partes.join(' · ') || '—';
   }
 
-  // Agregar por socio: total debe de no_pagados, total haber, y flag moroso
-  // (al menos un no_pagado con fecha >= 2 meses atrás).
+  // Flag moroso: al menos un cargo no_pagado con fecha >= 2 meses atrás.
+  //
+  // El neto crudo por socio (Σdebe − Σhaber) que se acumulaba acá se eliminó:
+  // ningún número de la lista lo usa más. La deuda sale de
+  // getDeudaPendienteBatch (mismo criterio por fila que la ficha) y el crédito
+  // del pool FIFO.
   const now = new Date();
   const dosMesesAtras = new Date(now.getFullYear(), now.getMonth() - 2, now.getDate());
 
-  const debeBySocio = new Map<string, number>();
-  const haberBySocio = new Map<string, number>();
   const morososSet = new Set<string>();
   for (const m of movimientosList) {
-    const debe = parseFloat(m.debe ?? '0');
-    const haber = parseFloat(m.haber ?? '0');
-    // Saldo: neto crudo sobre todos los movimientos (Σdebe − Σhaber).
-    //
-    // OJO: esto NO es lo mismo que la card "Saldo deudor" de la ficha del socio,
-    // que suma lo pendiente fila por fila (ver calcularSaldoYEstado). El neto le
-    // resta un adelanto todavía sin aplicar, así que un socio con deuda y un
-    // adelanto grande sin usar figura acá con deuda $0 (y sin el flag de moroso)
-    // aunque la ficha muestre la deuda entera.
-    //
-    // No se unificó todavía porque la columna es server-side para toda la lista y
-    // el criterio de las filas es client-side: replicarlo acá sería una segunda
-    // implementación del mismo cálculo, que es justo lo que causó la diferencia
-    // que reportó el cliente (2026-09-03, punto 9).
-    debeBySocio.set(m.socioId, (debeBySocio.get(m.socioId) ?? 0) + debe);
-    haberBySocio.set(m.socioId, (haberBySocio.get(m.socioId) ?? 0) + haber);
-    // Moroso: deuda impaga (no_pagado) con 2+ meses de antigüedad.
     if (m.estado === 'no_pagado' && m.fecha && m.fecha <= dosMesesAtras) {
       morososSet.add(m.socioId);
     }
@@ -311,6 +297,11 @@ export default async function UsuariosPage({
   // sin comprobante no debe saldar cargos viejos solo (pedido 2026-08-11).
   const poolPorSocio = await getPoolRestanteBatch(profileIds, { excluirAdelantos: true });
 
+  // Deuda: el MISMO número que la card "Saldo deudor" de la ficha (suma de lo
+  // pendiente fila por fila). Antes era el neto crudo y no coincidía — ver
+  // src/lib/deuda-socio.ts (reporte del cliente 2026-09-03, punto 9).
+  const deudaPorSocio = await getDeudaPendienteBatch(profileIds);
+
   // Crédito en notas de crédito sin aplicar, por socio. Se suma al crédito que
   // muestra la columna para que coincida con la card de la ficha: una NC
   // pendiente ES plata a favor aunque se aplique a mano en Cobranzas (reporte
@@ -342,9 +333,7 @@ export default async function UsuariosPage({
   }
 
   const sociosData = socios.map((s) => {
-    const debe = debeBySocio.get(s.profileId) ?? 0;
-    const haber = haberBySocio.get(s.profileId) ?? 0;
-    const deuda = Math.max(0, debe - haber);
+    const deuda = deudaPorSocio.get(s.profileId) ?? 0;
     const saldoAFavor = (poolPorSocio.get(s.profileId) ?? 0) + (ncPorSocio.get(s.profileId) ?? 0);
     const tipos = tiposPorSocio.get(s.profileId);
     const docsCompletos = (tipos?.size ?? 0) >= TIPOS_REQUERIDOS.size;
@@ -365,9 +354,10 @@ export default async function UsuariosPage({
       // targeteado a un comprobante nuevo no cancela una deuda vieja. Es el
       // mismo número que Cobranzas ofrece aplicar.
       saldoAFavor: saldoAFavor.toFixed(2),
-      // Moroso solo si además tiene saldo neto positivo: si pagó (aunque sea con
-      // "Registrar pago", que deja los cargos viejos en no_pagado), deuda = 0 y
-      // deja de figurar como moroso.
+      // Moroso solo si además le queda deuda: si pagó (aunque sea con "Registrar
+      // pago", que deja los cargos viejos en no_pagado), deuda = 0 y deja de
+      // figurar como moroso. Un adelanto SIN aplicar no lo saca de moroso — la
+      // deuda sigue viva hasta que el club lo aplique, mismo criterio que la ficha.
       estadoSocio: (morososSet.has(s.profileId) && deuda > 0.001 ? 'moroso' : 'activo') as
         | 'moroso'
         | 'activo',
