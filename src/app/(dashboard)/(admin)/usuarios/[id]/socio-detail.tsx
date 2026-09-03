@@ -2276,12 +2276,6 @@ export function SocioDetail({
 
   const memberDate = formatArgentinaDate(socio.memberSince);
 
-  // Saldo real del socio: SIEMPRE sobre todos los movimientos (no se filtra por
-  // fecha/estado/comprobante). Positivo = nos debe, negativo = saldo a favor.
-  const saldoBruto =
-    movimientos.reduce((sum, m) => sum + parseFloat(m.debe ?? '0'), 0) -
-    movimientos.reduce((sum, m) => sum + parseFloat(m.haber ?? '0'), 0);
-  const totalPendiente = Math.max(0, saldoBruto);
   // Crédito sin usar: viene del server (pool FIFO), NO del neto crudo. Con el
   // neto, un socio con deuda vieja y un adelanto sin aplicar mostraba $0 acá
   // mientras el modal de cobranza le ofrecía usar ese crédito.
@@ -2307,6 +2301,21 @@ export function SocioDetail({
   }
   // Movimientos con saldo acumulado y estado mostrado (ver calcularSaldoYEstado).
   const movimientosCalc = calcularSaldoYEstado(movimientos);
+
+  // Deuda de la card: la SUMA de lo que queda pendiente fila por fila, sobre
+  // TODOS los movimientos (la card nunca se filtra por fecha/estado/comprobante).
+  //
+  // Antes era el neto crudo (Σdebe − Σhaber) y eso no coincidía con la tabla:
+  // el neto le resta al socio un adelanto que todavía no se aplicó a ningún
+  // cargo, pero las filas no lo hacen (un adelanto sin comprobante no salda
+  // nada solo — ver calcularSaldoYEstado / calcularPoolRestante). Con deuda
+  // $2.451,61 y un adelanto sin aplicar de $10.050, el neto daba negativo y la
+  // card se daba vuelta a "Saldo a favor" tapando la deuda entera, mientras las
+  // filas seguían mostrándola bien. Reporte del cliente 2026-09-03, punto 9.
+  //
+  // Usar `pendiente` mantiene los dos números atados a la misma fuente: si una
+  // fila dice Cobrado no suma, si dice Parcial suma solo el resto.
+  const totalPendiente = movimientosCalc.reduce((sum, m) => sum + m.pendiente, 0);
 
   const movimientosFiltrados = movimientosCalc.filter((m) => pasaFiltrosCC(m, m.estadoDisplay));
 

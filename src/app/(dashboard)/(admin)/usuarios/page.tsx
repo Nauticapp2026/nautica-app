@@ -238,8 +238,18 @@ export default async function UsuariosPage({
   for (const m of movimientosList) {
     const debe = parseFloat(m.debe ?? '0');
     const haber = parseFloat(m.haber ?? '0');
-    // Saldo: mismo criterio que la card "Saldo deudor" del detalle del socio —
-    // todos los movimientos, sin filtrar por estado (Σdebe − Σhaber).
+    // Saldo: neto crudo sobre todos los movimientos (Σdebe − Σhaber).
+    //
+    // OJO: esto NO es lo mismo que la card "Saldo deudor" de la ficha del socio,
+    // que suma lo pendiente fila por fila (ver calcularSaldoYEstado). El neto le
+    // resta un adelanto todavía sin aplicar, así que un socio con deuda y un
+    // adelanto grande sin usar figura acá con deuda $0 (y sin el flag de moroso)
+    // aunque la ficha muestre la deuda entera.
+    //
+    // No se unificó todavía porque la columna es server-side para toda la lista y
+    // el criterio de las filas es client-side: replicarlo acá sería una segunda
+    // implementación del mismo cálculo, que es justo lo que causó la diferencia
+    // que reportó el cliente (2026-09-03, punto 9).
     debeBySocio.set(m.socioId, (debeBySocio.get(m.socioId) ?? 0) + debe);
     haberBySocio.set(m.socioId, (haberBySocio.get(m.socioId) ?? 0) + haber);
     // Moroso: deuda impaga (no_pagado) con 2+ meses de antigüedad.
