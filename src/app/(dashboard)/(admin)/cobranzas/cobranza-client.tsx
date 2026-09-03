@@ -129,6 +129,11 @@ function NuevaCobranzaModal({
   // Notas de credito tildadas en el listado. La factura a la que van la
   // resuelve ncAsignadas; el club no la elige.
   const [ncSeleccionadas, setNcSeleccionadas] = useState<Set<string>>(new Set());
+  // Cuánto se aplica de cada nota. Al tildarla arranca en todo su disponible y
+  // se puede bajar: la nota se aplica total o parcial, como cualquier
+  // comprobante (pedido del cliente 2026-09-02). El resto sigue disponible para
+  // la próxima cobranza.
+  const [ncMontos, setNcMontos] = useState<Record<string, string>>({});
   // Cuánto del saldo a favor aplicar. Editable: el club puede usar solo una
   // parte del crédito disponible y cobrar el resto (pedido 2026-08-10). Al
   // tildar arranca en el máximo aplicable y se puede bajar; nunca puede superar
@@ -186,9 +191,33 @@ function NuevaCobranzaModal({
     [notasCreditoCanal, ncSeleccionadas],
   );
 
+  /** Lo que le queda por aplicar a la nota (lo calcula el server). */
+  function ncDisponibleDe(n: NotaCreditoSuelta): number {
+    return parseFloat(n.importeDisponible ?? n.importe ?? '0');
+  }
+
+  /** Lo que se aplica de esta nota en esta cobranza. */
+  function ncMontoDe(n: NotaCreditoSuelta): number {
+    const crudo = ncMontos[n.id];
+    if (crudo == null) return ncDisponibleDe(n);
+    return parseFloat(montoToNumberStr(crudo)) || 0;
+  }
+
+  function setNcMonto(id: string, valor: string) {
+    setNcMontos((prev) => ({ ...prev, [id]: sanitizeMontoInput(valor) }));
+  }
+
   const totalNc = useMemo(
-    () => ncAplicadas.reduce((acc, n) => acc + parseFloat(n.importe ?? '0'), 0),
-    [ncAplicadas],
+    () => ncAplicadas.reduce((acc, n) => acc + ncMontoDe(n), 0),
+    // ncMontoDe depende de ncMontos; se lista para que el total se recalcule al
+    // editar un monto.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [ncAplicadas, ncMontos],
+  );
+
+  /** Una nota con más monto del que le queda disponible bloquea el registro. */
+  const ncExcedeDisponible = ncAplicadas.some(
+    (n) => ncMontoDe(n) > ncDisponibleDe(n) + 0.01 || ncMontoDe(n) <= 0,
   );
 
   // Total a APLICAR a los comprobantes: su pendiente completo, sin descontar la
@@ -266,7 +295,8 @@ function NuevaCobranzaModal({
     (montoEfectivo <= 0.005 || (formas.length > 0 && hayMediosManuales)) &&
     repartoValido &&
     !creditoExcedeDisponible &&
-    !ncExcede;
+    !ncExcede &&
+    !ncExcedeDisponible;
 
   function handleSelectSocio(s: SocioOption) {
     setSocio(s);
@@ -290,6 +320,7 @@ function NuevaCobranzaModal({
       setComprobantes(res.comprobantes ?? []);
       setNotasCredito(res.notasCredito ?? []);
       setNcSeleccionadas(new Set());
+      setNcMontos({});
       setTarjetaGuardada(res.tarjeta ?? null);
       setSelected(new Set());
       setSaldoDisponible(saldoRes.disponible ?? 0);
@@ -297,10 +328,20 @@ function NuevaCobranzaModal({
   }
 
   function toggleNotaCredito(id: string) {
+    const destildar = ncSeleccionadas.has(id);
     setNcSeleccionadas((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
+      if (destildar) next.delete(id);
       else next.add(id);
+      return next;
+    });
+    // Al tildar arranca en todo el disponible (el caso más común: usarla
+    // entera); al destildar se limpia para que no quede un monto viejo.
+    const nota = notasCreditoCanal.find((n) => n.id === id);
+    setNcMontos((prev) => {
+      const next = { ...prev };
+      if (destildar || !nota) delete next[id];
+      else next[id] = ncDisponibleDe(nota).toFixed(2);
       return next;
     });
   }
@@ -446,7 +487,9 @@ function NuevaCobranzaModal({
               monto: montoToNumberStr(montosPorComp[c.id] ?? '0'),
             }))
           : undefined,
-        notasCredito: ncAplicadas.length ? ncAplicadas.map((n) => n.id) : undefined,
+        notasCredito: ncAplicadas.length
+          ? ncAplicadas.map((n) => ({ notaId: n.id, monto: ncMontoDe(n).toFixed(2) }))
+          : undefined,
       });
       if (res.error) {
         setError(res.error);
@@ -615,20 +658,22 @@ function NuevaCobranzaModal({
                         tildarlas resta del total a cobrar, igual que el saldo a
                         favor. */}
                     {notasCreditoCanal.map((n) => {
-                      const monto = parseFloat(n.importe ?? '0');
+                      const disponible = ncDisponibleDe(n);
                       const tildada = ncSeleccionadas.has(n.id);
+                      const aplicado = ncMontoDe(n);
+                      const parcial = tildada && aplicado > 0 && aplicado < disponible - 0.005;
                       return (
-                        <label
+                        <div
                           key={n.id}
-                          className="flex cursor-pointer items-center gap-3 px-4 py-3 transition hover:bg-gray-50"
+                          className="flex items-center gap-3 px-4 py-3 transition hover:bg-gray-50"
                         >
                           <input
                             type="checkbox"
                             checked={tildada}
                             onChange={() => toggleNotaCredito(n.id)}
-                            className="h-4 w-4 accent-[#175861]"
+                            className="h-4 w-4 shrink-0 cursor-pointer accent-[#175861]"
                           />
-                          <div className="flex flex-1 flex-col">
+                          <div className="flex min-w-0 flex-1 flex-col">
                             <span className="text-sm font-medium text-[#101828]">
                               {n.codigo ?? 'Sin código'}
                               <span className="ml-2 text-xs font-normal text-gray-400">
@@ -642,13 +687,43 @@ function NuevaCobranzaModal({
                               {n.facturaOriginalCodigo
                                 ? ` · Relacionada a ${n.facturaOriginalCodigo}`
                                 : ''}
-                              {tildada ? ' · Resta de lo seleccionado' : ''}
+                              {/* Si ya se usó en parte, se avisa: el disponible
+                                  no es el importe de la nota. */}
+                              {disponible < parseFloat(n.importe ?? '0') - 0.005
+                                ? ` · Quedan ${fmtMoney(disponible)} de ${fmtMoney(parseFloat(n.importe ?? '0'))}`
+                                : ''}
+                              {parcial ? ` · Uso parcial, resto queda disponible` : ''}
                             </span>
                           </div>
-                          <span className="text-sm font-semibold" style={{ color: '#175861' }}>
-                            −{fmtMoney(monto)}
-                          </span>
-                        </label>
+                          {/* El monto es editable: la nota se puede aplicar
+                              total o parcial, como cualquier comprobante
+                              (pedido del cliente 2026-09-02). Tope: lo que le
+                              queda disponible. */}
+                          {tildada ? (
+                            <div className="flex shrink-0 items-center gap-1">
+                              <span className="text-sm font-semibold" style={{ color: '#175861' }}>
+                                −$
+                              </span>
+                              <input
+                                value={ncMontos[n.id] ?? ''}
+                                onChange={(e) => setNcMonto(n.id, e.target.value)}
+                                inputMode="decimal"
+                                className={`h-9 w-28 rounded-[8px] border bg-white px-2 text-right text-sm font-semibold focus:outline-none ${
+                                  aplicado > disponible + 0.01
+                                    ? 'border-red-300 text-red-700 focus:border-red-400'
+                                    : 'border-gray-200 text-[#175861] focus:border-[#175861]'
+                                }`}
+                              />
+                            </div>
+                          ) : (
+                            <span
+                              className="shrink-0 text-sm font-semibold"
+                              style={{ color: '#175861' }}
+                            >
+                              −{fmtMoney(disponible)}
+                            </span>
+                          )}
+                        </div>
                       );
                     })}
                   </div>
