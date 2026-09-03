@@ -2982,8 +2982,11 @@ export function SocioDetail({
                   )}
                 </div>
                 <div>
+                  {/* "Saldo deudor", no "Saldo cliente": queda simétrico con
+                      "Saldo a favor" y dice qué significa (pedido del cliente
+                      2026-09-02). */}
                   <p className="text-xs font-semibold tracking-wide text-gray-400 uppercase">
-                    {totalPendiente > 0.005 ? 'Saldo cliente' : 'Saldo a favor'}
+                    {totalPendiente > 0.005 ? 'Saldo deudor' : 'Saldo a favor'}
                   </p>
                   <p className="text-[18px] font-bold" style={{ color: '#101828' }}>
                     {totalPendiente > 0.005 ? fmt(totalPendiente) : fmt(creditoTotal)}

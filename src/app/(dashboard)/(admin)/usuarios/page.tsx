@@ -238,7 +238,7 @@ export default async function UsuariosPage({
   for (const m of movimientosList) {
     const debe = parseFloat(m.debe ?? '0');
     const haber = parseFloat(m.haber ?? '0');
-    // Saldo: mismo criterio que la card "Saldo cliente" del detalle del socio —
+    // Saldo: mismo criterio que la card "Saldo deudor" del detalle del socio —
     // todos los movimientos, sin filtrar por estado (Σdebe − Σhaber).
     debeBySocio.set(m.socioId, (debeBySocio.get(m.socioId) ?? 0) + debe);
     haberBySocio.set(m.socioId, (haberBySocio.get(m.socioId) ?? 0) + haber);

@@ -234,7 +234,7 @@ Lista los servicios que el socio tiene contratados. Es un **contrato**, no un hi
 
 Muestra los movimientos del socio: facturas, cobros y saldo.
 
-Arriba de la tabla hay tres tarjetas: **Ingresos por venta**, **Cobranzas** y una tercera que muestra **Saldo cliente** (lo que debe, en naranja) o **Saldo a favor** (crédito sin usar, en verde), según cuál tenga. Si el socio debe y **además** tiene algo de crédito sin usar sin alcanzar a cubrir la deuda, debajo del monto aparece la aclaración **"+ $X a favor sin usar"**. Cuando hay saldo a favor, un link **Ver historial** abre un panel con el detalle de **de dónde salió cada peso de crédito y en qué se aplicó** (por ejemplo, un adelanto que después se usó para pagar una factura puntual).
+Arriba de la tabla hay tres tarjetas: **Ingresos por venta**, **Cobranzas** y una tercera que muestra **Saldo deudor** (lo que debe, en naranja) o **Saldo a favor** (crédito sin usar, en verde), según cuál tenga. Si el socio debe y **además** tiene algo de crédito sin usar sin alcanzar a cubrir la deuda, debajo del monto aparece la aclaración **"+ $X a favor sin usar"**. Cuando hay saldo a favor, un link **Ver historial** abre un panel con el detalle de **de dónde salió cada peso de crédito y en qué se aplicó** (por ejemplo, un adelanto que después se usó para pagar una factura puntual).
 
 > Esta pestaña es de **solo lectura** de movimientos. Para registrar un cobro del socio, andá a la sección **Cobranzas** (menú lateral) y usá **Nueva cobranza** — reemplaza al viejo botón "Registrar pago" que tenía esta pestaña. Los consumos tampoco se cargan acá: usá **Cargar Servicio** en la pestaña **Servicios Contratados**.
 
@@ -244,7 +244,7 @@ Arriba de la tabla hay tres tarjetas: **Ingresos por venta**, **Cobranzas** y un
 - **Estado** — Todos / Cobrado / Anulado (NC) / Parcial / Pendiente.
 - **Tipo de comprobante** — Factura A/B/C, Recibo, Comprobante interno, Nota de crédito o Sin comprobante.
 
-Al aplicar **cualquier filtro**, la tercera tarjeta (Saldo cliente / Saldo a favor) se **oculta**: su valor es el saldo total del socio y no se corresponde con el subconjunto de movimientos filtrados. Las tarjetas de **Ingresos por venta** y **Cobranzas** se mantienen. Al limpiar los filtros, vuelve a aparecer.
+Al aplicar **cualquier filtro**, la tercera tarjeta (Saldo deudor / Saldo a favor) se **oculta**: su valor es el saldo total del socio y no se corresponde con el subconjunto de movimientos filtrados. Las tarjetas de **Ingresos por venta** y **Cobranzas** se mantienen. Al limpiar los filtros, vuelve a aparecer.
 
 **Ordenar por fecha.** Hacé clic en el encabezado **Fecha** para alternar el orden de los movimientos entre **más nuevo primero** (por defecto) y **más antiguo primero**. La flechita del encabezado indica el orden actual.
 
