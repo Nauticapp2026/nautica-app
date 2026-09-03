@@ -170,7 +170,12 @@ export default async function ReciboPage({
   let aplicaciones: AplicacionRecibo[] | null = null;
   if (row.movimientoId) {
     const dp = await getDatosPagoRecibo(row.movimientoId);
-    formasPago = dp.formas;
+    // Se descartan las formas sin monto: los recibos cubiertos 100% con saldo a
+    // favor o con notas de crédito quedaron guardados con `monto: ''`, y
+    // `parseFloat('')` imprimía "Efectivo — $NaN" (reportado 2026-09-03). Desde
+    // ese arreglo ya no se guardan así, pero los recibos viejos siguen en la
+    // base, así que el filtro se queda.
+    formasPago = dp.formas.filter((f) => (parseFloat(f.monto) || 0) > 0.005);
     aplicaciones = dp.aplicaciones;
   }
 

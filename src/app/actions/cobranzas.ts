@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { and, asc, count, eq, inArray, isNull, like, ne, notLike, or } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, isNull, like, ne, notLike, or } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 
 import { db } from '@/lib/db';
@@ -15,7 +15,7 @@ import {
   paywayTokens,
 } from '@/lib/db/schema';
 import { getActiveMarina } from '@/lib/auth/session';
-import { getPendientePorComprobante } from '@/lib/cobranza-cobertura';
+import { calcularCoberturaTargeted, getPendientePorComprobante } from '@/lib/cobranza-cobertura';
 import { fechaCalendariaArg } from '@/lib/dates';
 import { getEstadoFifo } from '@/lib/reconciliar-cuenta';
 import {
@@ -684,11 +684,17 @@ export async function registrarCobranzaAction(data: RegistrarCobranzaData): Prom
   const haberReal = montoAPagar.toFixed(2);
   const importe = montoTotalAplicar.toFixed(2);
   const fecha = data.fecha ? fechaCalendariaArg(data.fecha) : new Date();
-  const medioPago = data.formas?.length ? (medioPagoDeFormas(data.formas) as never) : null;
+  // Solo las formas con plata de verdad. Una cobranza cubierta 100% con saldo a
+  // favor o con notas de crédito llega con la fila del formulario vacía
+  // (`monto: ''`), y guardarla hacía que el recibo mostrara "Efectivo — $NaN"
+  // (reportado por el cliente 2026-09-03 con captura): `parseFloat('')` es NaN.
+  // Sin plata real no hay forma de pago que declarar.
+  const formasConMonto = (data.formas ?? []).filter((f) => (parseFloat(f.monto) || 0) > 0.005);
+  const medioPago = formasConMonto.length ? (medioPagoDeFormas(formasConMonto) as never) : null;
   const datosPago = {
     montoAPagar: haberReal,
     montoSaldoAFavor: montoSaldoAFavor > 0 ? montoSaldoAFavor.toFixed(2) : undefined,
-    formas: data.formas ?? [],
+    formas: formasConMonto,
     aplicaciones,
     // Qué NC sueltas consumió este recibo: la anulación las devuelve a
     // 'pendiente'. Recibos anteriores a 2026-08-24 no traen este campo.
@@ -921,6 +927,69 @@ export async function anularCobranzaAction(reciboId: string): Promise<{ error?: 
     : PERIODO_ANULACION_DEFAULT;
   if (!puedeAnularRecibo(recibo.emision, periodo)) {
     return { error: motivoBloqueoAnulacion(periodo) };
+  }
+
+  // ── El crédito de este recibo no puede estar ya gastado ────────────────────
+  //
+  // Bug real reportado por el cliente (2026-09-03, YCVL): se anuló un adelanto
+  // de $1 (RC-000018) cuyo crédito una cobranza posterior (RC-000019) ya había
+  // aplicado a una factura. La anulación revirtió la plata pero no tocó esa
+  // cobranza, así que la factura quedó "cobrada" con plata revertida — y el $1
+  // no reaparecía en Cobranzas porque ya se había consumido.
+  //
+  // Criterio: el pool de saldo a favor es fungible, así que basta con que la
+  // anulación no lo deje NEGATIVO. Lo que este recibo aporta al pool es su
+  // haber menos lo que ya comprometió a comprobantes; si eso supera el
+  // disponible actual, parte del crédito está gastado y hay que anular primero
+  // la cobranza que lo usó.
+  if (recibo.socioId && recibo.movimientoId) {
+    const [cobertura, disponible] = await Promise.all([
+      calcularCoberturaTargeted(recibo.socioId),
+      getSaldoAFavorDisponible(recibo.socioId),
+    ]);
+    const [pagoActual] = await db
+      .select({ haber: movimientosCuentaCorriente.haber })
+      .from(movimientosCuentaCorriente)
+      .where(eq(movimientosCuentaCorriente.id, recibo.movimientoId))
+      .limit(1);
+    const comprometido = cobertura.haberComprometido.get(recibo.movimientoId) ?? 0;
+    const aportaAlPool = Math.max(0, parseFloat(pagoActual?.haber ?? '0') - comprometido);
+
+    if (aportaAlPool > disponible + 0.01) {
+      // Qué cobranzas se financiaron con saldo a favor: son las candidatas a
+      // anular primero. Se nombran para que el club sepa qué hacer.
+      const consumidoras = await db
+        .select({ codigo: facturacion.codigo, datosPago: movimientosCuentaCorriente.datosPago })
+        .from(facturacion)
+        .innerJoin(
+          movimientosCuentaCorriente,
+          eq(movimientosCuentaCorriente.id, facturacion.movimientoId),
+        )
+        .where(
+          and(
+            eq(facturacion.guarderiaId, gId),
+            eq(facturacion.socioId, recibo.socioId),
+            eq(facturacion.tipoFactura, 'recibo'),
+            eq(facturacion.anulada, false),
+          ),
+        )
+        .orderBy(desc(facturacion.createdAt));
+      const culpables = consumidoras
+        .filter((c) => {
+          const dp = c.datosPago as { montoSaldoAFavor?: string } | null;
+          return parseFloat(dp?.montoSaldoAFavor ?? '0') > 0.005;
+        })
+        .map((c) => c.codigo)
+        .filter(Boolean);
+
+      const detalle = culpables.length
+        ? ` Anulá primero ${culpables.length === 1 ? 'el recibo' : 'los recibos'} ${culpables.join(', ')}, que se cobró con ese saldo a favor.`
+        : '';
+      return {
+        error:
+          `No se puede anular ${recibo.codigo}: parte de su crédito ($${aportaAlPool.toFixed(2)}) ya se usó en otra cobranza y hoy quedan $${disponible.toFixed(2)} disponibles. Anularlo dejaría un comprobante cobrado con plata revertida.${detalle}`.trim(),
+      };
+    }
   }
 
   const comprobanteIds = recibo.cobranzaComprobanteIds ?? [];
