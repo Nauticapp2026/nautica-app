@@ -36,6 +36,7 @@ import {
 } from '@/lib/db/schema';
 import { enviarReciboPorMail } from '@/lib/email/recibo-mail';
 import { formatPaywayError } from '@/lib/payway/format-error';
+import { prefijoReciboDeCanal } from '@/lib/recibo-codigos';
 import {
   fechaOperativa,
   getEstadoFifo,
@@ -230,7 +231,7 @@ async function cobrarCargos(args: {
     // Recibo del cobro. Antes el débito automático no dejaba comprobante: el
     // socio veía el cargo pagado en su cuenta pero no tenía el papel del pago
     // (pedido cliente 2026-08-19). Se numera en la MISMA serie que las
-    // cobranzas manuales (RC- fiscal / CI- interno) porque es una cobranza más,
+    // cobranzas manuales (RC- fiscal / RI- interno) porque es una cobranza más,
     // solo que la disparó el cron. La app mobile lista `facturacion` sin
     // filtrar por tipo, así que con esta fila el recibo ya le aparece al socio.
     //
@@ -238,7 +239,7 @@ async function cobrarCargos(args: {
     // registrada — quedaría sin recibo, no sin cobrar.
     let reciboId: string | null = null;
     try {
-      const prefijo = canal === 'interno' ? 'CI' : 'RC';
+      const prefijo = prefijoReciboDeCanal(canal);
       const [{ n }] = await db
         .select({ n: count() })
         .from(facturacion)

@@ -18,6 +18,11 @@ import { getActiveMarina } from '@/lib/auth/session';
 import { getPendientePorComprobante } from '@/lib/cobranza-cobertura';
 import { fechaCalendariaArg } from '@/lib/dates';
 import { getEstadoFifo } from '@/lib/reconciliar-cuenta';
+import {
+  PATRONES_RECIBO_COBRANZA,
+  esCodigoReciboCobranza,
+  prefijoReciboDeCanal,
+} from '@/lib/recibo-codigos';
 
 type Ctx = NonNullable<Awaited<ReturnType<typeof getActiveMarina>>>;
 
@@ -199,11 +204,11 @@ export async function getComprobantesPendientesAction(socioId: string): Promise<
         eq(facturacion.anulada, false),
         eq(facturacion.rechazada, false),
         or(isNull(facturacion.estado), ne(facturacion.estado, 'pagada')),
-        // Los recibos de cobranza (RC-/CI-) también son tipo 'recibo' pero
+        // Los recibos de cobranza (RC-/RI-) también son tipo 'recibo' pero
         // documentan un pago pasado, no deuda: nunca son cobrables.
         or(
           isNull(facturacion.codigo),
-          and(notLike(facturacion.codigo, 'RC-%'), notLike(facturacion.codigo, 'CI-%')),
+          and(...PATRONES_RECIBO_COBRANZA.map((pat) => notLike(facturacion.codigo, pat))),
         ),
       ),
     )
@@ -446,7 +451,7 @@ export async function registrarCobranzaAction(data: RegistrarCobranzaData): Prom
             inArray(facturacion.id, comprobanteIds),
             // Solo comprobantes con saldo pendiente (los 'pagada' ya no se
             // cobran — pedido del cliente 2026-08-03). Se excluyen anulados,
-            // rechazados y los recibos de cobranza RC-/CI- (documentan un
+            // rechazados y los recibos de cobranza RC-/RI- (documentan un
             // pago pasado, no deuda).
             inArray(facturacion.tipoFactura, [...TIPOS_COBRABLES]),
             eq(facturacion.anulada, false),
@@ -454,7 +459,7 @@ export async function registrarCobranzaAction(data: RegistrarCobranzaData): Prom
             or(isNull(facturacion.estado), ne(facturacion.estado, 'pagada')),
             or(
               isNull(facturacion.codigo),
-              and(notLike(facturacion.codigo, 'RC-%'), notLike(facturacion.codigo, 'CI-%')),
+              and(...PATRONES_RECIBO_COBRANZA.map((pat) => notLike(facturacion.codigo, pat))),
             ),
           ),
         )
@@ -616,8 +621,8 @@ export async function registrarCobranzaAction(data: RegistrarCobranzaData): Prom
     const movimientoId = await db.transaction(async (tx) => {
       // 1. Numerar el recibo de cobranza, distinto de los RB- de cargo. La
       // numeración es INDEPENDIENTE por canal: RC-NNNNNN para fiscales,
-      // CI-NNNNNN para internos (pedido del cliente 2026-08-03).
-      const prefijo = tipoRecibo === 'interno' ? 'CI' : 'RC';
+      // RI-NNNNNN para internos (pedido del cliente 2026-08-03).
+      const prefijo = prefijoReciboDeCanal(tipoRecibo === 'interno' ? 'interno' : 'fiscal');
       const [{ n }] = await tx
         .select({ n: count() })
         .from(facturacion)
@@ -793,8 +798,7 @@ export async function anularCobranzaAction(reciboId: string): Promise<{ error?: 
     .limit(1);
 
   if (!recibo) return { error: 'Recibo no encontrado.' };
-  const esReciboCobranza =
-    recibo.codigo != null && (recibo.codigo.startsWith('RC-') || recibo.codigo.startsWith('CI-'));
+  const esReciboCobranza = esCodigoReciboCobranza(recibo.codigo);
   if (recibo.tipoFactura !== 'recibo' || !esReciboCobranza) {
     return { error: 'Solo se pueden anular recibos de cobranza.' };
   }

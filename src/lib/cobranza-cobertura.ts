@@ -1,5 +1,5 @@
 /**
- * Cobertura targeted de los recibos de cobranza (RC-/CI-).
+ * Cobertura targeted de los recibos de cobranza (RC-/RI-).
  *
  * Desde 2026-08 cada recibo guarda en el `datos_pago` de su movimiento de pago
  * el detalle `aplicaciones: [{ comprobanteId, monto }]` — a qué comprobante fue
@@ -25,6 +25,7 @@
 import { and, asc, eq, inArray, like, or } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
+import { PATRONES_RECIBO_COBRANZA } from '@/lib/recibo-codigos';
 import {
   facturacion,
   facturacionItemMovimientos,
@@ -76,7 +77,7 @@ async function getRecibosConAplicacionesBatch(
         inArray(facturacion.socioId, socioIds),
         eq(facturacion.tipoFactura, 'recibo'),
         eq(facturacion.anulada, false),
-        or(like(facturacion.codigo, 'RC-%'), like(facturacion.codigo, 'CI-%')),
+        or(...PATRONES_RECIBO_COBRANZA.map((p) => like(facturacion.codigo, p))),
       ),
     )
     .orderBy(asc(facturacion.emision), asc(facturacion.createdAt));

@@ -1,5 +1,5 @@
 /**
- * Desglose "En concepto de" de un recibo de cobranza (RC-/CI-): qué comprobantes
+ * Desglose "En concepto de" de un recibo de cobranza (RC-/RI-): qué comprobantes
  * cobró, cuánto le aplicó a cada uno y el detalle de cargos de cada comprobante.
  *
  * Vive acá porque lo consumen dos vistas que tienen que decir lo MISMO: la

@@ -42,6 +42,7 @@ import {
 import { MOTIVO_NOTA_LABEL, type MotivoNota } from '@/app/actions/nota-constants';
 import { toast } from 'sonner';
 import { buscarSocios, normalizarBusqueda } from '@/lib/buscador';
+import { esCodigoReciboCobranza } from '@/lib/recibo-codigos';
 import { formatArgentinaDate } from '@/lib/dates';
 import { EmptyState } from '@/components/shared/empty-state';
 import { Pagination } from '@/components/shared/pagination';
@@ -181,9 +182,9 @@ const TIPO_FACTURA_LABEL: Record<string, string> = {
   nota_credito_interna: 'NC interna',
 };
 
-// 'recibo' agrupa RC-/CI- (cobranza), CM-/CL-/CA- (comprobante interno) y RB-
+// 'recibo' agrupa RC-/RI- (cobranza), CM-/CL-/CA- (comprobante interno) y RB-
 // — todos documentos sin validez fiscal en sí mismos. "Recibo" queda reservado
-// para Cobranzas (RC- fiscal / CI- interno): `tipoRecibo` (columna propia, se
+// para Cobranzas (RC- fiscal / RI- interno): `tipoRecibo` (columna propia, se
 // computa al registrar la cobranza) dice de qué tipo era la deuda que cancela.
 // Todo el resto es "Comprobante interno" — nunca "Recibo interno", que es otro
 // documento.
@@ -193,7 +194,7 @@ function tipoComprobanteLabel(f: {
   codigo: string | null;
 }): string {
   if (f.tipoFactura === 'recibo') {
-    if (!(f.codigo?.startsWith('RC-') || f.codigo?.startsWith('CI-'))) {
+    if (!esCodigoReciboCobranza(f.codigo)) {
       return 'Comprobante interno';
     }
     return f.tipoRecibo === 'fiscal' ? 'Recibo fiscal' : 'Recibo interno';

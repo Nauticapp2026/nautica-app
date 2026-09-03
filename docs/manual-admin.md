@@ -825,7 +825,7 @@ Arriba de la tabla de Cobranzas está el botón **Nueva cobranza**.
 
 ### Qué pasa al confirmar
 
-Al registrar la cobranza, el sistema genera un **recibo de cobranza** con numeración propia e **independiente por circuito**: **RC-NNNNNN** para cobros de comprobantes ARCA y **CI-NNNNNN** para cobros de comprobantes internos. Marca como **Cobrados** los comprobantes que quedaron cubiertos enteros (contando cobros parciales anteriores) y actualiza la Cuenta Corriente del socio. Si el pago fue parcial, cada comprobante guarda cuánto se le aplicó y queda pendiente por el resto.
+Al registrar la cobranza, el sistema genera un **recibo de cobranza** con numeración propia e **independiente por circuito**: **RC-NNNNNN** para cobros de comprobantes ARCA y **RI-NNNNNN** para cobros de comprobantes internos. Marca como **Cobrados** los comprobantes que quedaron cubiertos enteros (contando cobros parciales anteriores) y actualiza la Cuenta Corriente del socio. Si el pago fue parcial, cada comprobante guarda cuánto se le aplicó y queda pendiente por el resto.
 
 El recibo se puede ver e imprimir con el ícono **Ver** (ojo) de su fila. La plantilla muestra la **Fecha de emisión** y, en pagos parciales, el monto aplicado a cada comprobante.
 
@@ -834,7 +834,7 @@ El recibo se puede ver e imprimir con el ícono **Ver** (ojo) de su fila. La pla
 1. En la tabla de Cobranzas, hacé clic en **Anular recibo** en la fila del recibo (solo disponible si todavía está **Vigente**).
 2. Confirmá.
 
-Al anular: el pago se revierte, los comprobantes que ese recibo había cobrado (enteros o en parte) vuelven a pendiente, y los cargos vuelven a su estado previo. El recibo queda marcado **Anulado**, con su fecha de anulación, y no se puede volver a anular ni se genera ningún comprobante nuevo. El PDF del recibo anulado muestra el **monto en negativo** y la leyenda **ANULADO** (vale igual para RC- y CI-).
+Al anular: el pago se revierte, los comprobantes que ese recibo había cobrado (enteros o en parte) vuelven a pendiente, y los cargos vuelven a su estado previo. El recibo queda marcado **Anulado**, con su fecha de anulación, y no se puede volver a anular ni se genera ningún comprobante nuevo. El PDF del recibo anulado muestra el **monto en negativo** y la leyenda **ANULADO** (vale igual para RC- y RI-).
 
 > La anulación es siempre por el **total** del recibo — no se puede anular parcialmente una cobranza.
 

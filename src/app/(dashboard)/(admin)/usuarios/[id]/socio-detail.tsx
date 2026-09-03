@@ -60,6 +60,7 @@ import {
 } from '@/app/actions/payway';
 import { getLedgerSaldoAFavorAction, type LedgerSaldoAFavorEntry } from '@/app/actions/movimientos';
 import { buscarRankeado } from '@/lib/buscador';
+import { esCodigoReciboCobranza } from '@/lib/recibo-codigos';
 import { formatArgentinaDate, formatArgentinaDateTime, formatNaiveDateTime } from '@/lib/dates';
 import { escribirTabEnUrl, type SocioTabId } from '@/lib/tab-url';
 import { precioSinIva } from '@/lib/iva';
@@ -597,9 +598,9 @@ const TIPO_COMPROBANTE_LABEL: Record<string, string> = {
   nota_credito_c: 'Nota de crédito C',
 };
 
-// 'recibo' agrupa RC-/CI- (cobranza), CM-/CL-/CA- (comprobante interno) y RB-
+// 'recibo' agrupa RC-/RI- (cobranza), CM-/CL-/CA- (comprobante interno) y RB-
 // — ninguno tiene validez fiscal en sí mismo. "Recibo" queda reservado para
-// Cobranzas (RC- fiscal / CI- interno): `facturaTipoRecibo` (se completa al
+// Cobranzas (RC- fiscal / RI- interno): `facturaTipoRecibo` (se completa al
 // registrar la cobranza) dice de qué tipo era la deuda que cancela. Todo el
 // resto es "Comprobante interno" — nunca "Recibo interno", que es otro
 // documento.
@@ -609,7 +610,7 @@ function tipoComprobanteLabel(m: {
   facturaCodigo: string | null;
 }): string {
   if (m.facturaTipo === 'recibo') {
-    if (!(m.facturaCodigo?.startsWith('RC-') || m.facturaCodigo?.startsWith('CI-'))) {
+    if (!esCodigoReciboCobranza(m.facturaCodigo)) {
       return 'Comprobante interno';
     }
     return m.facturaTipoRecibo === 'fiscal' ? 'Recibo fiscal' : 'Recibo interno';
@@ -618,15 +619,12 @@ function tipoComprobanteLabel(m: {
 }
 
 /**
- * ¿La fila es un recibo de cobranza (RC-/CI-)? Mismo criterio que
+ * ¿La fila es un recibo de cobranza (RC-/RI-)? Mismo criterio que
  * `tipoComprobanteLabel`: un `facturaTipo='recibo'` con otro código es en
  * realidad un comprobante interno (CM-/CL-/CA-), o sea un cargo.
  */
 function esRecibo(m: { facturaTipo: string | null; facturaCodigo: string | null }): boolean {
-  return (
-    m.facturaTipo === 'recibo' &&
-    (m.facturaCodigo?.startsWith('RC-') === true || m.facturaCodigo?.startsWith('CI-') === true)
-  );
+  return m.facturaTipo === 'recibo' && esCodigoReciboCobranza(m.facturaCodigo);
 }
 
 // El link de PDF que TusFacturas devuelve al emitir es temporal y vence (su

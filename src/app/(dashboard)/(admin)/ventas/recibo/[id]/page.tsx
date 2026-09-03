@@ -3,6 +3,7 @@ import { eq, and } from 'drizzle-orm';
 
 import { getActiveMarina } from '@/lib/auth/session';
 import { db } from '@/lib/db';
+import { esCodigoReciboCobranza } from '@/lib/recibo-codigos';
 import {
   facturacion,
   facturacionItemMovimientos,
@@ -130,18 +131,17 @@ export default async function ReciboPage({
     notFound();
   }
   const esNotaCreditoInterna = row.tipoFactura === 'nota_credito_interna';
-  // "Recibo" queda reservado para Cobranzas (RC- fiscal / CI- interno). El
+  // "Recibo" queda reservado para Cobranzas (RC- fiscal / RI- interno). El
   // resto de los documentos internos (CM-/CL-/RB-) documentan cargos, no un
   // pago: son "Comprobante interno".
-  const esReciboCobranza =
-    (row.codigo?.startsWith('RC-') || row.codigo?.startsWith('CI-')) ?? false;
+  const esReciboCobranza = esCodigoReciboCobranza(row.codigo);
   const titulo = esNotaCreditoInterna
     ? 'NOTA DE CRÉDITO INTERNA'
     : esReciboCobranza
       ? 'RECIBO'
       : 'COMPROBANTE INTERNO';
   // Recibo anulado: el documento muestra el monto en negativo (la cobranza
-  // quedó revertida) — aplica a RC- y CI- por igual.
+  // quedó revertida) — aplica a RC- y RI- por igual.
   const anulado = row.anulada && esReciboCobranza;
 
   const socioNombre = [row.socioNombre, row.socioApellido].filter(Boolean).join(' ') || '—';
@@ -174,7 +174,7 @@ export default async function ReciboPage({
     aplicaciones = dp.aplicaciones;
   }
 
-  // Comprobantes que cobró el recibo. Para recibos de cobranza (RC-/CI-)
+  // Comprobantes que cobró el recibo. Para recibos de cobranza (RC-/RI-)
   // están guardados exactos en cobranza_comprobante_ids, o si no se buscan
   // por heurística FIFO (facturas AFIP del socio, de la más antigua a la más
   // nueva, hasta cubrir el importe). RB-/CM-/CL- documentan un cargo propio,
