@@ -43,6 +43,7 @@ import { MOTIVO_NOTA_LABEL, type MotivoNota } from '@/app/actions/nota-constants
 import { toast } from 'sonner';
 import { buscarSocios, normalizarBusqueda } from '@/lib/buscador';
 import { esCodigoReciboCobranza } from '@/lib/recibo-codigos';
+import { descargarCsv } from '@/lib/exportar-csv';
 import { formatArgentinaDate } from '@/lib/dates';
 import { EmptyState } from '@/components/shared/empty-state';
 import { Pagination } from '@/components/shared/pagination';
@@ -3972,23 +3973,26 @@ export function VentasClient({
     setFilterHasta('');
   }
 
+  // Mismas columnas y valores que la tabla visible, sobre lo FILTRADO. La
+  // mecánica del CSV (BOM para que Excel lea los acentos, comillas escapadas,
+  // descarga) vive en lib/exportar-csv para que Ventas, Cobranzas y Cuenta
+  // Corriente exporten igual.
   function exportarCSV() {
-    const BOM = '﻿';
-    const esc = (v: string) => `"${v.replace(/"/g, '""')}"`;
     if (activeTab === 'afip') {
-      const cols = [
-        'Número',
-        'FL Nº',
-        'Tipo',
-        'Cliente',
-        'Fecha',
-        'Vencimiento',
-        'Total',
-        'Estado',
-        'Descripción',
-      ];
-      const rows = filtradosAfip.map((f) =>
+      descargarCsv(
+        'comprobantes',
         [
+          'Número',
+          'FL Nº',
+          'Tipo',
+          'Cliente',
+          'Fecha',
+          'Vencimiento',
+          'Total',
+          'Estado',
+          'Descripción',
+        ],
+        filtradosAfip.map((f) => [
           f.codigo ?? '',
           f.folioLocal ?? '',
           TIPO_FACTURA_LABEL[f.tipoFactura ?? ''] ?? f.tipoFactura ?? '',
@@ -3998,40 +4002,21 @@ export function VentasClient({
           f.importe ?? '0',
           f.estado ?? '',
           f.descripcion ?? '',
-        ]
-          .map(esc)
-          .join(','),
+        ]),
       );
-      const csv = BOM + [cols.map(esc).join(','), ...rows].join('\n');
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `comprobantes-${new Date().toISOString().slice(0, 10)}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
     } else {
-      const cols = ['Número', 'Tipo', 'Cliente', 'Fecha', 'Total', 'Descripción'];
-      const rows = filtradosRecibos.map((f) =>
-        [
+      descargarCsv(
+        'recibos',
+        ['Número', 'Tipo', 'Cliente', 'Fecha', 'Total', 'Descripción'],
+        filtradosRecibos.map((f) => [
           f.codigo ?? '',
           tipoComprobanteLabel(f),
           f.socioNombre,
           f.emision ? fmtDate(f.emision) : '',
           f.importe ?? '0',
           f.descripcion ?? '',
-        ]
-          .map(esc)
-          .join(','),
+        ]),
       );
-      const csv = BOM + [cols.map(esc).join(','), ...rows].join('\n');
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `recibos-${new Date().toISOString().slice(0, 10)}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
     }
   }
 

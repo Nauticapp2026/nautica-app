@@ -27,6 +27,7 @@ import {
   Paperclip,
   Plus,
   Trash2,
+  FileDown,
   Upload,
   UserCheck,
   X,
@@ -61,6 +62,7 @@ import {
 import { getLedgerSaldoAFavorAction, type LedgerSaldoAFavorEntry } from '@/app/actions/movimientos';
 import { buscarRankeado } from '@/lib/buscador';
 import { esCodigoReciboCobranza } from '@/lib/recibo-codigos';
+import { descargarCsv } from '@/lib/exportar-csv';
 import { formatArgentinaDate, formatArgentinaDateTime, formatNaiveDateTime } from '@/lib/dates';
 import { escribirTabEnUrl, type SocioTabId } from '@/lib/tab-url';
 import { precioSinIva } from '@/lib/iva';
@@ -2307,6 +2309,74 @@ export function SocioDetail({
   const movimientosCalc = calcularSaldoYEstado(movimientos);
 
   const movimientosFiltrados = movimientosCalc.filter((m) => pasaFiltrosCC(m, m.estadoDisplay));
+
+  /**
+   * CSV de la Cuenta Corriente, con las MISMAS columnas y los mismos valores
+   * que la tabla — incluidos los signos, que acá tienen significado: una NC
+   * resta en Ventas y una anulación de recibo resta en Cobranzas. Exporta lo
+   * FILTRADO (no solo la página visible) y respeta el orden elegido.
+   */
+  function exportarCuentaCorriente() {
+    const filas = (
+      ccSortDir === 'asc' ? [...movimientosFiltrados].reverse() : movimientosFiltrados
+    ).map((m) => {
+      const venta = parseFloat(m.debe ?? '0');
+      const cobranza = parseFloat(m.haber ?? '0');
+      const esPago = cobranza > 0 && venta === 0;
+      const vencida = m.fechaVencimiento ? m.fechaVencimiento < todayISODate() : null;
+      return [
+        fmtDate(m.fecha),
+        m.comprobanteInterno && !m.facturaTipo
+          ? 'Comprobante interno'
+          : m.facturaTipo
+            ? tipoComprobanteLabel(m)
+            : '—',
+        m.facturaCodigo ?? '—',
+        m.numeroOperacion?.length ? m.numeroOperacion.join(', ') : '—',
+        esPago
+          ? m.concepto?.trim() || 'Pago a cuenta'
+          : m.concepto?.trim() || m.servicioNombre || '—',
+        m.fechaVencimiento ? fmtYmd(m.fechaVencimiento) : '—',
+        vencida == null ? '—' : vencida ? 'Vencida' : 'En término',
+        m.tipo === 'nota_credito' && cobranza > 0
+          ? `-${fmt(cobranza)}`
+          : venta > 0 && m.tipo !== 'anulacion_recibo'
+            ? fmt(venta)
+            : '—',
+        m.tipo === 'anulacion_recibo' && venta > 0
+          ? `-${fmt(venta)}`
+          : cobranza > 0 && m.tipo !== 'nota_credito'
+            ? fmt(cobranza)
+            : '—',
+        fmt(Math.abs(m.saldo)),
+        venta > 0 && m.tipo !== 'anulacion_recibo' ? fmt(m.pendiente) : '—',
+        m.tipo === 'anulacion_recibo'
+          ? 'Anulación'
+          : esRecibo(m)
+            ? '—'
+            : (ESTADO_LABEL[m.estadoDisplay ?? ''] ?? m.estadoDisplay ?? '—'),
+      ];
+    });
+
+    descargarCsv(
+      `cuenta-corriente-${nombre.replace(/\s+/g, '-').toLowerCase()}`,
+      [
+        'Fecha',
+        'Tipo de comprobante',
+        'Nº Comprobante',
+        'Nº de operación',
+        'Detalle',
+        'Vencimiento',
+        'Situación',
+        'Ventas',
+        'Cobranzas',
+        'Saldo',
+        'Importe pendiente',
+        'Estado',
+      ],
+      filas,
+    );
+  }
   const hayFiltrosCC = Boolean(ccFechaDesde || ccFechaHasta || ccEstado || ccTipoComp);
 
   // Cards Ventas/Cobranzas: reflejan los movimientos filtrados. Una Nota de
@@ -2847,6 +2917,16 @@ export function SocioDetail({
                 Limpiar
               </button>
             )}
+            {/* Exporta lo FILTRADO, no solo la página que se ve. */}
+            <button
+              onClick={exportarCuentaCorriente}
+              disabled={movimientosFiltrados.length === 0}
+              title="Exportar CSV"
+              className="ml-auto flex h-9 items-center gap-1.5 rounded-[8px] border border-gray-200 bg-white px-3 text-sm font-medium text-gray-600 transition hover:bg-gray-50 disabled:opacity-40"
+            >
+              <FileDown className="h-4 w-4" />
+              <span className="hidden sm:inline">Exportar</span>
+            </button>
           </div>
 
           {/* Metric cards. La card de Saldo se oculta cuando hay filtros aplicados:

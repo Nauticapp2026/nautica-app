@@ -3,9 +3,10 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { Eye, Receipt } from 'lucide-react';
+import { Eye, FileDown, Receipt } from 'lucide-react';
 
 import { formatArgentinaDate } from '@/lib/dates';
+import { descargarCsv } from '@/lib/exportar-csv';
 import { EmptyState } from '@/components/shared/empty-state';
 import { anularCobranzaAction } from '@/app/actions/cobranzas';
 
@@ -84,105 +85,157 @@ export function CobranzaTabla({ cobranzas }: { cobranzas: CobranzaRow[] }) {
     );
   }
 
+  // Mismas columnas que la tabla, en el mismo orden y con los mismos valores
+  // formateados: el CSV tiene que decir lo que el club está viendo. Se excluye
+  // "Acción", que es un botón.
+  function exportar() {
+    descargarCsv(
+      'cobranzas',
+      [
+        'Ente emisor',
+        'Tipo de recibo',
+        'Nº cliente',
+        'Razón social socio',
+        'Fecha',
+        'Nº de recibo',
+        'Monto',
+        'Instrumento de cobro 1',
+        'Instrumento de cobro 2',
+        'Instrumento de cobro 3',
+        'Estado',
+        'Fecha anulación',
+      ],
+      cobranzas.map((c) => [
+        c.entreEmisor,
+        c.tipoRecibo ? (TIPO_RECIBO_LABEL[c.tipoRecibo] ?? c.tipoRecibo) : '—',
+        c.numeroSocio != null ? String(c.numeroSocio) : '—',
+        c.socioRazonSocial,
+        c.fecha ? formatArgentinaDate(c.fecha) : '—',
+        c.codigo ?? '—',
+        // Igual que la tabla: un recibo anulado quedó revertido, su monto
+        // efectivo es $0. Si el CSV dijera el importe original, sumar la columna
+        // daría cobrado de más.
+        c.anulada ? fmtMoney('0') : fmtMoney(c.importe),
+        instrumentoCobro(c.formas, 0),
+        instrumentoCobro(c.formas, 1),
+        instrumentoCobro(c.formas, 2),
+        c.anulada ? 'Anulado' : 'Vigente',
+        c.anuladaAt ? formatArgentinaDate(c.anuladaAt) : '—',
+      ]),
+    );
+  }
+
   return (
-    <div className="overflow-x-auto rounded-2xl border border-gray-200 bg-white">
-      <table className="w-full min-w-[1500px] text-sm">
-        <thead>
-          <tr className="border-b border-gray-200 text-left text-xs font-medium text-gray-500">
-            <th className="px-4 py-3">Ente emisor</th>
-            <th className="px-4 py-3">Tipo de recibo</th>
-            <th className="px-4 py-3">Nº cliente</th>
-            <th className="px-4 py-3">Razón social socio</th>
-            <th className="px-4 py-3">Fecha</th>
-            <th className="px-4 py-3">Nº de recibo</th>
-            <th className="px-4 py-3 text-right">Monto</th>
-            <th className="px-4 py-3">Instrumento de cobro 1</th>
-            <th className="px-4 py-3">Instrumento de cobro 2</th>
-            <th className="px-4 py-3">Instrumento de cobro 3</th>
-            <th className="px-4 py-3">Estado</th>
-            <th className="px-4 py-3">Fecha anulación</th>
-            <th className="px-4 py-3 text-right">Acción</th>
-          </tr>
-        </thead>
-        <tbody>
-          {cobranzas.map((c) => (
-            <tr key={c.id} className="border-b border-gray-100 last:border-0">
-              <td className="px-4 py-3 text-gray-700">{c.entreEmisor}</td>
-              <td className="px-4 py-3 text-gray-700">
-                {c.tipoRecibo ? TIPO_RECIBO_LABEL[c.tipoRecibo] : '—'}
-              </td>
-              <td className="px-4 py-3 text-gray-700">{c.numeroSocio ?? '—'}</td>
-              <td className="px-4 py-3 font-medium text-[#101828]">{c.socioRazonSocial}</td>
-              <td className="px-4 py-3 text-gray-700">
-                {c.fecha ? formatArgentinaDate(c.fecha) : '—'}
-              </td>
-              <td className="px-4 py-3 text-gray-700">{c.codigo ?? '—'}</td>
-              {/* Anulado: el cobro quedó revertido — el monto efectivo es $0. */}
-              <td className="px-4 py-3 text-right font-semibold text-[#101828]">
-                {c.anulada ? fmtMoney('0') : fmtMoney(c.importe)}
-              </td>
-              <td className="px-4 py-3 text-gray-700">{instrumentoCobro(c.formas, 0)}</td>
-              <td className="px-4 py-3 text-gray-700">{instrumentoCobro(c.formas, 1)}</td>
-              <td className="px-4 py-3 text-gray-700">{instrumentoCobro(c.formas, 2)}</td>
-              <td className="px-4 py-3">
-                {c.anulada ? (
-                  <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
-                    Anulado
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
-                    Vigente
-                  </span>
-                )}
-              </td>
-              <td className="px-4 py-3 text-gray-700">
-                {c.anuladaAt ? formatArgentinaDate(c.anuladaAt) : '—'}
-              </td>
-              <td className="px-4 py-3">
-                <div className="flex items-center justify-end gap-2">
-                  <a
-                    // `from` para que el visor ofrezca volver a Cobranzas y no a
-                    // Ventas (se abre en pestaña nueva: no hay historial).
-                    href={`/ventas/recibo/${c.id}?from=cobranzas`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 rounded-[8px] border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50"
-                  >
-                    <Eye className="h-3.5 w-3.5" />
-                    Ver
-                  </a>
-                  {!c.anulada &&
-                    (anulandoId === c.id ? (
-                      <span className="inline-flex items-center gap-1">
-                        <button
-                          onClick={() => handleAnular(c.id)}
-                          disabled={isPending}
-                          className="rounded-[8px] bg-red-600 px-2.5 py-1.5 text-xs font-semibold text-white transition hover:bg-red-700 disabled:opacity-50"
-                        >
-                          {isPending ? 'Anulando…' : 'Confirmar'}
-                        </button>
-                        <button
-                          onClick={() => setAnulandoId(null)}
-                          disabled={isPending}
-                          className="rounded-[8px] border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-600 transition hover:bg-gray-50"
-                        >
-                          Cancelar
-                        </button>
-                      </span>
-                    ) : (
-                      <button
-                        onClick={() => setAnulandoId(c.id)}
-                        className="rounded-[8px] border border-red-200 px-2.5 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-50 hover:text-red-700"
-                      >
-                        Anular recibo
-                      </button>
-                    ))}
-                </div>
-              </td>
+    <div className="space-y-3">
+      <div className="flex justify-end">
+        <button
+          onClick={exportar}
+          title="Exportar CSV"
+          className="flex h-10 items-center gap-1.5 rounded-[10px] border border-gray-200 bg-white px-3 text-sm font-medium text-gray-600 transition hover:bg-gray-50"
+        >
+          <FileDown className="h-4 w-4" />
+          <span className="hidden sm:inline">Exportar</span>
+        </button>
+      </div>
+      <div className="overflow-x-auto rounded-2xl border border-gray-200 bg-white">
+        <table className="w-full min-w-[1500px] text-sm">
+          <thead>
+            <tr className="border-b border-gray-200 text-left text-xs font-medium text-gray-500">
+              <th className="px-4 py-3">Ente emisor</th>
+              <th className="px-4 py-3">Tipo de recibo</th>
+              <th className="px-4 py-3">Nº cliente</th>
+              <th className="px-4 py-3">Razón social socio</th>
+              <th className="px-4 py-3">Fecha</th>
+              <th className="px-4 py-3">Nº de recibo</th>
+              <th className="px-4 py-3 text-right">Monto</th>
+              <th className="px-4 py-3">Instrumento de cobro 1</th>
+              <th className="px-4 py-3">Instrumento de cobro 2</th>
+              <th className="px-4 py-3">Instrumento de cobro 3</th>
+              <th className="px-4 py-3">Estado</th>
+              <th className="px-4 py-3">Fecha anulación</th>
+              <th className="px-4 py-3 text-right">Acción</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {cobranzas.map((c) => (
+              <tr key={c.id} className="border-b border-gray-100 last:border-0">
+                <td className="px-4 py-3 text-gray-700">{c.entreEmisor}</td>
+                <td className="px-4 py-3 text-gray-700">
+                  {c.tipoRecibo ? TIPO_RECIBO_LABEL[c.tipoRecibo] : '—'}
+                </td>
+                <td className="px-4 py-3 text-gray-700">{c.numeroSocio ?? '—'}</td>
+                <td className="px-4 py-3 font-medium text-[#101828]">{c.socioRazonSocial}</td>
+                <td className="px-4 py-3 text-gray-700">
+                  {c.fecha ? formatArgentinaDate(c.fecha) : '—'}
+                </td>
+                <td className="px-4 py-3 text-gray-700">{c.codigo ?? '—'}</td>
+                {/* Anulado: el cobro quedó revertido — el monto efectivo es $0. */}
+                <td className="px-4 py-3 text-right font-semibold text-[#101828]">
+                  {c.anulada ? fmtMoney('0') : fmtMoney(c.importe)}
+                </td>
+                <td className="px-4 py-3 text-gray-700">{instrumentoCobro(c.formas, 0)}</td>
+                <td className="px-4 py-3 text-gray-700">{instrumentoCobro(c.formas, 1)}</td>
+                <td className="px-4 py-3 text-gray-700">{instrumentoCobro(c.formas, 2)}</td>
+                <td className="px-4 py-3">
+                  {c.anulada ? (
+                    <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
+                      Anulado
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
+                      Vigente
+                    </span>
+                  )}
+                </td>
+                <td className="px-4 py-3 text-gray-700">
+                  {c.anuladaAt ? formatArgentinaDate(c.anuladaAt) : '—'}
+                </td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center justify-end gap-2">
+                    <a
+                      // `from` para que el visor ofrezca volver a Cobranzas y no a
+                      // Ventas (se abre en pestaña nueva: no hay historial).
+                      href={`/ventas/recibo/${c.id}?from=cobranzas`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 rounded-[8px] border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50"
+                    >
+                      <Eye className="h-3.5 w-3.5" />
+                      Ver
+                    </a>
+                    {!c.anulada &&
+                      (anulandoId === c.id ? (
+                        <span className="inline-flex items-center gap-1">
+                          <button
+                            onClick={() => handleAnular(c.id)}
+                            disabled={isPending}
+                            className="rounded-[8px] bg-red-600 px-2.5 py-1.5 text-xs font-semibold text-white transition hover:bg-red-700 disabled:opacity-50"
+                          >
+                            {isPending ? 'Anulando…' : 'Confirmar'}
+                          </button>
+                          <button
+                            onClick={() => setAnulandoId(null)}
+                            disabled={isPending}
+                            className="rounded-[8px] border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-600 transition hover:bg-gray-50"
+                          >
+                            Cancelar
+                          </button>
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => setAnulandoId(c.id)}
+                          className="rounded-[8px] border border-red-200 px-2.5 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-50 hover:text-red-700"
+                        >
+                          Anular recibo
+                        </button>
+                      ))}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

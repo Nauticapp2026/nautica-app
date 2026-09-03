@@ -1187,6 +1187,10 @@ export const guarderiaCentrosEmisores = pgTable(
     // pero los comprobantes ya emitidos siguen apuntando a él (trazabilidad
     // ARCA). El principal nunca se da de baja: hay que designar otro antes.
     activo: boolean('activo').notNull().default(true),
+    // Cuándo se dio de baja (mig 0154). Se limpia al reactivar. No alcanzaba
+    // `updatedAt`: cualquier edición lo pisa, así que no sirve de registro.
+    // NULL en las bajas anteriores a la columna — la UI dice "sin registrar".
+    bajaAt: timestamp('baja_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },

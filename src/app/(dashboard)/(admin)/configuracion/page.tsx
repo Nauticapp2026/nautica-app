@@ -202,6 +202,7 @@ export default async function ConfiguracionPage({ searchParams }: Props) {
       puntoDeVenta: guarderiaCentrosEmisores.puntoDeVenta,
       esPrincipal: guarderiaCentrosEmisores.esPrincipal,
       activo: guarderiaCentrosEmisores.activo,
+      bajaAt: guarderiaCentrosEmisores.bajaAt,
     })
     .from(guarderiaCentrosEmisores)
     .where(eq(guarderiaCentrosEmisores.guarderiaId, guarderiaId))
@@ -210,7 +211,10 @@ export default async function ConfiguracionPage({ searchParams }: Props) {
       asc(guarderiaCentrosEmisores.puntoDeVenta),
     );
 
-  const centrosEmisores: CentroEmisor[] = centrosRows;
+  const centrosEmisores: CentroEmisor[] = centrosRows.map((c) => ({
+    ...c,
+    bajaAt: c.bajaAt ? c.bajaAt.toISOString() : null,
+  }));
   const principal = centrosRows.find((c) => c.esPrincipal) ?? null;
 
   const puntoVenta: PuntoVentaData = {

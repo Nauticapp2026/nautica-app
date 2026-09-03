@@ -46,6 +46,7 @@ import {
   type UpdateMiembroEquipoData,
 } from '@/app/actions/configuracion';
 import { normalizarBusqueda } from '@/lib/buscador';
+import { formatArgentinaDate, formatArgentinaDateTime } from '@/lib/dates';
 import { MEDIOS_PAGO } from '@/lib/medios-pago';
 import { EmptyState } from '@/components/shared/empty-state';
 import { ImagesUploader } from '@/components/shared/images-uploader';
@@ -99,6 +100,8 @@ export type CentroEmisor = {
   // false = dado de baja: no se ofrece al emitir, pero sus comprobantes
   // emitidos siguen intactos (trazabilidad ARCA).
   activo: boolean;
+  /** Cuando se dio de baja. null si esta activo, o si la baja es previa a mig 0154. */
+  bajaAt: string | null;
 };
 
 export type PuntoVentaData = {
@@ -1942,8 +1945,19 @@ function CentrosEmisoresSection({ centros }: { centros: CentroEmisor[] }) {
             )}
             <span className="text-xs text-gray-500">N.º {c.puntoDeVenta}</span>
             {!c.activo && (
-              <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold whitespace-nowrap text-gray-500">
+              <span
+                className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold whitespace-nowrap text-gray-500"
+                title={
+                  c.bajaAt
+                    ? `Dado de baja el ${formatArgentinaDateTime(c.bajaAt)}`
+                    : 'La fecha de esta baja no quedó registrada (es anterior a que se empezara a guardar)'
+                }
+              >
+                {/* La fecha va en la pastilla y no solo en el tooltip: el
+                    cliente pidió que quede "visible". Las bajas viejas no
+                    tienen fecha guardada y no se inventa una. */}
                 De baja
+                {c.bajaAt ? ` · ${formatArgentinaDate(c.bajaAt)}` : ' · sin fecha'}
               </span>
             )}
             {c.esPrincipal ? (

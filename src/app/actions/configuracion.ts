@@ -692,7 +692,13 @@ export async function toggleBajaCentroEmisorAction(
 
   await db
     .update(guarderiaCentrosEmisores)
-    .set({ activo: !darDeBaja, updatedAt: new Date() })
+    .set({
+      activo: !darDeBaja,
+      // Queda registrado el cuándo (pedido del cliente 2026-09-02). Al
+      // reactivar se limpia: un centro activo no tiene fecha de baja.
+      bajaAt: darDeBaja ? new Date() : null,
+      updatedAt: new Date(),
+    })
     .where(eq(guarderiaCentrosEmisores.id, centro.id));
 
   revalidatePath('/configuracion');
