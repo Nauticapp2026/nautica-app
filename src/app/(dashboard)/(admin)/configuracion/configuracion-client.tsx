@@ -1841,6 +1841,16 @@ function ConfiguracionCobranzasSection({ initial }: { initial: string[] }) {
  * Mismo criterio visual que "Gestión de cobranza" (pedido del cliente): título,
  * bajada explicando para qué sirve, las opciones y un botón propio de guardado.
  * Es una elección excluyente, así que van radios y no casillas.
+ *
+ * Las clases de las opciones son LAS MISMAS que las de Gestión de cobranza, a
+ * propósito. La primera versión pintaba la opción elegida (borde + fondo celeste
+ * + texto teal) y el cliente lo marcó: en ningún otro lado del sistema se rellena
+ * la opción seleccionada — el marcador es el radio, y la fila queda neutra (ver
+ * también tarifario-client, mismo patrón). Reporte del cliente 2026-09-03.
+ *
+ * El botón NO se deshabilita cuando el valor no cambió: se veía apagado al entrar
+ * y el cliente lo leyó como deshabilitado. Igual que los demás guardar del
+ * sistema, solo se apaga mientras guarda.
  */
 function PeriodoAnulacionSection({ initial }: { initial: PeriodoAnulacion }) {
   const router = useRouter();
@@ -1865,37 +1875,26 @@ function PeriodoAnulacionSection({ initial }: { initial: PeriodoAnulacion }) {
         Período de anulación de recibo
       </h3>
       <p className="mb-4 text-sm text-gray-500">
-        Hasta cuándo se puede anular un recibo de cobranza. Sirve para que no se anulen recibos de
-        períodos ya cerrados. Los recibos que queden fuera del período no se pueden anular, pero
-        siguen visibles en Cobranzas.
+        Hasta cuándo se puede anular un recibo de cobranza, para que no se toquen períodos ya
+        cerrados. La semana va de lunes a domingo. &quot;Mes anterior&quot; admite el mes en curso y
+        el anterior: en agosto se puede anular julio, pero no junio. Los recibos que queden fuera
+        siguen visibles en Cobranzas, solo no se pueden anular.
       </p>
 
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-4">
         {PERIODO_ANULACION_OPCIONES.map((o) => (
           <label
             key={o.value}
-            className={`flex cursor-pointer items-start gap-2.5 rounded-[10px] border px-4 py-3 text-sm transition ${
-              valor === o.value
-                ? 'border-[#175861] bg-[#D9EBE9]'
-                : 'border-gray-200 bg-white hover:bg-gray-50'
-            }`}
+            className="flex cursor-pointer items-center gap-2.5 rounded-[10px] border border-gray-200 px-4 py-2.5 text-sm text-[#101828] hover:bg-gray-50"
           >
             <input
               type="radio"
               name="periodo-anulacion"
-              className="mt-0.5 h-4 w-4 shrink-0 accent-[#175861]"
+              className="h-4 w-4 accent-[#175861]"
               checked={valor === o.value}
               onChange={() => setValor(o.value)}
             />
-            <span className="min-w-0">
-              <span
-                className="block font-medium"
-                style={{ color: valor === o.value ? '#175861' : '#101828' }}
-              >
-                {o.label}
-              </span>
-              <span className="block text-xs text-gray-500">{o.detalle}</span>
-            </span>
+            {o.label}
           </label>
         ))}
       </div>
@@ -1904,7 +1903,7 @@ function PeriodoAnulacionSection({ initial }: { initial: PeriodoAnulacion }) {
         <button
           type="button"
           onClick={guardar}
-          disabled={pending || valor === initial}
+          disabled={pending}
           className="rounded-[10px] bg-[#175861] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#0f4249] disabled:cursor-not-allowed disabled:opacity-60"
         >
           {pending ? 'Guardando…' : 'Guardar configuración'}
