@@ -2172,20 +2172,31 @@ export function SocioDetail({
   // Movimientos con saldo acumulado y estado mostrado (ver calcularSaldoYEstado).
   const movimientosCalc = calcularSaldoYEstado(movimientos);
 
-  // Deuda de la card: la SUMA de lo que queda pendiente fila por fila, sobre
-  // TODOS los movimientos (la card nunca se filtra por fecha/estado/comprobante).
+  // Saldo de la card = el saldo de la ÚLTIMA fila de la tabla: Σdebe − Σhaber
+  // sobre TODOS los movimientos (la card nunca se filtra). Regla del cliente
+  // (2026-09-07): la card tiene que decir lo mismo que la columna Saldo, con
+  // tres estados por signo — "Saldo deudor" / "Saldo" ($0) / "Saldo a favor".
   //
-  // Antes era el neto crudo (Σdebe − Σhaber) y eso no coincidía con la tabla:
-  // el neto le resta al socio un adelanto que todavía no se aplicó a ningún
-  // cargo, pero las filas no lo hacen (un adelanto sin comprobante no salda
-  // nada solo — ver calcularSaldoYEstado / calcularPoolRestante). Con deuda
-  // $2.451,61 y un adelanto sin aplicar de $10.050, el neto daba negativo y la
-  // card se daba vuelta a "Saldo a favor" tapando la deuda entera, mientras las
-  // filas seguían mostrándola bien. Reporte del cliente 2026-09-03, punto 9.
+  // Es el neto contable y no un derivado del estado guardado de cada cargo, a
+  // propósito: el neto sigue a la plata. Caso real (Mauro Sienra, YCVL): un
+  // adelanto de $1 se gastó en RC-000017 y después se anuló; la factura quedó
+  // `pagada` con $1 que ya no existe. Sumando `pendiente` por fila la card daba
+  // $0 (cada cargo dice Cobrado) mientras la columna Saldo decía $1 — la
+  // columna tenía razón. El estado por fila es otro eje (qué cargo está cubierto
+  // con qué) y se muestra abajo, en la tabla.
   //
-  // Usar `pendiente` mantiene los dos números atados a la misma fuente: si una
-  // fila dice Cobrado no suma, si dice Parcial suma solo el resto.
-  const totalPendiente = movimientosCalc.reduce((sum, m) => sum + m.pendiente, 0);
+  // Por eso mismo un adelanto SIN aplicar figura acá como saldo a favor aunque
+  // haya cargos Pendiente en la tabla: la plata está, el club todavía no la
+  // aplicó. La card lo dice en la línea de abajo (`cargosPendientes`).
+  const saldoNeto = movimientos.reduce(
+    (sum, m) => sum + parseFloat(m.debe ?? '0') - parseFloat(m.haber ?? '0'),
+    0,
+  );
+  const totalPendiente = Math.max(0, saldoNeto);
+  const totalAFavorNeto = Math.max(0, -saldoNeto);
+  // Lo que las filas todavía marcan sin cubrir (Pendiente/Parcial). Con saldo
+  // a favor, es lo que el club puede saldar aplicándolo desde Cobranzas.
+  const cargosPendientes = movimientosCalc.reduce((sum, m) => sum + m.pendiente, 0);
 
   const movimientosFiltrados = movimientosCalc.filter((m) => pasaFiltrosCC(m, m.estadoDisplay));
 
@@ -2227,7 +2238,8 @@ export function SocioDetail({
           : cobranza > 0 && m.tipo !== 'nota_credito'
             ? fmt(cobranza)
             : '—',
-        fmt(Math.abs(m.saldo)),
+        // Con signo, igual que la celda: a favor va en negativo.
+        m.saldo < -0.005 ? `-${fmt(Math.abs(m.saldo))}` : fmt(Math.abs(m.saldo)),
         venta > 0 && m.tipo !== 'anulacion_recibo' ? fmt(m.pendiente) : '—',
         m.tipo === 'anulacion_recibo'
           ? 'Anulación'
@@ -2850,37 +2862,61 @@ export function SocioDetail({
             </div>
             {!hayFiltrosCC && (
               <div className="flex items-center gap-4 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+                {/* Tres estados por signo del saldo neto (regla del cliente
+                    2026-09-07): deudor en naranja, $0 neutro, a favor en verde.
+                    "Saldo deudor" y no "Saldo cliente": dice qué significa y
+                    queda simétrico con "Saldo a favor" (pedido 2026-09-02). */}
                 <div
                   className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl"
-                  style={{ background: totalPendiente > 0.005 ? '#FEF0E6' : '#E6F8EC' }}
+                  style={{
+                    background:
+                      totalPendiente > 0.005
+                        ? '#FEF0E6'
+                        : totalAFavorNeto > 0.005
+                          ? '#E6F8EC'
+                          : '#F2F4F7',
+                  }}
                 >
                   {totalPendiente > 0.005 ? (
                     <AlertTriangle className="h-5 w-5" style={{ color: '#E87040' }} />
                   ) : (
-                    <DollarSign className="h-5 w-5" style={{ color: '#15803d' }} />
+                    <DollarSign
+                      className="h-5 w-5"
+                      style={{ color: totalAFavorNeto > 0.005 ? '#15803d' : '#667085' }}
+                    />
                   )}
                 </div>
                 <div>
-                  {/* "Saldo deudor", no "Saldo cliente": queda simétrico con
-                      "Saldo a favor" y dice qué significa (pedido del cliente
-                      2026-09-02). */}
                   <p className="text-xs font-semibold tracking-wide text-gray-400 uppercase">
-                    {totalPendiente > 0.005 ? 'Saldo deudor' : 'Saldo a favor'}
+                    {totalPendiente > 0.005
+                      ? 'Saldo deudor'
+                      : totalAFavorNeto > 0.005
+                        ? 'Saldo a favor'
+                        : 'Saldo'}
                   </p>
                   <p className="text-[18px] font-bold" style={{ color: '#101828' }}>
-                    {totalPendiente > 0.005 ? fmt(totalPendiente) : fmt(creditoTotal)}
+                    {fmt(Math.abs(saldoNeto))}
                   </p>
-                  {/* Deuda y crédito sin usar pueden convivir: un adelanto
-                      aplicado a un comprobante nuevo no cancela una deuda
-                      vieja. Con deuda, el crédito se informa aparte. */}
+                  {/* Con saldo a favor o en cero pueden quedar cargos que la
+                      tabla marca Pendiente: es plata que el club todavía no
+                      aplicó (un adelanto no salda cargos solo). Se dice acá
+                      para que la card y las filas no parezcan contradecirse. */}
+                  {totalPendiente <= 0.005 && cargosPendientes > 0.005 && (
+                    <p className="text-xs font-medium" style={{ color: '#E87040' }}>
+                      {fmt(cargosPendientes)} en cargos pendientes — se cubren aplicando el saldo
+                      desde Cobranzas
+                    </p>
+                  )}
+                  {/* Deuda y crédito sin aplicar pueden convivir: un adelanto
+                      sin comprobante no cancela una deuda vieja solo. Con
+                      deuda, el disponible se informa aparte. */}
                   {totalPendiente > 0.005 && creditoTotal > 0.005 && (
                     <p className="text-xs font-medium text-green-600">
-                      + {fmt(creditoTotal)} a favor sin usar
+                      + {fmt(creditoTotal)} disponibles para aplicar en Cobranzas
                     </p>
                   )}
                   {/* La parte en NC no se descuenta sola: se aplica tildándola
-                      en una cobranza. Se aclara para que el número cierre
-                      contra el modal, que ofrece solo el disponible. */}
+                      en una cobranza. */}
                   {ncPorAplicar > 0.005 && (
                     <p className="text-xs font-normal text-gray-500">
                       incluye {fmt(ncPorAplicar)} en notas de crédito por aplicar
@@ -3083,7 +3119,15 @@ export function SocioDetail({
                                     : 'text-gray-500'
                               }`}
                             >
-                              {fmt(Math.abs(m.saldo))}
+                              {/* Signo explícito cuando es a favor. Solo con el
+                                  color, un saldo de -$1 se leía como $1 y la
+                                  columna parecía no cerrar (reporte del cliente
+                                  2026-09-07: "1 + 3 debería dar 4, da 2" — el
+                                  anterior era -1). Mismo "-" que usa la columna
+                                  Cobranzas para las anulaciones. */}
+                              {m.saldo < -0.005
+                                ? `-${fmt(Math.abs(m.saldo))}`
+                                : fmt(Math.abs(m.saldo))}
                             </td>
                             {/* Importe pendiente: lo que falta cobrar de este
                                 comprobante. Solo aplica a cargos — un pago o

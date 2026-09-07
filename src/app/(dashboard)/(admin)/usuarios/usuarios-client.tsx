@@ -1278,17 +1278,22 @@ export function UsuariosClient({
                               <td className="px-4 py-3 text-center text-xs text-gray-400">
                                 {s.fechaIngreso ? formatArgentinaDate(s.fechaIngreso) : '—'}
                               </td>
-                              {/* Mismo criterio que la card de la ficha del socio y
-                                  que el modal de cobranza: si debe, la deuda; si
-                                  no, el crédito DISPONIBLE (pool FIFO, que excluye
-                                  adelantos y NC sueltas). Antes acá se mostraba el
-                                  neto crudo (Σdebe − Σhaber) rotulado "a favor", y
-                                  no coincidía con los otros dos lugares: un crédito
-                                  reservado daba "$1 a favor" en el listado y "$0
-                                  disponible" adentro (pedido 2026-08-25). */}
+                              {/* El MISMO número que la card de la ficha y que la
+                                  última fila de su Cuenta Corriente: el saldo neto,
+                                  partido por signo. Deuda, "$0" neutro, o "a favor"
+                                  en verde (regla del cliente 2026-09-07). Hasta acá
+                                  el "a favor" era el pool disponible para aplicar
+                                  (pedido 2026-08-25), que es otro número y no
+                                  coincidía con la card. */}
                               <td
                                 className="px-4 py-3 text-center font-medium"
-                                style={{ color: tieneDeuda ? '#669E9D' : '#15803d' }}
+                                style={{
+                                  color: tieneDeuda
+                                    ? '#669E9D'
+                                    : creditoSinUsar > 0.005
+                                      ? '#15803d'
+                                      : '#667085',
+                                }}
                               >
                                 ${(tieneDeuda ? deuda : creditoSinUsar).toLocaleString('es-AR')}
                                 {!tieneDeuda && creditoSinUsar > 0.005 && (

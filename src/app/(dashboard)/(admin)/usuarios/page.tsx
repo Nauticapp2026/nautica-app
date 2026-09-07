@@ -15,8 +15,6 @@ import {
   profiles,
 } from '@/lib/db/schema';
 import { and, desc, eq, inArray, isNull, notExists, sql } from 'drizzle-orm';
-import { getPoolRestanteBatch } from '@/lib/reconciliar-cuenta';
-import { getDeudaPendienteBatch } from '@/lib/deuda-socio';
 import { UsuariosClient, type FiltroSocios } from './usuarios-client';
 
 export default async function UsuariosPage({
@@ -228,17 +226,27 @@ export default async function UsuariosPage({
     ubicacionByProfile[e.ocupanteId] = partes.join(' · ') || '—';
   }
 
-  // Flag moroso: al menos un cargo no_pagado con fecha >= 2 meses atrás.
+  // Saldo neto por socio (Σdebe − Σhaber sobre TODOS los movimientos) y flag
+  // moroso (al menos un cargo no_pagado con fecha >= 2 meses atrás).
   //
-  // El neto crudo por socio (Σdebe − Σhaber) que se acumulaba acá se eliminó:
-  // ningún número de la lista lo usa más. La deuda sale de
-  // getDeudaPendienteBatch (mismo criterio por fila que la ficha) y el crédito
-  // del pool FIFO.
+  // El saldo es EL MISMO número que la card de la ficha y que la última fila de
+  // su Cuenta Corriente — regla del cliente (2026-09-07): la lista, la card y la
+  // columna Saldo tienen que decir lo mismo. Positivo = deuda, negativo = a
+  // favor. Es el neto contable y no un derivado del estado de cada cargo ni del
+  // pool FIFO: esos son otros ejes (qué cargo está cubierto, qué crédito puede
+  // aplicar Cobranzas) y se ven adentro de la ficha.
   const now = new Date();
   const dosMesesAtras = new Date(now.getFullYear(), now.getMonth() - 2, now.getDate());
 
+  const saldoNetoBySocio = new Map<string, number>();
   const morososSet = new Set<string>();
   for (const m of movimientosList) {
+    saldoNetoBySocio.set(
+      m.socioId,
+      (saldoNetoBySocio.get(m.socioId) ?? 0) +
+        parseFloat(m.debe ?? '0') -
+        parseFloat(m.haber ?? '0'),
+    );
     if (m.estado === 'no_pagado' && m.fecha && m.fecha <= dosMesesAtras) {
       morososSet.add(m.socioId);
     }
@@ -290,51 +298,15 @@ export default async function UsuariosPage({
     }
   }
 
-  // Saldo a favor real: el mismo pool FIFO que ofrece Cobranzas al cobrar. El
-  // neto crudo (haber − debe) daba $0 en cuanto el socio tenía más deuda que
-  // crédito, aunque ese crédito siguiera sin usar — por eso la lista mostraba un
-  // número distinto al del modal de cobranza. excluirAdelantos: un adelanto
-  // sin comprobante no debe saldar cargos viejos solo (pedido 2026-08-11).
-  const poolPorSocio = await getPoolRestanteBatch(profileIds, { excluirAdelantos: true });
-
-  // Deuda: el MISMO número que la card "Saldo deudor" de la ficha (suma de lo
-  // pendiente fila por fila). Antes era el neto crudo y no coincidía — ver
-  // src/lib/deuda-socio.ts (reporte del cliente 2026-09-03, punto 9).
-  const deudaPorSocio = await getDeudaPendienteBatch(profileIds);
-
-  // Crédito en notas de crédito sin aplicar, por socio. Se suma al crédito que
-  // muestra la columna para que coincida con la card de la ficha: una NC
-  // pendiente ES plata a favor aunque se aplique a mano en Cobranzas (reporte
-  // del cliente 2026-08-31, prueba 3).
-  const ncPorSocio = new Map<string, number>();
-  if (profileIds.length > 0) {
-    const ncRows = await db
-      .select({ socioId: facturacion.socioId, importe: facturacion.importe })
-      .from(facturacion)
-      .where(
-        and(
-          eq(facturacion.guarderiaId, gId),
-          inArray(facturacion.socioId, profileIds as string[]),
-          inArray(facturacion.tipoFactura, [
-            'nota_credito_a',
-            'nota_credito_b',
-            'nota_credito_c',
-            'nota_credito_interna',
-          ]),
-          eq(facturacion.estado, 'pendiente'),
-          eq(facturacion.anulada, false),
-          eq(facturacion.rechazada, false),
-        ),
-      );
-    for (const n of ncRows) {
-      if (!n.socioId) continue;
-      ncPorSocio.set(n.socioId, (ncPorSocio.get(n.socioId) ?? 0) + parseFloat(n.importe ?? '0'));
-    }
-  }
-
   const sociosData = socios.map((s) => {
-    const deuda = deudaPorSocio.get(s.profileId) ?? 0;
-    const saldoAFavor = (poolPorSocio.get(s.profileId) ?? 0) + (ncPorSocio.get(s.profileId) ?? 0);
+    // Un solo número, partido por signo para la columna (deuda o a favor).
+    // Antes "a favor" mostraba el pool FIFO (disponible para aplicar) y la
+    // deuda un derivado del estado por fila: no coincidían con la card ni con
+    // la columna Saldo de la ficha. Regla del cliente 2026-09-07: los tres
+    // lugares dicen lo mismo, el neto.
+    const saldoNeto = saldoNetoBySocio.get(s.profileId) ?? 0;
+    const deuda = Math.max(0, saldoNeto);
+    const saldoAFavor = Math.max(0, -saldoNeto);
     const tipos = tiposPorSocio.get(s.profileId);
     const docsCompletos = (tipos?.size ?? 0) >= TIPOS_REQUERIDOS.size;
     const tieneEmbarcacion = Boolean(s.profileId && embByProfile[s.profileId]);
