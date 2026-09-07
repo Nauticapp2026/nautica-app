@@ -101,12 +101,12 @@ La tabla muestra: número de socio (#), nombre, email, embarcación asignada, ub
 - Al lado del buscador hay **filtros por columna**: **Nº socio**, **Nombre** y **Embarcación**. Filtran en vivo a medida que escribís y se combinan entre sí y con el buscador.
 - Podés ordenar la lista haciendo clic en los encabezados **#**, **Nombre**, **Embarcación** o **Ubicación** (ascendente o descendente).
 - La columna **Ingreso** muestra la fecha en que se incorporó el socio al club.
-- La columna **Saldo** muestra el saldo de la cuenta del socio. Si **debe**, aparece el monto adeudado. Si tiene **saldo a favor** (pagó de más), aparece el monto en verde con la etiqueta **"a favor"**. Podés ordenar por esta columna haciendo clic en su encabezado (de mayor deuda a saldo a favor).
+- La columna **Saldo** muestra el saldo de la cuenta del socio: si **debe**, el monto adeudado; si tiene **saldo a favor** (pagó de más o cargó un adelanto), el monto en verde con la etiqueta **"a favor"**; si está en cero, **$0** en gris. Es **el mismo número** que la tarjeta de saldo de su ficha y que la última fila de su Cuenta Corriente. Podés ordenar por esta columna haciendo clic en su encabezado (de mayor deuda a mayor saldo a favor).
 - El **número de socio** (#NNN) aparece como un chip junto al nombre. Podés editarlo en el perfil del socio → pestaña **Generales**.
 - El **estado** de la membresía se indica con un badge de color:
   - **Verde (Activo)** — socio con membresía vigente, puede acceder a la app.
   - **Gris (Inactivo)** — socio sin acceso a la app (la app mobile lo bloquea al iniciar sesión).
-  - **Rojo (Moroso)** — socio con deuda pendiente.
+  - **Rojo (Moroso)** — socio con deuda de **2 meses o más** sin cobrar. Un socio con saldo a favor sin aplicar **sigue figurando moroso** hasta que ese saldo se impute a los comprobantes desde Cobranzas: la deuda está viva hasta que lo hagas.
 - Si un socio tiene un **ícono de alerta amarillo** junto a su nombre, significa que tiene datos de perfil o documentación incompletos. Hacé clic en su nombre para ver qué falta completar.
 - Cada fila tiene un **botón chevron (▾)** a la derecha. Al hacerle clic se despliega un panel con:
   - **Invitados autorizados** — personas registradas por el socio como invitados permanentes. Cada nombre muestra la fecha hasta la que está autorizado (ej: `· válido hasta 30/06/2026`). No incluye accesos externos.
@@ -234,7 +234,23 @@ Lista los servicios que el socio tiene contratados. Es un **contrato**, no un hi
 
 Muestra los movimientos del socio: facturas, cobros y saldo.
 
-Arriba de la tabla hay tres tarjetas: **Ingresos por venta**, **Cobranzas** y una tercera que muestra **Saldo deudor** (lo que debe, en naranja) o **Saldo a favor** (crédito sin usar, en verde), según cuál tenga. Si el socio debe y **además** tiene algo de crédito sin usar sin alcanzar a cubrir la deuda, debajo del monto aparece la aclaración **"+ $X a favor sin usar"**. Cuando hay saldo a favor, un link **Ver historial** abre un panel con el detalle de **de dónde salió cada peso de crédito y en qué se aplicó** (por ejemplo, un adelanto que después se usó para pagar una factura puntual).
+Arriba de la tabla hay tres tarjetas: **Ingresos por venta**, **Cobranzas** y una tercera con el **saldo del socio**, que cambia de nombre según cómo esté la cuenta:
+
+| Tarjeta           | Cuándo aparece         | Color   |
+| ----------------- | ---------------------- | ------- |
+| **Saldo deudor**  | El socio debe plata    | Naranja |
+| **Saldo**         | La cuenta está en cero | Gris    |
+| **Saldo a favor** | El socio tiene crédito | Verde   |
+
+Ese número es **el mismo que muestra la última fila de la columna Saldo** de la tabla de abajo: es el saldo contable de la cuenta (todo lo facturado menos todo lo cobrado). Si los dos no coinciden, es un problema — avisanos.
+
+Debajo del monto puede aparecer una aclaración:
+
+- **"$X en cargos pendientes — se cubren aplicando el saldo desde Cobranzas"** — el socio tiene saldo a favor (o cero) pero todavía hay comprobantes sin cobrar. Pasa cuando cargaste un **adelanto** y no lo aplicaste a ninguna factura: la plata está, pero hasta que no la imputes desde Cobranzas los comprobantes siguen figurando pendientes.
+- **"+ $X disponibles para aplicar en Cobranzas"** — el socio debe, pero además tiene crédito sin usar que no alcanza a cubrir la deuda.
+- **"incluye $X en notas de crédito por aplicar"** — parte de ese crédito son notas de crédito, que no se descuentan solas: hay que tildarlas en una cobranza.
+
+Cuando hay saldo a favor, un link **Ver historial** abre un panel con el detalle de **de dónde salió cada peso de crédito y en qué se aplicó** (por ejemplo, un adelanto que después se usó para pagar una factura puntual).
 
 > Esta pestaña es de **solo lectura** de movimientos. Para registrar un cobro del socio, andá a la sección **Cobranzas** (menú lateral) y usá **Nueva cobranza** — reemplaza al viejo botón "Registrar pago" que tenía esta pestaña. Los consumos tampoco se cargan acá: usá **Cargar Servicio** en la pestaña **Servicios Contratados**.
 
@@ -244,7 +260,9 @@ Arriba de la tabla hay tres tarjetas: **Ingresos por venta**, **Cobranzas** y un
 - **Estado** — Todos / Cobrado / Anulado (NC) / Parcial / Pendiente.
 - **Tipo de comprobante** — Factura A/B/C, Recibo, Comprobante interno, Nota de crédito o Sin comprobante.
 
-Al aplicar **cualquier filtro**, la tercera tarjeta (Saldo deudor / Saldo a favor) se **oculta**: su valor es el saldo total del socio y no se corresponde con el subconjunto de movimientos filtrados. Las tarjetas de **Ingresos por venta** y **Cobranzas** se mantienen. Al limpiar los filtros, vuelve a aparecer.
+Al aplicar **cualquier filtro**, la tercera tarjeta (la del saldo) se **oculta**: su valor es el saldo total del socio y no se corresponde con el subconjunto de movimientos filtrados. Las tarjetas de **Ingresos por venta** y **Cobranzas** se mantienen. Al limpiar los filtros, vuelve a aparecer.
+
+**Exportar.** El botón **Exportar**, arriba a la derecha, baja un CSV con **los movimientos que estás viendo** — respeta los filtros y el orden aplicados, y trae las mismas columnas que la tabla. Se abre con Excel y respeta los acentos.
 
 **Ordenar por fecha.** Hacé clic en el encabezado **Fecha** para alternar el orden de los movimientos entre **más nuevo primero** (por defecto) y **más antiguo primero**. La flechita del encabezado indica el orden actual.
 
@@ -254,7 +272,7 @@ Cada comprobante ocupa **una sola fila**: si una factura o un comprobante intern
 
 - **Vencimiento** — fecha límite de pago del cargo. En las **facturas fiscales** es el vencimiento que se eligió al emitirlas. En los **comprobantes internos** se calcula como la **fecha de emisión más el Plazo de cobro** definido en la tarifa del Tarifario (Contado, 5, 10, 15, 20 o 30 días); si la fila consolida varios servicios con plazos distintos, rige el que vence primero. Ejemplo: un comprobante del 26/06 con plazo de 30 días vence el 26/07. En cargos sin comprobante y en cobranzas muestra "—".
 - **Situación** — estado según esa fecha: **En término** (verde) o **Vencida** (rojo). Una fila pasa a **Vencida** el día siguiente al vencimiento (siguiendo el ejemplo, el 27/07). Es **puramente por fecha**: un cargo pagado tarde también puede figurar Vencida. Es independiente de la columna **Estado**, que refleja el estado de pago: **Cobrado** (cubierto por cobranzas), **Parcial** (cobrado en parte), **Pendiente** (sin cobrar), **Vencido** o **Anulado (NC)** (anulado por una nota de crédito). El Estado aplica solo a los **cargos**: en las filas de **recibo** muestra "—", porque un recibo _es_ el cobro (el estado de lo cobrado se ve en la factura que ese recibo pagó).
-- **Saldo** — saldo acumulado de la cuenta hasta ese movimiento (en verde cuando es a favor del socio).
+- **Saldo** — saldo acumulado de la cuenta hasta ese movimiento. Cuando es **a favor del socio** se muestra en **verde y con signo menos** (ej. `-$1,00`); cuando el socio debe, en negro y sin signo. El signo importa para seguir la cuenta: si una fila dice `-$1,00` y la siguiente factura $3,00, el saldo pasa a $2,00 (no a $4,00).
 - **Importe pendiente** — cuánto falta cobrar de **ese comprobante puntual**, descontando notas de crédito y pagos parciales ya aplicados. En rojo si falta cobrar algo, en verde si ese comprobante ya está cancelado al 100%. En pagos y anulaciones muestra "—" (no son cargos, no deben nada).
 
 #### Pestaña Accesos Externos
@@ -764,9 +782,12 @@ Si necesitás **anular varias facturas a la vez** (anulación total), podés hac
 
 En el tab **Comprobantes ARCA** podés acotar la tabla con los siguientes filtros:
 
-- **Estado**: Todos / Pendiente / Pagada / Vencida
+- **Estado**: Todos / Pendiente / Pagada / Vencida — es el estado de **cobro**.
+- **ARCA**: todos / aceptados / rechazados — es el estado del comprobante **ante ARCA**, que es otra cosa: una factura puede estar **aceptada por ARCA y todavía sin cobrar**.
 - **Tipo**: Todos / Facturas ARCA / Notas de Crédito
 - **Período**: fecha desde y fecha hasta
+
+> **Por qué el filtro de ARCA solo tiene dos valores y no hay "Pendiente".** La emisión es inmediata: cuando apretás emitir, o ARCA devuelve el CAE (queda **Aceptado**) o rechaza y la fila queda **Rechazado**. No existe un estado intermedio de "esperando respuesta", así que no hay nada que filtrar por "pendiente" en esta columna. Lo que sí puede estar pendiente es el **cobro**, y eso se filtra con el primer desplegable.
 
 Para exportar los comprobantes actualmente visibles (respetando los filtros activos), hacé clic en **Exportar** — se descarga un archivo CSV.
 
@@ -776,7 +797,17 @@ Para exportar los comprobantes actualmente visibles (respetando los filtros acti
 
 **Acciones por fila (Comprobantes ARCA).** El **lápiz (✏️)** marca la factura como cobrada, el **avión de papel (➤)** envía el comprobante por email al socio con el PDF de ARCA adjunto, y la **flecha de descarga (⬇)** abre el PDF para verlo o descargarlo. En las filas con **Estado envío ARCA = Rechazado** aparece además la **flecha circular (↻)**, que abre **Reenviar comprobante legal rechazado**.
 
-**Reenviar un comprobante rechazado por ARCA.** El modal muestra el **motivo del rechazo** que devolvió ARCA. Corregí lo que haga falta (normalmente un dato del socio: CUIT, condición frente al IVA, domicilio) y reintentá; el sistema toma los datos del socio frescos, así que la corrección se aplica sola. Podés ajustar la **fecha** y el **vencimiento**. La **condición de venta**, el **medio de pago** y los **cargos incluidos** no se piden de nuevo: se reintenta el mismo comprobante con los datos del intento original, por su mismo punto de venta. La **letra** tampoco se elige: es la que corresponde según las condiciones frente al IVA del club y del socio (si ARCA rechazó la letra, corregí la condición IVA del socio en su ficha).
+**Ver todos los rechazados juntos.** Si hay comprobantes rechazados, arriba de la tabla aparece un botón rojo **Rechazados** con la cantidad. Abre un panel con **todos** los que rebotaron, **agrupados por causa** — porque casi siempre varios fallan por el mismo motivo y se arreglan de una sola vez. Cada grupo te dice qué pasó y qué hay que hacer.
+
+Dentro del panel:
+
+- En las causas que **se resuelven desde la app** (un dato del socio mal cargado), podés **editar los datos ahí mismo**, sin salir a la ficha de cada socio.
+- En las causas que **no dependen de la app** (por ejemplo, un dato que hay que dar de alta en ARCA o en TusFacturas), el panel te lo aclara: reintentar sin resolver eso afuera va a volver a fallar.
+- Tildá los comprobantes que querés reenviar y confirmá: se reenvían **uno por uno**, y al final te muestra cuántos salieron y cuántos volvieron a fallar.
+
+> Los comprobantes arrancan **sin tildar**: el reenvío es una acción real ante ARCA, así que elegís explícitamente cuáles mandar.
+
+**Reenviar un comprobante rechazado por ARCA (de a uno).** También podés hacerlo desde la flecha circular (↻) de la fila. El modal muestra el **motivo del rechazo** que devolvió ARCA. Corregí lo que haga falta (normalmente un dato del socio: CUIT, condición frente al IVA, domicilio) y reintentá; el sistema toma los datos del socio frescos, así que la corrección se aplica sola. Podés ajustar la **fecha** y el **vencimiento**. La **condición de venta**, el **medio de pago** y los **cargos incluidos** no se piden de nuevo: se reintenta el mismo comprobante con los datos del intento original, por su mismo punto de venta. La **letra** tampoco se elige: es la que corresponde según las condiciones frente al IVA del club y del socio (si ARCA rechazó la letra, corregí la condición IVA del socio en su ficha).
 
 ### Marcar una factura como pagada
 
@@ -808,7 +839,10 @@ Arriba de la tabla de Cobranzas está el botón **Nueva cobranza**.
 1. Hacé clic en **Nueva cobranza**.
 2. Elegí **qué tipo de comprobantes vas a cobrar**: **Comprobantes ARCA** (facturas A/B/C y notas de débito) o **Comprobantes internos** (CM-/CL-/CA-) — la misma separación que las pestañas de Ventas. Un recibo no puede mezclar los dos circuitos, así que la lista solo muestra los del tipo elegido. La opción **Comprobantes internos** solo aparece si el club tiene medios habilitados en **Mi perfil → Datos Impositivos → Gestión de cobranza**.
 3. Buscá al socio por nombre, número de socio o embarcación, y hacé clic sobre él en la lista.
-4. El sistema te muestra **solo los comprobantes pendientes de cobro** de ese socio (total o parcialmente), del tipo elegido en el paso 2. Los comprobantes ya cobrados enteros no aparecen; los que tuvieron un **cobro parcial** aparecen con el **saldo que falta cobrar** (y la aclaración del total original). Tampoco incluye notas de crédito.
+4. El sistema te muestra **solo los comprobantes pendientes de cobro** de ese socio (total o parcialmente), del tipo elegido en el paso 2. Los comprobantes ya cobrados enteros no aparecen; los que tuvieron un **cobro parcial** aparecen con el **saldo que falta cobrar** (y la aclaración del total original).
+
+   En esa misma lista aparecen también las **notas de crédito sin usar** del socio, con el importe **en negativo**: son un comprobante más, pero en vez de sumar, restan. Cada una muestra su fecha, a qué factura está relacionada (si lo está) y, si ya se usó en parte, cuánto le queda disponible.
+
 5. Tildá los comprobantes que estás cobrando (o usá **Seleccionar todos**). Abajo se muestra el **Total seleccionado**.
 6. Hacé clic en **Continuar**. También podés continuar **sin seleccionar ningún comprobante**: en ese caso el monto se registra como **adelanto** y queda como **saldo a favor** en la Cuenta Corriente del socio. Un adelanto **no salda ningún comprobante viejo pendiente por sí solo** — sigue disponible entero hasta que lo usés a mano (tildando un comprobante y marcando "Usar saldo a favor disponible", ver paso 7) o lo consuma el débito automático al cobrar.
 7. Si tildaste **un solo comprobante**, revisá o ajustá el **Monto a cobrar** (viene precargado con el saldo pendiente) y la **Fecha** del cobro.
@@ -817,7 +851,11 @@ Arriba de la tabla de Cobranzas está el botón **Nueva cobranza**.
 
    Si tildaste **dos o más comprobantes**, en vez de un monto único aparece un **casillero por cada comprobante** (precargado con su saldo pendiente): escribí ahí cuánto le pagás a cada uno — así elegís vos a qué factura imputa un pago parcial, en vez de que el sistema lo aplique solo del más viejo al más nuevo. El **Total a cobrar** se calcula solo, sumando los casilleros.
 
-   Si el socio tiene **saldo a favor sin usar** (de un adelanto o de un cobro anterior), aparece el tilde **"Usar saldo a favor disponible ($X)"**: al marcarlo, ese monto se descuenta del total a cobrar y el resto se completa con las formas de pago de siempre. Se agota solo — una vez usado por completo, deja de ofrecerse en la próxima cobranza.
+   Si tildaste una **nota de crédito**, su importe también es **editable**: podés aplicarla **entera o solo una parte**, igual que cualquier otro comprobante. Viene precargada con todo lo disponible; si aplicás menos, el resto **queda disponible** para una cobranza futura y la fila te lo aclara ("Uso parcial, resto queda disponible"). No podés aplicar más de lo que le queda.
+
+   > Una nota de crédito **no se descuenta sola**, ni siquiera la que está relacionada a una factura: siempre hay que tildarla acá. Y el crédito de una nota **no vuelve como saldo a favor**: si aplicás una nota por más de lo que estás cobrando, ese excedente se perdería, así que el sistema no te deja confirmar y te pide bajar los montos.
+
+   Si el socio tiene **saldo a favor sin usar** (de un adelanto o de un cobro anterior), aparece el tilde **"Usar saldo a favor disponible ($X)"**. Al marcarlo se abre el campo **"Cuánto saldo a favor aplicar"**, precargado pero **editable**: podés usar solo una parte y cobrar el resto. No se puede aplicar más de lo disponible. Se agota solo — una vez usado por completo, deja de ofrecerse en la próxima cobranza.
 
 8. Elegí la **forma de pago**: Efectivo (pesos), Efectivo (dólares), Tarjeta de crédito, Tarjeta de débito, Transferencia bancaria, Cheque, Mercado Pago u Otro. Cada una pide sus propios datos (por ejemplo, Efectivo en dólares pide el tipo de cambio y calcula el equivalente en pesos; si el socio ya tiene una tarjeta cargada para débito automático, podés reutilizarla con un clic). Si estás cobrando **comprobantes internos**, el desplegable muestra **solo los medios habilitados** en la Gestión de cobranza del club (Efectivo habilita también Efectivo en dólares). Si el saldo a favor cubre el total completo, no hace falta cargar ninguna forma de pago.
 9. **Podés combinar más de una forma de pago** en el mismo cobro: hacé clic en **Agregar forma de pago** y repetí el paso anterior para cada una. La suma de todas tiene que coincidir con el Monto a cobrar.
@@ -834,9 +872,22 @@ El recibo se puede ver e imprimir con el ícono **Ver** (ojo) de su fila. La pla
 1. En la tabla de Cobranzas, hacé clic en **Anular recibo** en la fila del recibo (solo disponible si todavía está **Vigente**).
 2. Confirmá.
 
-Al anular: el pago se revierte, los comprobantes que ese recibo había cobrado (enteros o en parte) vuelven a pendiente, y los cargos vuelven a su estado previo. El recibo queda marcado **Anulado**, con su fecha de anulación, y no se puede volver a anular ni se genera ningún comprobante nuevo. El PDF del recibo anulado muestra el **monto en negativo** y la leyenda **ANULADO** (vale igual para RC- y RI-).
+Al anular: el pago se revierte, los comprobantes que ese recibo había cobrado (enteros o en parte) vuelven a pendiente, y los cargos vuelven a su estado previo. Si el recibo había usado **notas de crédito**, esas notas **vuelven a estar disponibles**. El recibo queda marcado **Anulado**, con su fecha de anulación, y no se puede volver a anular ni se genera ningún comprobante nuevo. El PDF del recibo anulado muestra el **monto en negativo** y la leyenda **ANULADO** (vale igual para RC- y RI-).
+
+En la Cuenta Corriente del socio, la anulación **no borra ni esconde** el cobro original: agrega una fila nueva **"Anulación recibo RC-XXXXXX"** que lo revierte. Es a propósito — la trazabilidad contable exige no borrar movimientos de plata.
 
 > La anulación es siempre por el **total** del recibo — no se puede anular parcialmente una cobranza.
+
+_Dos casos en los que el sistema no te va a dejar anular:_
+
+- **El recibo quedó fuera del período de anulación** que configuró el club (ver **Mi perfil → Datos Impositivos → Período de anulación de recibo**). El botón aparece deshabilitado y el mensaje te dice qué política está puesta.
+- **Parte del crédito de ese recibo ya se gastó en otra cobranza.** Pasa con los adelantos: si cargaste un adelanto y después usaste ese saldo a favor para cobrar una factura, anular el adelanto dejaría esa factura cobrada con plata que ya no existe. El sistema lo bloquea y te dice **cuál recibo anular primero** (el que gastó el crédito). El orden correcto es de atrás para adelante: primero se deshace el uso, después el origen.
+
+### Exportar la lista de cobranzas
+
+El botón **Exportar** (arriba a la derecha de la tabla) baja un archivo CSV con **los recibos que estás viendo** — respeta los filtros y la búsqueda aplicados. Se abre con Excel y respeta los acentos.
+
+Un recibo **anulado** se exporta con importe **$0**, igual que se muestra en la tabla: así, si sumás la columna en Excel, el total coincide con lo realmente cobrado.
 
 ### Pestaña Débito automático
 
@@ -997,6 +1048,8 @@ Cómo se comporta la emisión con varios centros:
 
 **Dar de baja un centro emisor.** Si dejás de usar un punto de venta, tocá **Dar de baja** en su fila. Deja de aparecer al emitir, pero **los comprobantes que ya emitió quedan intactos** y se pueden seguir consultando, reimprimiendo y reenviando por ese mismo punto de venta — por eso el centro nunca se borra del todo (la trazabilidad ante ARCA lo exige). Queda marcado como **De baja** y podés **Reactivarlo** cuando quieras.
 
+El badge **De baja** muestra al lado la **fecha en que se dio de baja** (y pasando el mouse por encima, la fecha con hora). Los centros que se dieron de baja antes de que existiera este registro aparecen como **"De baja · sin fecha"**: la baja es válida igual, solo que no quedó guardado el día.
+
 Dos casos en los que el sistema no te va a dejar darlo de baja:
 
 - **Es el principal** — es el que usa la facturación mensual automática. Designá otro como principal y recién entonces dalo de baja.
@@ -1015,6 +1068,23 @@ Esta configuración gobierna toda la pata de internos de la app:
 - Tildar **Débito automático** habilita además que los servicios **Interno** de socios adheridos entren al cobro automático por Payway (ver capítulo 14) — sin este tilde, el débito automático cobra únicamente servicios fiscales.
 
 Elegí los medios y hacé clic en **Guardar configuración**.
+
+_Período de anulación de recibo:_
+
+Debajo de la Gestión de cobranza está la sección **Período de anulación de recibo**: hasta cuándo se puede anular un recibo de cobranza. Sirve para que no se anulen recibos de períodos ya cerrados.
+
+Elegí una de las cuatro opciones y hacé clic en **Guardar configuración**:
+
+| Opción                | Qué recibos se pueden anular                                                        |
+| --------------------- | ----------------------------------------------------------------------------------- |
+| **Misma semana**      | Solo los de la semana en curso (de lunes a domingo).                                |
+| **Mismo mes**         | Solo los del mes en curso. Al cambiar de mes, los del mes anterior quedan cerrados. |
+| **Mes anterior**      | Los del mes en curso y los del anterior. En agosto se puede anular julio, no junio. |
+| **Sin restricciones** | Cualquier recibo, sin importar la fecha. Es como viene configurado de entrada.      |
+
+Los recibos que quedan fuera del período **siguen visibles en Cobranzas y se pueden consultar e imprimir** — lo único que no se puede es anularlos. En la tabla, el botón de anular aparece deshabilitado y al pasar el mouse te dice por qué.
+
+> El límite se calcula con la **fecha del recibo** y el calendario argentino. Cambiar la configuración no afecta anulaciones ya hechas.
 
 ### Pestaña: Equipo
 
@@ -1070,6 +1140,26 @@ El débito automático permite cobrar los servicios contratados directamente des
 
 > **Qué entra al débito y qué no.** Se cobran los cargos de los **Servicios Contratados con el tilde de débito** de socios **adheridos**. Los cargos que no salen de un servicio contratado (una nota de débito, un cobro por baja anticipada suelto) quedan afuera y se cobran a mano desde **Cobranzas**. Los servicios **Interno** solo entran si el club tildó **Débito automático** en su Gestión de cobranza — y aún así se cobran en un **pago separado** de los fiscales: los dos circuitos nunca se mezclan en un mismo cobro.
 
+_El detalle completo, para cuando hay que explicar por qué a alguien no se le cobró:_
+
+El débito **no cobra "el saldo" del socio**: va cargo por cargo, y solo entran los que cumplen **todo** esto.
+
+Para que el socio entre:
+
+- El club tiene las **credenciales de Payway** cargadas.
+- El socio está **adherido** (tilde **Cobro Automático Payway**). Tener la tarjeta guardada no alcanza: la adhesión es explícita.
+- La **membresía está activa**. Un socio dado de baja del club no se debita, aunque le queden el tilde y la tarjeta.
+
+Y de sus cargos, entran los que:
+
+- Salen de un **Servicio Contratado con el tilde de débito**. Sin ese tilde, ese contrato no se debita nunca.
+- **No están ya cubiertos** por cobros anteriores.
+- **No están bloqueados por una factura rechazada por ARCA.** Misma regla que Cobranzas: sin comprobante válido no se cobra. Hay que reenviar la factura primero.
+
+Al importe se le descuenta lo que ya está acreditado: **notas de crédito**, **pagos parciales** y el **saldo a favor** que sobre.
+
+> Si el débito "no cobró nada" y parece un error, lo primero a revisar es el **día de facturación del club** (el cobro corre ese día, no todos los días) y si los contratos tienen realmente el **tilde de débito** puesto. Son las dos causas más frecuentes.
+
 ### Paso 1 — Configurar Payway en tu club
 
 > Necesitás tener una cuenta en **Payway (Decidir)** y tus claves pública y privada. Si no las tenés, contactá a Payway para darlas de alta.
@@ -1118,6 +1208,10 @@ No hace falta hacer nada más. El día de facturación configurado en tu club, e
 
 Cuando el cobro se aprueba, se registra un pago **Pago — Débito automático** en la cuenta corriente del socio, los cargos cobrados quedan **Cobrados** y los comprobantes cubiertos enteros pasan a **Cobrada**.
 
+**El socio recibe su recibo.** Cada cobro aprobado genera un **recibo de cobranza** con la misma numeración que los cobros hechos a mano (**RC-** para el circuito ARCA, **RI-** para el interno), y se le **envía por email al socio** automáticamente. El recibo también le queda visible **en la app mobile**, junto con sus facturas y comprobantes, y en el panel aparece en la tabla de **Cobranzas** como cualquier otro.
+
+> Si el envío del mail falla (por ejemplo, el socio no tiene email cargado), **el cobro no se cae**: el recibo queda generado igual y se puede ver e imprimir desde Cobranzas.
+
 > **No se cobra de más.** Si el socio tenía **saldo a favor** o pagos parciales previos, ese crédito se descuenta del débito del mes. Y si un cargo ya quedó cubierto por un pago anterior, no se vuelve a cobrar.
 
 ### Ver el historial de cobros
@@ -1151,10 +1245,20 @@ Si un cobro aparece como **Rechazado** o **Error**:
 
 > Si el cobro vuelve a fallar, probablemente la tarjeta tiene un problema. Comunicarte con el socio para actualizar los datos.
 
+**Ver todos los rechazados juntos.** Si hay cobros rechazados, arriba de la tabla aparece un botón rojo **Rechazados** con la cantidad. Abre un panel con todos, **agrupados por causa**, y en cada grupo te dice **qué conviene hacer** y si **reintentar tiene sentido**:
+
+- Reintentar puede funcionar en **Sin fondos suficientes**, **Supera el límite de la tarjeta** y los rechazos **sin detalle**.
+- Reintentar **va a volver a fallar** en **Tarjeta vencida**, **Tarjeta inválida**, **Código de seguridad inválido**, **Tarjeta bloqueada, retenida o denunciada**, **Operación no permitida para esa tarjeta** y cuando **el banco emisor rechazó el pago**: hay que pedirle al socio una tarjeta nueva y reemplazarla en su ficha.
+- **Problema de credenciales con Payway** no es del socio: es la configuración del club (**Mi perfil → Payway**).
+
+Tildá los socios que querés reintentar y confirmá. El reintento se agrupa **por socio**: vuelve a correr el débito completo de ese socio, no un cobro puntual, así que si tenía varios cargos fallidos se resuelven todos juntos.
+
+> Los cobros arrancan **sin tildar**: reintentar es un cargo real a una tarjeta, así que elegís explícitamente a quiénes.
+
 ### Preguntas frecuentes sobre débito automático
 
 **¿El socio recibe alguna notificación del cobro?**
-Payway envía la notificación directamente al banco del socio. La app no envía notificación adicional por el momento.
+Sí. Cada cobro aprobado le manda el **recibo por email**, y le queda visible en la app mobile junto con sus otros comprobantes. Aparte, Payway notifica el consumo al banco del socio por su cuenta.
 
 **¿Qué pasa si el socio tiene deuda de meses anteriores?**
 Se cobra todo lo pendiente de sus **servicios con el tilde de débito**, no solo el mes corriente — siempre descontando lo que ya haya pagado. La deuda que no salió de esos servicios (por ejemplo una nota de débito) no entra: se cobra desde Cobranzas.

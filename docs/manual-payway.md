@@ -70,7 +70,9 @@ No hace falta hacer nada más. El día de facturación configurado en tu club, e
 
 Los cargos cobrados quedan marcados como **Cobrados** y los comprobantes cubiertos enteros pasan a **Cobrada**.
 
-> **Qué entra al débito:** solo los Servicios Contratados con el tilde puesto, de socios adheridos. La deuda que no salió de un servicio contratado (por ejemplo una nota de débito) se cobra a mano desde **Cobranzas**. Los servicios con facturación **Interno** solo entran si el club habilitó **Débito automático** en Mi perfil → Datos Impositivos → **Configuración de cobranzas**, y siempre en un pago separado de los fiscales.
+**El socio recibe su recibo.** Cada cobro aprobado genera un **recibo de cobranza** (**RC-** en el circuito ARCA, **RI-** en el interno) y se le **envía por email** automáticamente. El recibo también le queda visible **en la app mobile**, junto con sus facturas, y en el panel aparece en la tabla de **Cobranzas** como cualquier otro cobro. Si el socio no tiene email cargado, el cobro se hace igual y el recibo queda disponible en Cobranzas.
+
+> **Qué entra al débito:** solo los Servicios Contratados con el tilde puesto, de socios **adheridos** y con la **membresía activa**. La deuda que no salió de un servicio contratado (por ejemplo una nota de débito) se cobra a mano desde **Cobranzas**. Tampoco entran los cargos de una **factura que ARCA rechazó**: hay que reenviarla primero. Los servicios con facturación **Interno** solo entran si el club habilitó **Débito automático** en Mi perfil → Datos Impositivos → **Gestión de cobranza**, y siempre en un pago separado de los fiscales.
 
 ---
 
@@ -79,6 +81,12 @@ Los cargos cobrados quedan marcados como **Cobrados** y los comprobantes cubiert
 1. Andá a **Cobranzas** → **Débito automático**.
 2. Buscá el cobro con estado **Rechazado** o **Error**.
 3. Hacé clic en **Reintentar**. El sistema vuelve a correr el débito del socio hoy, con las mismas reglas del cobro mensual.
+
+Si son varios, el botón rojo **Rechazados** de arriba de la tabla los muestra **todos juntos y agrupados por causa**, con lo que conviene hacer en cada caso y si reintentar sirve o no:
+
+- Reintentar puede funcionar en **Sin fondos suficientes**, **Supera el límite de la tarjeta** y los rechazos sin detalle.
+- Reintentar **va a volver a fallar** con **Tarjeta vencida**, **Tarjeta inválida**, **Código de seguridad inválido**, **Tarjeta bloqueada/retenida/denunciada**, **Operación no permitida** o cuando **el banco emisor rechazó el pago**. Ahí hay que pedirle al socio otra tarjeta y reemplazarla en su ficha.
+- **Problema de credenciales con Payway** no es del socio: revisá las claves del club en Mi perfil → Payway.
 
 > Si el cobro vuelve a fallar, comunicate con el socio para actualizar los datos de la tarjeta o con el soporte de Payway.
 
