@@ -259,7 +259,7 @@
 
 <h3>Qué muestra</h3>
 
-<ul><li><strong>Embarcaciones en guardería</strong> — cantidad de embarcaciones actualmente activas.</li><li><strong>Socios activos</strong> — total de socios con estado activo.</li><li><strong>Ingresos del mes</strong> — monto <strong>cobrado</strong> (facturas pagadas) en el mes en curso.</li><li><strong>Socios con deuda 2+ meses</strong> — socios con movimientos pendientes de cobro desde hace más de dos meses.</li><li><strong>Socios con documentación incompleta</strong> — socios a los que les falta subir documentación.</li></ul>
+<ul><li><strong>Embarcaciones en guardería</strong> — cantidad de embarcaciones actualmente activas.</li><li><strong>Socios activos</strong> — total de socios con estado activo.</li><li><strong>Ingresos del mes</strong> — monto <strong>cobrado</strong> (facturas ya cobradas) en el mes en curso.</li><li><strong>Socios con deuda 2+ meses</strong> — socios con movimientos pendientes de cobro desde hace más de dos meses.</li><li><strong>Socios con documentación incompleta</strong> — socios a los que les falta subir documentación.</li></ul>
 <p>Más abajo, el Dashboard también muestra un panel de <strong>Operarios / Marineros</strong> (lista al personal de ambos roles, con un badge que indica cuál es cada uno) y otro de <strong>Comunicaciones recientes</strong>.</p>
 
 <h3>Alertas operativas</h3>
@@ -328,6 +328,11 @@
 <p>Mostrá y editá los datos personales: nombre, apellido, email, teléfono, documento y dirección.</p>
 
 <ul><li><strong>Número de socio</strong> — campo editable para asignar o modificar el número interno del socio. El número aparece como chip (#NNN) en la cabecera del perfil y en la lista de socios.</li><li><strong>Estado de membresía</strong> — selector en la cabecera del perfil para cambiar el estado: <strong>Activo</strong> o <strong>Inactivo</strong>. Un socio Inactivo no puede acceder a la app (bloqueo al iniciar sesión). Para desvincular al socio del club existe por separado el botón <strong>Eliminar socio</strong> (más abajo, en la pestaña Generales), que lo oculta del listado conservando su historial.</li></ul>
+<ul><li><strong>Se factura / No facturar</strong> — botón en la cabecera del perfil, al lado del estado. Alterna entre los dos valores y define si el socio <strong>aparece o no en los flujos de emisión de comprobantes</strong>:</li></ul><ul class="nested"><li>- <strong>Se factura</strong> (por defecto, en gris) — el socio aparece normalmente al emitir.</li><li><strong>No facturar</strong> (en ámbar) — <strong>deja de aparecer</strong> en Facturación manual, en Facturación por lote y en la emisión automática mensual.</li></ul>
+<p>> <strong>Es una marca aparte del estado, no un estado más.</strong> El socio sigue <strong>Activo</strong>: usa el club, entra a la app, y <strong>se le puede cobrar todo lo que ya debía</strong>. Lo único que se detiene es la emisión de comprobantes nuevos.</p>
+
+<p>> <strong>La deuda se sigue generando igual.</strong> Sus servicios contratados siguen acumulando cargos por detrás; simplemente no se emiten. Cuando lo vuelvas a poner en <strong>Se factura</strong>, reaparece en Ventas <strong>con todo lo que se acumuló en el medio</strong>. Es útil para un socio en conflicto o en revisión, no para "pausarle" la facturación sin consecuencias.</p>
+
 <h4>Pestaña Datos Impositivos</h4>
 
 <p>Mostrá y editá los datos fiscales del socio: razón social, CUIT, dirección fiscal, <strong>email de facturación</strong>, condición frente al IVA e Ingresos Brutos.</p>
@@ -604,15 +609,15 @@
 
 <p>Desde esta sección publicás amarras y camas disponibles en tu club para que los usuarios de la app mobile las puedan ver. Las publicaciones <strong>no están ligadas a un espacio en particular</strong>: son avisos independientes con su propia foto, descripción y precio.</p>
 
-<h3>Límite según plan<table></h3>
+<h3>Límite según plan</h3>
 
-<thead><table><tbody><tr><th>Plan</th><th>Publicaciones permitidas por mes</th></tr></tbody></table></thead><tbody><table><tbody><tr><td>--------</td><td>--------------------------------</td></tr>
-<tr><td>Esencial</td><td>0 (no disponible)</td></tr>
-<tr><td>Premium</td><td>2 por mes</td></tr>
-<tr><td>Elite</td><td>5 por mes</td></tr></tbody></table></tbody></table>
-<p>El contador en la parte superior muestra cuántas publicaciones usaste del total disponible en el mes en curso. Al inicio de cada mes el conteo se reinicia.</p>
+<p>Hoy el cupo es <strong>6 publicaciones</strong>, igual en los tres planes (Esencial, Premium y Élite).</p>
 
-<p>Si tu plan es Esencial, verás un aviso indicando que debés actualizar a Premium para usar esta sección.</p>
+<blockquote>El cupo lo configura NauticApp desde su panel y puede cambiar sin que se actualice la app. Si el número que ves en pantalla no coincide con el de este manual, <strong>el que vale es el de la pantalla</strong>.</blockquote>
+
+<p><strong>Es un cupo de publicaciones activas, no un cupo mensual.</strong> No se reinicia a fin de mes: el contador muestra cuántas tenés publicadas ahora sobre el total. Si llegaste al tope y querés publicar otra, <strong>borrá una</strong> — el lugar se libera en el momento.</p>
+
+<p>Al llegar al tope, el sistema te avisa. Si hay un plan superior al tuyo te sugiere cambiarte; si ya estás en Élite, te invita a contactar a NauticApp por un plan a medida.</p>
 
 <h3>Crear una publicación</h3>
 
@@ -639,13 +644,14 @@
 
 <h3>Límite según plan</h3>
 
-<p>Las comunicaciones tienen un límite mensual según el plan y el tipo:<table></p>
+<p>Las comunicaciones tienen un cupo <strong>mensual</strong>, y hoy es el mismo en los tres planes (Esencial, Premium y Élite):<table></p>
 
-<thead><table><tbody><tr><th>Plan</th><th>A socios del club</th><th>Públicas (landing)</th></tr></tbody></table></thead><tbody><table><tbody><tr><td>--------</td><td>-----------------</td><td>------------------</td></tr>
-<tr><td>Esencial</td><td>2 por mes</td><td>0 (no disponible)</td></tr>
-<tr><td>Premium</td><td>2 por mes</td><td>2 por mes</td></tr>
-<tr><td>Elite</td><td>5 por mes</td><td>5 por mes</td></tr></tbody></table></tbody></table>
-<p>El contador en la parte superior de cada tipo muestra el uso del mes en curso.</p>
+<thead><table><tbody><tr><th>Tipo</th><th>Cupo por mes</th></tr></tbody></table></thead><tbody><table><tbody><tr><td>----------------------</td><td>------------</td></tr>
+<tr><td><strong>A socios del club</strong></td><td>6</td></tr>
+<tr><td><strong>Públicas (landing)</strong></td><td>3</td></tr></tbody></table></tbody></table>
+<blockquote>Igual que en Publicaciones, estos cupos los configura NauticApp y pueden cambiar sin actualizar la app: si la pantalla dice otro número, vale el de la pantalla.</blockquote>
+
+<p>El contador en la parte superior de cada tipo muestra el uso del <strong>mes en curso</strong>; a diferencia de Publicaciones, acá el conteo <strong>sí se reinicia</strong> el primer día de cada mes (cuenta las creadas en el mes, así que borrar una no libera cupo).</p>
 
 <h3>Ver comunicaciones existentes</h3>
 
@@ -668,6 +674,19 @@
 <p>Hacé clic en el <strong>ícono de lápiz</strong> de la comunicación para abrirla y editarla. Podés volver a guardarla como borrador si necesitás pausar su visibilidad.</p>
 
 <blockquote>Solo podés editar una comunicación dentro de las <strong>24 horas</strong> siguientes a su creación. Pasado ese tiempo el lápiz se reemplaza por un <strong>candado</strong> grisado y ya no se puede modificar.</blockquote>
+
+<h3>Pestaña Mails — mandar un mail a los socios de un área</h3>
+
+<p>La sección tiene <strong>dos pestañas</strong>: <strong>Tablón de la app</strong> (todo lo anterior: lo que el socio ve dentro de la app) y <strong>Mails</strong>, para mandar un <strong>email</strong> a los socios de una o varias áreas. Sirve para lo operativo y urgente — un corte de agua en una nave, una veda de navegación, trabajos en un peine — donde no alcanza con que quede publicado en el tablón.</p>
+
+<p><strong>Enviar un mail:</strong></p>
+
+<ol><li>Entrá a la pestaña <strong>Mails</strong>.</li><li>En <strong>Áreas</strong>, tildá una o más. Al lado de cada nombre se muestra <strong>cuántos espacios</strong> tiene.</li><li>Debajo aparece <strong>a cuántos socios le va a llegar</strong>. El número se recalcula cada vez que cambiás la selección.</li><li>Escribí el <strong>Asunto</strong> y el <strong>Mensaje</strong>.</li><li>Hacé clic en enviar.</li></ol>
+<blockquote><strong>A quién le llega:</strong> a los socios que <strong>ocupan un espacio</strong> en las áreas elegidas. No es "todos los socios del club": si un socio no tiene espacio asignado en esas áreas, no lo recibe. Por eso conviene mirar el número de destinatarios antes de enviar — si dice 0, el botón queda deshabilitado.</blockquote>
+
+<p><strong>Enviados.</strong> Debajo del formulario queda el historial: asunto, mensaje, áreas y a cuántos socios se envió cada uno.</p>
+
+<blockquote>Un mail enviado <strong>no se puede editar ni cancelar</strong> — sale en el momento. Revisá el texto antes de mandarlo.</blockquote>
 
 <hr>
 
@@ -693,7 +712,7 @@
 
 <p>Las tarjetas superiores muestran:</p>
 
-<ul><li><strong>Pendientes de cobro</strong> — <strong>cantidad</strong> de facturas sin cobrar.</li><li><strong>Pagadas este mes</strong> — <strong>cantidad</strong> de facturas cobradas en el mes.</li><li><strong>Vencidas</strong> — cantidad de facturas que superaron su fecha de vencimiento sin cobro.</li><li><strong>Total facturado</strong> — monto acumulado histórico.</li></ul>
+<ul><li><strong>Pendientes de cobro</strong> — <strong>cantidad</strong> de facturas sin cobrar.</li><li><strong>Cobradas este mes</strong> — <strong>cantidad</strong> de facturas cobradas en el mes.</li><li><strong>Vencidas</strong> — cantidad de facturas que superaron su fecha de vencimiento sin cobro.</li><li><strong>Total facturado</strong> — monto acumulado histórico.</li></ul>
 <h3>Emitir una factura individual</h3>
 
 <ol><li>Hacé clic en <strong>Nuevo comprobante</strong> → <strong>Facturación manual</strong>. El formulario sigue este orden:</li><li><strong>Socio y Número de documento</strong> — buscá y seleccioná el socio; el buscador filtra por nombre, número de socio o embarcación (mismo buscador que usás en Cobranzas). El documento (DNI/CUIT/CUIL) se completa solo.</li><li><strong>Fecha y Vencimiento</strong> — el vencimiento se sugiere solo <strong>según el tarifario</strong>: fecha + el <strong>Plazo de cobro</strong> de los servicios seleccionados (si tienen plazos distintos, rige el que vence primero). Podés pisarlo a mano cuando haga falta.</li><li><strong>Centro emisor y Tipo de comprobante</strong>:</li></ol>   - <strong>Centro emisor</strong> — por qué punto de venta de ARCA sale el comprobante (ver "Centros emisores" en Mi perfil → Datos Impositivos). El campo aparece siempre, arriba de Tipo de comprobante, preseleccionado en el principal; con un solo centro configurado queda como única opción. Los centros emisores solo intervienen en la facturación por ARCA — los <strong>comprobantes internos no los usan</strong>.
@@ -787,7 +806,7 @@
 
 <p>En el tab <strong>Comprobantes ARCA</strong> podés acotar la tabla con los siguientes filtros:</p>
 
-<ul><li><strong>Estado</strong>: Todos / Pendiente / Pagada / Vencida — es el estado de <strong>cobro</strong>.</li><li><strong>ARCA</strong>: todos / aceptados / rechazados — es el estado del comprobante <strong>ante ARCA</strong>, que es otra cosa: una factura puede estar <strong>aceptada por ARCA y todavía sin cobrar</strong>.</li><li><strong>Tipo</strong>: Todos / Facturas ARCA / Notas de Crédito</li><li><strong>Período</strong>: fecha desde y fecha hasta</li></ul>
+<ul><li><strong>Estado</strong>: Todos los estados / Pendiente / Cobrada / Vencida — es el estado de <strong>cobro</strong>.</li><li><strong>ARCA</strong>: todos / aceptados / rechazados — es el estado del comprobante <strong>ante ARCA</strong>, que es otra cosa: una factura puede estar <strong>aceptada por ARCA y todavía sin cobrar</strong>.</li><li><strong>Tipo</strong>: Todos / Facturas ARCA / Notas de Crédito</li><li><strong>Período</strong>: fecha desde y fecha hasta</li></ul>
 <blockquote><strong>Por qué el filtro de ARCA solo tiene dos valores y no hay "Pendiente".</strong> La emisión es inmediata: cuando apretás emitir, o ARCA devuelve el CAE (queda <strong>Aceptado</strong>) o rechaza y la fila queda <strong>Rechazado</strong>. No existe un estado intermedio de "esperando respuesta", así que no hay nada que filtrar por "pendiente" en esta columna. Lo que sí puede estar pendiente es el <strong>cobro</strong>, y eso se filtra con el primer desplegable.</blockquote>
 
 <p>Para exportar los comprobantes actualmente visibles (respetando los filtros activos), hacé clic en <strong>Exportar</strong> — se descarga un archivo CSV.</p>
@@ -807,11 +826,11 @@
 
 <p><strong>Reenviar un comprobante rechazado por ARCA (de a uno).</strong> También podés hacerlo desde la flecha circular (↻) de la fila. El modal muestra el <strong>motivo del rechazo</strong> que devolvió ARCA. Corregí lo que haga falta (normalmente un dato del socio: CUIT, condición frente al IVA, domicilio) y reintentá; el sistema toma los datos del socio frescos, así que la corrección se aplica sola. Podés ajustar la <strong>fecha</strong> y el <strong>vencimiento</strong>. La <strong>condición de venta</strong>, el <strong>medio de pago</strong> y los <strong>cargos incluidos</strong> no se piden de nuevo: se reintenta el mismo comprobante con los datos del intento original, por su mismo punto de venta. La <strong>letra</strong> tampoco se elige: es la que corresponde según las condiciones frente al IVA del club y del socio (si ARCA rechazó la letra, corregí la condición IVA del socio en su ficha).</p>
 
-<h3>Marcar una factura como pagada</h3>
+<h3>Marcar una factura como cobrada</h3>
 
-<p>Cuando un socio te abona <strong>una factura puntual</strong> que le emitiste, marcala como pagada:</p>
+<p>Cuando un socio te abona <strong>una factura puntual</strong> que le emitiste, marcala como cobrada:</p>
 
-<ol><li>En el tab <strong>Comprobantes ARCA</strong>, ubicá la factura en la tabla. En la última columna (acciones) hacé clic en el <strong>ícono de lápiz (✏️)</strong> — al pasar el mouse aparece el texto "Marcar como cobrada". Si la factura ya está cobrada, el ícono se ve deshabilitado.</li><li>Seleccioná el <strong>medio de pago</strong>.</li><li>Confirmá. La factura pasa de <strong>Pendiente</strong> a <strong>Pagada</strong> y los cargos vinculados a ella quedan saldados.</li></ol>
+<ol><li>En el tab <strong>Comprobantes ARCA</strong>, ubicá la factura en la tabla. En la última columna (acciones) hacé clic en el <strong>ícono de lápiz (✏️)</strong> — al pasar el mouse aparece el texto "Marcar como cobrada". Si la factura ya está cobrada, el ícono se ve deshabilitado.</li><li>Seleccioná el <strong>medio de pago</strong>.</li><li>Confirmá. La factura pasa de <strong>Pendiente</strong> a <strong>Cobrada</strong> y los cargos vinculados a ella quedan saldados.</li></ol>
 <blockquote><strong>No la confundas con una cobranza</strong> (sección <strong>Cobranzas</strong> → <strong>Nueva cobranza</strong>): esa registra un <strong>cobro</strong> que descuenta del <strong>saldo</strong> del socio. Esta acción solo cambia el estado de <strong>una factura</strong> y <strong>no modifica el saldo</strong> de la cuenta corriente. Si necesitás que baje la deuda del socio, registrá el cobro desde <strong>Cobranzas</strong> o por débito automático.</blockquote>
 
 <hr>
@@ -885,7 +904,12 @@
 <p>Cada tarifa muestra su concepto, un badge <strong>Fijo</strong> o <strong>Variable</strong> (fijo = precio único; variable = se cobra según el metraje de la embarcación) — si la Variable es de <strong>tarifa diaria</strong>, el badge dice <strong>Variable · Diaria</strong> —, el período de vigencia, el precio y el estado. <strong>Fijo/Variable también define si se repite sola todos los meses</strong>: las Fijas sí, las Variables se cobran una sola vez (ver "¿Qué conceptos entran en la factura automática?" más abajo). En la columna de precio se muestran dos valores:</p>
 
 <ul><li><strong>Precio c/IVA</strong> — el total que se le cobra al socio, calculado automáticamente sumando la alícuota al precio de lista (precio × (1 + alícuota)).</li><li><strong>Precio s/IVA</strong> — el precio de lista que cargaste (sin impuesto). La línea "s/IVA" solo aparece cuando la alícuota es mayor a 0; si la tarifa es <strong>Exento / No gravado</strong> (0 %), no se muestra.</li></ul>
-<p><strong>Estados de una tarifa:</strong> <strong>Activa</strong>; <strong>Vencida</strong> (en ámbar, si pasó su fecha de vencimiento); <strong>Pausada</strong>; o <strong>Inactiva</strong>. Con el botón <strong>Pausar</strong> dejás de aplicar una tarifa sin borrarla, y con <strong>Reactivar</strong> la volvés a habilitar — si hay socios con ese servicio contratado, el sistema te los muestra a modo informativo antes de confirmar, pero <strong>no bloquea</strong> la pausa (a esos socios no les afecta, siguen facturándose igual; solo deja de poder contratarse de nuevo mientras esté pausada). Cambiar el <strong>Estado</strong> a "Inactivo" desde Editar es más restrictivo: <strong>si hay socios con el servicio contratado, no se puede</strong> — hay que darlos de baja primero. Una tarifa Pausada o Inactiva deja de generar cargos nuevos (el cron mensual la salta, no se puede cargar manualmente por "Cargar Servicio", y no aparece en los selectores para asignarla a un espacio o socio nuevo).</p>
+<p><strong>Estados de una tarifa:</strong> <strong>Activa</strong>; <strong>Vencida</strong> (en ámbar, si pasó su fecha de vencimiento); <strong>Pausada</strong>; o <strong>Inactiva</strong>. Con el botón <strong>Pausar</strong> dejás de aplicar una tarifa sin borrarla, y con <strong>Reactivar</strong> la volvés a habilitar — si hay socios con ese servicio contratado, el sistema te los muestra a modo informativo antes de confirmar, pero <strong>no bloquea</strong> la pausa (a esos socios no les afecta, siguen facturándose igual; solo deja de poder contratarse de nuevo mientras esté pausada). Cambiar el <strong>Estado</strong> a "Inactivo" desde Editar es más restrictivo: <strong>si hay socios con el servicio contratado, no se puede</strong> — hay que darlos de baja primero.</p>
+
+<p><strong>Para generar cargos nuevos, una tarifa tiene que estar Activa Y vigente al día de hoy.</strong> Si no cumple las dos cosas, deja de generarlos: el cron mensual la salta, no se puede cargar por "Cargar Servicio" y no aparece en los selectores para asignarla a un espacio o socio nuevo. Eso incluye:</p>
+
+<ul><li>las <strong>Pausadas</strong> e <strong>Inactivas</strong>, y</li><li>las <strong>Vencidas</strong> — aunque el estado siga diciendo "Activa", si la fecha de <strong>Vencimiento</strong> ya pasó (o la <strong>Vigencia desde</strong> todavía no llegó), no genera cargos. Es la causa más fácil de pasar por alto cuando un servicio "dejó de facturarse solo": revisá primero las fechas de vigencia de su tarifa.</li></ul>
+<blockquote>Esto <strong>no borra la deuda ya generada</strong>: los cargos que existían se siguen facturando y cobrando normalmente. Solo deja de crear cargos nuevos.</blockquote>
 
 <h3>Crear una tarifa</h3>
 
@@ -935,11 +959,19 @@
 
 <h2>13. Mi perfil</h2>
 
-<p>Desde <strong>Mi perfil</strong> administrás los datos de tu club y las integraciones.</p>
+<p>Desde <strong>Mi perfil</strong> administrás los datos de tu club y las integraciones. Tiene hasta <strong>cinco pestañas</strong>:<table></p>
+
+<thead><table><tbody><tr><th>Pestaña</th><th>Qué hay ahí</th></tr></tbody></table></thead><tbody><table><tbody><tr><td>-----------------------</td><td>----------------------------------------------------------------------------------------------</td></tr>
+<tr><td><strong>Información general</strong></td><td>Datos del club, día de facturación, horarios de atención y fotos</td></tr>
+<tr><td><strong>Datos impositivos</strong></td><td>Punto de venta, certificado ARCA, centros emisores, gestión de cobranza y período de anulación</td></tr>
+<tr><td><strong>Equipo</strong></td><td>Personal del club con acceso al panel o a la app</td></tr>
+<tr><td><strong>Plan</strong></td><td>Plan actual y cambio de plan</td></tr>
+<tr><td><strong>Payway</strong></td><td>Credenciales para el débito automático (ver capítulo 14)</td></tr></tbody></table></tbody></table>
+<blockquote><strong>La pestaña "Datos impositivos" no está desde el primer día.</strong> Aparece recién cuando el club tiene <strong>los datos básicos completos</strong> (nombre, dirección y email) <strong>y el Punto de Venta ya configurado</strong>. Hasta entonces todo ese contenido se ve <strong>dentro de Información general</strong>, debajo de las fotos del club — así que si este manual te manda a "Mi perfil → Datos Impositivos" y no ves esa pestaña, buscá la sección al final de Información general.</blockquote>
 
 <h3>Pestaña: Información general</h3>
 
-<p>Datos básicos del club y configuración de facturación, todo en una sola pestaña.</p>
+<p>Datos básicos del club y configuración de facturación.</p>
 
 <p><strong>Datos del club:</strong></p>
 
@@ -955,7 +987,7 @@
 
 <p><strong>Datos Impositivos:</strong></p>
 
-<p>Configurá aquí el Punto de Venta para poder emitir facturas electrónicas. Antes de configurarlo, esta sección aparece debajo de las fotos; una vez configurado el POS, pasa a una <strong>pestaña propia "Datos impositivos"</strong>.</p>
+<p>Configurá aquí el Punto de Venta para poder emitir facturas electrónicas. Mientras falte completar los datos básicos del club o el Punto de Venta, esta sección se ve <strong>acá mismo, debajo de las fotos</strong>; cuando las dos cosas estén listas pasa a su <strong>pestaña propia "Datos impositivos"</strong> (ver el cuadro al principio del capítulo).</p>
 
 <p><em>Paso 1 — Configurar el Punto de Venta:</em></p>
 
