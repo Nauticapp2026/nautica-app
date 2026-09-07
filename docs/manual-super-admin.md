@@ -15,9 +15,10 @@ Guía paso a paso para gestionar la plataforma NauticApp desde el panel de super
 5. [Comunicaciones](#5-comunicaciones)
 6. [Publicidades](#6-publicidades)
 7. [Moderación](#7-moderación)
-8. [Notificaciones push](#8-notificaciones-push)
-9. [Pricing](#9-pricing)
-10. [Términos y Condiciones](#10-términos-y-condiciones)
+8. [Salidas](#8-salidas)
+9. [Notificaciones push](#9-notificaciones-push)
+10. [Pricing](#10-pricing)
+11. [Términos y Condiciones](#11-términos-y-condiciones)
 
 ---
 
@@ -25,7 +26,7 @@ Guía paso a paso para gestionar la plataforma NauticApp desde el panel de super
 
 1. Ingresá a **www.nauticapp.club** con tu cuenta de super admin.
 2. El panel super admin se encuentra en **/super-admin**. Si tu cuenta tiene el flag de super admin activado, el sistema te redirige automáticamente.
-3. La navegación lateral muestra las secciones: Inicio, Guarderías, Usuarios, Comunicaciones, Publicidades, Notificaciones, Moderación, Pricing y Términos.
+3. La navegación lateral muestra las secciones: Inicio, Guarderías, Usuarios, Comunicaciones, Publicidades, Moderación, Salidas, Notificaciones, Pricing y Términos.
 
 ---
 
@@ -250,24 +251,64 @@ Hacé clic en **Ver** para abrir el modal con eslora, manga, precio, expensas, s
 
 ---
 
-## 8. Notificaciones push
+## 8. Salidas
+
+Registro de **todas las salidas de embarcaciones de todos los clubes** de la plataforma, en una sola pantalla. Está pensada para responder pedidos de **Prefectura**: quién salió, cuándo, con cuánta gente a bordo y si volvió.
+
+Es la única sección donde los datos de los clubes se ven **cruzados** a propósito; el resto del panel respeta la separación por club.
+
+### Filtrar
+
+- **Buscador** — por socio, embarcación o matrícula.
+- **Club** — el desplegable lista todos los clubes con salidas registradas.
+- **Estado** — Navegando / Arribó / Programada / Cancelada.
+- **Desde / Hasta** — rango de fechas.
+
+El botón de limpiar resetea todos los filtros de una.
+
+### Columnas
+
+Club, Socio, Embarcación, Matrícula, **Salida**, **Regreso previsto**, **Arribo**, **A bordo**, Teléfono y Estado.
+
+- **A bordo** — las personas que viajan. Cada nombre puede venir con un acompañante o varios: se muestra como **"Pedro + 5"**, que significa Pedro más 5 personas más con él. Si no declaró acompañantes, va solo el nombre.
+- **Arribo** — queda vacío mientras la embarcación está navegando.
+- **Estado** — **Navegando** (salió y no volvió), **Arribó**, **Programada** (cargada pero todavía no zarpó) y **Cancelada** (la salida se dio de baja antes de zarpar).
+
+> Los horarios se muestran en hora de Argentina.
+
+### Descargar el Excel
+
+El botón **Descargar Excel** baja la planilla con **los mismos filtros** que tenés aplicados en pantalla — es lo que se le entrega a Prefectura.
+
+> La tabla en pantalla muestra **solo las salidas más recientes** cuando hay muchas (te lo avisa arriba de la tabla), pero **el Excel trae todas** las que cumplen los filtros. Si vas a entregar el listado, descargá el Excel; no cuentes las filas de la pantalla.
+
+---
+
+## 9. Notificaciones push
 
 Enviá notificaciones push a los usuarios de la app mobile de toda la plataforma, segmentadas por audiencia.
 
 ### Cómo funcionan
 
-Al enviar, la notificación sale en el momento a todos los dispositivos de la audiencia elegida que tengan la app instalada y hayan dado permiso de notificaciones. Si alguna queda en estado **pendiente** o **fallida**, el sistema la reintenta automáticamente una vez por día.
+Podés enviarla **en el momento** o **programarla** para un día y turno.
+
+Sale a todos los dispositivos de la audiencia elegida que tengan la app instalada y hayan dado permiso de notificaciones.
+
+> **Una notificación se envía una sola vez.** Si la entrega falla, queda marcada **Fallida** y **no se reintenta**: si la querés mandar igual, creá una nueva. Es a propósito — un reintento automático puede terminar en la pantalla del usuario dos veces.
 
 ### Métricas de estado (notificaciones de plataforma)
 
-Las cuatro tarjetas superiores muestran un resumen de las notificaciones de plataforma enviadas desde este panel:
+Las tarjetas superiores muestran un resumen de las notificaciones de plataforma enviadas desde este panel:
 
-| Tarjeta    | Qué mide                                    |
-| ---------- | ------------------------------------------- |
-| Total      | Cantidad total de notificaciones creadas    |
-| Pendientes | Notificaciones que aún no fueron entregadas |
-| Enviadas   | Notificaciones entregadas correctamente     |
-| Fallidas   | Notificaciones con error de entrega         |
+| Tarjeta     | Qué mide                                                    |
+| ----------- | ----------------------------------------------------------- |
+| Total       | Cantidad total de notificaciones creadas                    |
+| Programadas | Creadas con fecha futura, esperando su turno de envío       |
+| Pendientes  | Ya les llegó el momento de salir y todavía no se entregaron |
+| Enviadas    | Notificaciones entregadas correctamente                     |
+| Fallidas    | Notificaciones con error de entrega (no se reintentan)      |
+
+> **Programada** y **Pendiente** no son lo mismo: una programada para el mes que viene está esperando su fecha y todo está bien. Una pendiente ya debería haber salido.
 
 ### Métricas de engagement (notificaciones transaccionales)
 
@@ -282,7 +323,7 @@ La segunda fila de tarjetas muestra el comportamiento de los usuarios con las no
 
 ### Ver notificaciones enviadas
 
-Las notificaciones aparecen en tarjetas con: título, cuerpo, estado (Pendiente / Enviada / Fallida), audiencia, fecha y autor. Si una notificación falló, se muestra el mensaje de error.
+Las notificaciones aparecen en tarjetas con: título, cuerpo, estado (Programada / Pendiente / Enviada / Fallida), audiencia, fecha y autor. Las programadas que todavía no salieron muestran **"Programada para \<fecha y hora\>"**. Si una notificación falló, se muestra el mensaje de error.
 
 ### Enviar una notificación
 
@@ -301,15 +342,26 @@ Las notificaciones aparecen en tarjetas con: título, cuerpo, estado (Pendiente 
      | Solo plan Premium                 | Usuarios en clubes con plan Premium              |
      | Solo plan Élite                   | Usuarios en clubes con plan Élite                |
 
-3. Hacé clic en **Enviar notificación**. La entrega es inmediata.
+3. Si la querés **programar**, tildá la opción de programar y elegí:
+   - **Día** — la fecha de envío.
+   - **Turno** — **Mañana (8:00)**, **Tarde (14:00)** o **Noche (20:00)**, en hora de Argentina.
+
+   Sin tildar nada, la entrega es **inmediata**.
+
+4. Hacé clic en **Enviar notificación** (o **Programar**, según lo que hayas elegido).
+
+> **Por qué turnos y no una hora exacta.** El sistema despacha las programadas en tres corridas por día (8, 14 y 20 hs de Argentina). Elegir "Tarde" significa "en la corrida de las 14", no las 14:00 al segundo. Si necesitás precisión de minutos, mandala a mano en el momento.
 
 ### Eliminar una notificación del historial
 
-Hacé clic en el ícono de basura (rojo) en la tarjeta de la notificación. Esto solo la borra del historial del panel; no revoca la notificación ya entregada.
+Hacé clic en el ícono de basura (rojo) en la tarjeta de la notificación.
+
+- Si la notificación **ya salió**, solo se borra del historial del panel; no revoca lo que ya llegó a los dispositivos.
+- Si está **programada y todavía no salió**, borrarla **cancela el envío** — el sistema te lo avisa en la confirmación.
 
 ---
 
-## 9. Pricing
+## 10. Pricing
 
 Editor de planes y features que se muestra en la landing pública, en el onboarding y en el panel de cada club.
 
@@ -358,7 +410,7 @@ La tabla de features muestra todas las funcionalidades en filas agrupadas por ca
 
 ---
 
-## 10. Términos y Condiciones
+## 11. Términos y Condiciones
 
 Gestión del historial de versiones de los Términos y Condiciones de NauticApp.
 

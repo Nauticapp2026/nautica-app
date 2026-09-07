@@ -385,4 +385,14 @@ processFile(
   'Guía para configurar el débito automático mensual con Payway en NauticApp.'
 );
 
+// Faltaba en esta lista, así que su PDF quedaba viejo cada vez que se editaba
+// el .md (el que estaba publicado era de junio). Se agrega para que los tres
+// manuales se regeneren siempre juntos.
+processFile(
+  'manual-super-admin.md',
+  'manual-super-admin',
+  'Manual del Super Admin',
+  'Guía para gestionar la plataforma NauticApp desde el panel de super administración.'
+);
+
 console.log('\nListo.');
