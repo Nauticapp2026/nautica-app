@@ -344,6 +344,12 @@ export default async function SocioPage({
       .select({
         paywayPublicKey: guarderias.paywayPublicKey,
         mediosCobroInternos: guarderias.mediosCobroInternos,
+        // Membrete del Estado de cuenta (mismo criterio que el mail del
+        // recibo: razón social si la tiene, si no el nombre del club).
+        nombre: guarderias.nombre,
+        razonSocial: guarderias.razonSocial,
+        cuit: guarderias.cuit,
+        direccion: guarderias.direccion,
       })
       .from(guarderias)
       .where(eq(guarderias.id, gId))
@@ -649,6 +655,11 @@ export default async function SocioPage({
       ncPorAplicar={ncPorAplicar}
       paywayPublicKey={guarderiaRow[0]?.paywayPublicKey ?? null}
       internosHabilitados={(guarderiaRow[0]?.mediosCobroInternos ?? []).length > 0}
+      club={{
+        nombre: guarderiaRow[0]?.razonSocial ?? guarderiaRow[0]?.nombre ?? 'Club',
+        cuit: guarderiaRow[0]?.cuit ?? null,
+        direccion: guarderiaRow[0]?.direccion ?? null,
+      }}
       debitoInternoHabilitado={(guarderiaRow[0]?.mediosCobroInternos ?? []).includes(
         'debito_automatico',
       )}

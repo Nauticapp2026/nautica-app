@@ -274,6 +274,13 @@ Al aplicar **cualquier filtro**, la tercera tarjeta (la del saldo) se **oculta**
 
 **Exportar.** El botón **Exportar**, arriba a la derecha, abre un menú para elegir el formato — **Excel**, **PDF** o **CSV** — y baja **los movimientos que estás viendo**: respeta los filtros y el orden aplicados, y trae las mismas columnas que la tabla, con los mismos signos. Ver "Formatos de exportación" en la sección Ventas para qué conviene en cada caso.
 
+**Estado de cuenta (imprimir o enviar por mail).** Al lado de Exportar está el botón **Estado de cuenta**, con dos opciones:
+
+- **Imprimir** — abre en una pestaña nueva un PDF con membrete (nombre y CUIT del club, datos del socio, fecha de emisión, período), la tabla de movimientos y un resumen con **Ventas**, **Cobranzas** y el **Saldo** final. Desde ahí lo imprimís o lo guardás. Si el navegador bloquea la pestaña, el PDF se descarga directamente.
+- **Enviar por mail** — abre una ventana con el **destinatario** (viene cargado el email de facturación del socio o, si no tiene, el de su cuenta; se puede cambiar) y un **mensaje opcional** que va en el cuerpo del mail. Al confirmar, el socio recibe un mail con el resumen y el **mismo PDF adjunto**.
+
+> Los dos usan **los movimientos que estás viendo en la tabla**, con los filtros aplicados. Si querés mandarle al socio solo un mes, filtrá por fecha primero: el PDF dice qué período cubre. Sin filtros, dice "Todos los movimientos".
+
 **Ordenar por fecha.** Hacé clic en el encabezado **Fecha** para alternar el orden de los movimientos entre **más nuevo primero** (por defecto) y **más antiguo primero**. La flechita del encabezado indica el orden actual.
 
 **Columnas de la tabla.** En orden: **Fecha**, **Tipo de comprobante**, **Nº Comprobante**, **Nº de operación**, **Detalle**, **Vencimiento**, **Situación**, **Ventas**, **Cobranzas**, **Saldo**, **Importe pendiente** y **Estado**.

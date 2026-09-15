@@ -30,6 +30,9 @@ import {
   Upload,
   UserCheck,
   X,
+  ChevronDown,
+  Mail,
+  Printer,
 } from 'lucide-react';
 import { cargarServicioAction, obtenerPdfFacturaAction } from '@/app/actions/facturacion';
 import {
@@ -63,6 +66,18 @@ import { buscarRankeado } from '@/lib/buscador';
 import { esCodigoReciboCobranza } from '@/lib/recibo-codigos';
 import { exportarTabla, type FormatoExportacion } from '@/lib/exportar-tabla';
 import { ExportarMenu } from '@/components/shared/exportar-menu';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  blobABase64,
+  generarEstadoCuentaPdf,
+  nombreArchivoEstadoCuenta,
+} from '@/lib/estado-cuenta-pdf';
+import { enviarEstadoCuentaAction } from '@/app/actions/estado-cuenta';
 import { calcularSaldoYEstado } from '@/lib/cuenta-corriente-saldo';
 import { formatArgentinaDate, formatArgentinaDateTime, formatNaiveDateTime } from '@/lib/dates';
 import { escribirTabEnUrl, type SocioTabId } from '@/lib/tab-url';
@@ -1929,6 +1944,7 @@ export function SocioDetail({
   internosHabilitados = true,
   debitoInternoHabilitado = true,
   saldoAFavorDisponible = 0,
+  club,
   ncPorAplicar = 0,
   initialTab = TAB_POR_DEFECTO,
 }: {
@@ -1956,6 +1972,8 @@ export function SocioDetail({
   // número que Cobranzas ofrece aplicar al cobrar — no el neto crudo
   // (haber − debe), que da $0 en cuanto hay más deuda que crédito.
   saldoAFavorDisponible?: number;
+  /** Membrete del Estado de cuenta (PDF que se imprime o se manda por mail). */
+  club: { nombre: string; cuit: string | null; direccion: string | null };
   // Crédito en notas de crédito sin aplicar. Va aparte del disponible: no se
   // usa solo (se aplica a mano en Cobranzas) pero ES plata a favor del socio.
   ncPorAplicar?: number;
@@ -2176,6 +2194,103 @@ export function SocioDetail({
     setMotivoModal('editar');
   }
 
+  // ── Estado de cuenta: imprimir / enviar por mail ──────────────────────────
+  // El PDF se arma en el navegador con las MISMAS filas que la tabla (ver
+  // armarTablaCuentaCorriente) y el resumen que muestran las cards. Para el
+  // mail, ese mismo PDF viaja al server como adjunto: lo que el socio recibe es
+  // exactamente lo que el admin tenía en pantalla.
+  const [estadoCuentaModal, setEstadoCuentaModal] = useState(false);
+  const [estadoCuentaEmail, setEstadoCuentaEmail] = useState('');
+  const [estadoCuentaMensaje, setEstadoCuentaMensaje] = useState('');
+  const [generandoEstado, setGenerandoEstado] = useState(false);
+  const [enviandoEstado, startEnviandoEstado] = useTransition();
+
+  function resumenEstadoCuenta() {
+    const deuda = saldoNeto > 0.005;
+    const aFavor = saldoNeto < -0.005;
+    return {
+      ventas: fmt(totalIngresos),
+      cobranzas: fmt(totalPagosACuenta),
+      saldo: aFavor ? `-${fmt(Math.abs(saldoNeto))}` : fmt(Math.abs(saldoNeto)),
+      saldoLabel: deuda ? 'Saldo deudor' : aFavor ? 'Saldo a favor' : 'Saldo',
+    };
+  }
+
+  async function generarPdfEstadoCuenta(): Promise<Blob> {
+    const { columnas, filas } = armarTablaCuentaCorriente();
+    return generarEstadoCuentaPdf({
+      club,
+      socio: {
+        nombre,
+        numeroSocio: socio.numeroSocio,
+        documento: socio.numeroDocumento,
+        email: socio.emailFacturacion?.trim() || socio.email,
+      },
+      periodo: { desde: ccFechaDesde || null, hasta: ccFechaHasta || null },
+      columnas,
+      filas,
+      resumen: resumenEstadoCuenta(),
+    });
+  }
+
+  async function imprimirEstadoCuenta() {
+    // La ventana se abre ANTES del await: si se abre después, el bloqueador de
+    // pop-ups la frena porque ya no la ve como respuesta directa al clic.
+    const ventana = window.open('', '_blank');
+    setGenerandoEstado(true);
+    try {
+      const blob = await generarPdfEstadoCuenta();
+      const url = URL.createObjectURL(blob);
+      if (ventana) {
+        ventana.location.href = url;
+      } else {
+        // Sin pop-up: se baja el archivo y el admin lo imprime desde ahí.
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = nombreArchivoEstadoCuenta(nombre);
+        a.click();
+        toast.message('El navegador bloqueó la ventana: se descargó el PDF para imprimirlo.');
+      }
+    } catch (err) {
+      ventana?.close();
+      console.error('[imprimirEstadoCuenta]', err);
+      toast.error('No se pudo generar el estado de cuenta.');
+    } finally {
+      setGenerandoEstado(false);
+    }
+  }
+
+  function abrirEnviarEstadoCuenta() {
+    setEstadoCuentaEmail(socio.emailFacturacion?.trim() || socio.email || '');
+    setEstadoCuentaMensaje('');
+    setEstadoCuentaModal(true);
+  }
+
+  function enviarEstadoCuenta() {
+    startEnviandoEstado(async () => {
+      try {
+        const blob = await generarPdfEstadoCuenta();
+        const res = await enviarEstadoCuentaAction({
+          socioId: socio.id,
+          email: estadoCuentaEmail.trim(),
+          mensaje: estadoCuentaMensaje.trim() || null,
+          pdfBase64: await blobABase64(blob),
+          nombreArchivo: nombreArchivoEstadoCuenta(nombre),
+          resumen: { ...resumenEstadoCuenta(), movimientos: movimientosFiltrados.length },
+        });
+        if (res.error) {
+          toast.error(res.error);
+          return;
+        }
+        setEstadoCuentaModal(false);
+        toast.success(`Estado de cuenta enviado a ${res.email}.`);
+      } catch (err) {
+        console.error('[enviarEstadoCuenta]', err);
+        toast.error('No se pudo generar el estado de cuenta.');
+      }
+    });
+  }
+
   const nombre = [socio.nombre, socio.apellido].filter(Boolean).join(' ') || socio.email;
   const inicial = (socio.nombre?.[0] ?? socio.email[0]).toUpperCase();
 
@@ -2236,13 +2351,15 @@ export function SocioDetail({
   const movimientosFiltrados = movimientosCalc.filter((m) => pasaFiltrosCC(m, m.estadoDisplay));
 
   /**
-   * Exportación de la Cuenta Corriente (CSV / Excel / PDF), con las MISMAS
-   * columnas y los mismos valores que la tabla — incluidos los signos, que acá
-   * tienen significado: una NC resta en Ventas y una anulación de recibo resta
-   * en Cobranzas. Exporta lo FILTRADO (no solo la página visible) y respeta el
-   * orden elegido.
+   * Columnas y filas de la Cuenta Corriente tal como se ven en la tabla —
+   * incluidos los signos, que acá tienen significado: una NC resta en Ventas y
+   * una anulación de recibo resta en Cobranzas. Sobre lo FILTRADO (no solo la
+   * página visible) y en el orden elegido.
+   *
+   * Es la ÚNICA fuente para exportar (CSV/Excel/PDF), imprimir y mandar por
+   * mail el estado de cuenta: los cuatro tienen que decir lo mismo.
    */
-  function exportarCuentaCorriente(formato: FormatoExportacion) {
+  function armarTablaCuentaCorriente(): { columnas: string[]; filas: string[][] } {
     const filas = (
       ccSortDir === 'asc' ? [...movimientosFiltrados].reverse() : movimientosFiltrados
     ).map((m) => {
@@ -2285,9 +2402,7 @@ export function SocioDetail({
       ];
     });
 
-    return exportarTabla(formato, {
-      nombre: `cuenta-corriente-${nombre.replace(/\s+/g, '-').toLowerCase()}`,
-      titulo: `Cuenta Corriente — ${nombre}`,
+    return {
       columnas: [
         'Fecha',
         'Tipo de comprobante',
@@ -2303,6 +2418,14 @@ export function SocioDetail({
         'Estado',
       ],
       filas,
+    };
+  }
+
+  function exportarCuentaCorriente(formato: FormatoExportacion) {
+    return exportarTabla(formato, {
+      nombre: `cuenta-corriente-${nombre.replace(/\s+/g, '-').toLowerCase()}`,
+      titulo: `Cuenta Corriente — ${nombre}`,
+      ...armarTablaCuentaCorriente(),
     });
   }
   const hayFiltrosCC = Boolean(ccFechaDesde || ccFechaHasta || ccEstado || ccTipoComp);
@@ -2437,6 +2560,90 @@ export function SocioDetail({
           </select>
         </div>
       </div>
+
+      {/* Enviar el estado de cuenta por mail: destinatario editable (arranca en
+          el mail de facturación o, si no tiene, el de la cuenta) y una nota
+          opcional que va en el cuerpo del mail. El PDF se genera al confirmar. */}
+      {estadoCuentaModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="flex w-full max-w-md flex-col rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-start justify-between p-6 pb-4">
+              <div>
+                <h2 className="text-[18px] font-bold" style={{ color: '#101828' }}>
+                  Enviar estado de cuenta
+                </h2>
+                <p className="mt-0.5 text-sm" style={{ color: '#669E9D' }}>
+                  {movimientosFiltrados.length}{' '}
+                  {movimientosFiltrados.length === 1 ? 'movimiento' : 'movimientos'}
+                  {hayFiltrosCC ? ' (con los filtros aplicados)' : ''} ·{' '}
+                  {resumenEstadoCuenta().saldoLabel} {resumenEstadoCuenta().saldo}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEstadoCuentaModal(false)}
+                disabled={enviandoEstado}
+                className="rounded-[8px] p-1 text-gray-400 hover:bg-gray-100"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="border-t border-gray-200" />
+            <div className="space-y-4 p-6">
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
+                  Enviar a
+                </label>
+                <input
+                  type="email"
+                  value={estadoCuentaEmail}
+                  onChange={(e) => setEstadoCuentaEmail(e.target.value)}
+                  placeholder="email@ejemplo.com"
+                  className="focus:border-ring focus:ring-ring/50 h-10 w-full rounded-[10px] border border-gray-200 px-3 text-sm text-[#101828] focus:ring-[3px] focus:outline-none"
+                />
+                {!socio.emailFacturacion?.trim() && !socio.email && (
+                  <p className="mt-1 text-xs text-amber-700">
+                    El socio no tiene email cargado: escribí a dónde mandarlo.
+                  </p>
+                )}
+              </div>
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
+                  Mensaje <span className="font-normal text-gray-400">(opcional)</span>
+                </label>
+                <textarea
+                  value={estadoCuentaMensaje}
+                  onChange={(e) => setEstadoCuentaMensaje(e.target.value)}
+                  maxLength={1000}
+                  rows={3}
+                  placeholder="Ej. Te recordamos que la cuota de septiembre vence el 30."
+                  className="focus:border-ring focus:ring-ring/50 w-full resize-none rounded-[10px] border border-gray-200 px-3 py-2 text-sm text-[#101828] focus:ring-[3px] focus:outline-none"
+                />
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEstadoCuentaModal(false)}
+                  disabled={enviandoEstado}
+                  className="flex-1 rounded-[10px] border border-gray-200 bg-white py-2.5 text-sm font-medium text-gray-600 transition hover:bg-gray-50 disabled:opacity-60"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={enviarEstadoCuenta}
+                  disabled={enviandoEstado || !estadoCuentaEmail.trim()}
+                  className="flex flex-1 items-center justify-center gap-2 rounded-[10px] py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
+                  style={{ background: '#175861' }}
+                >
+                  <Mail className="h-4 w-4" />
+                  {enviandoEstado ? 'Enviando…' : 'Enviar'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Motivo de la baja: se pide al pasar a Inactivo (opcional) y se puede
           editar después sin mover la fecha. Mismo patrón visual que el resto de
@@ -2938,12 +3145,50 @@ export function SocioDetail({
                 Limpiar
               </button>
             )}
-            {/* Exporta lo FILTRADO, no solo la página que se ve. */}
-            <ExportarMenu
-              onExportar={exportarCuentaCorriente}
-              disabled={movimientosFiltrados.length === 0}
-              className="ml-auto flex h-9 items-center gap-1.5 rounded-[8px] border border-gray-200 bg-white px-3 text-sm font-medium text-gray-600 transition hover:bg-gray-50 disabled:opacity-40"
-            />
+            <div className="ml-auto flex items-center gap-2">
+              {/* Estado de cuenta: el documento con membrete, para imprimir o
+                  mandarle al socio. Usa las mismas filas filtradas que la
+                  tabla y que Exportar. */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    disabled={movimientosFiltrados.length === 0 || generandoEstado}
+                    className="flex h-9 items-center gap-1.5 rounded-[8px] border border-gray-200 bg-white px-3 text-sm font-medium text-gray-600 transition hover:bg-gray-50 disabled:opacity-40"
+                  >
+                    <FileText className="h-4 w-4" />
+                    <span className="hidden sm:inline">
+                      {generandoEstado ? 'Generando…' : 'Estado de cuenta'}
+                    </span>
+                    <ChevronDown className="h-3.5 w-3.5 opacity-60" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onSelect={() => void imprimirEstadoCuenta()}>
+                    <Printer className="h-4 w-4 text-gray-500" />
+                    <div className="flex flex-col">
+                      <span className="text-sm font-medium">Imprimir</span>
+                      <span className="text-xs text-gray-500">Abre el PDF listo para imprimir</span>
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={abrirEnviarEstadoCuenta}>
+                    <Mail className="h-4 w-4 text-gray-500" />
+                    <div className="flex flex-col">
+                      <span className="text-sm font-medium">Enviar por mail</span>
+                      <span className="text-xs text-gray-500">
+                        Se lo manda al socio con el PDF adjunto
+                      </span>
+                    </div>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              {/* Exporta lo FILTRADO, no solo la página que se ve. */}
+              <ExportarMenu
+                onExportar={exportarCuentaCorriente}
+                disabled={movimientosFiltrados.length === 0}
+                className="flex h-9 items-center gap-1.5 rounded-[8px] border border-gray-200 bg-white px-3 text-sm font-medium text-gray-600 transition hover:bg-gray-50 disabled:opacity-40"
+              />
+            </div>
           </div>
 
           {/* Metric cards. La card de Saldo se oculta cuando hay filtros aplicados:
