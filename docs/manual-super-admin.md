@@ -88,6 +88,26 @@ El botón de estado en la columna **Estado** muestra **Activa** (verde) o **Pend
 2. Leé el resumen de lo que se va a borrar: memberships, espacios y embarcaciones.
 3. Confirmá para proceder.
 
+### Resetear una guardería (dejarla de cero)
+
+Para **clubes de prueba**: borra toda la operación pero el club sigue existiendo con su configuración, como recién salido del onboarding. Sirve para volver a empezar una demo o una carga sin crear el club de nuevo.
+
+1. Hacé clic en **Resetear** (ámbar) en la fila de la guardería.
+2. Leé el detalle y **escribí el nombre exacto del club** para confirmar. Sin el nombre exacto no hace nada.
+3. Al terminar, un resumen te dice cuántos socios, comprobantes, movimientos y archivos se borraron.
+
+| Se borra                                                                                                                                                                                                                                                                                                                                               | Se conserva                                                                                                                                                                                                                                 |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Socios **y sus cuentas**, embarcaciones, toda la estructura de espacios (áreas, marinas, naves, pisos, espacios), tarifario, servicios contratados, cuenta corriente, comprobantes, cobranzas, débitos Payway y tarjetas, tareas, salidas, lavados, invitados y accesos, solicitudes, comunicaciones, mails masivos y publicaciones (con sus archivos) | El club y su configuración: datos impositivos, centros emisores, plan e historial de plan, horarios, credenciales Payway, fotos, período de anulación. El **equipo** completo (admins, operarios, seguridad) y sus invitaciones pendientes. |
+
+**La numeración vuelve a 1**: el próximo recibo es RC-000001 / RI-000001, el próximo comprobante interno CM-000001, y el próximo socio es el #1.
+
+> **No se puede resetear un club si alguno de sus socios también es socio de otro club.** La cuenta corriente cuelga del socio, no del club, y borrarla le borraría también la del otro club. El botón avisa quién es y no hace nada.
+
+> **Facturas ARCA:** el reset borra el registro local de las facturas aunque ARCA las tenga aceptadas. Por eso es una herramienta para clubes de **prueba**. En un club real con facturas emitidas, no usarlo.
+
+> Esta acción es **irreversible**. Si querés borrar el club entero, usá **Eliminar**.
+
 ---
 
 ## 4. Usuarios

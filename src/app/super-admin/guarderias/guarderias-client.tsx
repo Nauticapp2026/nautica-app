@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState, useTransition } from 'react';
-import { ChevronDown, ChevronRight, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, RotateCcw, Trash2 } from 'lucide-react';
 
 import { buscarRankeado } from '@/lib/buscador';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import {
   deleteGuarderiaAction,
+  resetGuarderiaAction,
   setGuarderiaActivaAction,
 } from '@/app/actions/super-admin/guarderias';
 
@@ -151,6 +152,43 @@ function GuarderiaFila({
     });
   }
 
+  // Reset "de cero": conserva la configuración y borra la operación. Es
+  // irreversible, así que la confirmación es escribir el nombre del club (un
+  // confirm() de un click no alcanza para algo que borra socios y comprobantes).
+  function handleReset() {
+    const tipeado = prompt(
+      `RESETEAR "${guarderia.nombre}" — deja el club como recién creado.\n\n` +
+        `Se BORRAN: socios y sus cuentas, embarcaciones, espacios, tarifario, servicios contratados, ` +
+        `cuenta corriente, comprobantes, cobranzas, débitos Payway, tareas, salidas, ` +
+        `comunicaciones y publicaciones. La numeración de comprobantes vuelve a 1.\n\n` +
+        `Se CONSERVAN: equipo, datos impositivos, centros emisores, plan, horarios y configuración.\n\n` +
+        `Esta acción no se puede deshacer. Para confirmar, escribí el nombre exacto del club:`,
+    );
+    if (tipeado == null) return;
+    onError(null);
+    startTransition(async () => {
+      const res = await resetGuarderiaAction({ guarderiaId: guarderia.id, confirmacion: tipeado });
+      if (res.error) {
+        onError(res.error);
+        return;
+      }
+      const r = res.resumen!;
+      const comprobantes = r.porTabla.find((t) => t.tabla === 'facturacion')?.filas ?? 0;
+      const movimientos =
+        r.porTabla.find((t) => t.tabla === 'movimientos_cuenta_corriente')?.filas ?? 0;
+      alert(
+        `"${guarderia.nombre}" quedó de cero.\n\n` +
+          `Socios desvinculados: ${r.socios} (cuentas borradas: ${r.cuentasBorradas}` +
+          (r.perfilesConservados.length
+            ? `, conservadas por ser super admin: ${r.perfilesConservados.length}`
+            : '') +
+          `)\nComprobantes: ${comprobantes}\nMovimientos de cuenta corriente: ${movimientos}\n` +
+          `Archivos borrados: ${r.archivosBorrados}` +
+          (r.advertencias.length ? `\n\nAdvertencias:\n- ${r.advertencias.join('\n- ')}` : ''),
+      );
+    });
+  }
+
   function handleToggleActiva() {
     const nuevaActiva = !guarderia.activa;
     const verbo = nuevaActiva ? 'activar' : 'desactivar';
@@ -232,17 +270,33 @@ function GuarderiaFila({
           {formatDate(guarderia.createdAt)}
         </td>
         <td className="px-4 py-3 text-right">
-          <Button
-            type="button"
-            variant="outline"
-            size="xs"
-            onClick={handleDelete}
-            disabled={filaPending}
-            className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
-          >
-            <Trash2 />
-            Eliminar
-          </Button>
+          <div className="inline-flex items-center gap-2">
+            {/* Ámbar y no rojo: es destructivo pero el club sigue existiendo.
+                El rojo queda para Eliminar. */}
+            <Button
+              type="button"
+              variant="outline"
+              size="xs"
+              onClick={handleReset}
+              disabled={filaPending}
+              title="Borrar toda la operación del club y dejarlo como recién creado"
+              className="border-amber-200 text-amber-700 hover:bg-amber-50 hover:text-amber-800"
+            >
+              <RotateCcw />
+              Resetear
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="xs"
+              onClick={handleDelete}
+              disabled={filaPending}
+              className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+            >
+              <Trash2 />
+              Eliminar
+            </Button>
+          </div>
         </td>
       </tr>
       {open && hasHistorial && (
