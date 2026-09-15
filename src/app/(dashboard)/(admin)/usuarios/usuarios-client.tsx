@@ -24,6 +24,7 @@ import {
 import { createSocioAction, uploadSocioDocumentoAction } from '@/app/actions/socios';
 import { normalizarBusqueda } from '@/lib/buscador';
 import { formatArgentinaDate } from '@/lib/dates';
+import type { SocioTabId } from '@/lib/tab-url';
 import { EmptyState } from '@/components/shared/empty-state';
 import { Pagination } from '@/components/shared/pagination';
 import { ImportSociosModal } from './import-socios-modal';
@@ -902,6 +903,18 @@ export function UsuariosClient({
     });
   }
 
+  /**
+   * Abre la ficha del socio, opcionalmente en una solapa puntual.
+   *
+   * La solapa viaja en la query string porque así es como la ficha decide cuál
+   * mostrar en el primer render (ver src/lib/tab-url.ts): el Server Component
+   * lee `?tab=` y lo pasa como prop, así no hay parpadeo de "abre Generales y
+   * después salta". Pasar un id inválido no rompe — la ficha cae en Generales.
+   */
+  function abrirFicha(profileId: string, tab?: SocioTabId) {
+    router.push(tab ? `/usuarios/${profileId}?tab=${tab}` : `/usuarios/${profileId}`);
+  }
+
   function clearFiltro() {
     setFiltro(null);
     router.replace('/usuarios');
@@ -1221,7 +1234,7 @@ export function UsuariosClient({
                               className={`cursor-pointer border-t border-gray-100 transition hover:bg-gray-50/80 ${
                                 isExpanded ? 'bg-gray-50/40' : ''
                               }`}
-                              onClick={() => router.push(`/usuarios/${s.profileId}`)}
+                              onClick={() => abrirFicha(s.profileId)}
                             >
                               <td className="w-10 px-4 py-3">
                                 <button
@@ -1258,7 +1271,22 @@ export function UsuariosClient({
                                   {s.email}
                                 </p>
                               </td>
-                              <td className="px-4 py-3 text-gray-500">{s.embarcacion ?? '—'}</td>
+                              {/* Atajo a la solapa Embarcación de la ficha (pedido
+                                  del cliente 2026-09-15). Sigue abriendo la ficha
+                                  como el resto de la fila, solo que en la solapa
+                                  que corresponde a lo que el usuario clickeó. */}
+                              <td
+                                className="px-4 py-3 text-gray-500"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  abrirFicha(s.profileId, 'embarcacion');
+                                }}
+                                title="Ver la embarcación del socio"
+                              >
+                                <span className="hover:text-[#175861] hover:underline">
+                                  {s.embarcacion ?? '—'}
+                                </span>
+                              </td>
                               <td className="px-4 py-3 text-gray-500">{s.ubicacion ?? '—'}</td>
                               <td className="px-4 py-3 text-center">
                                 {s.membershipStatus === 'inactivo' ? (
@@ -1294,13 +1322,20 @@ export function UsuariosClient({
                                       ? '#15803d'
                                       : '#667085',
                                 }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  abrirFicha(s.profileId, 'cuenta-corriente');
+                                }}
+                                title="Ver la cuenta corriente del socio"
                               >
-                                ${(tieneDeuda ? deuda : creditoSinUsar).toLocaleString('es-AR')}
-                                {!tieneDeuda && creditoSinUsar > 0.005 && (
-                                  <span className="ml-1 text-xs font-normal text-green-600">
-                                    a favor
-                                  </span>
-                                )}
+                                <span className="hover:underline">
+                                  ${(tieneDeuda ? deuda : creditoSinUsar).toLocaleString('es-AR')}
+                                  {!tieneDeuda && creditoSinUsar > 0.005 && (
+                                    <span className="ml-1 text-xs font-normal text-green-600">
+                                      a favor
+                                    </span>
+                                  )}
+                                </span>
                               </td>
                               <td
                                 className="px-4 py-3 text-right"
