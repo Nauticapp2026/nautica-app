@@ -883,7 +883,6 @@ export function UsuariosClient({
   initialFiltro?: FiltroSocios | null;
 }) {
   const router = useRouter();
-  const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [importEmbModalOpen, setImportEmbModalOpen] = useState(false);
@@ -977,13 +976,7 @@ export function UsuariosClient({
   }, [sortKey, sortDir]);
 
   const filtered = useMemo(() => {
-    const q = normalizarBusqueda(search.trim());
-    let base = q
-      ? socios.filter((s) => {
-          const nombre = normalizarBusqueda(`${s.nombre ?? ''} ${s.apellido ?? ''}`);
-          return nombre.includes(q) || normalizarBusqueda(s.email).includes(q);
-        })
-      : socios.slice();
+    let base = socios.slice();
 
     if (filtro === 'morosos') {
       base = base.filter((s) => s.estadoSocio === 'moroso');
@@ -995,17 +988,22 @@ export function UsuariosClient({
       base = base.filter((s) => s.avisoVencimiento === 'vencida');
     }
 
-    // Filtros por columna (se combinan entre sí y con el buscador).
+    // Tres filtros que se combinan entre sí: Nombre, Nº socio y Embarcación.
+    // Antes había además un buscador general "por nombre o email" que se
+    // pisaba con el filtro Nombre (pedido del cliente 2026-09-15: "está
+    // repetido"). El de Nombre absorbió el email para no perder esa búsqueda.
+    const fNom = normalizarBusqueda(colNombre.trim());
+    if (fNom) {
+      base = base.filter(
+        (s) =>
+          normalizarBusqueda(`${s.nombre ?? ''} ${s.apellido ?? ''}`).includes(fNom) ||
+          normalizarBusqueda(s.email).includes(fNom),
+      );
+    }
     const fNum = colNumero.trim().toLowerCase();
     if (fNum) {
       base = base.filter((s) =>
         (s.numeroSocio != null ? String(s.numeroSocio) : '').includes(fNum),
-      );
-    }
-    const fNom = normalizarBusqueda(colNombre.trim());
-    if (fNom) {
-      base = base.filter((s) =>
-        normalizarBusqueda(`${s.nombre ?? ''} ${s.apellido ?? ''}`).includes(fNom),
       );
     }
     const fEmb = normalizarBusqueda(colEmbarcacion.trim());
@@ -1051,14 +1049,14 @@ export function UsuariosClient({
       return sortDir === 'asc' ? result : -result;
     });
     return base;
-  }, [socios, search, sortKey, sortDir, filtro, colNumero, colNombre, colEmbarcacion]);
+  }, [socios, sortKey, sortDir, filtro, colNumero, colNombre, colEmbarcacion]);
 
   // Paginación (10 por página). Volver a la página 1 cuando cambia el conjunto
   // filtrado: ajuste de estado en render (la key previa), en vez de setState
   // dentro de useEffect.
   const PAGE_SIZE = 10;
   const [page, setPage] = useState(1);
-  const filterKey = `${search}|${filtro ?? ''}|${sortKey ?? ''}|${sortDir}|${colNumero}|${colNombre}|${colEmbarcacion}`;
+  const filterKey = `${filtro ?? ''}|${sortKey ?? ''}|${sortDir}|${colNumero}|${colNombre}|${colEmbarcacion}`;
   const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
   if (filterKey !== prevFilterKey) {
     setPrevFilterKey(filterKey);
@@ -1087,29 +1085,26 @@ export function UsuariosClient({
         <div className="rounded-2xl border border-gray-200 bg-white">
           {/* Buscador + filtros por columna + botones */}
           <div className="flex flex-col gap-3 border-b border-gray-100 p-4 sm:flex-row sm:flex-wrap sm:items-center">
+            {/* Tres filtros, en este orden: Nombre / Nº socio / Embarcación.
+                El buscador general que había antes ("nombre o email") se pisaba
+                con el filtro Nombre; ahora Nombre es el buscador y también
+                encuentra por email. */}
             <div className="relative w-full sm:w-56">
               <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400" />
               <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Buscar por nombre o email..."
+                value={colNombre}
+                onChange={(e) => setColNombre(e.target.value)}
+                placeholder="Nombre"
+                aria-label="Filtrar por nombre o email"
                 className="h-10 w-full rounded-[10px] border border-gray-200 bg-white pr-4 pl-10 text-sm focus:border-[#175861] focus:ring-1 focus:ring-[#175861] focus:outline-none"
               />
             </div>
-            {/* Filtros por columna, al lado del buscador */}
             <input
               value={colNumero}
               onChange={(e) => setColNumero(e.target.value)}
               placeholder="Nº socio"
               aria-label="Filtrar por número de socio"
               className={`${colFilterCls} sm:w-24`}
-            />
-            <input
-              value={colNombre}
-              onChange={(e) => setColNombre(e.target.value)}
-              placeholder="Nombre"
-              aria-label="Filtrar por nombre"
-              className={`${colFilterCls} sm:w-36`}
             />
             <input
               value={colEmbarcacion}

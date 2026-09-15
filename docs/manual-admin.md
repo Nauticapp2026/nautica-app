@@ -97,8 +97,7 @@ Desde **Socios** en el menú lateral gestionás el padrón de socios de tu club.
 
 La tabla muestra: número de socio (#), nombre, email, embarcación asignada, ubicación, fecha de ingreso, estado y **Saldo**.
 
-- Usá la barra de búsqueda para filtrar por nombre o email.
-- Al lado del buscador hay **filtros por columna**: **Nº socio**, **Nombre** y **Embarcación**. Filtran en vivo a medida que escribís y se combinan entre sí y con el buscador.
+- Arriba de la tabla hay **tres filtros**, en este orden: **Nombre**, **Nº socio** y **Embarcación**. Filtran en vivo a medida que escribís y se combinan entre sí (por ejemplo, "Sienra" en Nombre y "Perla" en Embarcación). El de Nombre también encuentra al socio si escribís su **email**.
 - Podés ordenar la lista haciendo clic en los encabezados **#**, **Nombre**, **Embarcación** o **Ubicación** (ascendente o descendente).
 - La columna **Ingreso** muestra la fecha en que se incorporó el socio al club.
 - La columna **Saldo** muestra el saldo de la cuenta del socio: si **debe**, el monto adeudado; si tiene **saldo a favor** (pagó de más o cargó un adelanto), el monto en verde con la etiqueta **"a favor"**; si está en cero, **$0** en gris. Es **el mismo número** que la tarjeta de saldo de su ficha y que la última fila de su Cuenta Corriente. Podés ordenar por esta columna haciendo clic en su encabezado (de mayor deuda a mayor saldo a favor).
