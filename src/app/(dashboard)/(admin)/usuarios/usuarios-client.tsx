@@ -33,7 +33,7 @@ import { ASTILLEROS } from './astilleros';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-export type FiltroSocios = 'morosos' | 'docs-incompletas';
+export type FiltroSocios = 'morosos' | 'docs-incompletas' | 'facturas-vencidas';
 
 type InvitadoItem = {
   id: string;
@@ -76,6 +76,7 @@ type Socio = {
 const FILTRO_LABEL: Record<FiltroSocios, string> = {
   morosos: 'Socios con deuda 2+ meses',
   'docs-incompletas': 'Socios con documentación incompleta',
+  'facturas-vencidas': 'Socios con facturas vencidas',
 };
 
 function buildWhatsappUrl(telefono: string | null): string | null {
@@ -986,6 +987,10 @@ export function UsuariosClient({
       base = base.filter((s) => s.estadoSocio === 'moroso');
     } else if (filtro === 'docs-incompletas') {
       base = base.filter((s) => !s.docsCompletos);
+    } else if (filtro === 'facturas-vencidas') {
+      // Solo las YA vencidas (puntito rojo), no las que vencen hoy: es el
+      // mismo conjunto que cuenta la tarjeta del Dashboard.
+      base = base.filter((s) => s.avisoVencimiento === 'vencida');
     }
 
     // Filtros por columna (se combinan entre sí y con el buscador).

@@ -25,7 +25,9 @@ export default async function UsuariosPage({
 }) {
   const { filtro } = await searchParams;
   const initialFiltro: FiltroSocios | null =
-    filtro === 'morosos' || filtro === 'docs-incompletas' ? filtro : null;
+    filtro === 'morosos' || filtro === 'docs-incompletas' || filtro === 'facturas-vencidas'
+      ? filtro
+      : null;
 
   const ctx = await getActiveMarina();
   if (!ctx) return null;

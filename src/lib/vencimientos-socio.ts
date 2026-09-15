@@ -19,7 +19,7 @@
 import { and, eq, inArray, isNull, ne, notLike, or, sql } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
-import { facturacion } from '@/lib/db/schema';
+import { facturacion, memberships } from '@/lib/db/schema';
 import { PATRONES_RECIBO_COBRANZA } from '@/lib/recibo-codigos';
 
 /** Tipos que representan deuda cobrable. Mismo criterio que actions/cobranzas. */
@@ -56,6 +56,29 @@ const hoyArg = sql`(now() AT TIME ZONE 'America/Argentina/Buenos_Aires')::date`;
  * la columna Situación). Si el club quisiera más anticipación, acá se cambia
  * el `= hoy` por un rango.
  */
+/**
+ * Qué comprobante cuenta como deuda que puede vencer. Vive en una sola función
+ * para que el puntito de la lista y el contador del Dashboard no puedan
+ * separarse: son el mismo conjunto visto de dos maneras.
+ */
+function comprobantesQuePuedenVencer(guarderiaId: string) {
+  return and(
+    eq(facturacion.guarderiaId, guarderiaId),
+    inArray(facturacion.tipoFactura, [...TIPOS_COBRABLES]),
+    eq(facturacion.anulada, false),
+    eq(facturacion.rechazada, false),
+    or(isNull(facturacion.estado), ne(facturacion.estado, 'pagada')),
+    // Un comprobante sin vencimiento cargado no puede vencer.
+    sql`${facturacion.vencimiento} is not null`,
+    // Los recibos de cobranza (RC-/RI-) son tipo 'recibo' pero documentan un
+    // pago, no deuda: nunca vencen.
+    or(
+      isNull(facturacion.codigo),
+      and(...PATRONES_RECIBO_COBRANZA.map((pat) => notLike(facturacion.codigo, pat))),
+    ),
+  );
+}
+
 export async function getAvisoVencimientoBatch(
   socioIds: string[],
   guarderiaId: string,
@@ -70,24 +93,7 @@ export async function getAvisoVencimientoBatch(
       venceHoy: sql<boolean>`bool_or(${diaVencimientoArg} = ${hoyArg})`,
     })
     .from(facturacion)
-    .where(
-      and(
-        eq(facturacion.guarderiaId, guarderiaId),
-        inArray(facturacion.socioId, socioIds),
-        inArray(facturacion.tipoFactura, [...TIPOS_COBRABLES]),
-        eq(facturacion.anulada, false),
-        eq(facturacion.rechazada, false),
-        or(isNull(facturacion.estado), ne(facturacion.estado, 'pagada')),
-        // Un comprobante sin vencimiento cargado no puede vencer.
-        sql`${facturacion.vencimiento} is not null`,
-        // Los recibos de cobranza (RC-/RI-) son tipo 'recibo' pero documentan un
-        // pago, no deuda: nunca vencen.
-        or(
-          isNull(facturacion.codigo),
-          and(...PATRONES_RECIBO_COBRANZA.map((pat) => notLike(facturacion.codigo, pat))),
-        ),
-      ),
-    )
+    .where(and(comprobantesQuePuedenVencer(guarderiaId), inArray(facturacion.socioId, socioIds)))
     .groupBy(facturacion.socioId);
 
   for (const r of rows) {
@@ -97,4 +103,32 @@ export async function getAvisoVencimientoBatch(
   }
 
   return out;
+}
+
+/**
+ * Cuántos socios del club tienen al menos una factura YA vencida. Es el número
+ * de la tarjeta del Dashboard, y tiene que coincidir con la cantidad de filas
+ * que muestra `/usuarios?filtro=facturas-vencidas`.
+ *
+ * Por eso se join-ea con `memberships` con el MISMO criterio que arma la lista
+ * de socios (rol socio, status active/inactivo): si se contara solo sobre
+ * `facturacion`, un socio desvinculado del club con deuda vieja sumaría al
+ * contador pero no aparecería en la lista, y los dos números no cerrarían.
+ */
+export async function contarSociosConFacturasVencidas(guarderiaId: string): Promise<number> {
+  const [row] = await db
+    .select({ total: sql<number>`count(distinct ${facturacion.socioId})::int` })
+    .from(facturacion)
+    .innerJoin(
+      memberships,
+      and(
+        eq(memberships.userId, facturacion.socioId),
+        eq(memberships.guarderiaId, guarderiaId),
+        eq(memberships.rol, 'socio'),
+        inArray(memberships.status, ['active', 'inactivo']),
+      ),
+    )
+    .where(and(comprobantesQuePuedenVencer(guarderiaId), sql`${diaVencimientoArg} < ${hoyArg}`));
+
+  return row?.total ?? 0;
 }

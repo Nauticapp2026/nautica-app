@@ -16,12 +16,14 @@ import {
 } from '@/lib/db/schema';
 import { and, asc, count, desc, eq, gte, inArray, lte, sql, sum } from 'drizzle-orm';
 
+import { contarSociosConFacturasVencidas } from '@/lib/vencimientos-socio';
 import { AlertasOperativasList, type AlertaOperativa } from './alertas-operativas';
 import { EmptyState } from '@/components/shared/empty-state';
 import {
   AlertTriangle,
   Anchor,
   Bell,
+  CalendarClock,
   FileText,
   MessageSquare,
   Plus,
@@ -338,6 +340,12 @@ export default async function DashboardPage() {
     if (tipos.size < TIPOS_REQUERIDOS.size) sociosDocsIncompletos++;
   }
 
+  // Socios con al menos una factura YA vencida (pedido del cliente 2026-09-15).
+  // Es otra cosa que "moroso": moroso mira el saldo neto y pide 2+ meses de
+  // antigüedad; esto mira el VENCIMIENTO de cada comprobante, así que avisa el
+  // día después de que venció, mucho antes de que el socio sea moroso.
+  const sociosFacturasVencidas = await contarSociosConFacturasVencidas(gId);
+
   const alertasOperativas: AlertaOperativa[] = alertasOperativasRows.map((r) => ({
     id: r.id,
     tipo: r.tipo as 'retorno_proximo' | 'sin_respuesta',
@@ -390,6 +398,13 @@ export default async function DashboardPage() {
           label="Socios con deuda 2+ meses"
           sublabel={`${formatCurrency(deudaTotal)} a cobrar`}
           href="/usuarios?filtro=morosos"
+        />
+        <MetricCard
+          icon={<CalendarClock className="h-5 w-5 text-white" />}
+          iconBg="#D92D20"
+          value={String(sociosFacturasVencidas)}
+          label="Socios con facturas vencidas"
+          href="/usuarios?filtro=facturas-vencidas"
         />
         <MetricCard
           icon={<FileText className="h-5 w-5 text-white" />}
