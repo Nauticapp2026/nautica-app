@@ -8,10 +8,19 @@
  * clubes de prueba — en uno real, borrar el rastro local de una factura que
  * ARCA sí tiene sería un problema serio).
  *
- * Qué se CONSERVA: la fila de `guarderias` (datos impositivos, plan, creds
- * Payway, fotos, período de anulación, etc.), `guarderia_centros_emisores`,
+ * Qué se CONSERVA: la fila de `guarderias` (razón social, CUIT, condición IVA,
+ * plan, creds Payway, fotos, período de anulación, etc.),
  * `guarderia_plan_historial`, `horarios_dia`, las memberships del EQUIPO
  * (todo rol distinto de socio), `invitations` y `equipo_invitaciones_pendientes`.
+ *
+ * Qué se SUELTA además (2026-09-15, "todo lo que hay hoy es pruebas"): el
+ * punto de venta, las credenciales de TusFacturas del club, el flag del
+ * certificado y los centros emisores adicionales. Motivo: la cuenta madre de
+ * TusFacturas pasa a ser la de PRUEBA, y las credenciales guardadas de un
+ * club son las que le devolvió la madre al dar de alta su POS — si se
+ * conservaran, el club seguiría facturando contra la cuenta vieja (real).
+ * Tras el reset, el club vuelve a hacer Datos Impositivos y queda dado de
+ * alta contra la madre vigente.
  *
  * Qué se BORRA: socios (membership + cuenta, ver abajo), embarcaciones, toda la
  * estructura de espacios (áreas, marinas, naves, lados, pisos, espacios),
@@ -41,7 +50,7 @@
 import { and, eq, inArray, ne, sql } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
-import { memberships, profiles } from '@/lib/db/schema';
+import { guarderias, memberships, profiles } from '@/lib/db/schema';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -199,6 +208,25 @@ export async function resetearGuarderiaEnTx(tx: Tx, guarderiaId: string): Promis
       tabla === 'documentos' || tabla === 'datos_facturacion' ? 'profile_id' : 'socio_id';
     porTabla.push({ tabla, filas: await borrarPorColumna(tx, tabla, columna, socioIds) });
   }
+
+  // Punto de venta y credenciales de TusFacturas: se sueltan para que el club
+  // se dé de alta de nuevo contra la cuenta madre vigente (ver cabecera). Los
+  // centros emisores adicionales son POS de esa misma cuenta: van con ella.
+  porTabla.push({
+    tabla: 'guarderia_centros_emisores',
+    filas: await borrarPorColumna(tx, 'guarderia_centros_emisores', 'guarderia_id', [guarderiaId]),
+  });
+  await tx
+    .update(guarderias)
+    .set({
+      puntoDeVenta: null,
+      tusfacturasApikey: null,
+      tusfacturasApitoken: null,
+      tusfacturasUsertoken: null,
+      certificadoAfipOk: false,
+      updatedAt: new Date(),
+    })
+    .where(eq(guarderias.id, guarderiaId));
 
   // Memberships de socio de ESTE club (las del equipo quedan).
   const membs = await tx

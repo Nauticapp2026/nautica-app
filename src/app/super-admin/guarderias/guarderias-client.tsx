@@ -160,8 +160,10 @@ function GuarderiaFila({
       `RESETEAR "${guarderia.nombre}" — deja el club como recién creado.\n\n` +
         `Se BORRAN: socios y sus cuentas, embarcaciones, espacios, tarifario, servicios contratados, ` +
         `cuenta corriente, comprobantes, cobranzas, débitos Payway, tareas, salidas, ` +
-        `comunicaciones y publicaciones. La numeración de comprobantes vuelve a 1.\n\n` +
-        `Se CONSERVAN: equipo, datos impositivos, centros emisores, plan, horarios y configuración.\n\n` +
+        `comunicaciones y publicaciones. La numeración de comprobantes vuelve a 1.\n` +
+        `También se SUELTAN el punto de venta y las credenciales de TusFacturas: el club vuelve a ` +
+        `configurar Datos Impositivos y queda dado de alta contra la cuenta madre vigente.\n\n` +
+        `Se CONSERVAN: equipo, razón social y CUIT, plan, horarios, Payway y el resto de la configuración.\n\n` +
         `Esta acción no se puede deshacer. Para confirmar, escribí el nombre exacto del club:`,
     );
     if (tipeado == null) return;
