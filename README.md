@@ -12,15 +12,17 @@ SaaS multi-tenant para guarderías náuticas: gestión de espacios y embarcacion
 - **Onboarding guiado** — wizard de 10 pasos: alta de cuenta, datos del club, horarios, equipo, espacios, elección de plan, info de pago, demo con Calendly y aceptación de T&C.
 - **Dashboard operativo** — alertas en tiempo real (movimientos, vencimientos, salidas pendientes) en zona horaria Argentina.
 - **Espacios y embarcaciones** — estructura jerárquica (marinas/naves → pisos → espacios), asignación de embarcaciones, reordenamiento drag-and-drop, mudanzas entre espacios.
-- **Socios** — alta individual o carga masiva (`.xlsx`), perfil completo con embarcaciones, historial de movimientos y facturación.
+- **Socios** — alta individual o carga masiva (`.xlsx`), perfil completo con embarcaciones, historial de movimientos y facturación. Baja con motivo y fecha; avisos de facturas vencidas en la lista.
+- **Cuenta corriente y cobranzas** — registro de cobros aplicados a comprobantes, saldo a favor FIFO, notas de crédito, anulación con período configurable por club; **estado de cuenta** del socio imprimible y enviable por mail (PDF adjunto).
+- **Exportación** — Ventas, Cobranzas y Cuenta Corriente exportan a Excel (`.xlsx`, exceljs), PDF (jspdf) y CSV, siempre con las mismas columnas que la tabla en pantalla.
 - **Solicitudes de membresía** — flujo mobile → web: el socio solicita desde la app, el admin valida y aprueba; notificación por email vía Resend.
 - **Tareas** — admin crea y asigna; operario ve y resuelve. Vinculadas a salidas/entradas y lavados.
 - **Tarifario** — definición de tarifas por servicio y unidad (metros / pies).
 - **Facturación** — movimientos mensuales automáticos (Vercel Cron), emisión de facturas A/B/C contra AFIP vía tusfacturas.app, saldo a favor, certificado AFIP.
 - **Comunicaciones** — envío masivo a socios del club.
-- **Notificaciones push** — Expo Push a iOS/Android, segmentadas por plan (esencial / premium / elite). Envío inline + cron diario.
-- **Planes** — tres planes DB-driven (Esencial, Premium, Élite) con features configurables desde el panel super admin.
-- **Super admin** — panel cross-tenant para gestionar guarderías, usuarios globales, comunicaciones, publicidades, pricing y Términos y Condiciones.
+- **Notificaciones push** — Expo Push a iOS/Android, segmentadas por plan (esencial / premium / elite). Envío inmediato o programado por día y turno (8/14/20 hs); cron tres veces por día.
+- **Planes** — tres planes DB-driven (Esencial, Premium, Élite) con features y cupos configurables desde el panel super admin.
+- **Super admin** — panel cross-tenant para gestionar guarderías, usuarios globales, salidas de todos los clubes (listado para Prefectura con Excel), comunicaciones, publicidades, notificaciones, moderación, pricing y Términos y Condiciones.
 - **QR público** — vistas de embarcación e invitado para escaneo en el muelle, sin login.
 - **Mareas** — endpoint `/api/mareas` con scraper del SHN (Servicio de Hidrografía Naval).
 - **Términos y Condiciones** — versiones publicables desde super admin; gate en el dashboard hasta aceptación.
@@ -127,6 +129,8 @@ pnpm dev
 
 App en `http://localhost:3000`.
 
+> **Windows:** si el login falla con "Ocurrió un error inesperado" y el log dice `UNABLE_TO_VERIFY_LEAF_SIGNATURE`, Node no confía en la CA del certificado de Supabase. Arrancá con `NODE_OPTIONS=--use-system-ca pnpm dev` (y los scripts contra la DB con `node --use-system-ca ...`).
+
 ---
 
 ## Variables de entorno
@@ -180,6 +184,8 @@ pnpm format           # prettier --write
 pnpm format:check     # prettier --check
 
 pnpm db:studio        # UI de Drizzle para inspeccionar la DB
+
+node scripts/generate-pdfs.mjs   # regenera los manuales de docs/ (html + pdf) a partir de los .md
 ```
 
 > `pnpm db:generate` está roto en este repo — las migraciones se escriben a mano en `supabase/migrations/` y se aplican desde el SQL Editor de Supabase.

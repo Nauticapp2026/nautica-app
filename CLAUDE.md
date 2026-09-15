@@ -61,7 +61,7 @@ Si necesitás compartir constantes / types / enums entre el cliente y un server 
 - Para gating en server: usar `requireSuperAdmin()` de `src/lib/auth/session.ts`. No exige `getActiveMarina` (un super admin no necesita estar en ninguna guardería).
 - Server actions del panel viven en `src/app/actions/super-admin/`, todas empiezan con `await requireSuperAdmin()` y validan con Zod.
 - Tablas globales (no scopeadas) — `pricing_plans`, `platform_settings`, `platform_publicidades`, `tc_versiones`. Si agregás otra, sus policies son: SELECT público (si la lee la landing) o solo super admin, INSERT/UPDATE/DELETE solo `is_super_admin()`.
-- Routing: el panel está en `/super-admin/` (fuera del `(dashboard)`). Reusa el `Sidebar` con `variant="super-admin"`. Si querés agregar una sección, agregá item al nav en `src/components/shared/sidebar.tsx` (dentro del módulo, no como prop — los icons de lucide no cruzan el boundary server→client). Secciones actuales: Inicio, Guarderías, Usuarios, Comunicaciones, Publicidades, Pricing, Notificaciones, Términos, Moderación.
+- Routing: el panel está en `/super-admin/` (fuera del `(dashboard)`). Reusa el `Sidebar` con `variant="super-admin"`. Si querés agregar una sección, agregá item al nav en `src/components/shared/sidebar.tsx` (dentro del módulo, no como prop — los icons de lucide no cruzan el boundary server→client). Secciones actuales (en el orden del nav): Inicio, Guarderías, Usuarios, Salidas, Comunicaciones, Publicidades, Notificaciones, Moderación, Pricing, Términos. **Salidas** es la única sección que cruza datos de todos los clubes a propósito (listado para Prefectura, con Excel server-side vía exceljs).
 
 ### 7. Design system — respetar tokens shadcn
 
@@ -106,6 +106,16 @@ Estilo conventional commits en español: `feat(area): descripcion`, `fix(area): 
 
 Husky + lint-staged corren prettier y eslint en cada commit. Si un hook falla, arreglar la causa — nunca usar `--no-verify`.
 
+### Manuales
+
+Los manuales que se entregan a los clientes viven en `docs/` (`manual-admin.md`, `manual-super-admin.md`, `manual-payway.md`) y **se actualizan en el mismo cambio que la feature**, no después. Al tocar comportamiento documentado:
+
+1. Editar el `.md` correspondiente.
+2. Regenerar con `node scripts/generate-pdfs.mjs` (procesa los tres; usa Chrome headless — no usar `md-to-pdf`).
+3. Revertir con `git checkout --` los `.pdf`/`.html` cuyo `.md` no cambió: el render mete churn de metadata aunque el contenido sea idéntico.
+
+Regla del usuario, permanente: una feature sin su manual actualizado no está terminada.
+
 ### Antes de mergear un PR
 
 1. Esperar la preview de Vercel.
@@ -119,9 +129,9 @@ Husky + lint-staged corren prettier y eslint en cada commit. Si un hook falla, a
 - **Supabase** — Auth, Postgres, RLS. Único proyecto (prod).
 - **Resend** — Emails transaccionales (aprobación de socios, invitaciones, etc.). Cliente en `src/lib/email/resend.ts`. Los mails de Supabase Auth (confirmación, reset) son un canal aparte, configurado directo en el dashboard de Supabase.
 - **App mobile** — repo separado pero **comparte la misma DB Supabase**. La comunicación entre web y mobile es vía tablas compartidas y triggers Postgres. Antes de cambiar una tabla compartida (`solicitudes_lavado`, `porteria_invitados`, `actividad_porteria`, `tareas`, `notificaciones`, etc.), pensar si rompe algo del lado mobile.
-- **Expo Push** — notificaciones push a iOS/Android. Tokens en tabla `device_tokens`. Envío en `src/lib/push-notifications.ts`. Cron diario en `api/cron/notificaciones-push`.
+- **Expo Push** — notificaciones push a iOS/Android. Tokens en tabla `device_tokens`. Envío en `src/lib/push-notifications.ts`. Cron en `api/cron/notificaciones-push` **tres veces por día** (11/17/23 UTC = 8/14/20 ART): esas tres corridas son los turnos Mañana/Tarde/Noche de las push programadas (`super-admin/notificaciones/turnos.ts` — si cambiás el horario en `vercel.json`, cambialo ahí también). Una push fallida **no se reintenta** (decisión de producto).
 - **tusfacturas.app** — emisión de facturas AFIP. Cliente y mappers en `src/lib/tusfacturas/`. Las credenciales `TUSFACTURAS_*` son las master de NauticaApp (solo para el alta del POS); cada guardería factura con sus propias credenciales que TusFacturas devuelve al alta.
-- **Vercel Cron** — tres jobs: `api/cron/mensuales` (movimientos mensuales), `api/cron/notificaciones-push` (push diario), `api/cron/historial-plan-mensual`. Si tocás ese código, considerar idempotencia (pueden correrse dos veces).
+- **Vercel Cron** — tres jobs: `api/cron/mensuales` (auto-emisión + débito automático Payway, una vez por día para los clubes cuyo día de facturación es hoy), `api/cron/notificaciones-push` (3 corridas por día, ver arriba), `api/cron/historial-plan-mensual`. Si tocás ese código, considerar idempotencia (pueden correrse dos veces).
 - **Pre-launch gate** — toda la web está detrás de Basic Auth hasta el lanzamiento. Se destraba borrando las env vars `PRELAUNCH_GATE_USER` y `PRELAUNCH_GATE_PASSWORD` en Vercel. Rutas excluidas del gate: `/auth/*`, `/api/cron/*`, `/api/webhooks/*`, `/api/devices/*`, `/api/mareas/*`, `/api/delete-account`, `/eliminar-cuenta`, `/privacidad`, `/terminos*`.
 - **Gate de Términos y Condiciones** — el gate que obliga a aceptar T&C vive en el layout de `(dashboard)`, no en middleware. Esto es intencional: middleware corre en Edge Runtime y no puede consultar la DB (Drizzle/Supabase no son compatibles con Edge). Si necesitás agregar un gate similar que requiera consultar la DB, hacerlo en el layout del grupo de rutas correspondiente, no en `middleware.ts`.
 
@@ -144,4 +154,14 @@ pnpm typecheck        # antes de pushear, idealmente
 pnpm lint
 pnpm db:generate      # tras cambios en schema.ts (actualmente roto en Windows — las migraciones van a mano)
 pnpm db:studio        # inspeccionar la DB
+node scripts/generate-pdfs.mjs   # regenera los manuales de docs/
 ```
+
+**Windows + certificado de Supabase.** En esta máquina Node no confía en la CA que firma el certificado de Supabase: el dev server arranca pero el login falla con "Ocurrió un error inesperado" (`UNABLE_TO_VERIFY_LEAF_SIGNATURE` en el log), y cualquier script contra la DB falla igual. Correr con la CA del sistema:
+
+```bash
+NODE_OPTIONS=--use-system-ca pnpm dev
+node --env-file=.env.local --use-system-ca scripts/lo-que-sea.mjs
+```
+
+Los scripts contra la DB se corren desde la raíz del repo (para que resuelva `postgres`) y **se borran después** si son temporales.
