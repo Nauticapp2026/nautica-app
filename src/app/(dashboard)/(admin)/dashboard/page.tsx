@@ -372,7 +372,9 @@ export default async function DashboardPage() {
       </div>
 
       {/* Metric cards */}
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
+      {/* Seis tarjetas: 3 por fila en desktop. Con 5 columnas la sexta quedaba
+          sola en una segunda fila. */}
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
         <MetricCard
           icon={<Ship className="h-5 w-5 text-white" />}
           iconBg="#175861"
