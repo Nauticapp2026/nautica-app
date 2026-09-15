@@ -96,9 +96,11 @@ Si necesitás compartir constantes / types / enums entre el cliente y un server 
 
 ### Deploy
 
-Siempre: **rama → PR → preview → merge a `main`**. Nunca pushear directo a `main` ni deployar a prod manualmente. Vercel deploya prod en cada merge a `main` y genera preview en cada PR.
+Se trabaja **directo en `main`**: commit local y, **solo cuando el usuario lo indica** ("commit y push", "subilo"), `git push`. Vercel deploya producción en cada push a `main` — no hay paso manual de deploy. No crear ramas ni PRs por iniciativa propia; si el usuario quiere una preview aparte, lo pide.
 
-Naming de ramas: `feat/...`, `fix/...`, `chore/...`, `docs/...`, `refactor/...`.
+Consecuencia: **un push es un deploy**. Antes de pushear, lo de la sección siguiente tiene que estar hecho, y los commits que muevan plata o datos (facturación, cobranzas, migraciones) tienen que dejar dicho en su mensaje qué se verificó y qué no.
+
+Las migraciones SQL se aplican a producción **antes** del push que las necesita (con un script `--use-system-ca` desde la raíz, o el SQL Editor), así el deploy nunca corre contra una base sin la columna.
 
 ### Commits
 
@@ -116,10 +118,10 @@ Los manuales que se entregan a los clientes viven en `docs/` (`manual-admin.md`,
 
 Regla del usuario, permanente: una feature sin su manual actualizado no está terminada.
 
-### Antes de mergear un PR
+### Antes de pushear
 
-1. Esperar la preview de Vercel.
-2. Verificar el cambio en la preview (no solo el diff).
+1. `pnpm typecheck` y `pnpm lint` en verde (lint-staged solo mira los archivos tocados; un cambio de tipo puede romper otro archivo).
+2. Verificar el cambio andando, no solo el diff: con el dev server local (`NODE_OPTIONS=--use-system-ca pnpm dev`, el usuario hace el login) o, si no se puede, decirlo explícitamente en el mensaje del commit y al usuario.
 3. Si toca features sensibles (auth, roles, multi-tenancy, facturación), probar el caso feliz **y** el caso de borde.
 
 ---
