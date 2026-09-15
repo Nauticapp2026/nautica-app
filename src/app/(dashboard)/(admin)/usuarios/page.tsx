@@ -15,6 +15,7 @@ import {
   profiles,
 } from '@/lib/db/schema';
 import { and, desc, eq, inArray, isNull, notExists, sql } from 'drizzle-orm';
+import { getAvisoVencimientoBatch } from '@/lib/vencimientos-socio';
 import { UsuariosClient, type FiltroSocios } from './usuarios-client';
 
 export default async function UsuariosPage({
@@ -298,6 +299,12 @@ export default async function UsuariosPage({
     }
   }
 
+  // Puntito al lado del saldo: rojo si tiene alguna factura vencida, amarillo si
+  // vence hoy (pedido del cliente 2026-09-15). Se calcula por FECHA y no por
+  // `facturacion.estado`, que tiene el valor 'vencida' en el enum pero nadie lo
+  // escribe nunca. Ver src/lib/vencimientos-socio.ts.
+  const avisoPorSocio = await getAvisoVencimientoBatch(profileIds, gId);
+
   const sociosData = socios.map((s) => {
     // Un solo número, partido por signo para la columna (deuda o a favor).
     // Antes "a favor" mostraba el pool FIFO (disponible para aplicar) y la
@@ -326,6 +333,7 @@ export default async function UsuariosPage({
       // targeteado a un comprobante nuevo no cancela una deuda vieja. Es el
       // mismo número que Cobranzas ofrece aplicar.
       saldoAFavor: saldoAFavor.toFixed(2),
+      avisoVencimiento: avisoPorSocio.get(s.profileId) ?? null,
       // Moroso solo si además le queda deuda: si pagó (aunque sea con "Registrar
       // pago", que deja los cargos viejos en no_pagado), deuda = 0 y deja de
       // figurar como moroso. Un adelanto SIN aplicar no lo saca de moroso — la

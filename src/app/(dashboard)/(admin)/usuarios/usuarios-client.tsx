@@ -57,6 +57,8 @@ type Socio = {
   telefono: string | null;
   direccion: string | null;
   deuda: string | null;
+  /** Aviso de vencimiento: puntito rojo (vencida) o amarillo (vence hoy). */
+  avisoVencimiento?: 'vencida' | 'por_vencer' | null;
   /** Crédito disponible para aplicar (pool FIFO). Mismo número que la ficha. */
   saldoAFavor?: string | null;
   estadoSocio: 'activo' | 'moroso' | null;
@@ -1336,6 +1338,32 @@ export function UsuariosClient({
                                     </span>
                                   )}
                                 </span>
+                                {/* Puntito de vencimiento (pedido del cliente
+                                    2026-09-15). Va FUERA del span subrayado: es
+                                    un aviso sobre los comprobantes del socio, no
+                                    parte del importe. El texto va en `title` y
+                                    además en `aria-label`, porque un punto de
+                                    color solo no comunica nada a quien no
+                                    distingue rojo de amarillo. */}
+                                {s.avisoVencimiento && (
+                                  <span
+                                    title={
+                                      s.avisoVencimiento === 'vencida'
+                                        ? 'Posee facturas vencidas'
+                                        : 'Factura próx. a vencer'
+                                    }
+                                    aria-label={
+                                      s.avisoVencimiento === 'vencida'
+                                        ? 'Posee facturas vencidas'
+                                        : 'Factura próx. a vencer'
+                                    }
+                                    className={`ml-1.5 inline-block h-2 w-2 shrink-0 rounded-full align-middle ${
+                                      s.avisoVencimiento === 'vencida'
+                                        ? 'bg-red-500'
+                                        : 'bg-amber-400'
+                                    }`}
+                                  />
+                                )}
                               </td>
                               <td
                                 className="px-4 py-3 text-right"
