@@ -27,7 +27,6 @@ import {
   Paperclip,
   Plus,
   Trash2,
-  FileDown,
   Upload,
   UserCheck,
   X,
@@ -62,7 +61,8 @@ import {
 import { getLedgerSaldoAFavorAction, type LedgerSaldoAFavorEntry } from '@/app/actions/movimientos';
 import { buscarRankeado } from '@/lib/buscador';
 import { esCodigoReciboCobranza } from '@/lib/recibo-codigos';
-import { descargarCsv } from '@/lib/exportar-csv';
+import { exportarTabla, type FormatoExportacion } from '@/lib/exportar-tabla';
+import { ExportarMenu } from '@/components/shared/exportar-menu';
 import { calcularSaldoYEstado } from '@/lib/cuenta-corriente-saldo';
 import { formatArgentinaDate, formatArgentinaDateTime, formatNaiveDateTime } from '@/lib/dates';
 import { escribirTabEnUrl, type SocioTabId } from '@/lib/tab-url';
@@ -2201,12 +2201,13 @@ export function SocioDetail({
   const movimientosFiltrados = movimientosCalc.filter((m) => pasaFiltrosCC(m, m.estadoDisplay));
 
   /**
-   * CSV de la Cuenta Corriente, con las MISMAS columnas y los mismos valores
-   * que la tabla — incluidos los signos, que acá tienen significado: una NC
-   * resta en Ventas y una anulación de recibo resta en Cobranzas. Exporta lo
-   * FILTRADO (no solo la página visible) y respeta el orden elegido.
+   * Exportación de la Cuenta Corriente (CSV / Excel / PDF), con las MISMAS
+   * columnas y los mismos valores que la tabla — incluidos los signos, que acá
+   * tienen significado: una NC resta en Ventas y una anulación de recibo resta
+   * en Cobranzas. Exporta lo FILTRADO (no solo la página visible) y respeta el
+   * orden elegido.
    */
-  function exportarCuentaCorriente() {
+  function exportarCuentaCorriente(formato: FormatoExportacion) {
     const filas = (
       ccSortDir === 'asc' ? [...movimientosFiltrados].reverse() : movimientosFiltrados
     ).map((m) => {
@@ -2249,9 +2250,10 @@ export function SocioDetail({
       ];
     });
 
-    descargarCsv(
-      `cuenta-corriente-${nombre.replace(/\s+/g, '-').toLowerCase()}`,
-      [
+    return exportarTabla(formato, {
+      nombre: `cuenta-corriente-${nombre.replace(/\s+/g, '-').toLowerCase()}`,
+      titulo: `Cuenta Corriente — ${nombre}`,
+      columnas: [
         'Fecha',
         'Tipo de comprobante',
         'Nº Comprobante',
@@ -2266,7 +2268,7 @@ export function SocioDetail({
         'Estado',
       ],
       filas,
-    );
+    });
   }
   const hayFiltrosCC = Boolean(ccFechaDesde || ccFechaHasta || ccEstado || ccTipoComp);
 
@@ -2809,15 +2811,11 @@ export function SocioDetail({
               </button>
             )}
             {/* Exporta lo FILTRADO, no solo la página que se ve. */}
-            <button
-              onClick={exportarCuentaCorriente}
+            <ExportarMenu
+              onExportar={exportarCuentaCorriente}
               disabled={movimientosFiltrados.length === 0}
-              title="Exportar CSV"
               className="ml-auto flex h-9 items-center gap-1.5 rounded-[8px] border border-gray-200 bg-white px-3 text-sm font-medium text-gray-600 transition hover:bg-gray-50 disabled:opacity-40"
-            >
-              <FileDown className="h-4 w-4" />
-              <span className="hidden sm:inline">Exportar</span>
-            </button>
+            />
           </div>
 
           {/* Metric cards. La card de Saldo se oculta cuando hay filtros aplicados:

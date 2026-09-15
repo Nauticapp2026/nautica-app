@@ -11,7 +11,6 @@ import {
   CornerDownLeft,
   Download,
   Edit3,
-  FileDown,
   FileText,
   Plus,
   Printer,
@@ -43,7 +42,8 @@ import { MOTIVO_NOTA_LABEL, type MotivoNota } from '@/app/actions/nota-constants
 import { toast } from 'sonner';
 import { buscarSocios, normalizarBusqueda } from '@/lib/buscador';
 import { esCodigoReciboCobranza } from '@/lib/recibo-codigos';
-import { descargarCsv } from '@/lib/exportar-csv';
+import { exportarTabla, type FormatoExportacion } from '@/lib/exportar-tabla';
+import { ExportarMenu } from '@/components/shared/exportar-menu';
 import { formatArgentinaDate } from '@/lib/dates';
 import { EmptyState } from '@/components/shared/empty-state';
 import { Pagination } from '@/components/shared/pagination';
@@ -3974,14 +3974,15 @@ export function VentasClient({
   }
 
   // Mismas columnas y valores que la tabla visible, sobre lo FILTRADO. La
-  // mecánica del CSV (BOM para que Excel lea los acentos, comillas escapadas,
-  // descarga) vive en lib/exportar-csv para que Ventas, Cobranzas y Cuenta
-  // Corriente exporten igual.
-  function exportarCSV() {
+  // mecánica de cada formato (CSV con BOM, Excel, PDF) vive en
+  // lib/exportar-tabla para que Ventas, Cobranzas y Cuenta Corriente exporten
+  // igual.
+  function exportar(formato: FormatoExportacion) {
     if (activeTab === 'afip') {
-      descargarCsv(
-        'comprobantes',
-        [
+      return exportarTabla(formato, {
+        nombre: 'comprobantes',
+        titulo: 'Ventas — Comprobantes ARCA',
+        columnas: [
           'Número',
           'FL Nº',
           'Tipo',
@@ -3992,7 +3993,7 @@ export function VentasClient({
           'Estado',
           'Descripción',
         ],
-        filtradosAfip.map((f) => [
+        filas: filtradosAfip.map((f) => [
           f.codigo ?? '',
           f.folioLocal ?? '',
           TIPO_FACTURA_LABEL[f.tipoFactura ?? ''] ?? f.tipoFactura ?? '',
@@ -4003,12 +4004,13 @@ export function VentasClient({
           f.estado ?? '',
           f.descripcion ?? '',
         ]),
-      );
+      });
     } else {
-      descargarCsv(
-        'recibos',
-        ['Número', 'Tipo', 'Cliente', 'Fecha', 'Total', 'Descripción'],
-        filtradosRecibos.map((f) => [
+      return exportarTabla(formato, {
+        nombre: 'recibos',
+        titulo: 'Ventas — Comprobantes internos',
+        columnas: ['Número', 'Tipo', 'Cliente', 'Fecha', 'Total', 'Descripción'],
+        filas: filtradosRecibos.map((f) => [
           f.codigo ?? '',
           tipoComprobanteLabel(f),
           f.socioNombre,
@@ -4016,7 +4018,7 @@ export function VentasClient({
           f.importe ?? '0',
           f.descripcion ?? '',
         ]),
-      );
+      });
     }
   }
 
@@ -4268,15 +4270,10 @@ export function VentasClient({
                   </span>
                 </button>
               )}
-              <button
-                onClick={exportarCSV}
+              <ExportarMenu
+                onExportar={exportar}
                 disabled={(activeTab === 'afip' ? filtradosAfip : filtradosRecibos).length === 0}
-                title="Exportar CSV"
-                className="flex h-10 items-center gap-1.5 rounded-[10px] border border-gray-200 bg-white px-3 text-sm font-medium text-gray-600 transition hover:bg-gray-50 disabled:opacity-40"
-              >
-                <FileDown className="h-4 w-4" />
-                <span className="hidden sm:inline">Exportar</span>
-              </button>
+              />
             </div>
             {/* Fila 2: filtros */}
             <div className="flex flex-wrap gap-2">

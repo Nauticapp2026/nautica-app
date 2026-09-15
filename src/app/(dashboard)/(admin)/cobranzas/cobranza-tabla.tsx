@@ -3,10 +3,11 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { Eye, FileDown, Receipt } from 'lucide-react';
+import { Eye, Receipt } from 'lucide-react';
 
 import { formatArgentinaDate } from '@/lib/dates';
-import { descargarCsv } from '@/lib/exportar-csv';
+import { exportarTabla, type FormatoExportacion } from '@/lib/exportar-tabla';
+import { ExportarMenu } from '@/components/shared/exportar-menu';
 import {
   motivoBloqueoAnulacion,
   puedeAnularRecibo,
@@ -98,12 +99,13 @@ export function CobranzaTabla({
   }
 
   // Mismas columnas que la tabla, en el mismo orden y con los mismos valores
-  // formateados: el CSV tiene que decir lo que el club está viendo. Se excluye
-  // "Acción", que es un botón.
-  function exportar() {
-    descargarCsv(
-      'cobranzas',
-      [
+  // formateados: el archivo tiene que decir lo que el club está viendo, sea
+  // CSV, Excel o PDF. Se excluye "Acción", que es un botón.
+  function exportar(formato: FormatoExportacion) {
+    return exportarTabla(formato, {
+      nombre: 'cobranzas',
+      titulo: 'Cobranzas',
+      columnas: [
         'Ente emisor',
         'Tipo de recibo',
         'Nº cliente',
@@ -117,7 +119,7 @@ export function CobranzaTabla({
         'Estado',
         'Fecha anulación',
       ],
-      cobranzas.map((c) => [
+      filas: cobranzas.map((c) => [
         c.entreEmisor,
         c.tipoRecibo ? (TIPO_RECIBO_LABEL[c.tipoRecibo] ?? c.tipoRecibo) : '—',
         c.numeroSocio != null ? String(c.numeroSocio) : '—',
@@ -134,20 +136,13 @@ export function CobranzaTabla({
         c.anulada ? 'Anulado' : 'Vigente',
         c.anuladaAt ? formatArgentinaDate(c.anuladaAt) : '—',
       ]),
-    );
+    });
   }
 
   return (
     <div className="space-y-3">
       <div className="flex justify-end">
-        <button
-          onClick={exportar}
-          title="Exportar CSV"
-          className="flex h-10 items-center gap-1.5 rounded-[10px] border border-gray-200 bg-white px-3 text-sm font-medium text-gray-600 transition hover:bg-gray-50"
-        >
-          <FileDown className="h-4 w-4" />
-          <span className="hidden sm:inline">Exportar</span>
-        </button>
+        <ExportarMenu onExportar={exportar} />
       </div>
       <div className="overflow-x-auto rounded-2xl border border-gray-200 bg-white">
         <table className="w-full min-w-[1500px] text-sm">
