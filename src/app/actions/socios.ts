@@ -18,7 +18,7 @@ import { todayArg } from '@/lib/dates';
 import { getActiveMarina } from '@/lib/auth/session';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { translateInviteError } from '@/lib/auth/errors';
-import { and, eq, max } from 'drizzle-orm';
+import { and, eq, max, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 
@@ -643,14 +643,26 @@ export async function updateNumeroSocioAction(
 const updateStatusSchema = z.object({
   socioId: z.string().uuid(),
   status: z.enum(['active', 'inactivo']),
+  motivo: z.string().trim().max(500, 'El motivo no puede superar los 500 caracteres.').nullable(),
 });
 
+/**
+ * Cambia el estado de la membresía del socio (Activo / Inactivo).
+ *
+ * Al pasar a Inactivo se guarda el `motivo` (opcional) y la fecha (mig 0156).
+ * Si el socio YA estaba inactivo, la llamada solo actualiza el motivo y
+ * conserva la fecha original — el club puede corregir el texto sin que
+ * "desde cuándo" se mueva. Al volver a Activo se blanquean las dos.
+ */
 export async function updateSocioStatusAction(
   socioId: string,
   newStatus: 'active' | 'inactivo',
+  motivo: string | null = null,
 ): Promise<{ error?: string }> {
-  const parsed = updateStatusSchema.safeParse({ socioId, status: newStatus });
-  if (!parsed.success) return { error: 'Datos inválidos.' };
+  const parsed = updateStatusSchema.safeParse({ socioId, status: newStatus, motivo });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? 'Datos inválidos.' };
+  }
 
   const ctx = await getActiveMarina();
   if (!ctx) return { error: 'Tu sesión expiró. Recargá la página e intentá de nuevo.' };
@@ -660,7 +672,20 @@ export async function updateSocioStatusAction(
   try {
     await db
       .update(memberships)
-      .set({ status: parsed.data.status })
+      .set(
+        parsed.data.status === 'active'
+          ? { status: 'active', motivoInactivo: null, inactivoDesde: null, updatedAt: new Date() }
+          : {
+              status: 'inactivo',
+              motivoInactivo: parsed.data.motivo || null,
+              // Un solo UPDATE decide la fecha: si ya estaba inactivo se
+              // conserva la que tenía (o now() si es anterior a la columna);
+              // si recién pasa a inactivo, arranca hoy. Sin leer-y-escribir
+              // en dos pasos, así dos admins a la vez no la pisan.
+              inactivoDesde: sql`case when ${memberships.status} = 'inactivo' then coalesce(${memberships.inactivoDesde}, now()) else now() end`,
+              updatedAt: new Date(),
+            },
+      )
       .where(
         and(
           eq(memberships.userId, parsed.data.socioId),

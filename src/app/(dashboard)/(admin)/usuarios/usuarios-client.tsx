@@ -59,6 +59,8 @@ type Socio = {
   deuda: string | null;
   /** Aviso de vencimiento: puntito rojo (vencida) o amarillo (vence hoy). */
   avisoVencimiento?: 'vencida' | 'por_vencer' | null;
+  /** Motivo cargado al pasarlo a Inactivo (mig 0156); se muestra al pasar el mouse por el badge. */
+  motivoInactivo?: string | null;
   /** Crédito disponible para aplicar (pool FIFO). Mismo número que la ficha. */
   saldoAFavor?: string | null;
   estadoSocio: 'activo' | 'moroso' | null;
@@ -1297,7 +1299,14 @@ export function UsuariosClient({
                               <td className="px-4 py-3 text-gray-500">{s.ubicacion ?? '—'}</td>
                               <td className="px-4 py-3 text-center">
                                 {s.membershipStatus === 'inactivo' ? (
-                                  <span className="inline-block rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-500">
+                                  <span
+                                    title={
+                                      s.motivoInactivo
+                                        ? `Motivo: ${s.motivoInactivo}`
+                                        : 'Inactivo (sin motivo cargado)'
+                                    }
+                                    className="inline-block cursor-help rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-500"
+                                  >
                                     Inactivo
                                   </span>
                                 ) : s.estadoSocio === 'moroso' ? (

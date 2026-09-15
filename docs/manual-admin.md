@@ -154,6 +154,8 @@ Mostrá y editá los datos personales: nombre, apellido, email, teléfono, docum
 - **Número de socio** — campo editable para asignar o modificar el número interno del socio. El número aparece como chip (#NNN) en la cabecera del perfil y en la lista de socios.
 - **Estado de membresía** — selector en la cabecera del perfil para cambiar el estado: **Activo** o **Inactivo**. Un socio Inactivo no puede acceder a la app (bloqueo al iniciar sesión). Para desvincular al socio del club existe por separado el botón **Eliminar socio** (más abajo, en la pestaña Generales), que lo oculta del listado conservando su historial.
 
+  Al elegir **Inactivo** se abre una ventana para cargar el **motivo** (opcional, hasta 500 caracteres) — por ejemplo "Vendió la embarcación" o "Deuda de 6 meses". Al confirmar, en la cabecera queda visible **"Inactivo desde DD/MM/AAAA · Motivo: …"**, con un botón para **editar el motivo** sin tocar la fecha. En la lista de socios, al pasar el mouse por el badge **Inactivo** se ve el motivo. Al volver a **Activo**, motivo y fecha se borran (describen la baja vigente, no un historial).
+
 - **Se factura / No facturar** — botón en la cabecera del perfil, al lado del estado. Alterna entre los dos valores y define si el socio **aparece o no en los flujos de emisión de comprobantes**:
   - **Se factura** (por defecto, en gris) — el socio aparece normalmente al emitir.
   - **No facturar** (en ámbar) — **deja de aparecer** en Facturación manual, en Facturación por lote y en la emisión automática mensual.

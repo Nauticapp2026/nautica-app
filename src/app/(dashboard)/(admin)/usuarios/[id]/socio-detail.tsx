@@ -116,6 +116,9 @@ type SocioData = {
   // Fecha (YYYY-MM-DD) del último destilde; null si nunca se destildó o si se
   // re-tildó después.
   cobroAutomaticoBaja: string | null;
+  /** Motivo y fecha de la baja vigente (mig 0156). NULL si está activo. */
+  motivoInactivo: string | null;
+  inactivoDesde: string | null;
 };
 
 type Embarcacion = {
@@ -2125,20 +2128,52 @@ export function SocioDetail({
     });
   }
 
-  function handleStatusChange(newStatus: 'active' | 'inactivo') {
+  // Motivo y fecha de la baja vigente (mig 0156). Se muestran en la cabecera
+  // mientras el socio está Inactivo y se blanquean al reactivarlo.
+  const [motivoInactivo, setMotivoInactivo] = useState<string | null>(socio.motivoInactivo);
+  const [inactivoDesde, setInactivoDesde] = useState<string | null>(socio.inactivoDesde);
+  // Ventana del motivo. 'baja' = está pasando a Inactivo recién ahora; 'editar'
+  // = ya estaba inactivo y solo corrige el texto (la fecha no se mueve).
+  const [motivoModal, setMotivoModal] = useState<'baja' | 'editar' | null>(null);
+  const [motivoDraft, setMotivoDraft] = useState('');
+
+  function handleStatusChange(newStatus: 'active' | 'inactivo', motivo: string | null = null) {
     startUpdatingStatus(async () => {
-      const res = await updateSocioStatusAction(socio.id, newStatus);
+      const res = await updateSocioStatusAction(socio.id, newStatus, motivo);
       if (res.error) {
         toast.error(res.error);
         return;
       }
       setCurrentStatus(newStatus);
-      toast.success('Estado actualizado.');
+      if (newStatus === 'inactivo') {
+        setMotivoInactivo(motivo);
+        // Si ya estaba inactivo, el server conserva la fecha original; acá
+        // se refleja lo mismo para no mostrar "desde hoy" en una edición.
+        setInactivoDesde((prev) => prev ?? new Date().toISOString());
+      } else {
+        setMotivoInactivo(null);
+        setInactivoDesde(null);
+      }
+      setMotivoModal(null);
+      toast.success(newStatus === 'inactivo' ? 'Socio dado de baja.' : 'Socio reactivado.');
     });
   }
 
   function handleSelectChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    handleStatusChange(e.target.value as 'active' | 'inactivo');
+    const nuevo = e.target.value as 'active' | 'inactivo';
+    if (nuevo === 'inactivo') {
+      // No se cambia el estado todavía: primero el motivo. Si cancela, el
+      // select sigue en Activo porque `currentStatus` no se tocó.
+      setMotivoDraft('');
+      setMotivoModal('baja');
+      return;
+    }
+    handleStatusChange('active');
+  }
+
+  function abrirEditarMotivo() {
+    setMotivoDraft(motivoInactivo ?? '');
+    setMotivoModal('editar');
   }
 
   const nombre = [socio.nombre, socio.apellido].filter(Boolean).join(' ') || socio.email;
@@ -2345,6 +2380,28 @@ export function SocioDetail({
               )}
             </div>
             <p className="text-sm text-gray-400">Socio desde {memberDate}</p>
+            {currentStatus === 'inactivo' && (
+              <p className="mt-0.5 text-sm text-gray-500">
+                <span className="font-semibold text-gray-700">
+                  Inactivo{inactivoDesde ? ` desde ${formatArgentinaDate(inactivoDesde)}` : ''}
+                </span>
+                {motivoInactivo ? (
+                  <>
+                    {' · '}Motivo: <span className="text-gray-700">{motivoInactivo}</span>
+                  </>
+                ) : (
+                  <span className="text-gray-400"> · sin motivo cargado</span>
+                )}
+                <button
+                  type="button"
+                  onClick={abrirEditarMotivo}
+                  className="ml-2 inline-flex items-center gap-1 text-xs font-semibold text-[#175861] hover:underline"
+                >
+                  <Pencil className="h-3 w-3" />
+                  {motivoInactivo ? 'Editar motivo' : 'Cargar motivo'}
+                </button>
+              </p>
+            )}
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
@@ -2380,6 +2437,77 @@ export function SocioDetail({
           </select>
         </div>
       </div>
+
+      {/* Motivo de la baja: se pide al pasar a Inactivo (opcional) y se puede
+          editar después sin mover la fecha. Mismo patrón visual que el resto de
+          los modales de la ficha (Cargar Servicio). */}
+      {motivoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="flex w-full max-w-md flex-col rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-start justify-between p-6 pb-4">
+              <div>
+                <h2 className="text-[18px] font-bold" style={{ color: '#101828' }}>
+                  {motivoModal === 'baja' ? 'Pasar a Inactivo' : 'Motivo de la baja'}
+                </h2>
+                <p className="mt-0.5 text-sm" style={{ color: '#669E9D' }}>
+                  {motivoModal === 'baja'
+                    ? `${nombre} no va a poder entrar a la app hasta que lo reactives.`
+                    : 'La fecha de baja se conserva; solo cambia el texto.'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMotivoModal(null)}
+                disabled={isUpdatingStatus}
+                className="rounded-[8px] p-1 text-gray-400 hover:bg-gray-100"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="border-t border-gray-200" />
+            <div className="space-y-4 p-6">
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
+                  Motivo <span className="font-normal text-gray-400">(opcional)</span>
+                </label>
+                <textarea
+                  value={motivoDraft}
+                  onChange={(e) => setMotivoDraft(e.target.value)}
+                  maxLength={500}
+                  rows={3}
+                  autoFocus
+                  placeholder="Ej. Vendió la embarcación / Deuda de 6 meses / Pidió la baja"
+                  className="focus:border-ring focus:ring-ring/50 w-full resize-none rounded-[10px] border border-gray-200 px-3 py-2 text-sm text-[#101828] focus:ring-[3px] focus:outline-none"
+                />
+                <p className="mt-1 text-right text-xs text-gray-400">{motivoDraft.length}/500</p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setMotivoModal(null)}
+                  disabled={isUpdatingStatus}
+                  className="flex-1 rounded-[10px] border border-gray-200 bg-white py-2.5 text-sm font-medium text-gray-600 transition hover:bg-gray-50 disabled:opacity-60"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleStatusChange('inactivo', motivoDraft.trim() || null)}
+                  disabled={isUpdatingStatus}
+                  className="flex-1 rounded-[10px] py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
+                  style={{ background: '#175861' }}
+                >
+                  {isUpdatingStatus
+                    ? 'Guardando…'
+                    : motivoModal === 'baja'
+                      ? 'Pasar a Inactivo'
+                      : 'Guardar motivo'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Aviso mientras está marcado: la deuda se sigue acumulando, así que
           conviene que el club vea cuánto se junta y no se lo encuentre de golpe

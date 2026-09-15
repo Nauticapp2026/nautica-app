@@ -82,6 +82,8 @@ export default async function SocioPage({
       comprobanteInterno: memberships.comprobanteInterno,
       cobroAutomaticoPayway: memberships.cobroAutomaticoPayway,
       cobroAutomaticoBaja: memberships.cobroAutomaticoBaja,
+      motivoInactivo: memberships.motivoInactivo,
+      inactivoDesde: memberships.inactivoDesde,
     })
     .from(profiles)
     .innerJoin(
@@ -670,6 +672,8 @@ export default async function SocioPage({
         comprobanteInterno: socio.comprobanteInterno ?? false,
         cobroAutomaticoPayway: socio.cobroAutomaticoPayway ?? false,
         cobroAutomaticoBaja: socio.cobroAutomaticoBaja ?? null,
+        motivoInactivo: socio.motivoInactivo ?? null,
+        inactivoDesde: socio.inactivoDesde?.toISOString() ?? null,
       }}
       embarcaciones={embarcacionesList.map((e) => ({
         ...e,

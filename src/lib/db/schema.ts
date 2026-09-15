@@ -516,6 +516,11 @@ export const memberships = pgTable(
     // Fecha del último destilde de cobro_automatico_payway; se blanquea al
     // re-tildar (arranca un período nuevo de adhesión).
     cobroAutomaticoBaja: date('cobro_automatico_baja'),
+    // Por qué y desde cuándo el socio está Inactivo (mig 0156). Describen la
+    // inactivación VIGENTE: se blanquean al volver a Activo. `updated_at` no
+    // sirve como fecha de baja porque se pisa con cualquier otra edición.
+    motivoInactivo: text('motivo_inactivo'),
+    inactivoDesde: timestamp('inactivo_desde', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },

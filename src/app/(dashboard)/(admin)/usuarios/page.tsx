@@ -47,6 +47,7 @@ export default async function UsuariosPage({
       numeroDocumento: profiles.numeroDocumento,
       condicionIva: profiles.condicionIva,
       membershipStatus: memberships.status,
+      motivoInactivo: memberships.motivoInactivo,
       numeroSocio: memberships.numeroSocio,
       membresiaCreatedAt: memberships.createdAt,
     })
