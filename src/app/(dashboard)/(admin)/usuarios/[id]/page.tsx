@@ -344,10 +344,10 @@ export default async function SocioPage({
       .select({
         paywayPublicKey: guarderias.paywayPublicKey,
         mediosCobroInternos: guarderias.mediosCobroInternos,
-        // Membrete del Estado de cuenta (mismo criterio que el mail del
-        // recibo: razón social si la tiene, si no el nombre del club).
+        // Membrete del Estado de cuenta: el NOMBRE del club, no la razón social
+        // (decisión del cliente 2026-09-15: es un documento para el socio, no
+        // fiscal — "Yacht Club Vicente López", no la sociedad que factura).
         nombre: guarderias.nombre,
-        razonSocial: guarderias.razonSocial,
         cuit: guarderias.cuit,
         direccion: guarderias.direccion,
       })
@@ -656,7 +656,7 @@ export default async function SocioPage({
       paywayPublicKey={guarderiaRow[0]?.paywayPublicKey ?? null}
       internosHabilitados={(guarderiaRow[0]?.mediosCobroInternos ?? []).length > 0}
       club={{
-        nombre: guarderiaRow[0]?.razonSocial ?? guarderiaRow[0]?.nombre ?? 'Club',
+        nombre: guarderiaRow[0]?.nombre ?? 'Club',
         cuit: guarderiaRow[0]?.cuit ?? null,
         direccion: guarderiaRow[0]?.direccion ?? null,
       }}

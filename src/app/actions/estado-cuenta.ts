@@ -80,8 +80,10 @@ export async function enviarEstadoCuentaAction(
     .select({
       nombre: profiles.nombre,
       apellido: profiles.apellido,
+      // Nombre del club, no razón social: mismo criterio que el membrete del
+      // PDF (decisión del cliente 2026-09-15). El mail y el adjunto tienen que
+      // nombrar al remitente igual.
       clubNombre: guarderias.nombre,
-      clubRazonSocial: guarderias.razonSocial,
     })
     .from(memberships)
     .innerJoin(profiles, eq(profiles.id, memberships.userId))
@@ -109,7 +111,7 @@ export async function enviarEstadoCuentaAction(
 
   const socioNombre = [row.nombre, row.apellido].filter(Boolean).join(' ') || 'socio';
   const { subject, html } = estadoCuentaEmail({
-    clubNombre: row.clubRazonSocial ?? row.clubNombre,
+    clubNombre: row.clubNombre,
     socioNombre,
     fecha: formatArgentinaDate(new Date()),
     saldoLabel: resumen.saldoLabel,
