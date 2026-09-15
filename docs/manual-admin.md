@@ -270,7 +270,7 @@ Cuando hay saldo a favor, un link **Ver historial** abre un panel con el detalle
 
 Al aplicar **cualquier filtro**, la tercera tarjeta (la del saldo) se **oculta**: su valor es el saldo total del socio y no se corresponde con el subconjunto de movimientos filtrados. Las tarjetas de **Ingresos por venta** y **Cobranzas** se mantienen. Al limpiar los filtros, vuelve a aparecer.
 
-**Exportar.** El botón **Exportar**, arriba a la derecha, baja un CSV con **los movimientos que estás viendo** — respeta los filtros y el orden aplicados, y trae las mismas columnas que la tabla. Se abre con Excel y respeta los acentos.
+**Exportar.** El botón **Exportar**, arriba a la derecha, abre un menú para elegir el formato — **Excel**, **PDF** o **CSV** — y baja **los movimientos que estás viendo**: respeta los filtros y el orden aplicados, y trae las mismas columnas que la tabla, con los mismos signos. Ver "Formatos de exportación" en la sección Ventas para qué conviene en cada caso.
 
 **Ordenar por fecha.** Hacé clic en el encabezado **Fecha** para alternar el orden de los movimientos entre **más nuevo primero** (por defecto) y **más antiguo primero**. La flechita del encabezado indica el orden actual.
 
@@ -814,7 +814,19 @@ En el tab **Comprobantes ARCA** podés acotar la tabla con los siguientes filtro
 
 > **Por qué el filtro de ARCA solo tiene dos valores y no hay "Pendiente".** La emisión es inmediata: cuando apretás emitir, o ARCA devuelve el CAE (queda **Aceptado**) o rechaza y la fila queda **Rechazado**. No existe un estado intermedio de "esperando respuesta", así que no hay nada que filtrar por "pendiente" en esta columna. Lo que sí puede estar pendiente es el **cobro**, y eso se filtra con el primer desplegable.
 
-Para exportar los comprobantes actualmente visibles (respetando los filtros activos), hacé clic en **Exportar** — se descarga un archivo CSV.
+Para exportar los comprobantes actualmente visibles (respetando los filtros activos), hacé clic en **Exportar** y elegí el formato.
+
+**Formatos de exportación.** El mismo menú está en Ventas, en Cobranzas y en la Cuenta Corriente del socio, y los tres formatos traen **exactamente las mismas columnas y valores que la tabla en pantalla**:
+
+| Formato   | Qué baja                                                                                                        | Cuándo conviene                                           |
+| --------- | --------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| **Excel** | Una planilla `.xlsx` con el encabezado fijo y coloreado, filtros en cada columna y los anchos ya ajustados.     | Para trabajar los datos: ordenar, filtrar, cruzar.        |
+| **PDF**   | Un A4 apaisado con título, fecha y hora de generación, el encabezado repetido en cada página y "Página X de Y". | Para imprimir, archivar o mandar por mail tal cual se ve. |
+| **CSV**   | Texto plano separado por comas, con los acentos bien codificados para Excel.                                    | Para importar en otro sistema (contabilidad, un ERP).     |
+
+> Los importes salen en el Excel **tal como se muestran en pantalla** (por ejemplo `$1.234,50`), como texto y no como número. Si querés sumarlos en Excel, convertí la columna a número desde ahí. Se hizo así a propósito: un CUIT de 11 dígitos tratado como número Excel lo muestra como `2,02E+10`.
+
+El nombre del archivo lleva la fecha del día (por ejemplo `comprobantes-2026-09-15.xlsx`).
 
 **Columnas de la tabla Comprobantes ARCA.** En orden: casilla de selección, Ente emisor, CUIT emisor, Nº Op. SC, Fecha, Tipo de comprobante (solo la sigla FC/NC/ND — la letra va en su propia columna), Letra, Número de comprobante legal (con el folio interno FM-/FL- debajo), Nº Socio, Razón social, CUIT/CUIL, Vencimiento, CAE, Vencimiento del CAE, Período (Desde/Hasta), Neto, Exento, IVA, Total, Estado envío ARCA (Aceptado/Rechazado), Estado de cobro y Acciones.
 
@@ -910,7 +922,7 @@ _Dos casos en los que el sistema no te va a dejar anular:_
 
 ### Exportar la lista de cobranzas
 
-El botón **Exportar** (arriba a la derecha de la tabla) baja un archivo CSV con **los recibos que estás viendo** — respeta los filtros y la búsqueda aplicados. Se abre con Excel y respeta los acentos.
+El botón **Exportar** (arriba a la derecha de la tabla) abre un menú para elegir **Excel**, **PDF** o **CSV**, y baja **los recibos que estás viendo** — respeta los filtros y la búsqueda aplicados. Ver "Formatos de exportación" en la sección Ventas.
 
 Un recibo **anulado** se exporta con importe **$0**, igual que se muestra en la tabla: así, si sumás la columna en Excel, el total coincide con lo realmente cobrado.
 

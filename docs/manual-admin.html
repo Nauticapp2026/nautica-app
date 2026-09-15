@@ -413,7 +413,7 @@
 <ul><li><strong>Desde / Hasta</strong> — rango de fechas.</li><li><strong>Estado</strong> — Todos / Cobrado / Anulado (NC) / Parcial / Pendiente.</li><li><strong>Tipo de comprobante</strong> — Factura A/B/C, Recibo, Comprobante interno, Nota de crédito o Sin comprobante.</li></ul>
 <p>Al aplicar <strong>cualquier filtro</strong>, la tercera tarjeta (la del saldo) se <strong>oculta</strong>: su valor es el saldo total del socio y no se corresponde con el subconjunto de movimientos filtrados. Las tarjetas de <strong>Ingresos por venta</strong> y <strong>Cobranzas</strong> se mantienen. Al limpiar los filtros, vuelve a aparecer.</p>
 
-<p><strong>Exportar.</strong> El botón <strong>Exportar</strong>, arriba a la derecha, baja un CSV con <strong>los movimientos que estás viendo</strong> — respeta los filtros y el orden aplicados, y trae las mismas columnas que la tabla. Se abre con Excel y respeta los acentos.</p>
+<p><strong>Exportar.</strong> El botón <strong>Exportar</strong>, arriba a la derecha, abre un menú para elegir el formato — <strong>Excel</strong>, <strong>PDF</strong> o <strong>CSV</strong> — y baja <strong>los movimientos que estás viendo</strong>: respeta los filtros y el orden aplicados, y trae las mismas columnas que la tabla, con los mismos signos. Ver "Formatos de exportación" en la sección Ventas para qué conviene en cada caso.</p>
 
 <p><strong>Ordenar por fecha.</strong> Hacé clic en el encabezado <strong>Fecha</strong> para alternar el orden de los movimientos entre <strong>más nuevo primero</strong> (por defecto) y <strong>más antiguo primero</strong>. La flechita del encabezado indica el orden actual.</p>
 
@@ -809,7 +809,17 @@
 <ul><li><strong>Estado</strong>: Todos los estados / Pendiente / Cobrada / Vencida — es el estado de <strong>cobro</strong>.</li><li><strong>ARCA</strong>: todos / aceptados / rechazados — es el estado del comprobante <strong>ante ARCA</strong>, que es otra cosa: una factura puede estar <strong>aceptada por ARCA y todavía sin cobrar</strong>.</li><li><strong>Tipo</strong>: Todos / Facturas ARCA / Notas de Crédito</li><li><strong>Período</strong>: fecha desde y fecha hasta</li></ul>
 <blockquote><strong>Por qué el filtro de ARCA solo tiene dos valores y no hay "Pendiente".</strong> La emisión es inmediata: cuando apretás emitir, o ARCA devuelve el CAE (queda <strong>Aceptado</strong>) o rechaza y la fila queda <strong>Rechazado</strong>. No existe un estado intermedio de "esperando respuesta", así que no hay nada que filtrar por "pendiente" en esta columna. Lo que sí puede estar pendiente es el <strong>cobro</strong>, y eso se filtra con el primer desplegable.</blockquote>
 
-<p>Para exportar los comprobantes actualmente visibles (respetando los filtros activos), hacé clic en <strong>Exportar</strong> — se descarga un archivo CSV.</p>
+<p>Para exportar los comprobantes actualmente visibles (respetando los filtros activos), hacé clic en <strong>Exportar</strong> y elegí el formato.</p>
+
+<p><strong>Formatos de exportación.</strong> El mismo menú está en Ventas, en Cobranzas y en la Cuenta Corriente del socio, y los tres formatos traen <strong>exactamente las mismas columnas y valores que la tabla en pantalla</strong>:<table></p>
+
+<thead><table><tbody><tr><th>Formato</th><th>Qué baja</th><th>Cuándo conviene</th></tr></tbody></table></thead><tbody><table><tbody><tr><td>---------</td><td>---------------------------------------------------------------------------------------------------------------</td><td>---------------------------------------------------------</td></tr>
+<tr><td><strong>Excel</strong></td><td>Una planilla <code>.xlsx</code> con el encabezado fijo y coloreado, filtros en cada columna y los anchos ya ajustados.</td><td>Para trabajar los datos: ordenar, filtrar, cruzar.</td></tr>
+<tr><td><strong>PDF</strong></td><td>Un A4 apaisado con título, fecha y hora de generación, el encabezado repetido en cada página y "Página X de Y".</td><td>Para imprimir, archivar o mandar por mail tal cual se ve.</td></tr>
+<tr><td><strong>CSV</strong></td><td>Texto plano separado por comas, con los acentos bien codificados para Excel.</td><td>Para importar en otro sistema (contabilidad, un ERP).</td></tr></tbody></table></tbody></table>
+<blockquote>Los importes salen en el Excel <strong>tal como se muestran en pantalla</strong> (por ejemplo <code>$1.234,50</code>), como texto y no como número. Si querés sumarlos en Excel, convertí la columna a número desde ahí. Se hizo así a propósito: un CUIT de 11 dígitos tratado como número Excel lo muestra como <code>2,02E+10</code>.</blockquote>
+
+<p>El nombre del archivo lleva la fecha del día (por ejemplo <code>comprobantes-2026-09-15.xlsx</code>).</p>
 
 <p><strong>Columnas de la tabla Comprobantes ARCA.</strong> En orden: casilla de selección, Ente emisor, CUIT emisor, Nº Op. SC, Fecha, Tipo de comprobante (solo la sigla FC/NC/ND — la letra va en su propia columna), Letra, Número de comprobante legal (con el folio interno FM-/FL- debajo), Nº Socio, Razón social, CUIT/CUIL, Vencimiento, CAE, Vencimiento del CAE, Período (Desde/Hasta), Neto, Exento, IVA, Total, Estado envío ARCA (Aceptado/Rechazado), Estado de cobro y Acciones.</p>
 
@@ -883,7 +893,7 @@
 <ul><li><strong>El recibo quedó fuera del período de anulación</strong> que configuró el club (ver <strong>Mi perfil → Datos Impositivos → Período de anulación de recibo</strong>). El botón aparece deshabilitado y el mensaje te dice qué política está puesta.</li><li><strong>Parte del crédito de ese recibo ya se gastó en otra cobranza.</strong> Pasa con los adelantos: si cargaste un adelanto y después usaste ese saldo a favor para cobrar una factura, anular el adelanto dejaría esa factura cobrada con plata que ya no existe. El sistema lo bloquea y te dice <strong>cuál recibo anular primero</strong> (el que gastó el crédito). El orden correcto es de atrás para adelante: primero se deshace el uso, después el origen.</li></ul>
 <h3>Exportar la lista de cobranzas</h3>
 
-<p>El botón <strong>Exportar</strong> (arriba a la derecha de la tabla) baja un archivo CSV con <strong>los recibos que estás viendo</strong> — respeta los filtros y la búsqueda aplicados. Se abre con Excel y respeta los acentos.</p>
+<p>El botón <strong>Exportar</strong> (arriba a la derecha de la tabla) abre un menú para elegir <strong>Excel</strong>, <strong>PDF</strong> o <strong>CSV</strong>, y baja <strong>los recibos que estás viendo</strong> — respeta los filtros y la búsqueda aplicados. Ver "Formatos de exportación" en la sección Ventas.</p>
 
 <p>Un recibo <strong>anulado</strong> se exporta con importe <strong>$0</strong>, igual que se muestra en la tabla: así, si sumás la columna en Excel, el total coincide con lo realmente cobrado.</p>
 
