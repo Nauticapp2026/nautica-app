@@ -378,6 +378,20 @@ export async function savePuntoVentaAction(data: SavePuntoVentaData): Promise<{ 
       posCreds,
     );
   } catch (err) {
+    // Queda en el log del servidor: hasta ahora el error de TusFacturas solo se
+    // mostraba en pantalla y se perdía, y no había forma de reconstruir qué
+    // pasó en un alta fallida (2026-09-15: dos CUITs consumidos en la cuenta
+    // de prueba sin que nadie supiera con qué respuesta). Se registra contra
+    // qué cuenta salió: la madre (alta nueva) o las credenciales propias del
+    // club (modificación) — con los clubes viejos eso es la cuenta REAL.
+    console.error('[puntoVenta] TusFacturas rechazó el alta/modificación', {
+      guarderiaId,
+      operacion: esModificacion ? 'M' : 'A',
+      credenciales: principal ? 'propias del club (centro principal)' : 'madre (env)',
+      cuit: data.cuit.trim(),
+      puntoDeVenta: principal ? principal.puntoDeVenta : data.puntoDeVenta,
+      error: err instanceof Error ? err.message : String(err),
+    });
     return {
       error: err instanceof Error ? err.message : 'Error al sincronizar con TusFacturas.',
     };
