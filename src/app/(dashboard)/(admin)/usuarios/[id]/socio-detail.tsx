@@ -4416,7 +4416,7 @@ function ServiciosContratadosTab({
               <tr className="border-b border-gray-100 text-left text-xs font-semibold text-gray-400 uppercase">
                 <th className="pr-4 pb-2">Concepto</th>
                 <th className="pr-4 pb-2">Categoría</th>
-                <th className="pr-4 pb-2">Facturación</th>
+                <th className="pr-4 pb-2">Comprobante</th>
                 <th className="pr-4 pb-2">Cobro</th>
                 <th className="pr-4 pb-2">Débito autom.</th>
                 <th className="pr-4 pb-2">Fecha de asignación</th>
