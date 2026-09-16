@@ -3467,14 +3467,18 @@ export function SocioDetail({
                                 Cobranzas. ND: suma en Ventas como un cargo.
                                 Contraasiento de anulación de recibo: no es
                                 una venta — resta en la columna Cobranzas. */}
-                            <td className="px-4 py-3 text-right font-medium text-[#101828]">
+                            {/* whitespace-nowrap en las cuatro celdas de plata: en
+                                pantallas angostas (iPad) "-$1,00" se partía en
+                                "-" arriba y "$1,00" abajo — el guion es un punto
+                                de corte para el navegador (reporte 2026-09-16). */}
+                            <td className="px-4 py-3 text-right font-medium whitespace-nowrap text-[#101828]">
                               {m.tipo === 'nota_credito' && cobranza > 0
                                 ? `-${fmt(cobranza)}`
                                 : venta > 0 && m.tipo !== 'anulacion_recibo'
                                   ? fmt(venta)
                                   : '—'}
                             </td>
-                            <td className="px-4 py-3 text-right font-medium text-green-700">
+                            <td className="px-4 py-3 text-right font-medium whitespace-nowrap text-green-700">
                               {m.tipo === 'anulacion_recibo' && venta > 0
                                 ? `-${fmt(venta)}`
                                 : cobranza > 0 && m.tipo !== 'nota_credito'
@@ -3482,7 +3486,7 @@ export function SocioDetail({
                                   : '—'}
                             </td>
                             <td
-                              className={`px-4 py-3 text-right font-semibold ${
+                              className={`px-4 py-3 text-right font-semibold whitespace-nowrap ${
                                 m.saldo < 0
                                   ? 'text-green-700'
                                   : m.saldo > 0
@@ -3505,7 +3509,7 @@ export function SocioDetail({
                                 una anulación no deben nada. Mismo verde/rojo
                                 que Cobranzas y Vencido/Vencida, para que la
                                 tabla no mezcle dos tonos por el mismo sentido. */}
-                            <td className="px-4 py-3 text-right font-medium">
+                            <td className="px-4 py-3 text-right font-medium whitespace-nowrap">
                               {venta > 0 && m.tipo !== 'anulacion_recibo' ? (
                                 <span
                                   className={
