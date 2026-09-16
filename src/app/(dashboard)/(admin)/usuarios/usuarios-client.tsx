@@ -530,10 +530,10 @@ function CrearSocioModal({ open, onClose }: { open: boolean; onClose: () => void
               ) : (
                 <div className="space-y-3">
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <Field label="Razón social">
+                    <Field label="Nombre o Razón Social">
                       <input
                         className={inputCls}
-                        placeholder="Razón social"
+                        placeholder="Nombre o Razón Social"
                         value={form.razonSocial}
                         onChange={set('razonSocial')}
                       />
@@ -548,7 +548,7 @@ function CrearSocioModal({ open, onClose }: { open: boolean; onClose: () => void
                     </Field>
                   </div>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-[2fr_1fr]">
-                    <Field label="Calle fiscal">
+                    <Field label="Domicilio fiscal">
                       <input
                         className={inputCls}
                         placeholder="Av. Corrientes"
@@ -574,7 +574,7 @@ function CrearSocioModal({ open, onClose }: { open: boolean; onClose: () => void
                         onChange={set('ciudadFiscal')}
                       />
                     </Field>
-                    <Field label="Provincia fiscal">
+                    <Field label="Provincia">
                       <input
                         className={inputCls}
                         placeholder="Buenos Aires"

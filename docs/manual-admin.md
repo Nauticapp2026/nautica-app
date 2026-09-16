@@ -165,7 +165,7 @@ Mostrá y editá los datos personales: nombre, apellido, email, teléfono, docum
 
 #### Pestaña Datos Impositivos
 
-Mostrá y editá los datos fiscales del socio: razón social, CUIT, dirección fiscal, **email de facturación**, condición frente al IVA e Ingresos Brutos.
+Mostrá y editá los datos fiscales del socio: **Nombre o Razón Social**, CUIT, **Domicilio fiscal** (con ciudad y provincia), **email de facturación**, condición frente al IVA e Ingresos Brutos.
 
 El **email de facturación** es la dirección a la que se envía el comprobante. Si se deja vacío, se usa el email de la cuenta del socio (pestaña Generales).
 

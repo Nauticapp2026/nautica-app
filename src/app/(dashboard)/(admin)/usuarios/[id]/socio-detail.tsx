@@ -4203,7 +4203,9 @@ function ImpositivosTab({
       <div className="space-y-4">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <label className="mb-1.5 block text-xs font-semibold text-gray-500">Razón social</label>
+            <label className="mb-1.5 block text-xs font-semibold text-gray-500">
+              Nombre o Razón Social
+            </label>
             <input
               className={inputCls}
               value={editForm.razonSocial}
@@ -4225,7 +4227,9 @@ function ImpositivosTab({
         </div>
         <div className="grid grid-cols-[2fr_1fr] gap-4">
           <div>
-            <label className="mb-1.5 block text-xs font-semibold text-gray-500">Calle fiscal</label>
+            <label className="mb-1.5 block text-xs font-semibold text-gray-500">
+              Domicilio fiscal
+            </label>
             <input
               className={inputCls}
               value={editForm.direccionFiscal}
@@ -4259,9 +4263,7 @@ function ImpositivosTab({
             />
           </div>
           <div>
-            <label className="mb-1.5 block text-xs font-semibold text-gray-500">
-              Provincia fiscal
-            </label>
+            <label className="mb-1.5 block text-xs font-semibold text-gray-500">Provincia</label>
             <input
               className={inputCls}
               value={editForm.provinciaFiscal}
