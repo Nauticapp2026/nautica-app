@@ -452,7 +452,7 @@ export default async function SocioPage({
       facturasPorMovimiento.set(r.movimientoId, {
         facturacionId: r.facturacionId,
         codigo: r.codigo,
-        // Comprobantes internos (CM-/CL-) no tienen PDF externo: se ven/imprimen
+        // Comprobantes internos (CI-/CL-) no tienen PDF externo: se ven/imprimen
         // en su página dedicada, igual que los recibos con vínculo directo.
         archivo:
           r.archivo ?? (r.tipoFactura === 'recibo' ? `/ventas/recibo/${r.facturacionId}` : null),

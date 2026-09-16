@@ -180,7 +180,7 @@ const TIPO_FACTURA_LABEL: Record<string, string> = {
   nota_credito_interna: 'NC interna',
 };
 
-// 'recibo' agrupa RC-/RI- (cobranza), CM-/CL-/CA- (comprobante interno) y RB-
+// 'recibo' agrupa RC-/RI- (cobranza), CI-/CL-/CA- (comprobante interno) y RB-
 // — todos documentos sin validez fiscal en sí mismos. "Recibo" queda reservado
 // para Cobranzas (RC- fiscal / RI- interno): `tipoRecibo` (columna propia, se
 // computa al registrar la cobranza) dice de qué tipo era la deuda que cancela.
@@ -3215,11 +3215,11 @@ function NotaCreditoModal({
   );
 }
 
-// ─── Modal: nota de crédito interna (sobre un Comprobante interno CM-/CL-) ──
+// ─── Modal: nota de crédito interna (sobre un Comprobante interno CI-/CL-) ──
 //
 // Mismo molde que NotaCreditoModal pero sin NcNdToggle (solo NC, no hay ND
 // interna) y sin nada de TusFacturas (no hay CAE ni PDF que descargar — el
-// comprobante se ve/imprime en /ventas/recibo/[id] como cualquier CM-/CL-).
+// comprobante se ve/imprime en /ventas/recibo/[id] como cualquier CI-/CL-).
 
 function NotaCreditoInternaModal({
   open,
@@ -4030,11 +4030,14 @@ export function VentasClient({
     });
   }
 
-  // Tabla Recibos internos — incluye las NC internas (anulan un CM-/CL- de
-  // acá mismo, tiene sentido verlas al lado de lo que referencian).
+  // Tabla Comprobantes internos — incluye las NC internas (anulan un CI-/CL-
+  // de acá mismo, tiene sentido verlas al lado de lo que referencian). Los
+  // recibos de cobranza RC-/RI- no entran: el server ya no los trae, y el
+  // filtro acá es la red por si llegara alguno (viven en Cobranzas).
   const filtradosRecibos = useMemo(() => {
     return facturas
       .filter((f) => f.tipoFactura === 'recibo' || f.tipoFactura === 'nota_credito_interna')
+      .filter((f) => !esCodigoReciboCobranza(f.codigo))
       .filter((f) => {
         if (search.trim()) {
           const q = normalizarBusqueda(search);
@@ -4356,7 +4359,9 @@ export function VentasClient({
           <span className="ml-2 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
             {
               facturas.filter(
-                (f) => f.tipoFactura === 'recibo' || f.tipoFactura === 'nota_credito_interna',
+                (f) =>
+                  (f.tipoFactura === 'recibo' || f.tipoFactura === 'nota_credito_interna') &&
+                  !esCodigoReciboCobranza(f.codigo),
               ).length
             }
           </span>
@@ -4781,7 +4786,7 @@ export function VentasClient({
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-end gap-1">
-                            {(f.codigo?.startsWith('CM-') || f.codigo?.startsWith('CL-')) &&
+                            {(f.codigo?.startsWith('CI-') || f.codigo?.startsWith('CL-')) &&
                               (() => {
                                 const agotado =
                                   (acreditadoNcPorFactura.get(f.id) ?? 0) >=

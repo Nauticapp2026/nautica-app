@@ -36,7 +36,7 @@
  *    los del otro. Por eso el reset se NIEGA si algún socio del club tiene
  *    membership en otra guardería. Hoy no pasa; el código no lo asume.
  *
- * 2. La numeración de comprobantes (RC-/RI-/FM-/FL-/FA-/CM-/CL-/CA-/NCI-) y el
+ * 2. La numeración de comprobantes (RC-/RI-/FM-/FL-/FA-/CI-/CL-/CA-/NCI-) y el
  *    Nº de socio se calculan CONTANDO filas por club, no hay contadores
  *    guardados. Al borrar las filas, el próximo número es 000001 solo. No hay
  *    nada que "resetear" aparte.

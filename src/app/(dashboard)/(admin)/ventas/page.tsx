@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, notLike, or } from 'drizzle-orm';
 
 import { getActiveMarina } from '@/lib/auth/session';
 import { db } from '@/lib/db';
@@ -19,6 +19,7 @@ import { identidadFacturacion } from '@/lib/facturacion/identidad';
 import { claveItem, listarPendientesFacturar } from '@/lib/pendientes-facturar';
 import { getCargosSaldadosFifo } from '@/lib/reconciliar-cuenta';
 import { getKpisVentas } from '@/lib/ventas-kpis';
+import { PATRONES_RECIBO_COBRANZA } from '@/lib/recibo-codigos';
 
 import { VentasClient } from './ventas-client';
 import { VENTAS_TAB_IDS, tabDesdeUrl } from '@/lib/tab-url';
@@ -220,7 +221,18 @@ export default async function VentasPage({
         memberships,
         and(eq(memberships.userId, facturacion.socioId), eq(memberships.guarderiaId, gId)),
       )
-      .where(eq(facturacion.guarderiaId, gId))
+      // Sin los recibos de cobranza (RC-/RI-): documentan un pago y viven en
+      // Cobranzas. El cliente pidió (2026-09-16) que Ventas no los muestre;
+      // además ocupaban lugar en el tope de 200 filas.
+      .where(
+        and(
+          eq(facturacion.guarderiaId, gId),
+          or(
+            isNull(facturacion.codigo),
+            and(...PATRONES_RECIBO_COBRANZA.map((p) => notLike(facturacion.codigo, p))),
+          ),
+        ),
+      )
       .orderBy(desc(facturacion.createdAt))
       .limit(200),
 

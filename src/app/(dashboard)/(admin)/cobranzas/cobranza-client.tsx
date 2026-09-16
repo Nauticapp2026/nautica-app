@@ -42,7 +42,7 @@ const TIPO_COMPROBANTE_LABEL: Record<string, string> = {
   nota_debito_a: 'Nota de débito A',
   nota_debito_b: 'Nota de débito B',
   nota_debito_c: 'Nota de débito C',
-  // Los pendientes de cobro con tipo 'recibo' son siempre CM-/CL-/CA- (un
+  // Los pendientes de cobro con tipo 'recibo' son siempre CI-/CL-/CA- (un
   // RC- nunca queda pendiente): el documento se llama "Comprobante interno".
   recibo: 'Comprobante interno',
 };
@@ -154,7 +154,7 @@ function NuevaCobranzaModal({
 
   const sociosFiltrados = useMemo(() => buscarSocios(socios, query).slice(0, 50), [socios, query]);
 
-  // Solo los comprobantes del canal elegido: interno = CM-/CL-/CA- (tipo
+  // Solo los comprobantes del canal elegido: interno = CI-/CL-/CA- (tipo
   // 'recibo'); fiscal = facturas A/B/C y notas de débito.
   const comprobantesCanal = useMemo(
     () => comprobantes.filter((c) => (c.tipoFactura === 'recibo') === (canal === 'interno')),

@@ -661,7 +661,7 @@ La sección tiene **dos pestañas**: **Tablón de la app** (todo lo anterior: lo
 
 Desde esta sección emitís y gestionás las facturas de tu club.
 
-> Para poder emitir facturas ARCA necesitás tener configurado el **Punto de Venta** y haber confirmado el **Certificado ARCA**. Podés hacerlo desde **Mi perfil → Datos Impositivos**. Si la emisión está bloqueada, el panel muestra un aviso explicando qué falta. Los **recibos internos** se pueden emitir aunque el certificado todavía no esté configurado.
+> Para poder emitir facturas ARCA necesitás tener configurado el **Punto de Venta** y haber confirmado el **Certificado ARCA**. Podés hacerlo desde **Mi perfil → Datos Impositivos**. Si la emisión está bloqueada, el panel muestra un aviso explicando qué falta. Los **comprobantes internos** se pueden emitir aunque el certificado todavía no esté configurado.
 
 ### Datos requeridos para emitir facturas ARCA
 
@@ -753,7 +753,7 @@ Al **Cargar Servicio** (pestaña Servicios Contratados de un socio) eligiendo **
 
 Los servicios Interno se consolidan en un comprobante desde **Ventas → Nuevo comprobante**, o los emite solo el sistema el día de facturación:
 
-- **Comprobante interno manual** — elegís un socio, el sistema te muestra sus servicios Interno pendientes en una lista para tildar (igual que Facturación manual), y emitís un solo comprobante con todos los que selecciones. Numeración **CM-NNNNNN**.
+- **Comprobante interno manual** — elegís un socio, el sistema te muestra sus servicios Interno pendientes en una lista para tildar (igual que Facturación manual), y emitís un solo comprobante con todos los que selecciones. Numeración **CI-NNNNNN**.
 - **Comprobante interno por lote** — igual, pero para todos los socios con servicios Interno pendientes a la vez; genera un comprobante por socio. Numeración **CL-NNNNNN**.
 - **Automático** — el día de facturación del club, el sistema emite solo un comprobante interno por socio con sus servicios Interno del período. Numeración **CA-NNNNNN**.
 
@@ -761,11 +761,13 @@ El comprobante generado muestra fecha de emisión, descripción del o los servic
 
 Todos aparecen en **Ventas → tab Comprobantes internos** y quedan disponibles para imprimir o enviar por mail.
 
+> Los **recibos de cobranza** (RC- fiscales y RI- internos) **no se muestran en Ventas**: documentan un pago, no una venta, y se ven desde **Cobranzas**.
+
 ### Anular un comprobante interno (Nota de Crédito interna)
 
-Si necesitás anular un comprobante interno (CM- o CL-) ya emitido, hay una Nota de Crédito interna — no pasa por ARCA, no tiene CAE ni validez fiscal, es solo para dejar constancia dentro del club.
+Si necesitás anular un comprobante interno (CI- o CL-) ya emitido, hay una Nota de Crédito interna — no pasa por ARCA, no tiene CAE ni validez fiscal, es solo para dejar constancia dentro del club.
 
-1. En el tab **Comprobantes internos**, en la fila del comprobante CM-/CL- que querés anular, hacé clic en el ícono de flecha curva (↩) — **"Emitir Nota de Crédito interna"**.
+1. En el tab **Comprobantes internos**, en la fila del comprobante CI-/CL- que querés anular, hacé clic en el ícono de flecha curva (↩) — **"Emitir Nota de Crédito interna"**.
 2. Elegí el motivo: **Anulación total**, **Descuento parcial** o **Devolución de servicio**.
 3. Si no es anulación total, ingresá el **importe a acreditar** (no puede superar el importe original). La **descripción** es opcional — si la dejás vacía, el sistema arma una automática.
 4. Confirmá. Se numera con su propia serie **NCI-NNNNNN** y se ve/imprime desde el mismo visor que el resto de los comprobantes.
@@ -797,7 +799,7 @@ En **Nuevo comprobante → Facturación manual**, el campo **Tipo de comprobante
 
 > La **nota de débito impacta como una factura**: es deuda nueva del socio. Nace **Pendiente**, suma al saldo de la Cuenta Corriente y se cobra por los mismos circuitos que una factura — aparece en **Cobranzas → Nueva cobranza**, se puede **Marcar como cobrada** desde la fila, y el débito automático/pagos a cuenta la saldan por FIFO. La **nota de crédito**, en cambio, nace ya "Cobrada" (un crédito no queda pendiente de cobro).
 
-> **Tope de las notas de crédito**: entre todas las NC de una misma factura no se puede acreditar más que el **total facturado**. Podés emitir varias NC parciales, pero el formulario muestra cuánto queda **disponible** (total menos lo ya acreditado) y el sistema rechaza cualquier importe que lo supere. Una factura totalmente acreditada ya no admite más NC, y si tiene NC parciales deja de ofrecer "Anulación total" (queda el camino parcial por lo disponible). La misma regla aplica a las **NC internas** sobre comprobantes CM-/CL-.
+> **Tope de las notas de crédito**: entre todas las NC de una misma factura no se puede acreditar más que el **total facturado**. Podés emitir varias NC parciales, pero el formulario muestra cuánto queda **disponible** (total menos lo ya acreditado) y el sistema rechaza cualquier importe que lo supere. Una factura totalmente acreditada ya no admite más NC, y si tiene NC parciales deja de ofrecer "Anulación total" (queda el camino parcial por lo disponible). La misma regla aplica a las **NC internas** sobre comprobantes CI-/CL-.
 
 > La nota de crédito o débito sobre un comprobante emitido sale siempre por el **mismo punto de venta** que la factura original (así las asocia ARCA) — no hay que elegir centro emisor. Lo mismo aplica al **Reenviar** una factura rechazada: se reintenta por el punto de venta del intento original.
 
@@ -874,17 +876,20 @@ Desde acá registrás los cobros que recibís de tus socios (efectivo, transfere
 
 ### Cómo se ve la pantalla
 
-La pantalla tiene dos pestañas:
+La pantalla tiene tres pestañas:
 
-- **Cobranzas** — el registro de cobros manuales que fuiste cargando.
+- **Todas** — recibos de cobranza y cobros por débito automático juntos, ordenados por fecha.
+- **Cobranzas** — el registro de cobros manuales que fuiste cargando, con el detalle de cada recibo.
 - **Débito automático** — el historial de cobros automáticos por Payway (ver capítulo 14).
 
-Arriba de la tabla de Cobranzas está el botón **Nueva cobranza**.
+Arriba de las pestañas hay **filtros comunes a las tres**: un buscador por **socio** (nombre, razón social o número de socio) y un rango de fechas **Desde / Hasta** del cobro. Los contadores de las pestañas y la exportación de Cobranzas respetan los filtros; el botón **Limpiar** los saca de una vez.
+
+Arriba a la derecha está el botón **Nueva cobranza**.
 
 ### Registrar una cobranza nueva
 
 1. Hacé clic en **Nueva cobranza**.
-2. Elegí **qué tipo de comprobantes vas a cobrar**: **Comprobantes ARCA** (facturas A/B/C y notas de débito) o **Comprobantes internos** (CM-/CL-/CA-) — la misma separación que las pestañas de Ventas. Un recibo no puede mezclar los dos circuitos, así que la lista solo muestra los del tipo elegido. La opción **Comprobantes internos** solo aparece si el club tiene medios habilitados en **Mi perfil → Datos Impositivos → Gestión de cobranza**.
+2. Elegí **qué tipo de comprobantes vas a cobrar**: **Comprobantes ARCA** (facturas A/B/C y notas de débito) o **Comprobantes internos** (CI-/CL-/CA-) — la misma separación que las pestañas de Ventas. Un recibo no puede mezclar los dos circuitos, así que la lista solo muestra los del tipo elegido. La opción **Comprobantes internos** solo aparece si el club tiene medios habilitados en **Mi perfil → Datos Impositivos → Gestión de cobranza**.
 3. Buscá al socio por nombre, número de socio o embarcación, y hacé clic sobre él en la lista.
 4. El sistema te muestra **solo los comprobantes pendientes de cobro** de ese socio (total o parcialmente), del tipo elegido en el paso 2. Los comprobantes ya cobrados enteros no aparecen; los que tuvieron un **cobro parcial** aparecen con el **saldo que falta cobrar** (y la aclaración del total original).
 

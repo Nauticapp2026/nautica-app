@@ -42,7 +42,14 @@ const COBRO_ESTADO_LABEL: Record<string, string> = {
   pendiente: 'Pendiente',
 };
 
-export function PaywayCobrosList({ cobros }: { cobros: CobroPayway[] }) {
+export function PaywayCobrosList({
+  cobros,
+  filtradoExterno = false,
+}: {
+  cobros: CobroPayway[];
+  /** La lista ya viene filtrada por socio/fechas desde la pantalla (cambia el vacío). */
+  filtradoExterno?: boolean;
+}) {
   const [search, setSearch] = useState('');
   const [filterEstado, setFilterEstado] = useState('');
   const [isPending, startTransition] = useTransition();
@@ -155,7 +162,7 @@ export function PaywayCobrosList({ cobros }: { cobros: CobroPayway[] }) {
           <EmptyState
             icon={<CreditCard className="h-7 w-7 opacity-40" />}
             text={
-              search || filterEstado
+              search || filterEstado || filtradoExterno
                 ? 'No se encontraron cobros con ese criterio.'
                 : 'Todavía no hay cobros de débito automático.'
             }

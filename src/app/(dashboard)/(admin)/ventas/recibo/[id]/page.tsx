@@ -132,7 +132,7 @@ export default async function ReciboPage({
   }
   const esNotaCreditoInterna = row.tipoFactura === 'nota_credito_interna';
   // "Recibo" queda reservado para Cobranzas (RC- fiscal / RI- interno). El
-  // resto de los documentos internos (CM-/CL-/RB-) documentan cargos, no un
+  // resto de los documentos internos (CI-/CL-/RB-) documentan cargos, no un
   // pago: son "Comprobante interno".
   const esReciboCobranza = esCodigoReciboCobranza(row.codigo);
   const titulo = esNotaCreditoInterna
@@ -152,7 +152,7 @@ export default async function ReciboPage({
       : null;
   const clubNombre = row.guarderiaRazonSocial ?? row.guarderiaName;
 
-  // Nota de Crédito interna: código del Comprobante interno (CM-/CL-) que anula.
+  // Nota de Crédito interna: código del Comprobante interno (CI-/CL-) que anula.
   let codigoOriginal: string | null = null;
   if (esNotaCreditoInterna && row.facturaOriginalId) {
     const [original] = await db
@@ -182,7 +182,7 @@ export default async function ReciboPage({
   // Comprobantes que cobró el recibo. Para recibos de cobranza (RC-/RI-)
   // están guardados exactos en cobranza_comprobante_ids, o si no se buscan
   // por heurística FIFO (facturas AFIP del socio, de la más antigua a la más
-  // nueva, hasta cubrir el importe). RB-/CM-/CL- documentan un cargo propio,
+  // nueva, hasta cubrir el importe). RB-/CI-/CL- documentan un cargo propio,
   // no un pago — para esos se muestra row.descripcion directamente más abajo.
   // El armado es compartido con el mail del recibo (src/lib/recibo-desglose.ts).
   let comprobantes: ComprobanteCobrado[] = [];
@@ -194,7 +194,7 @@ export default async function ReciboPage({
     comprobantes = await getComprobantesCobradosLegacy(gId, row.socioId, row.importe);
   }
 
-  // Ítems propios del comprobante (CM-/CL-: consolida varios cargos Interno
+  // Ítems propios del comprobante (CI-/CL-: consolida varios cargos Interno
   // en un solo documento). Antes se resumía en `row.descripcion` ("Expensas
   // (+1)"); acá mostramos cada cargo con su concepto y precio discriminados.
   // Solo aplica cuando el recibo documenta cargos propios (no cuando ya

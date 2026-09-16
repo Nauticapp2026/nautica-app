@@ -58,7 +58,7 @@ export const hoyArg = sql`(now() AT TIME ZONE 'America/Argentina/Buenos_Aires'):
  */
 /**
  * Qué comprobante es DEUDA COBRABLE del club, pagada o no: facturas, notas de
- * débito y comprobantes internos (CM-/CL-), sin anuladas ni rechazadas y sin
+ * débito y comprobantes internos (CI-/CL-), sin anuladas ni rechazadas y sin
  * los recibos de cobranza RC-/RI- (documentan un pago, no deuda). Es el mismo
  * conjunto que Cobranzas ofrece cobrar. Lo usan el puntito de Socios, la
  * tarjeta del Dashboard y las tarjetas de Ventas, para que ningún contador

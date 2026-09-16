@@ -27,20 +27,18 @@ export const PREFIJO_RECIBO_FISCAL = 'RC';
 export const PREFIJO_RECIBO_INTERNO = 'RI';
 
 /**
- * Todos los prefijos que identifican un recibo de cobranza, incluido el legacy.
+ * Todos los prefijos que identifican un recibo de cobranza.
  *
- * `CI` se conserva a propósito aunque la migración ya renombró los que había:
- * el modo de fallar de estos filtros es tratar un recibo como deuda cobrable,
- * así que si alguna vez reaparece un CI- (una restauración desde un backup, una
- * fila que se pasó por alto) tiene que seguir reconociéndose. Nada lo genera.
+ * `CI` estuvo acá como legacy (era la sigla vieja del recibo interno, renombrada
+ * a RI- en la mig 0153) hasta el 2026-09-16: ese día el cliente pidió que el
+ * **Comprobante interno manual** pase de CM- a **CI-** (mig 0157), así que CI-
+ * ahora es DEUDA (un comprobante interno), no un recibo. Si quedara acá, los
+ * comprobantes internos manuales desaparecerían de Cobranzas y de los saldos.
+ * Se verificó antes de la mig que no existía ningún CI- viejo en la base.
  */
-export const PREFIJOS_RECIBO_COBRANZA = [
-  PREFIJO_RECIBO_FISCAL,
-  PREFIJO_RECIBO_INTERNO,
-  'CI',
-] as const;
+export const PREFIJOS_RECIBO_COBRANZA = [PREFIJO_RECIBO_FISCAL, PREFIJO_RECIBO_INTERNO] as const;
 
-/** Patrones `LIKE` para las queries (`RC-%`, `RI-%`, `CI-%`). */
+/** Patrones `LIKE` para las queries (`RC-%`, `RI-%`). */
 export const PATRONES_RECIBO_COBRANZA = PREFIJOS_RECIBO_COBRANZA.map((p) => `${p}-%`);
 
 /** ¿Este código es de un recibo de cobranza? */

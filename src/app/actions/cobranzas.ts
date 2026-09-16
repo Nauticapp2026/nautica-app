@@ -554,7 +554,7 @@ export async function registrarCobranzaAction(data: RegistrarCobranzaData): Prom
   }
 
   // Un recibo no puede mezclar comprobantes fiscales (factura_a/b/c) con
-  // internos (recibo/CM-/CL-) — son circuitos separados.
+  // internos (recibo/CI-/CL-) — son circuitos separados.
   const tiposEnSeleccion = new Set(
     comprobantes.map((c) => (c.tipoFactura === 'recibo' ? 'interno' : 'fiscal')),
   );

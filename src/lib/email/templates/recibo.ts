@@ -21,7 +21,7 @@ export type ReciboEmailParams = {
   importeFmt: string; // ya formateado $X
   comprobantes: string[]; // ej. ["Factura B 0001-00000012"]
   formaPago: string | null;
-  // true para CM-/CL-/RB- (documentan cargos, no un pago): el documento se
+  // true para CI-/CL-/RB- (documentan cargos, no un pago): el documento se
   // titula "Comprobante interno" — "Recibo" queda reservado para Cobranzas (RC-).
   esComprobanteInterno?: boolean;
 };

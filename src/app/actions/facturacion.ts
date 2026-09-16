@@ -1825,8 +1825,8 @@ export async function cargarServicioAction(data: CargarServicioData): Promise<{
 // comprobante emitido todavía) en un solo documento no fiscal. No interactúa
 // con ARCA ni con las facturas: es solo un recibo para imprimir/mandar.
 
-// CM = manual, CL = lote, CA = automático (cron) — espeja FM/FL/FA.
-type PrefijoInterno = 'CM' | 'CL' | 'CA';
+// CI = manual, CL = lote, CA = automático (cron) — espeja FM/FL/FA.
+type PrefijoInterno = 'CI' | 'CL' | 'CA';
 
 async function nextComprobanteInternoCodigo(
   dbx: DbExecutor,
@@ -1838,7 +1838,7 @@ async function nextComprobanteInternoCodigo(
   // efecto si dbx es una transacción — el codigo se asigna siempre dentro de
   // la tx de emisión.
   await dbx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${'ci:' + gId}, 0))`);
-  // Correlativo ÚNICO entre todos los comprobantes internos del club: CM-,
+  // Correlativo ÚNICO entre todos los comprobantes internos del club: CI-,
   // CL- y CA- comparten la secuencia (el prefijo solo indica el origen), y la
   // numeración es propia, separada de la de ARCA. Se cuenta el total emitido
   // con cualquiera de los tres prefijos; como cada secuencia vieja era
@@ -1851,7 +1851,7 @@ async function nextComprobanteInternoCodigo(
         eq(facturacion.guarderiaId, gId),
         eq(facturacion.tipoFactura, 'recibo'),
         or(
-          like(facturacion.codigo, 'CM-%'),
+          like(facturacion.codigo, 'CI-%'),
           like(facturacion.codigo, 'CL-%'),
           like(facturacion.codigo, 'CA-%'),
         ),
@@ -2077,7 +2077,7 @@ export async function crearComprobanteInternoAction(
   if (!ctx) return { error: 'No autenticado' };
   return crearComprobanteInternoCore(
     { ...data, guarderiaId: ctx.activeMembership.guarderiaId },
-    'CM',
+    'CI',
   );
 }
 
@@ -2626,7 +2626,7 @@ export async function emitirNotaAsociadaAction(
       concepto: descripcionNota,
       createdBy: ctx.user.id,
     });
-    // Vincula la nota a su propio movimiento (mismo patrón que RC-/CM-/CL-)
+    // Vincula la nota a su propio movimiento (mismo patrón que RC-/CI-/CL-)
     // para que el cálculo de cobertura sepa a qué cargo puntual aplica esta
     // NC, en vez de tratarla como crédito genérico.
     await db.update(facturacion).set({ movimientoId }).where(eq(facturacion.id, notaId));
@@ -2662,7 +2662,7 @@ export async function emitirNotaCreditoAction(
   return emitirNotaAsociadaAction({ ...data, esNc: true });
 }
 
-// ─── Nota de Crédito interna: anula/reduce un Comprobante interno (CM-/CL-) ──
+// ─── Nota de Crédito interna: anula/reduce un Comprobante interno (CI-/CL-) ──
 //
 // A diferencia de emitirNotaAsociadaAction, NO pasa por TusFacturas/ARCA —
 // un Comprobante interno no tiene validez fiscal, así que no hay nada que
@@ -2711,11 +2711,11 @@ export async function emitirNotaCreditoInternaAction(
   if (!original) return { error: 'Comprobante no encontrado.' };
   if (
     original.tipoFactura !== 'recibo' ||
-    !(original.codigo?.startsWith('CM-') || original.codigo?.startsWith('CL-'))
+    !(original.codigo?.startsWith('CI-') || original.codigo?.startsWith('CL-'))
   ) {
     return {
       error:
-        'Solo se puede emitir una Nota de Crédito interna sobre un Comprobante interno (CM-/CL-).',
+        'Solo se puede emitir una Nota de Crédito interna sobre un Comprobante interno (CI-/CL-).',
     };
   }
   if (!original.socioId) return { error: 'El comprobante no tiene socio asociado.' };

@@ -488,7 +488,7 @@ const TIPO_COMPROBANTE_LABEL: Record<string, string> = {
   nota_credito_c: 'Nota de crédito C',
 };
 
-// 'recibo' agrupa RC-/RI- (cobranza), CM-/CL-/CA- (comprobante interno) y RB-
+// 'recibo' agrupa RC-/RI- (cobranza), CI-/CL-/CA- (comprobante interno) y RB-
 // — ninguno tiene validez fiscal en sí mismo. "Recibo" queda reservado para
 // Cobranzas (RC- fiscal / RI- interno): `facturaTipoRecibo` (se completa al
 // registrar la cobranza) dice de qué tipo era la deuda que cancela. Todo el
@@ -511,7 +511,7 @@ function tipoComprobanteLabel(m: {
 /**
  * ¿La fila es un recibo de cobranza (RC-/RI-)? Mismo criterio que
  * `tipoComprobanteLabel`: un `facturaTipo='recibo'` con otro código es en
- * realidad un comprobante interno (CM-/CL-/CA-), o sea un cargo.
+ * realidad un comprobante interno (CI-/CL-/CA-), o sea un cargo.
  */
 function esRecibo(m: { facturaTipo: string | null; facturaCodigo: string | null }): boolean {
   return m.facturaTipo === 'recibo' && esCodigoReciboCobranza(m.facturaCodigo);

@@ -84,7 +84,7 @@ export async function enviarReciboPorMail(
   // Comprobantes que cobró el recibo — igual que la vista del recibo: los
   // exactos guardados en cobranza_comprobante_ids (con el detalle de sus
   // cargos), o la heurística FIFO para recibos viejos sin ese dato. Solo
-  // aplica a recibos de cobranza (RC-/RI-): RB-/CM-/CL- documentan un cargo
+  // aplica a recibos de cobranza (RC-/RI-): RB-/CI-/CL- documentan un cargo
   // propio, no un pago — para esos se usa row.descripcion más abajo.
   const fmtPesos = (v: string | null) =>
     `$${parseFloat(v ?? '0').toLocaleString('es-AR', {
@@ -161,7 +161,7 @@ export async function enviarReciboPorMail(
     importeFmt,
     comprobantes,
     formaPago: row.medioPago ? (FORMA_PAGO_LABEL[row.medioPago] ?? row.medioPago) : null,
-    // "Recibo" solo para Cobranzas (RC-/RI-); CM-/CL-/RB- son Comprobante interno.
+    // "Recibo" solo para Cobranzas (RC-/RI-); CI-/CL-/RB- son Comprobante interno.
     esComprobanteInterno: !esReciboCobranza,
   });
 

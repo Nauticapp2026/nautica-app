@@ -170,13 +170,13 @@ export const tipoFacturaEnum = pgEnum('tipo_factura', [
   'nota_debito_b',
   'nota_debito_c',
   // A diferencia de nota_credito_a/b/c (siempre fiscales, van a ARCA), esta
-  // anula/reduce un Comprobante interno (CM-/CL-) sin pasar por TusFacturas.
+  // anula/reduce un Comprobante interno (CI-/CL-) sin pasar por TusFacturas.
   // Numeración propia NCI-NNNNNN.
   'nota_credito_interna',
 ]);
 
 // Solo para recibos de cobranza (RC-): si los comprobantes que cobró son
-// facturas fiscales o comprobantes internos (CM-/CL-) — un mismo recibo no
+// facturas fiscales o comprobantes internos (CI-/CL-) — un mismo recibo no
 // puede mezclar los dos tipos, se valida al registrar la cobranza.
 export const tipoReciboEnum = pgEnum('tipo_recibo', ['fiscal', 'interno']);
 

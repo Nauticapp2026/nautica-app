@@ -24,6 +24,8 @@ export type CobranzaRow = {
   anulada: boolean;
   anuladaAt: string | null;
   tipoRecibo: 'fiscal' | 'interno' | null;
+  /** Nombre y apellido del socio (para el filtro por socio de la pantalla). */
+  socioNombre: string;
   socioRazonSocial: string;
   numeroSocio: number | null;
   entreEmisor: string;
@@ -65,10 +67,13 @@ function instrumentoCobro(formas: { tipo: string; monto: string }[], slot: 0 | 1
 export function CobranzaTabla({
   cobranzas,
   periodoAnulacion,
+  filtradoExterno = false,
 }: {
   cobranzas: CobranzaRow[];
   /** Hasta cuándo el club permite anular (Configuración → Período de anulación). */
   periodoAnulacion: PeriodoAnulacion;
+  /** La lista ya viene filtrada por socio/fechas desde la pantalla (cambia el vacío). */
+  filtradoExterno?: boolean;
 }) {
   const router = useRouter();
   const [anulandoId, setAnulandoId] = useState<string | null>(null);
@@ -91,8 +96,16 @@ export function CobranzaTabla({
     return (
       <EmptyState
         icon={<Receipt className="h-6 w-6 text-gray-400" />}
-        text="Todavía no hay cobranzas registradas."
-        description="Cuando registres una cobranza con “Nueva cobranza”, va a aparecer acá."
+        text={
+          filtradoExterno
+            ? 'Ninguna cobranza coincide con los filtros.'
+            : 'Todavía no hay cobranzas registradas.'
+        }
+        description={
+          filtradoExterno
+            ? 'Probá con otro socio u otro rango de fechas.'
+            : 'Cuando registres una cobranza con “Nueva cobranza”, va a aparecer acá.'
+        }
         className="rounded-2xl border border-gray-200 bg-white"
       />
     );
