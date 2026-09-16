@@ -68,7 +68,13 @@ export async function signup(_: ActionResult | null, formData: FormData): Promis
 
 export async function logout() {
   const supabase = await createClient();
-  await supabase.auth.signOut();
+  // scope 'local': cierra SOLO esta sesión (este navegador). El default de
+  // Supabase es 'global', que revoca todas las sesiones del usuario — con dos
+  // computadoras entradas con la misma cuenta, cerrar sesión en una echaba a
+  // la otra (reporte del cliente 2026-09-16). Las pantallas de reset de
+  // contraseña siguen usando el global a propósito: ahí sí se quiere cortar
+  // todo.
+  await supabase.auth.signOut({ scope: 'local' });
   revalidatePath('/', 'layout');
   redirect('/login');
 }
