@@ -70,7 +70,12 @@ export default async function UsuariosPage({
         ? db
             .select({ profileId: embarcaciones.profileId, nombre: embarcaciones.nombre })
             .from(embarcaciones)
-            .where(inArray(embarcaciones.profileId, profileIds as string[]))
+            .where(
+              and(
+                inArray(embarcaciones.profileId, profileIds as string[]),
+                eq(embarcaciones.guarderiaId, gId),
+              ),
+            )
         : Promise.resolve([] as { profileId: string | null; nombre: string }[]),
 
       // Deuda + estado moroso se calculan desde movimientos en lugar de leer
