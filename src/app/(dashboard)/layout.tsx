@@ -7,6 +7,10 @@ import { RealtimeRefresher } from '@/components/shared/realtime-refresher';
 import { GuarderiaInactivaScreen } from '@/components/shared/guarderia-inactiva-screen';
 import { db } from '@/lib/db';
 import { alertas, solicitudesMembership } from '@/lib/db/schema';
+import { NOINDEX } from '@/lib/seo';
+
+// Toda la app detrás del login: fuera de los buscadores.
+export const metadata = NOINDEX;
 
 // Roles con acceso al dashboard web. El resto (socio, invitado, etc.)
 // se gestiona desde la app mobile.

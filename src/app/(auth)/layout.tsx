@@ -1,3 +1,8 @@
+import { NOINDEX } from '@/lib/seo';
+
+// Login, alta, recuperar contraseña: nada que indexar.
+export const metadata = NOINDEX;
+
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
     <div

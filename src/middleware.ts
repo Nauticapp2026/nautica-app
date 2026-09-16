@@ -77,7 +77,11 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/api/delete-account') ||
     pathname.startsWith('/eliminar-cuenta') ||
     pathname.startsWith('/privacidad') ||
-    pathname.startsWith('/terminos');
+    pathname.startsWith('/terminos') ||
+    // Para los buscadores (app/robots.ts y app/sitemap.ts). Si el gate se
+    // vuelve a activar, estos dos tienen que seguir respondiendo.
+    pathname === '/robots.txt' ||
+    pathname === '/sitemap.xml';
 
   if (!isPublicAPI) {
     const gate = checkPrelaunchGate(request);

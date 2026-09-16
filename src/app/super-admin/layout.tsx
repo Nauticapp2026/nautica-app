@@ -1,5 +1,8 @@
 import { requireSuperAdmin } from '@/lib/auth/session';
 import { Sidebar } from '@/components/shared/sidebar';
+import { NOINDEX } from '@/lib/seo';
+
+export const metadata = NOINDEX;
 
 export default async function SuperAdminLayout({ children }: { children: React.ReactNode }) {
   const { profile } = await requireSuperAdmin();

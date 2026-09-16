@@ -2,6 +2,9 @@ import { logout } from '@/app/actions/auth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { getUserContext } from '@/lib/auth/session';
+import { NOINDEX } from '@/lib/seo';
+
+export const metadata = NOINDEX;
 
 export default async function NoAccessPage() {
   const ctx = await getUserContext();
