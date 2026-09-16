@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gte, inArray, lte, sum } from 'drizzle-orm';
+import { and, desc, eq, inArray } from 'drizzle-orm';
 
 import { getActiveMarina } from '@/lib/auth/session';
 import { db } from '@/lib/db';
@@ -18,6 +18,7 @@ import {
 import { identidadFacturacion } from '@/lib/facturacion/identidad';
 import { claveItem, listarPendientesFacturar } from '@/lib/pendientes-facturar';
 import { getCargosSaldadosFifo } from '@/lib/reconciliar-cuenta';
+import { getKpisVentas } from '@/lib/ventas-kpis';
 
 import { VentasClient } from './ventas-client';
 import { VENTAS_TAB_IDS, tabDesdeUrl } from '@/lib/tab-url';
@@ -160,15 +161,8 @@ export default async function VentasPage({
   if (!ctx) return null;
 
   const gId = ctx.activeMembership.guarderiaId;
-  const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
-
   const [
-    [{ pendientesCount }],
-    [{ pagadasMes }],
-    [{ vencidas }],
-    [{ totalFacturado }],
+    kpis,
     lista,
     sociosList,
     [guarderiaInfo],
@@ -177,32 +171,8 @@ export default async function VentasPage({
     embarcacionesList,
     centrosEmisoresList,
   ] = await Promise.all([
-    db
-      .select({ pendientesCount: count() })
-      .from(facturacion)
-      .where(and(eq(facturacion.guarderiaId, gId), eq(facturacion.estado, 'pendiente'))),
-
-    db
-      .select({ pagadasMes: count() })
-      .from(facturacion)
-      .where(
-        and(
-          eq(facturacion.guarderiaId, gId),
-          eq(facturacion.estado, 'pagada'),
-          gte(facturacion.emision, startOfMonth),
-          lte(facturacion.emision, endOfMonth),
-        ),
-      ),
-
-    db
-      .select({ vencidas: count() })
-      .from(facturacion)
-      .where(and(eq(facturacion.guarderiaId, gId), eq(facturacion.estado, 'vencida'))),
-
-    db
-      .select({ totalFacturado: sum(facturacion.importe) })
-      .from(facturacion)
-      .where(eq(facturacion.guarderiaId, gId)),
+    // Tarjetas de resumen: una sola definición en lib/ventas-kpis.ts.
+    getKpisVentas(gId),
 
     db
       .select({
@@ -617,12 +587,7 @@ export default async function VentasPage({
       facturas={facturas}
       socios={socios}
       sociosInterno={sociosInterno}
-      kpis={{
-        pendientes: pendientesCount,
-        pagadasMes,
-        vencidas,
-        totalFacturado: totalFacturado ?? '0',
-      }}
+      kpis={kpis}
       posConfigurado={posConfigurado}
       certificadoOk={certificadoOk}
       guarderiaCondicionIva={guarderiaCondicionIva}

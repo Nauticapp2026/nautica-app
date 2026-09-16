@@ -1659,7 +1659,9 @@ export async function markInvoicePaidAction(
   try {
     const [updated] = await db
       .update(facturacion)
-      .set({ estado: 'pagada', medioPago })
+      // updatedAt: la tarjeta "Cobradas este mes" de Ventas lee esta columna
+      // como fecha de cobro (ver lib/ventas-kpis.ts), igual que Cobranzas.
+      .set({ estado: 'pagada', medioPago, updatedAt: new Date() })
       .where(and(eq(facturacion.id, id), eq(facturacion.guarderiaId, gId)))
       .returning({ socioId: facturacion.socioId, movimientoId: facturacion.movimientoId });
 

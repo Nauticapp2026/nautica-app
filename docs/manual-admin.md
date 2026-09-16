@@ -687,10 +687,12 @@ Si alguno de estos datos falta en el modo elegido, el sistema puede rechazar la 
 
 Las tarjetas superiores muestran:
 
-- **Pendientes de cobro** — **cantidad** de facturas sin cobrar.
-- **Cobradas este mes** — **cantidad** de facturas cobradas en el mes.
-- **Vencidas** — cantidad de facturas que superaron su fecha de vencimiento sin cobro.
-- **Total facturado** — monto acumulado histórico.
+- **Pendientes de cobro** — **cantidad** de comprobantes de deuda (facturas, notas de débito y comprobantes internos) aceptados y todavía sin cobrar. No cuenta las rechazadas por ARCA ni las notas de crédito: por eso coincide con lo que Cobranzas ofrece cobrar.
+- **Cobradas este mes** — **cantidad** de comprobantes de deuda que quedaron cobrados en el mes vigente (por fecha de cobro, no de emisión).
+- **Vencidas** — cantidad de comprobantes de deuda sin cobrar cuyo vencimiento ya pasó. Es el mismo criterio del puntito rojo de Socios y de la tarjeta del Dashboard.
+- **Total facturado** — **monto** facturado a ARCA: facturas y notas de débito menos notas de crédito, solo comprobantes aceptados. No entran los comprobantes internos ni los recibos de cobranza. Tiene un desplegable de período: **Mes vigente** (por defecto), **Histórico** o **Personalizado**, que abre dos fechas desde/hasta. El período se toma por fecha de emisión.
+
+Cada tarjeta lleva debajo una línea corta que aclara qué cuenta.
 
 ### Emitir una factura individual
 

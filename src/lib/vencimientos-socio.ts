@@ -41,8 +41,8 @@ export type AvisoVencimiento = 'vencida' | 'por_vencer';
  * funcionaría por poco — pero se convierte igual, por el mismo motivo que el
  * resto del sistema: en el borde del día la hora cruda miente.
  */
-const diaVencimientoArg = sql`(${facturacion.vencimiento} AT TIME ZONE 'America/Argentina/Buenos_Aires')::date`;
-const hoyArg = sql`(now() AT TIME ZONE 'America/Argentina/Buenos_Aires')::date`;
+export const diaVencimientoArg = sql`(${facturacion.vencimiento} AT TIME ZONE 'America/Argentina/Buenos_Aires')::date`;
+export const hoyArg = sql`(now() AT TIME ZONE 'America/Argentina/Buenos_Aires')::date`;
 
 /**
  * Aviso por socio. Los socios sin comprobantes impagos no entran en el mapa.
@@ -57,26 +57,52 @@ const hoyArg = sql`(now() AT TIME ZONE 'America/Argentina/Buenos_Aires')::date`;
  * el `= hoy` por un rango.
  */
 /**
- * Qué comprobante cuenta como deuda que puede vencer. Vive en una sola función
- * para que el puntito de la lista y el contador del Dashboard no puedan
- * separarse: son el mismo conjunto visto de dos maneras.
+ * Qué comprobante es DEUDA COBRABLE del club, pagada o no: facturas, notas de
+ * débito y comprobantes internos (CM-/CL-), sin anuladas ni rechazadas y sin
+ * los recibos de cobranza RC-/RI- (documentan un pago, no deuda). Es el mismo
+ * conjunto que Cobranzas ofrece cobrar. Lo usan el puntito de Socios, la
+ * tarjeta del Dashboard y las tarjetas de Ventas, para que ningún contador
+ * pueda separarse de los otros.
  */
-function comprobantesQuePuedenVencer(guarderiaId: string) {
+export function deudaCobrable(guarderiaId: string) {
   return and(
     eq(facturacion.guarderiaId, guarderiaId),
     inArray(facturacion.tipoFactura, [...TIPOS_COBRABLES]),
     eq(facturacion.anulada, false),
     eq(facturacion.rechazada, false),
-    or(isNull(facturacion.estado), ne(facturacion.estado, 'pagada')),
-    // Un comprobante sin vencimiento cargado no puede vencer.
-    sql`${facturacion.vencimiento} is not null`,
-    // Los recibos de cobranza (RC-/RI-) son tipo 'recibo' pero documentan un
-    // pago, no deuda: nunca vencen.
     or(
       isNull(facturacion.codigo),
       and(...PATRONES_RECIBO_COBRANZA.map((pat) => notLike(facturacion.codigo, pat))),
     ),
   );
+}
+
+/** Deuda cobrable todavía sin cobrar. */
+export function deudaCobrablePendiente(guarderiaId: string) {
+  return and(
+    deudaCobrable(guarderiaId),
+    or(isNull(facturacion.estado), ne(facturacion.estado, 'pagada')),
+  );
+}
+
+/**
+ * Qué comprobante cuenta como deuda que puede vencer: la pendiente que tiene
+ * vencimiento cargado (sin fecha no puede vencer).
+ */
+function comprobantesQuePuedenVencer(guarderiaId: string) {
+  return and(deudaCobrablePendiente(guarderiaId), sql`${facturacion.vencimiento} is not null`);
+}
+
+/**
+ * Cuántos COMPROBANTES del club están vencidos hoy (no cuántos socios: eso es
+ * `contarSociosConFacturasVencidas`). Es la tarjeta "Vencidas" de Ventas.
+ */
+export async function contarComprobantesVencidos(guarderiaId: string): Promise<number> {
+  const [row] = await db
+    .select({ total: sql<number>`count(*)::int` })
+    .from(facturacion)
+    .where(and(comprobantesQuePuedenVencer(guarderiaId), sql`${diaVencimientoArg} < ${hoyArg}`));
+  return row?.total ?? 0;
 }
 
 export async function getAvisoVencimientoBatch(

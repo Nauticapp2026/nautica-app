@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import { useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   AlertCircle,
@@ -38,6 +38,8 @@ import {
   type ComprobanteInternoLoteResult,
   type PendienteEmision,
 } from '@/app/actions/facturacion';
+import { totalFacturadoAction } from '@/app/actions/ventas-kpis';
+import type { KpisVentas } from '@/lib/ventas-kpis';
 import { MOTIVO_NOTA_LABEL, type MotivoNota } from '@/app/actions/nota-constants';
 import { toast } from 'sonner';
 import { buscarSocios, normalizarBusqueda } from '@/lib/buscador';
@@ -163,12 +165,7 @@ function numeroDocumentoEfectivo(
   return socio.cuit?.trim() || socio.numeroDocumento;
 }
 
-type Kpis = {
-  pendientes: number;
-  pagadasMes: number;
-  vencidas: number;
-  totalFacturado: string;
-};
+type Kpis = KpisVentas;
 
 // ─── Constantes ─────────────────────────────────────────────────────────────
 
@@ -482,7 +479,18 @@ function lastOfMonthIso(): string {
 
 // ─── KPI Card ───────────────────────────────────────────────────────────────
 
-function KpiCard({ value, label }: { value: string; label: string }) {
+function KpiCard({
+  value,
+  label,
+  detalle,
+  children,
+}: {
+  value: string;
+  label: string;
+  /** Qué cuenta exactamente la tarjeta (el cliente pidió aclararlo, 2026-09-16). */
+  detalle?: string;
+  children?: ReactNode;
+}) {
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-5">
       <p className="text-2xl font-bold" style={{ color: '#101828' }}>
@@ -491,7 +499,108 @@ function KpiCard({ value, label }: { value: string; label: string }) {
       <p className="mt-0.5 text-sm" style={{ color: '#669E9D' }}>
         {label}
       </p>
+      {detalle && <p className="mt-1 text-xs text-gray-500">{detalle}</p>}
+      {children}
     </div>
+  );
+}
+
+type PeriodoKpi = 'mes' | 'historico' | 'rango';
+
+/**
+ * "Total facturado" con selector de período: Mes vigente (default, lo que
+ * trae el server), Histórico o un rango desde/hasta. Solo esta tarjeta tiene
+ * período (decisión del 2026-09-16); las otras tres son fotos de hoy.
+ */
+function TotalFacturadoCard({ inicial }: { inicial: string }) {
+  const [periodo, setPeriodo] = useState<PeriodoKpi>('mes');
+  const [desde, setDesde] = useState('');
+  const [hasta, setHasta] = useState('');
+  // Total de los períodos que se piden al server desde acá (histórico/rango).
+  // El mes vigente NO se guarda: se muestra siempre `inicial`, que el server
+  // recalcula en cada revalidatePath (emitir, cobrar), así nunca queda viejo.
+  const [totalConsultado, setTotalConsultado] = useState(inicial);
+  const [pending, startTransition] = useTransition();
+  const total = periodo === 'mes' ? inicial : totalConsultado;
+
+  function consultar(input: Parameters<typeof totalFacturadoAction>[0]) {
+    startTransition(async () => {
+      const res = await totalFacturadoAction(input);
+      if ('error' in res) {
+        toast.error(res.error);
+        return;
+      }
+      setTotalConsultado(res.total);
+    });
+  }
+
+  function cambiarPeriodo(p: PeriodoKpi) {
+    setPeriodo(p);
+    if (p === 'historico') consultar({ periodo: 'historico' });
+    else if (desde && hasta) consultar({ periodo: 'rango', desde, hasta });
+  }
+
+  function cambiarRango(nuevoDesde: string, nuevoHasta: string) {
+    setDesde(nuevoDesde);
+    setHasta(nuevoHasta);
+    if (nuevoDesde && nuevoHasta) {
+      if (nuevoDesde > nuevoHasta) {
+        toast.error('La fecha "desde" no puede ser posterior a "hasta".');
+        return;
+      }
+      consultar({ periodo: 'rango', desde: nuevoDesde, hasta: nuevoHasta });
+    }
+  }
+
+  const detalle =
+    periodo === 'mes'
+      ? 'Facturas y ND menos NC aceptadas por ARCA, emitidas este mes'
+      : periodo === 'historico'
+        ? 'Facturas y ND menos NC aceptadas por ARCA, desde el inicio'
+        : 'Facturas y ND menos NC aceptadas por ARCA, en el rango elegido';
+
+  // Mismas clases de tokens que el Input de shadcn (CLAUDE.md regla 7).
+  const selectCls =
+    'h-8 w-full rounded-md border border-input bg-transparent px-2 text-xs text-[#101828] focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none disabled:opacity-50';
+
+  return (
+    <KpiCard value={pending ? '…' : fmtMoney(total)} label="Total facturado" detalle={detalle}>
+      <div className="mt-2 space-y-1.5">
+        <select
+          aria-label="Período del total facturado"
+          className={selectCls}
+          value={periodo}
+          disabled={pending}
+          onChange={(e) => cambiarPeriodo(e.target.value as PeriodoKpi)}
+        >
+          <option value="mes">Mes vigente</option>
+          <option value="historico">Histórico</option>
+          <option value="rango">Personalizado</option>
+        </select>
+        {periodo === 'rango' && (
+          <div className="grid grid-cols-2 gap-1.5">
+            <input
+              type="date"
+              aria-label="Desde"
+              className={selectCls}
+              value={desde}
+              max={hasta || undefined}
+              disabled={pending}
+              onChange={(e) => cambiarRango(e.target.value, hasta)}
+            />
+            <input
+              type="date"
+              aria-label="Hasta"
+              className={selectCls}
+              value={hasta}
+              min={desde || undefined}
+              disabled={pending}
+              onChange={(e) => cambiarRango(desde, e.target.value)}
+            />
+          </div>
+        )}
+      </div>
+    </KpiCard>
   );
 }
 
@@ -4202,10 +4311,22 @@ export function VentasClient({
 
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <KpiCard value={String(kpis.pendientes)} label="Pendientes de cobro" />
-        <KpiCard value={String(kpis.pagadasMes)} label="Cobradas este mes" />
-        <KpiCard value={String(kpis.vencidas)} label="Vencidas" />
-        <KpiCard value={fmtMoney(kpis.totalFacturado)} label="Total facturado" />
+        <KpiCard
+          value={String(kpis.pendientes)}
+          label="Pendientes de cobro"
+          detalle="Facturas, ND y comprobantes internos aceptados y sin cobrar"
+        />
+        <KpiCard
+          value={String(kpis.cobradasMes)}
+          label="Cobradas este mes"
+          detalle="Comprobantes que quedaron cobrados este mes"
+        />
+        <KpiCard
+          value={String(kpis.vencidas)}
+          label="Vencidas"
+          detalle="Sin cobrar y con vencimiento anterior a hoy"
+        />
+        <TotalFacturadoCard inicial={kpis.totalFacturadoMes} />
       </div>
 
       {/* Tabs */}
