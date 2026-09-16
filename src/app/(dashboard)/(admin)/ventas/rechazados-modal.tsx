@@ -388,90 +388,111 @@ export function RechazadosModal({
                             Facturar con los datos personales (si está destildado usa los
                             impositivos)
                           </label>
+                          {/* Se muestra SOLO el juego de datos con el que se
+                              factura según el tilde: personales (tipo y nº de
+                              documento + su condición IVA) o impositivos (CUIT,
+                              razón social + su condición IVA). Antes aparecían
+                              los dos juegos juntos y el club veía "Cond. IVA"
+                              dos veces sin saber cuál valía (reporte
+                              2026-09-16). El otro juego se edita cambiando el
+                              tilde o desde la ficha completa. */}
                           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                            <div>
-                              <label className="mb-1 block text-xs font-medium text-gray-500">
-                                Tipo doc.
-                              </label>
-                              <select
-                                className={inputCls}
-                                value={f.tipoDocumento}
-                                onChange={(e) => setForm(s.id, { tipoDocumento: e.target.value })}
-                              >
-                                <option value="">—</option>
-                                {TIPO_DOC_OPTS.map((o) => (
-                                  <option key={o.value} value={o.value}>
-                                    {o.label}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-                            <div>
-                              <label className="mb-1 block text-xs font-medium text-gray-500">
-                                N° documento
-                              </label>
-                              <input
-                                className={inputCls}
-                                value={f.numeroDocumento}
-                                onChange={(e) => setForm(s.id, { numeroDocumento: e.target.value })}
-                              />
-                            </div>
-                            <div>
-                              <label className="mb-1 block text-xs font-medium text-gray-500">
-                                CUIT
-                              </label>
-                              <input
-                                className={inputCls}
-                                value={f.cuit}
-                                onChange={(e) => setForm(s.id, { cuit: e.target.value })}
-                              />
-                            </div>
-                            <div className="col-span-2 sm:col-span-1">
-                              <label className="mb-1 block text-xs font-medium text-gray-500">
-                                Razón social
-                              </label>
-                              <input
-                                className={inputCls}
-                                value={f.razonSocial}
-                                onChange={(e) => setForm(s.id, { razonSocial: e.target.value })}
-                              />
-                            </div>
-                            <div>
-                              <label className="mb-1 block text-xs font-medium text-gray-500">
-                                Cond. IVA (personales)
-                              </label>
-                              <select
-                                className={inputCls}
-                                value={f.condicionIvaPersonal}
-                                onChange={(e) =>
-                                  setForm(s.id, { condicionIvaPersonal: e.target.value })
-                                }
-                              >
-                                <option value="">—</option>
-                                {CONDICION_IVA_OPTS.map((o) => (
-                                  <option key={o.value} value={o.value}>
-                                    {o.label}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-                            <div>
-                              <label className="mb-1 block text-xs font-medium text-gray-500">
-                                Cond. IVA (impositivos)
-                              </label>
-                              <select
-                                className={inputCls}
-                                value={f.condicionIva}
-                                onChange={(e) => setForm(s.id, { condicionIva: e.target.value })}
-                              >
-                                <option value="">—</option>
-                                {CONDICION_IVA_OPTS.map((o) => (
-                                  <option key={o.value} value={o.value}>
-                                    {o.label}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
+                            {f.facturaFiscal ? (
+                              <>
+                                <div>
+                                  <label className="mb-1 block text-xs font-medium text-gray-500">
+                                    Tipo doc.
+                                  </label>
+                                  <select
+                                    className={inputCls}
+                                    value={f.tipoDocumento}
+                                    onChange={(e) =>
+                                      setForm(s.id, { tipoDocumento: e.target.value })
+                                    }
+                                  >
+                                    <option value="">—</option>
+                                    {TIPO_DOC_OPTS.map((o) => (
+                                      <option key={o.value} value={o.value}>
+                                        {o.label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="mb-1 block text-xs font-medium text-gray-500">
+                                    N° documento
+                                  </label>
+                                  <input
+                                    className={inputCls}
+                                    value={f.numeroDocumento}
+                                    onChange={(e) =>
+                                      setForm(s.id, { numeroDocumento: e.target.value })
+                                    }
+                                  />
+                                </div>
+                                <div className="col-span-2 sm:col-span-1">
+                                  <label className="mb-1 block text-xs font-medium text-gray-500">
+                                    Cond. IVA
+                                  </label>
+                                  <select
+                                    className={inputCls}
+                                    value={f.condicionIvaPersonal}
+                                    onChange={(e) =>
+                                      setForm(s.id, { condicionIvaPersonal: e.target.value })
+                                    }
+                                  >
+                                    <option value="">—</option>
+                                    {CONDICION_IVA_OPTS.map((o) => (
+                                      <option key={o.value} value={o.value}>
+                                        {o.label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                <div>
+                                  <label className="mb-1 block text-xs font-medium text-gray-500">
+                                    CUIT
+                                  </label>
+                                  <input
+                                    className={inputCls}
+                                    value={f.cuit}
+                                    onChange={(e) => setForm(s.id, { cuit: e.target.value })}
+                                  />
+                                </div>
+                                <div>
+                                  <label className="mb-1 block text-xs font-medium text-gray-500">
+                                    Nombre o Razón Social
+                                  </label>
+                                  <input
+                                    className={inputCls}
+                                    value={f.razonSocial}
+                                    onChange={(e) => setForm(s.id, { razonSocial: e.target.value })}
+                                  />
+                                </div>
+                                <div className="col-span-2 sm:col-span-1">
+                                  <label className="mb-1 block text-xs font-medium text-gray-500">
+                                    Cond. IVA
+                                  </label>
+                                  <select
+                                    className={inputCls}
+                                    value={f.condicionIva}
+                                    onChange={(e) =>
+                                      setForm(s.id, { condicionIva: e.target.value })
+                                    }
+                                  >
+                                    <option value="">—</option>
+                                    {CONDICION_IVA_OPTS.map((o) => (
+                                      <option key={o.value} value={o.value}>
+                                        {o.label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                              </>
+                            )}
                           </div>
                         </div>
                       );

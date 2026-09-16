@@ -846,7 +846,7 @@ El nombre del archivo lleva la fecha del día (por ejemplo `comprobantes-2026-09
 
 Dentro del panel:
 
-- En las causas que **se resuelven desde la app** (un dato del socio mal cargado), podés **editar los datos ahí mismo**, sin salir a la ficha de cada socio.
+- En las causas que **se resuelven desde la app** (un dato del socio mal cargado), podés **editar los datos ahí mismo**, sin salir a la ficha de cada socio. El panel muestra **solo los datos con los que se factura** ese socio, según el tilde **Facturar con los datos personales**: con el tilde puesto, tipo y número de documento y su condición IVA; sin el tilde, CUIT, nombre o razón social y su condición IVA. Si querés corregir el otro juego de datos, cambiá el tilde o abrí la **Ficha completa**.
 - En las causas que **no dependen de la app** (por ejemplo, un dato que hay que dar de alta en ARCA o en TusFacturas), el panel te lo aclara: reintentar sin resolver eso afuera va a volver a fallar.
 - Tildá los comprobantes que querés reenviar y confirmá: se reenvían **uno por uno**, y al final te muestra cuántos salieron y cuántos volvieron a fallar.
 
