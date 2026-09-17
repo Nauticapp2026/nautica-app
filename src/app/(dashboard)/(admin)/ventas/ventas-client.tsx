@@ -39,7 +39,7 @@ import {
   type PendienteEmision,
 } from '@/app/actions/facturacion';
 import { totalFacturadoAction } from '@/app/actions/ventas-kpis';
-import type { KpisVentas } from '@/lib/ventas-kpis';
+import type { CanalVentas, KpisVentas } from '@/lib/ventas-kpis';
 import { MOTIVO_NOTA_LABEL, type MotivoNota } from '@/app/actions/nota-constants';
 import { toast } from 'sonner';
 import { buscarSocios, normalizarBusqueda } from '@/lib/buscador';
@@ -512,7 +512,7 @@ type PeriodoKpi = 'mes' | 'historico' | 'rango';
  * trae el server), Histórico o un rango desde/hasta. Solo esta tarjeta tiene
  * período (decisión del 2026-09-16); las otras tres son fotos de hoy.
  */
-function TotalFacturadoCard({ inicial }: { inicial: string }) {
+function TotalFacturadoCard({ inicial, canal }: { inicial: string; canal: CanalVentas }) {
   const [periodo, setPeriodo] = useState<PeriodoKpi>('mes');
   const [desde, setDesde] = useState('');
   const [hasta, setHasta] = useState('');
@@ -536,8 +536,8 @@ function TotalFacturadoCard({ inicial }: { inicial: string }) {
 
   function cambiarPeriodo(p: PeriodoKpi) {
     setPeriodo(p);
-    if (p === 'historico') consultar({ periodo: 'historico' });
-    else if (desde && hasta) consultar({ periodo: 'rango', desde, hasta });
+    if (p === 'historico') consultar({ periodo: 'historico', canal });
+    else if (desde && hasta) consultar({ periodo: 'rango', canal, desde, hasta });
   }
 
   function cambiarRango(nuevoDesde: string, nuevoHasta: string) {
@@ -548,16 +548,21 @@ function TotalFacturadoCard({ inicial }: { inicial: string }) {
         toast.error('La fecha "desde" no puede ser posterior a "hasta".');
         return;
       }
-      consultar({ periodo: 'rango', desde: nuevoDesde, hasta: nuevoHasta });
+      consultar({ periodo: 'rango', canal, desde: nuevoDesde, hasta: nuevoHasta });
     }
   }
 
-  const detalle =
+  const queCuenta =
+    canal === 'fiscal'
+      ? 'Facturas y ND menos NC aceptadas por ARCA'
+      : 'Comprobantes internos menos NC internas';
+  const cuando =
     periodo === 'mes'
-      ? 'Facturas y ND menos NC aceptadas por ARCA, emitidas este mes'
+      ? 'emitidos este mes'
       : periodo === 'historico'
-        ? 'Facturas y ND menos NC aceptadas por ARCA, desde el inicio'
-        : 'Facturas y ND menos NC aceptadas por ARCA, en el rango elegido';
+        ? 'desde el inicio'
+        : 'en el rango elegido';
+  const detalle = `${queCuenta}, ${cuando}`;
 
   // Mismas clases de tokens que el Input de shadcn (CLAUDE.md regla 7).
   const selectCls =
@@ -3880,6 +3885,11 @@ export function VentasClient({
 }) {
   const [activeTab, setActiveTab] = useState<VentasTab>(initialTab);
 
+  // Las tarjetas de arriba siguen a la pestaña abierta. El server manda los dos
+  // juegos, así que cambiar de pestaña no dispara ninguna consulta.
+  const canal: CanalVentas = activeTab === 'recibos' ? 'interno' : 'fiscal';
+  const kpisCanal = kpis[canal];
+
   function cambiarTab(t: VentasTab) {
     setActiveTab(t);
     escribirTabEnUrl(t, 'afip');
@@ -4312,24 +4322,40 @@ export function VentasClient({
         </div>
       )}
 
-      {/* KPIs */}
+      {/* KPIs — del canal de la pestaña abierta. Antes mostraban siempre lo
+          mismo en las dos pestañas (reporte del cliente 2026-09-17). */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <KpiCard
-          value={String(kpis.pendientes)}
+          value={String(kpisCanal.pendientes)}
           label="Pendientes de cobro"
-          detalle="Facturas, ND y comprobantes internos aceptados y sin cobrar"
+          detalle={
+            canal === 'fiscal'
+              ? 'Facturas y ND aceptadas por ARCA, sin cobrar'
+              : 'Comprobantes internos sin cobrar'
+          }
         />
         <KpiCard
-          value={String(kpis.cobradasMes)}
+          value={String(kpisCanal.cobradasMes)}
           label="Cobradas este mes"
-          detalle="Comprobantes que quedaron cobrados este mes"
+          detalle={
+            canal === 'fiscal'
+              ? 'Facturas y ND que quedaron cobradas este mes'
+              : 'Comprobantes internos cobrados este mes'
+          }
         />
         <KpiCard
-          value={String(kpis.vencidas)}
+          value={String(kpisCanal.vencidas)}
           label="Vencidas"
           detalle="Sin cobrar y con vencimiento anterior a hoy"
         />
-        <TotalFacturadoCard inicial={kpis.totalFacturadoMes} />
+        <TotalFacturadoCard
+          // `key`: al cambiar de pestaña la tarjeta se remonta, así el período
+          // elegido vuelve a "Mes vigente" y no queda mostrando el total de un
+          // rango pedido para el otro canal.
+          key={canal}
+          inicial={kpisCanal.totalFacturadoMes}
+          canal={canal}
+        />
       </div>
 
       {/* Tabs */}

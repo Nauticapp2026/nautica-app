@@ -8,11 +8,13 @@ import { inicioMesVigenteArg, totalFacturadoEnPeriodo } from '@/lib/ventas-kpis'
 
 const ymd = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha inválida');
 
+const canal = z.enum(['fiscal', 'interno']);
+
 const schema = z
   .discriminatedUnion('periodo', [
-    z.object({ periodo: z.literal('mes') }),
-    z.object({ periodo: z.literal('historico') }),
-    z.object({ periodo: z.literal('rango'), desde: ymd, hasta: ymd }),
+    z.object({ periodo: z.literal('mes'), canal }),
+    z.object({ periodo: z.literal('historico'), canal }),
+    z.object({ periodo: z.literal('rango'), canal, desde: ymd, hasta: ymd }),
   ])
   .refine((d) => d.periodo !== 'rango' || d.desde <= d.hasta, {
     message: 'La fecha "desde" no puede ser posterior a "hasta".',
@@ -23,10 +25,10 @@ const schema = z
 type PeriodoTotalFacturado = z.infer<typeof schema>;
 
 /**
- * Total facturado de la guardería activa para el período que elige el club en
- * la tarjeta de Ventas (mes vigente / histórico / rango). Misma cuenta que la
- * tarjeta trae al cargar la página, así el número no cambia según de dónde
- * salga.
+ * Total emitido de la guardería activa para el período que elige el club en la
+ * tarjeta de Ventas (mes vigente / histórico / rango) y el canal de la pestaña
+ * abierta (ARCA o internos). Misma cuenta que la tarjeta trae al cargar la
+ * página, así el número no cambia según de dónde salga.
  */
 export async function totalFacturadoAction(
   input: PeriodoTotalFacturado,
@@ -54,6 +56,6 @@ export async function totalFacturadoAction(
         ? { desde: null, hasta: null }
         : { desde: p.desde, hasta: p.hasta };
 
-  const total = await totalFacturadoEnPeriodo(gId, periodo);
+  const total = await totalFacturadoEnPeriodo(gId, periodo, p.canal);
   return { total };
 }
