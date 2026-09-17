@@ -7,7 +7,6 @@ import Script from 'next/script';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import {
@@ -20,42 +19,22 @@ import {
 import {
   signUpStep,
   createGuarderiaStep,
-  updateDetallesStep,
   selectPlanStep,
-  inviteTeamMembersStep,
-  uploadGuarderiaFotoStep,
   notificarAvanceOnboardingStep,
 } from '@/app/actions/onboarding';
 import { aceptarTerminosAction } from '@/app/actions/terminos';
 import { MarkdownView } from '@/components/shared/markdown-view';
 import { PasswordChecks, PasswordInput } from '@/components/shared/password-input';
 import { toast } from 'sonner';
-import { Check, Trash2, Plus, ChevronRight } from 'lucide-react';
+import { Check, ChevronRight } from 'lucide-react';
 
-const TOTAL_STEPS = 10;
+// El wizard tenía 10 pasos. El cliente pidió sacar "Detalles de tu guardería"
+// (horarios, fotos y descripción) y "Armá tu equipo de trabajo" (2026-09-17):
+// alargaban el alta y las dos cosas se cargan igual desde Configuración una vez
+// adentro (pestañas Información general y Equipo). Los componentes se
+// eliminaron junto con sus server actions; no quedó código muerto.
+const TOTAL_STEPS = 8;
 const STORAGE_KEY = 'onboarding-state-v1';
-
-const DIAS = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'] as const;
-const DIAS_LABELS: Record<string, string> = {
-  lunes: 'Lunes',
-  martes: 'Martes',
-  miercoles: 'Miércoles',
-  jueves: 'Jueves',
-  viernes: 'Viernes',
-  sabado: 'Sábado',
-  domingo: 'Domingo',
-};
-
-type TeamMember = {
-  nombre: string;
-  apellido: string;
-  email: string;
-  rol: string;
-  telefono: string;
-  sede: string;
-};
-
-type HorarioDia = { apertura: string; cierre: string; activo: boolean };
 
 type Data = {
   // step 1
@@ -82,26 +61,16 @@ type Data = {
   instagram: string;
   facebook: string;
   // step 3
-  descripcion: string;
-  horarios: Record<string, HorarioDia>;
-  // step 4
-  equipo: TeamMember[];
-  // step 5
   espaciosNaves: string;
   espaciosMarinas: string;
-  // step 6
   activarNotificaciones: boolean;
   activarClimaYMareas: boolean;
   activarReservasOnline: boolean;
   activarPagosOnline: boolean;
   activarMenuGastronomico: boolean;
-  // step 7
+  // step 4
   plan: 'esencial' | 'premium' | 'elite';
 };
-
-const DEFAULT_HORARIOS: Record<string, HorarioDia> = Object.fromEntries(
-  DIAS.map((d) => [d, { apertura: '09:00', cierre: '18:00', activo: true }]),
-);
 
 type PlanInfoEntry = { label: string; precio: string };
 type PlanInfoMap = Record<'esencial' | 'premium' | 'elite', PlanInfoEntry>;
@@ -490,326 +459,6 @@ function Step2({
         {error && <p className="text-sm text-red-600">{error}</p>}
         <NavButtons onBack={onBack} onNext={onNext} pending={pending} disabled={!isValid} />
       </FieldGroup>
-    </>
-  );
-}
-
-function Step3({
-  data,
-  onChangeHorario,
-  onChangeDesc,
-  onNext,
-  onBack,
-}: {
-  data: Data;
-  onChangeHorario: (
-    dia: string,
-    field: 'apertura' | 'cierre' | 'activo',
-    val: string | boolean,
-  ) => void;
-  onChangeDesc: (v: string) => void;
-  onNext: () => void;
-  onBack: () => void;
-}) {
-  const [fotos, setFotos] = useState<string[]>([]);
-  const [subiendo, setSubiendo] = useState<string | null>(null);
-  const [fotosError, setFotosError] = useState<string | null>(null);
-
-  const handleFiles = async (files: FileList | null) => {
-    if (!files || !data.guarderiaId) return;
-    setFotosError(null);
-    for (const f of Array.from(files)) {
-      setSubiendo(f.name);
-      const fd = new FormData();
-      fd.append('guarderiaId', data.guarderiaId);
-      fd.append('file', f);
-      const res = await uploadGuarderiaFotoStep(fd);
-      if (res.error) {
-        setFotosError(`${f.name}: ${res.error}`);
-      } else if (res.url) {
-        setFotos((prev) => [...prev, res.url!]);
-      }
-    }
-    setSubiendo(null);
-  };
-  const setAllTimes = () => {
-    // Pedimos apertura y cierre en un prompt mínimo. Simple y sin dependencias.
-    const apertura = window.prompt('Hora de apertura para todos los días (HH:MM)', '09:00');
-    if (!apertura) return;
-    const cierre = window.prompt('Hora de cierre para todos los días (HH:MM)', '18:00');
-    if (!cierre) return;
-    DIAS.forEach((d) => {
-      onChangeHorario(d, 'apertura', apertura);
-      onChangeHorario(d, 'cierre', cierre);
-    });
-  };
-
-  return (
-    <>
-      <StepHeader
-        title="Detalles de tu guardería"
-        subtitle="Agregá descripción, horarios detallados y fotos"
-      />
-      <FieldGroup>
-        <div>
-          <div className="mb-3 flex items-center justify-between">
-            <p className="font-semibold" style={{ color: '#175861' }}>
-              Horarios detallados
-            </p>
-            <button
-              type="button"
-              className="text-xs underline"
-              style={{ color: '#669E9D' }}
-              onClick={setAllTimes}
-            >
-              Cambiar todos los horarios juntos
-            </button>
-          </div>
-          <div className="-mx-2 overflow-x-auto px-2">
-            <div className="grid min-w-[340px] grid-cols-1 gap-2 md:grid-cols-2">
-              {DIAS.map((dia) => {
-                const h = data.horarios[dia];
-                return (
-                  <div
-                    key={dia}
-                    className="flex items-center gap-2 rounded-[10px] border border-gray-200 p-2"
-                  >
-                    <span
-                      className="w-16 shrink-0 text-xs font-semibold"
-                      style={{ color: '#175861' }}
-                    >
-                      {DIAS_LABELS[dia]}
-                    </span>
-                    <input
-                      type="time"
-                      value={h.apertura}
-                      disabled={!h.activo}
-                      onChange={(e) => onChangeHorario(dia, 'apertura', e.target.value)}
-                      className="w-[84px] shrink-0 rounded border border-gray-200 px-1.5 py-1 text-xs disabled:bg-gray-50 disabled:text-gray-400"
-                    />
-                    <span className="text-xs text-gray-400">-</span>
-                    <input
-                      type="time"
-                      value={h.cierre}
-                      disabled={!h.activo}
-                      onChange={(e) => onChangeHorario(dia, 'cierre', e.target.value)}
-                      className="w-[84px] shrink-0 rounded border border-gray-200 px-1.5 py-1 text-xs disabled:bg-gray-50 disabled:text-gray-400"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => onChangeHorario(dia, 'activo', !h.activo)}
-                      title={h.activo ? 'Marcar cerrado' : 'Marcar abierto'}
-                      className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold transition ${h.activo ? 'bg-gray-200 text-gray-600 hover:bg-gray-300' : 'bg-red-100 text-red-600 hover:bg-red-200'}`}
-                    >
-                      {h.activo ? 'Abierto' : 'Cerrado'}
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-
-        <div>
-          <p className="mb-2 font-semibold" style={{ color: '#175861' }}>
-            Fotos de tu guardería
-          </p>
-          <label className="flex min-h-24 cursor-pointer flex-col items-center justify-center gap-1 rounded-[10px] border-2 border-dashed border-gray-300 text-sm text-gray-500 transition hover:border-[#175861] hover:text-[#175861]">
-            <span>Click para subir fotos</span>
-            <span className="text-xs text-gray-400">JPG, PNG — podés elegir varias</span>
-            <input
-              type="file"
-              multiple
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => {
-                handleFiles(e.target.files);
-                e.target.value = '';
-              }}
-            />
-          </label>
-          {subiendo && <p className="mt-1 text-xs text-[#669E9D]">Subiendo {subiendo}…</p>}
-          {fotosError && <p className="mt-1 text-xs text-red-600">{fotosError}</p>}
-          {fotos.length > 0 && (
-            <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-4">
-              {fotos.map((url, idx) => (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  key={idx}
-                  src={url}
-                  alt={`Foto ${idx + 1}`}
-                  className="h-20 w-full rounded-[8px] border border-gray-200 object-cover"
-                />
-              ))}
-            </div>
-          )}
-        </div>
-
-        <Field label="Descripción de tu guardería">
-          <Textarea
-            placeholder="Contanos sobre tu guardería: servicios, ubicación, historia..."
-            className="min-h-24 rounded-[10px] border-gray-200 text-sm"
-            value={data.descripcion}
-            onChange={(e) => onChangeDesc(e.target.value)}
-          />
-        </Field>
-
-        <NavButtons onBack={onBack} onNext={onNext} />
-      </FieldGroup>
-    </>
-  );
-}
-
-function Step4({
-  data,
-  onAddMember,
-  onRemoveMember,
-  onChangeMember,
-  onNext,
-  onBack,
-  onSkip,
-  error,
-  pending,
-}: {
-  data: Data;
-  onAddMember: () => void;
-  onRemoveMember: (i: number) => void;
-  onChangeMember: (i: number, k: keyof TeamMember, v: string) => void;
-  onNext: () => void;
-  onBack: () => void;
-  onSkip: () => void;
-  error?: string;
-  pending?: boolean;
-}) {
-  return (
-    <>
-      <StepHeader
-        title="Armá tu equipo de trabajo"
-        subtitle={
-          <>
-            Invitá a <span style={{ color: '#669E9D' }}>operarios</span>,{' '}
-            <span style={{ color: '#669E9D' }}>administradores</span> y responsables
-          </>
-        }
-      />
-
-      {data.equipo.length === 0 ? (
-        <div className="mb-4 flex flex-col items-center gap-2 rounded-2xl border border-gray-200 py-8 text-gray-400">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="40"
-            height="40"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            className="opacity-40"
-          >
-            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-            <circle cx="9" cy="7" r="4" />
-            <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-            <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-          </svg>
-          <p className="text-sm">Aún no has agregado miembros al equipo</p>
-        </div>
-      ) : (
-        <div className="-mx-4 mb-4 space-y-2 overflow-x-auto px-4 md:mx-0 md:px-0">
-          {data.equipo.map((m, i) => (
-            <div
-              key={i}
-              className="flex min-w-[640px] items-center gap-1.5 rounded-[10px] border border-gray-200 p-2 md:min-w-0"
-            >
-              <Input
-                className="h-8 flex-1 rounded-[10px] border-gray-200 px-2 text-xs"
-                placeholder="Nombre"
-                value={m.nombre}
-                onChange={(e) => onChangeMember(i, 'nombre', e.target.value)}
-              />
-              <Input
-                className="h-8 flex-1 rounded-[10px] border-gray-200 px-2 text-xs"
-                placeholder="Apellido"
-                value={m.apellido}
-                onChange={(e) => onChangeMember(i, 'apellido', e.target.value)}
-              />
-              <Input
-                className="h-8 flex-1 rounded-[10px] border-gray-200 px-2 text-xs"
-                placeholder="email@ej"
-                value={m.email}
-                onChange={(e) => onChangeMember(i, 'email', e.target.value)}
-              />
-              <select
-                className="h-8 rounded-[10px] border border-gray-200 px-1 text-xs"
-                value={m.rol}
-                onChange={(e) => onChangeMember(i, 'rol', e.target.value)}
-              >
-                <option value="">Rol</option>
-                <option value="administrador_general">Admin</option>
-                <option value="administrativo">Administrativo</option>
-                <option value="operario">Operario</option>
-                <option value="marinero">Marinero</option>
-                <option value="seguridad">Portería / Seguridad</option>
-              </select>
-              <Input
-                className="h-8 w-24 rounded-[10px] border-gray-200 px-2 text-xs"
-                placeholder="+54 11..."
-                value={m.telefono}
-                onChange={(e) => onChangeMember(i, 'telefono', e.target.value)}
-              />
-              <button
-                type="button"
-                onClick={() => onRemoveMember(i)}
-                className="rounded-[10px] p-1.5 text-red-400 hover:bg-red-50"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <button
-        type="button"
-        onClick={onAddMember}
-        className="mb-4 flex items-center gap-2 rounded-[10px] px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90"
-        style={{ background: '#175861' }}
-      >
-        <Plus className="h-4 w-4" /> Agregar miembro del equipo
-      </button>
-
-      {error && (
-        <p className="mb-3 rounded-[10px] border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-          {error}
-        </p>
-      )}
-
-      <div className="flex flex-col gap-3 sm:flex-row">
-        <button
-          type="button"
-          onClick={onBack}
-          disabled={pending}
-          className="flex-1 rounded-[10px] border border-[#d1d5dc] bg-white py-3 text-sm font-medium text-[#364153] hover:bg-gray-50 disabled:opacity-40"
-        >
-          Atrás
-        </button>
-        <button
-          type="button"
-          onClick={onSkip}
-          disabled={pending}
-          className="flex-1 rounded-[10px] border py-3 text-sm font-medium transition hover:bg-gray-50 disabled:opacity-40"
-          style={{ borderColor: '#669E9D', color: '#669E9D' }}
-        >
-          Lo configuro más tarde
-        </button>
-        <button
-          type="button"
-          onClick={onNext}
-          disabled={pending}
-          className="flex flex-1 items-center justify-center gap-2 rounded-[10px] py-3 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40"
-          style={{ background: '#175861' }}
-        >
-          {pending ? 'Invitando…' : 'Continuar'} <ChevronRight className="h-4 w-4" />
-        </button>
-      </div>
     </>
   );
 }
@@ -1217,9 +866,6 @@ export function OnboardingClient({ planInfo, featuresByPlan, terminos }: Onboard
     emailOperativo: '',
     instagram: '',
     facebook: '',
-    descripcion: '',
-    horarios: DEFAULT_HORARIOS,
-    equipo: [],
     espaciosNaves: '',
     espaciosMarinas: '',
     activarNotificaciones: true,
@@ -1346,58 +992,6 @@ export function OnboardingClient({ planInfo, featuresByPlan, terminos }: Onboard
     });
   }
 
-  async function handleStep3() {
-    if (!data.guarderiaId) {
-      next();
-      return;
-    }
-    setError(undefined);
-    const res = await updateDetallesStep(data.guarderiaId, {
-      descripcion: data.descripcion,
-      horarios: data.horarios,
-    });
-    if (res?.error) {
-      setError(res.error);
-      return;
-    }
-    next();
-  }
-
-  function handleStep4() {
-    setError(undefined);
-    // Filtrar miembros incompletos — requerimos nombre, email y rol.
-    const completos = data.equipo.filter((m) => m.nombre.trim() && m.email.trim() && m.rol.trim());
-    const incompletos = data.equipo.length - completos.length;
-
-    if (!data.guarderiaId) {
-      next();
-      return;
-    }
-
-    if (completos.length === 0) {
-      if (incompletos > 0) {
-        setError('Hay miembros con campos vacíos (nombre, email o rol). Completalos o quitalos.');
-        return;
-      }
-      // Sin miembros → avanzamos directo.
-      next();
-      return;
-    }
-
-    startTransition(async () => {
-      const res = await inviteTeamMembersStep(data.guarderiaId, completos);
-      if (res.error) {
-        setError(res.error);
-        return;
-      }
-      if (res.errores && res.errores.length > 0) {
-        setError(`Algunos miembros fallaron: ${res.errores.join(' · ')}`);
-        return; // NO avanzamos — que el usuario corrija
-      }
-      next();
-    });
-  }
-
   function handleStep5() {
     if (!data.guarderiaId) {
       next();
@@ -1464,55 +1058,9 @@ export function OnboardingClient({ planInfo, featuresByPlan, terminos }: Onboard
         />
       )}
       {step === 3 && (
-        <Step3
-          data={data}
-          onChangeHorario={(dia, field, val) =>
-            setData((prev) => ({
-              ...prev,
-              horarios: {
-                ...prev.horarios,
-                [dia]: { ...prev.horarios[dia], [field]: val },
-              },
-            }))
-          }
-          onChangeDesc={(v) => set('descripcion', v)}
-          onNext={handleStep3}
-          onBack={back}
-        />
-      )}
-      {step === 4 && (
-        <Step4
-          data={data}
-          onAddMember={() =>
-            setData((prev) => ({
-              ...prev,
-              equipo: [
-                ...prev.equipo,
-                { nombre: '', apellido: '', email: '', rol: '', telefono: '', sede: '' },
-              ],
-            }))
-          }
-          onRemoveMember={(i) =>
-            setData((prev) => ({ ...prev, equipo: prev.equipo.filter((_, idx) => idx !== i) }))
-          }
-          onChangeMember={(i, k, v) =>
-            setData((prev) => {
-              const equipo = [...prev.equipo];
-              equipo[i] = { ...equipo[i], [k]: v };
-              return { ...prev, equipo };
-            })
-          }
-          onNext={handleStep4}
-          onBack={back}
-          onSkip={next}
-          error={error}
-          pending={pending}
-        />
-      )}
-      {step === 5 && (
         <Step5 data={data} onChange={(k, v) => set(k, v)} onNext={handleStep5} onBack={back} />
       )}
-      {step === 6 && (
+      {step === 4 && (
         <Step7
           data={data}
           planInfo={planInfo}
@@ -1521,9 +1069,9 @@ export function OnboardingClient({ planInfo, featuresByPlan, terminos }: Onboard
           onBack={back}
         />
       )}
-      {step === 7 && <Step8 data={data} planInfo={planInfo} onNext={next} onBack={back} />}
-      {step === 8 && <Step9 onNext={next} onBack={back} />}
-      {step === 9 && (
+      {step === 5 && <Step8 data={data} planInfo={planInfo} onNext={next} onBack={back} />}
+      {step === 6 && <Step9 onNext={next} onBack={back} />}
+      {step === 7 && (
         <Step10Terminos
           terminos={terminos}
           onNext={handleStep10Terminos}
@@ -1531,7 +1079,7 @@ export function OnboardingClient({ planInfo, featuresByPlan, terminos }: Onboard
           pending={pending}
         />
       )}
-      {step === 10 && <Step11Welcome />}
+      {step === 8 && <Step11Welcome />}
     </Shell>
   );
 }
