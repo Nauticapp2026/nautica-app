@@ -64,6 +64,10 @@ type Data = {
   email: string;
   telefono: string;
   password: string;
+  // Email (en minúscula) para el que YA se creó la cuenta en este alta. Se
+  // persiste en localStorage; la contraseña no. Sirve para no volver a pedir
+  // la contraseña ni reintentar el alta si se vuelve al paso 1.
+  cuentaCreada: string;
   // step 2
   guarderiaId: string;
   guarderiaName: string;
@@ -243,12 +247,16 @@ function Step1({
   pending: boolean;
 }) {
   const [accepted, setAccepted] = useState(false);
+  // Si la cuenta ya se creó en este alta, la contraseña no se vuelve a pedir
+  // (además no se guarda en localStorage, así que tras un refresh está vacía).
+  const cuentaYaCreada =
+    !!data.cuentaCreada && data.cuentaCreada === data.email.trim().toLowerCase();
   const isValid =
     !!data.nombre.trim() &&
     !!data.apellido.trim() &&
     !!data.email.trim() &&
     !!data.telefono.trim() &&
-    data.password.length >= 8 &&
+    (cuentaYaCreada || data.password.length >= 8) &&
     accepted;
 
   return (
@@ -293,18 +301,26 @@ function Step1({
             onChange={(e) => onChange('telefono', e.target.value)}
           />
         </Field>
-        <Field label="Contraseña" required>
-          <PasswordInput
-            className={inputCls}
-            placeholder="Mínimo 8 caracteres"
-            value={data.password}
-            onChange={(e) => onChange('password', e.target.value)}
-            autoComplete="new-password"
-          />
-          <div className="mt-1.5">
-            <PasswordChecks password={data.password} />
-          </div>
-        </Field>
+        {cuentaYaCreada ? (
+          <Field label="Contraseña">
+            <p className="rounded-[8px] bg-gray-50 px-3 py-2 text-sm text-gray-600">
+              Tu cuenta ya está creada con la contraseña que elegiste. Seguí con el paso siguiente.
+            </p>
+          </Field>
+        ) : (
+          <Field label="Contraseña" required>
+            <PasswordInput
+              className={inputCls}
+              placeholder="Mínimo 8 caracteres"
+              value={data.password}
+              onChange={(e) => onChange('password', e.target.value)}
+              autoComplete="new-password"
+            />
+            <div className="mt-1.5">
+              <PasswordChecks password={data.password} />
+            </div>
+          </Field>
+        )}
         <div className="flex items-start gap-3">
           <Checkbox
             id="terms"
@@ -1188,6 +1204,7 @@ export function OnboardingClient({ planInfo, featuresByPlan, terminos }: Onboard
     email: '',
     telefono: '',
     password: '',
+    cuentaCreada: '',
     guarderiaId: '',
     guarderiaName: '',
     cuit: '',
@@ -1272,6 +1289,14 @@ export function OnboardingClient({ planInfo, featuresByPlan, terminos }: Onboard
   }
 
   function handleStep1() {
+    // La cuenta ya se creó antes en este mismo alta (se volvió al paso 1 para
+    // leer los términos, o se refrescó la página): no hay nada que crear ni
+    // contraseña que pedir de nuevo. Sin esto, volver al paso 1 y avanzar
+    // terminaba en "ya existe una cuenta con ese email" (reporte 2026-09-17).
+    if (data.cuentaCreada && data.cuentaCreada === data.email.trim().toLowerCase()) {
+      next();
+      return;
+    }
     if (!data.nombre || !data.apellido || !data.email || !data.password || !data.telefono) {
       setError('Completá todos los campos obligatorios');
       return;
@@ -1288,6 +1313,7 @@ export function OnboardingClient({ planInfo, featuresByPlan, terminos }: Onboard
         setError(res.error);
         return;
       }
+      setData((prev) => ({ ...prev, cuentaCreada: prev.email.trim().toLowerCase() }));
       next();
     });
   }

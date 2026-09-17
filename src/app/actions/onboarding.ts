@@ -42,21 +42,55 @@ export async function signUpStep(data: {
   telefono: string;
   password: string;
 }): Promise<ActionResult & { userId?: string }> {
-  const admin = createAdminClient();
+  // Supabase guarda los emails en minúscula: normalizamos para que comparar
+  // contra la sesión actual no falle por un "Juan@" vs "juan@".
+  const email = data.email.trim().toLowerCase();
+  const supabase = await createClient();
 
+  // Idempotente a propósito. Si el admin vuelve del paso 2 al paso 1 (por
+  // ejemplo para leer los términos) y avanza de nuevo, este paso se ejecuta
+  // una segunda vez con el mismo email. Antes eso llamaba a createUser otra
+  // vez y Supabase respondía "ya existe una cuenta con ese email", dejándolo
+  // trabado sin poder seguir (reporte del cliente 2026-09-17). La cuenta ya
+  // creada es la suya: seguimos con la sesión que tiene.
+  const {
+    data: { user: sesionActual },
+  } = await supabase.auth.getUser();
+  if (sesionActual?.email?.toLowerCase() === email) {
+    return { userId: sesionActual.id };
+  }
+
+  const admin = createAdminClient();
   const { data: created, error: createErr } = await admin.auth.admin.createUser({
-    email: data.email,
+    email,
     password: data.password,
     email_confirm: true,
     user_metadata: { nombre: data.nombre, apellido: data.apellido },
   });
 
-  if (createErr) return { error: translateAuthError(createErr.message) };
+  if (createErr) {
+    // El email ya existe pero esta sesión no es la suya (se reabrió el
+    // navegador, se limpiaron las cookies, otra pestaña). Si la contraseña
+    // coincide es la misma persona retomando el alta, así que la dejamos
+    // seguir; es exactamente lo que haría iniciando sesión. Si no coincide,
+    // el email es de otro y hay que decirlo con todas las letras.
+    const { data: signedIn, error: signInErr } = await supabase.auth.signInWithPassword({
+      email,
+      password: data.password,
+    });
+    if (signInErr || !signedIn.user) {
+      return {
+        error:
+          'Ya existe una cuenta con ese email. Si es tuya, ingresá la misma contraseña para retomar el alta; si no, usá otro email.',
+      };
+    }
+    return { userId: signedIn.user.id };
+  }
+
   if (!created.user) return { error: 'No se pudo crear el usuario' };
 
-  const supabase = await createClient();
   const { error: signInErr } = await supabase.auth.signInWithPassword({
-    email: data.email,
+    email,
     password: data.password,
   });
   if (signInErr) return { error: translateAuthError(signInErr.message) };
