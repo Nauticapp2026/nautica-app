@@ -724,7 +724,42 @@ function Step8({
   );
 }
 
+const CALENDLY_URL =
+  'https://calendly.com/nauticapp/nauticapp?hide_event_type_details=1&hide_gdpr_banner=1';
+
+type WindowConCalendly = Window & {
+  Calendly?: { initInlineWidget: (opts: { url: string; parentElement: HTMLElement }) => void };
+};
+
 function Step9({ onNext, onBack }: { onNext: () => void; onBack: () => void }) {
+  const contenedor = useRef<HTMLDivElement>(null);
+
+  // El widget se monta a mano en vez de dejar que lo haga el script solo.
+  // widget.js busca los `.calendly-inline-widget` UNA sola vez, cuando carga:
+  // al salir del paso y volver, el div se vuelve a crear vacío y el script ya
+  // no lo mira, así que el calendario quedaba en blanco (reporte del cliente
+  // 2026-09-17). Llamando a initInlineWidget en cada montaje se redibuja
+  // siempre. El div ya no lleva la clase ni el data-url justamente para que el
+  // script no lo tome también y queden dos calendarios.
+  function montarCalendly() {
+    const el = contenedor.current;
+    const calendly = (window as WindowConCalendly).Calendly;
+    if (!el || !calendly) return;
+    el.innerHTML = '';
+    calendly.initInlineWidget({ url: CALENDLY_URL, parentElement: el });
+  }
+
+  useEffect(() => {
+    // Si el script ya se cargó en un paso anterior, `onReady` puede no volver
+    // a dispararse: lo montamos nosotros.
+    montarCalendly();
+    const el = contenedor.current;
+    return () => {
+      if (el) el.innerHTML = '';
+    };
+    // Solo al montar/desmontar el paso.
+  }, []);
+
   return (
     <>
       <StepHeader
@@ -732,13 +767,14 @@ function Step9({ onNext, onBack }: { onNext: () => void; onBack: () => void }) {
         subtitle="Coordiná una videollamada con nuestro equipo"
       />
       <div
-        className="calendly-inline-widget mb-6 rounded-2xl border border-gray-200"
-        data-url="https://calendly.com/nauticapp/nauticapp?hide_event_type_details=1&hide_gdpr_banner=1"
+        ref={contenedor}
+        className="mb-6 rounded-2xl border border-gray-200"
         style={{ minWidth: '320px', height: '700px' }}
       />
       <Script
         src="https://assets.calendly.com/assets/external/widget.js"
         strategy="afterInteractive"
+        onReady={montarCalendly}
       />
       <NavButtons onBack={onBack} onNext={onNext} />
     </>
