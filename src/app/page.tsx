@@ -9,6 +9,7 @@ import { Navega } from '@/components/landing/navega';
 import { Pricing } from '@/components/landing/pricing';
 import { PorQue } from '@/components/landing/por-que';
 import { Footer } from '@/components/landing/footer';
+import { WhatsappFlotante } from '@/components/landing/whatsapp-flotante';
 
 export default async function Home() {
   const user = await getCurrentUser();
@@ -27,6 +28,7 @@ export default async function Home() {
         <PorQue />
       </main>
       <Footer />
+      <WhatsappFlotante />
     </>
   );
 }

@@ -1,5 +1,6 @@
 import { Header } from '@/components/landing/header';
 import { Footer } from '@/components/landing/footer';
+import { WhatsappFlotante } from '@/components/landing/whatsapp-flotante';
 
 export const metadata = {
   title: 'Eliminar cuenta — NauticApp',
@@ -53,6 +54,7 @@ export default function EliminarCuentaPage() {
         </section>
       </main>
       <Footer />
+      <WhatsappFlotante />
     </>
   );
 }

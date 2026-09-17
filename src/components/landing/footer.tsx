@@ -1,7 +1,16 @@
 import Link from 'next/link';
 import Image from 'next/image';
 
-const columns = [
+import { EMAIL_CONTACTO, EMAIL_CONTACTO_URL, WHATSAPP_URL } from '@/lib/contacto';
+
+type FooterLink = {
+  label: string;
+  href: string;
+  /** Sale del sitio (WhatsApp, mailto): `<a>` plano, no `Link` de Next. */
+  externo?: boolean;
+};
+
+const columns: { title: string; links: FooterLink[] }[] = [
   {
     title: 'Producto',
     links: [
@@ -14,20 +23,27 @@ const columns = [
     title: 'Empresa',
     links: [
       { label: 'Sobre nosotros', href: '#' },
-      { label: 'Contacto', href: '#' },
+      // Contacto abre el WhatsApp de la empresa, y debajo va el mail por si
+      // prefieren escribir (pedido del cliente 2026-09-17).
+      { label: 'Contacto', href: WHATSAPP_URL, externo: true },
+      { label: EMAIL_CONTACTO, href: EMAIL_CONTACTO_URL, externo: true },
       { label: 'Blog', href: '#' },
     ],
   },
   {
     title: 'Legal',
     links: [
-      { label: 'Términos y condiciones', href: '#' },
+      // Apuntaba a "#" y la página existe desde siempre: con la web ya pública
+      // e indexable, un link legal muerto no puede quedar.
+      { label: 'Términos y condiciones', href: '/terminos' },
       { label: 'Política de privacidad', href: '/privacidad' },
       { label: 'Admin', href: '/login' },
       { label: 'Restaurantes', href: '#' },
     ],
   },
 ];
+
+const linkCls = 'text-sm font-bold transition hover:underline hover:opacity-100';
 
 export function Footer() {
   return (
@@ -53,12 +69,20 @@ export function Footer() {
               <ul className="space-y-2 opacity-80">
                 {col.links.map((link) => (
                   <li key={link.label}>
-                    <Link
-                      href={link.href}
-                      className="text-sm font-bold transition hover:underline hover:opacity-100"
-                    >
-                      {link.label}
-                    </Link>
+                    {link.externo ? (
+                      <a
+                        href={link.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`${linkCls} break-all`}
+                      >
+                        {link.label}
+                      </a>
+                    ) : (
+                      <Link href={link.href} className={linkCls}>
+                        {link.label}
+                      </Link>
+                    )}
                   </li>
                 ))}
               </ul>

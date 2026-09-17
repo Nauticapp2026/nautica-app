@@ -1,5 +1,6 @@
 import { Header } from '@/components/landing/header';
 import { Footer } from '@/components/landing/footer';
+import { WhatsappFlotante } from '@/components/landing/whatsapp-flotante';
 
 export const metadata = {
   title: 'Política de Privacidad — NauticApp',
@@ -117,6 +118,7 @@ export default function PrivacidadPage() {
         </div>
       </main>
       <Footer />
+      <WhatsappFlotante />
     </>
   );
 }
