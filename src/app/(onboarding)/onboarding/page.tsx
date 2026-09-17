@@ -42,7 +42,7 @@ export default async function OnboardingPage() {
     <OnboardingClient
       planInfo={planInfo}
       featuresByPlan={featuresByPlan}
-      terminos={terminos ? { version: terminos.version, contenido: terminos.contenido } : null}
+      terminosVersion={terminos?.version ?? null}
     />
   );
 }

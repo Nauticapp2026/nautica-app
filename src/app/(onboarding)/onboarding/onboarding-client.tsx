@@ -23,17 +23,22 @@ import {
   notificarAvanceOnboardingStep,
 } from '@/app/actions/onboarding';
 import { aceptarTerminosAction } from '@/app/actions/terminos';
-import { MarkdownView } from '@/components/shared/markdown-view';
 import { PasswordChecks, PasswordInput } from '@/components/shared/password-input';
 import { toast } from 'sonner';
 import { Check, ChevronRight } from 'lucide-react';
 
-// El wizard tenía 10 pasos. El cliente pidió sacar "Detalles de tu guardería"
-// (horarios, fotos y descripción) y "Armá tu equipo de trabajo" (2026-09-17):
-// alargaban el alta y las dos cosas se cargan igual desde Configuración una vez
-// adentro (pestañas Información general y Equipo). Los componentes se
-// eliminaron junto con sus server actions; no quedó código muerto.
-const TOTAL_STEPS = 8;
+// El wizard tenía 10 pasos. El cliente pidió sacar tres (2026-09-17):
+// "Detalles de tu guardería" (horarios, fotos y descripción) y "Armá tu equipo
+// de trabajo", porque alargaban el alta y las dos cosas se cargan igual desde
+// Configuración una vez adentro; y el paso de "Términos y Condiciones", porque
+// ya se aceptan con el tilde del paso 1. Los componentes se eliminaron junto
+// con sus server actions; no quedó código muerto.
+//
+// OJO con los términos: la aceptación se REGISTRA igual (tabla
+// terminos_aceptaciones) apenas se crea la cuenta en el paso 1. Sin ese
+// registro, el gate de T&C del layout de (dashboard) mandaría al admin a
+// /terminos/aceptar apenas entra, que es peor que el paso que sacamos.
+const TOTAL_STEPS = 7;
 const STORAGE_KEY = 'onboarding-state-v1';
 
 type Data = {
@@ -297,15 +302,31 @@ function Step1({
             onCheckedChange={(v) => setAccepted(!!v)}
             className="mt-0.5"
           />
+          {/* Links de verdad (antes eran <span> sin href). Este tilde es el
+              único lugar donde se aceptan los T&C desde que se sacó el paso
+              dedicado, así que tiene que poder leerlos. Se abren en otra
+              pestaña para no perder el progreso del alta. */}
           <label htmlFor="terms" className="text-sm" style={{ color: '#101828' }}>
             Acepto los{' '}
-            <span className="cursor-pointer underline" style={{ color: '#669E9D' }}>
+            <a
+              href="/terminos"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline"
+              style={{ color: '#669E9D' }}
+            >
               Términos y Condiciones
-            </span>{' '}
+            </a>{' '}
             y la{' '}
-            <span className="cursor-pointer underline" style={{ color: '#669E9D' }}>
+            <a
+              href="/privacidad"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline"
+              style={{ color: '#669E9D' }}
+            >
               Política de Privacidad
-            </span>
+            </a>
           </label>
         </div>
         {error && <p className="text-sm text-red-600">{error}</p>}
@@ -781,60 +802,6 @@ function Step9({ onNext, onBack }: { onNext: () => void; onBack: () => void }) {
   );
 }
 
-function Step10Terminos({
-  terminos,
-  onNext,
-  onBack,
-  pending,
-}: {
-  terminos: { version: number; contenido: string } | null;
-  onNext: () => void;
-  onBack: () => void;
-  pending: boolean;
-}) {
-  const [acepta, setAcepta] = useState(false);
-  return (
-    <>
-      <StepHeader
-        title="Términos y Condiciones"
-        subtitle={
-          terminos
-            ? `Versión ${terminos.version}. Para terminar la creación de tu cuenta necesitamos que aceptes los Términos.`
-            : 'No hay términos publicados.'
-        }
-      />
-      <div className="mb-4 max-h-[420px] overflow-y-auto rounded-md border border-gray-200 bg-white p-4">
-        {terminos ? (
-          <MarkdownView source={terminos.contenido} />
-        ) : (
-          <p className="text-muted-foreground text-sm">
-            Hay un error de configuración. Volvé al inicio y reintentá.
-          </p>
-        )}
-      </div>
-      <label className="mb-6 flex items-start gap-3 text-sm text-gray-700">
-        <Checkbox
-          checked={acepta}
-          onCheckedChange={(v) => setAcepta(v === true)}
-          disabled={pending || !terminos}
-          className="mt-0.5"
-        />
-        <span>
-          Leí y acepto los Términos y Condiciones de NauticApp
-          {terminos ? ` en su versión ${terminos.version}.` : '.'}
-        </span>
-      </label>
-      <NavButtons
-        onBack={onBack}
-        onNext={onNext}
-        disabled={!acepta || !terminos}
-        pending={pending}
-        nextLabel={pending ? 'Guardando…' : 'Aceptar y continuar'}
-      />
-    </>
-  );
-}
-
 function Step11Welcome() {
   const router = useRouter();
   return (
@@ -875,10 +842,19 @@ function Step11Welcome() {
 type OnboardingClientProps = {
   planInfo: PlanInfoMap;
   featuresByPlan: Record<'esencial' | 'premium' | 'elite', PlanFeatureLine[]>;
-  terminos: { version: number; contenido: string } | null;
+  /**
+   * Versión vigente de los T&C, para registrar la aceptación del paso 1. Solo
+   * el número: desde que se sacó el paso dedicado ya no hace falta mandarle al
+   * navegador el texto completo de los términos en cada alta.
+   */
+  terminosVersion: number | null;
 };
 
-export function OnboardingClient({ planInfo, featuresByPlan, terminos }: OnboardingClientProps) {
+export function OnboardingClient({
+  planInfo,
+  featuresByPlan,
+  terminosVersion,
+}: OnboardingClientProps) {
   const [step, setStep] = useState(1);
   const [error, setError] = useState<string | undefined>();
   const [pending, startTransition] = useTransition();
@@ -995,6 +971,20 @@ export function OnboardingClient({ planInfo, featuresByPlan, terminos }: Onboard
         setError(res.error);
         return;
       }
+      // El tilde de este paso es la aceptación de los T&C: se registra acá,
+      // con la cuenta ya creada y la sesión iniciada. Si fallara, no se corta
+      // el alta (la cuenta existe) — el gate del dashboard se la vuelve a
+      // pedir al entrar, que es la red de seguridad.
+      if (terminosVersion !== null) {
+        try {
+          const resTerminos = await aceptarTerminosAction({ version: terminosVersion });
+          if (resTerminos.error) {
+            console.error('[onboarding] no se registró la aceptación de T&C', resTerminos.error);
+          }
+        } catch (err) {
+          console.error('[onboarding] excepción registrando la aceptación de T&C', err);
+        }
+      }
       setData((prev) => ({ ...prev, cuentaCreada: prev.email.trim().toLowerCase() }));
       next();
     });
@@ -1049,29 +1039,6 @@ export function OnboardingClient({ planInfo, featuresByPlan, terminos }: Onboard
     next();
   }
 
-  function handleStep10Terminos() {
-    if (!terminos) {
-      setError('No hay términos publicados. Contactá a soporte.');
-      return;
-    }
-    startTransition(async () => {
-      try {
-        const res = await aceptarTerminosAction({ version: terminos.version });
-        if (res.error) {
-          setError(res.error);
-          toast.error(res.error);
-          return;
-        }
-        next();
-      } catch (err) {
-        console.error('[onboarding step10 terminos] excepcion', err);
-        const msg = 'No se pudo guardar la aceptación. Reintentá en unos segundos.';
-        setError(msg);
-        toast.error(msg);
-      }
-    });
-  }
-
   return (
     <Shell step={step}>
       {step === 1 && (
@@ -1107,15 +1074,7 @@ export function OnboardingClient({ planInfo, featuresByPlan, terminos }: Onboard
       )}
       {step === 5 && <Step8 data={data} planInfo={planInfo} onNext={next} onBack={back} />}
       {step === 6 && <Step9 onNext={next} onBack={back} />}
-      {step === 7 && (
-        <Step10Terminos
-          terminos={terminos}
-          onNext={handleStep10Terminos}
-          onBack={back}
-          pending={pending}
-        />
-      )}
-      {step === 8 && <Step11Welcome />}
+      {step === 7 && <Step11Welcome />}
     </Shell>
   );
 }
