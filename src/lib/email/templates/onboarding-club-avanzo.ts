@@ -18,6 +18,9 @@ export function onboardingClubAvanzoEmail(params: {
   cuit: string | null;
   direccion: string | null;
   ciudad: string | null;
+  /** Teléfono y mail operativos del club (paso "Datos de tu guardería"). */
+  telefonoClub: string | null;
+  emailClub: string | null;
   adminNombre: string | null;
   adminApellido: string | null;
   adminEmail: string;
@@ -30,13 +33,19 @@ export function onboardingClubAvanzoEmail(params: {
 
   const subject = `Nuevo club en onboarding: ${params.nombreClub}`;
 
+  // Van los datos del CLUB y los de la PERSONA por separado, con etiquetas que
+  // dicen de quién es cada teléfono y cada mail. Antes el mail mostraba un solo
+  // "Teléfono" (el de la persona) y el del club, que sí estaba cargado, no
+  // aparecía en ningún lado (reporte del cliente 2026-09-17).
   const filas: [string, string][] = [
     ['Club', club],
     ['CUIT', escapeHtml(params.cuit ?? '—')],
     ['Dirección', escapeHtml(ubicacion)],
+    ['Teléfono del club', escapeHtml(params.telefonoClub ?? '—')],
+    ['Email del club', escapeHtml(params.emailClub ?? '—')],
     ['Contacto', escapeHtml(adminNombreCompleto)],
-    ['Email', escapeHtml(params.adminEmail)],
-    ['Teléfono', escapeHtml(params.adminTelefono ?? '—')],
+    ['Email del contacto', escapeHtml(params.adminEmail)],
+    ['Teléfono del contacto', escapeHtml(params.adminTelefono ?? '—')],
   ];
 
   const html = `<!DOCTYPE html>

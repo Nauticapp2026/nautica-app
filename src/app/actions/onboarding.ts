@@ -58,7 +58,7 @@ export async function signUpStep(data: {
     email,
     password: data.password,
     email_confirm: true,
-    user_metadata: { nombre: data.nombre, apellido: data.apellido },
+    user_metadata: { nombre: data.nombre, apellido: data.apellido, telefono: data.telefono },
   });
 
   if (createErr) {
@@ -204,6 +204,8 @@ export async function notificarAvanceOnboardingStep(guarderiaId: string): Promis
       cuit: guarderias.cuit,
       direccion: guarderias.direccion,
       ciudad: guarderias.ciudad,
+      telefono: guarderias.telefono,
+      email: guarderias.email,
       yaEnviado: guarderias.onboardingNotificacionEnviada,
     })
     .from(guarderias)
@@ -235,6 +237,8 @@ export async function notificarAvanceOnboardingStep(guarderiaId: string): Promis
       cuit: guarderiaRow.cuit,
       direccion: guarderiaRow.direccion,
       ciudad: guarderiaRow.ciudad,
+      telefonoClub: guarderiaRow.telefono,
+      emailClub: guarderiaRow.email,
       adminNombre: profileRow?.nombre ?? null,
       adminApellido: profileRow?.apellido ?? null,
       adminEmail: user?.email ?? '—',
