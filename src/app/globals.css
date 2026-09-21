@@ -104,3 +104,33 @@
     color: #4a5565;
   }
 }
+
+/*
+ * Latido del corazón de la firma de Cambalache Studio (pie del sitio).
+ * Fuera de @layer a propósito: es una animación propia, no un token del
+ * design system.
+ */
+@keyframes latido {
+  0%,
+  28%,
+  100% {
+    transform: scale(1);
+  }
+  14% {
+    transform: scale(1.18);
+  }
+  21% {
+    transform: scale(1.04);
+  }
+}
+
+.animate-latido {
+  animation: latido 1.6s ease-in-out infinite;
+}
+
+/* A quien pidió menos movimiento en su sistema no le late nada. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-latido {
+    animation: none;
+  }
+}
