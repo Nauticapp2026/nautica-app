@@ -546,6 +546,10 @@ Podés arrastrar los espacios dentro de un peine o piso para cambiar el orden de
 
 Si nunca reordenaste un piso o peine, los espacios se muestran **de menor a mayor según su número**. Al agregar un espacio nuevo, toma el número siguiente y queda al final de la fila.
 
+### Renombrar peines y pisos
+
+El sistema los crea como "Peine 1", "Piso 1", etc. Para ponerles el nombre que usás en el club, hacé clic en el **lápiz** al lado del nombre, escribí el nuevo y confirmá con **Enter** o el tilde. **Escape** o la cruz cancelan. El cambio impacta en todos los lugares donde aparece ese nombre (ficha del socio, tareas, exportaciones).
+
 ### Carga masiva de áreas
 
 1. Hacé clic en **Importar áreas**.

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { z } from 'zod';
 
 import { db } from '@/lib/db';
 import {
@@ -1089,6 +1090,68 @@ export async function deletePisoAction(pisoId: string): Promise<{ error?: string
 
   await db.delete(espacios).where(eq(espacios.pisoId, pisoId));
   await db.delete(pisosTable).where(eq(pisosTable.id, pisoId));
+
+  revalidatePath('/espacios');
+  return {};
+}
+
+// Nombre de un peine o piso. Los crea el sistema como "Peine 1" / "Piso 1" y
+// el club los renombra a lo que usa en la práctica (pedido 2026-09-22).
+const nombreContenedorSchema = z
+  .string()
+  .trim()
+  .min(1, 'El nombre no puede estar vacío.')
+  .max(60, 'El nombre no puede superar los 60 caracteres.');
+
+export async function renamePeineAction(
+  marinaId: string,
+  nombre: string,
+): Promise<{ error?: string }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+  if (!isAdmin(ctx)) return { error: 'Solo administradores pueden renombrar peines.' };
+
+  const parsed = nombreContenedorSchema.safeParse(nombre);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Nombre inválido.' };
+
+  const guarderiaId = ctx.activeMembership.guarderiaId;
+
+  const actualizados = await db
+    .update(marinas)
+    .set({ nombre: parsed.data })
+    .where(and(eq(marinas.id, marinaId), eq(marinas.guarderiaId, guarderiaId)))
+    .returning({ id: marinas.id });
+  if (actualizados.length === 0) return { error: 'Peine no encontrado.' };
+
+  revalidatePath('/espacios');
+  return {};
+}
+
+export async function renamePisoAction(
+  pisoId: string,
+  nombre: string,
+): Promise<{ error?: string }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+  if (!isAdmin(ctx)) return { error: 'Solo administradores pueden renombrar pisos.' };
+
+  const parsed = nombreContenedorSchema.safeParse(nombre);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Nombre inválido.' };
+
+  const guarderiaId = ctx.activeMembership.guarderiaId;
+
+  // pisos no tiene guarderia_id: el scope se valida vía el lado, igual que en
+  // deletePisoAction. Primero se confirma que el piso es de este club y recién
+  // después se actualiza por id.
+  const [p] = await db
+    .select({ id: pisosTable.id })
+    .from(pisosTable)
+    .innerJoin(ladosTable, eq(ladosTable.id, pisosTable.ladoId))
+    .where(and(eq(pisosTable.id, pisoId), eq(ladosTable.guarderiaId, guarderiaId)))
+    .limit(1);
+  if (!p) return { error: 'Piso no encontrado.' };
+
+  await db.update(pisosTable).set({ nombre: parsed.data }).where(eq(pisosTable.id, p.id));
 
   revalidatePath('/espacios');
   return {};

@@ -8,6 +8,7 @@ import {
   Check,
   ChevronDown,
   Loader2,
+  Pencil,
   Plus,
   Search,
   Trash2,
@@ -46,6 +47,8 @@ import {
   moveEspacioToMarinaAction,
   moveEspacioToPisoAction,
   moveOcupanteAction,
+  renamePeineAction,
+  renamePisoAction,
   reorderEspaciosAction,
   setAreaMarinerosAction,
   setAreaOperariosAction,
@@ -1449,9 +1452,14 @@ function MarinaSection({
             area.peines.map((p) => (
               <div key={p.marinaId}>
                 <div className="mb-2 flex items-center justify-between gap-2 text-xs text-gray-500">
-                  <div className="flex items-center gap-2">
-                    <Anchor className="h-3.5 w-3.5" />
-                    {p.nombre}
+                  <div className="flex min-w-0 items-center gap-2">
+                    <Anchor className="h-3.5 w-3.5 shrink-0" />
+                    <NombreEditable
+                      nombre={p.nombre}
+                      ariaLabel={`el peine ${p.nombre}`}
+                      iconoClassName="h-3.5 w-3.5"
+                      onGuardar={(nuevo) => renamePeineAction(p.marinaId, nuevo)}
+                    />
                   </div>
                   <button
                     type="button"
@@ -1572,6 +1580,124 @@ function NaveSection({
   );
 }
 
+/**
+ * Nombre con lápiz al lado: al tocarlo se convierte en un input. Enter o el
+ * tilde guardan, Escape o la cruz cancelan. Lo usan las cabeceras de peine y
+ * de piso (pedido del cliente 2026-09-22: poder renombrarlos).
+ *
+ * El guardado lo hace el padre vía `onGuardar` (llama a la server action);
+ * acá solo se maneja la edición. Si el nombre no cambió o quedó vacío, se
+ * cancela sin llamar al server.
+ */
+function NombreEditable({
+  nombre,
+  ariaLabel,
+  onGuardar,
+  textoClassName,
+  iconoClassName = 'h-3 w-3',
+}: {
+  nombre: string;
+  ariaLabel: string;
+  onGuardar: (nuevoNombre: string) => Promise<{ error?: string }>;
+  textoClassName?: string;
+  iconoClassName?: string;
+}) {
+  const router = useRouter();
+  const [editando, setEditando] = useState(false);
+  const [valor, setValor] = useState(nombre);
+  const [pending, startTransition] = useTransition();
+
+  function empezar() {
+    setValor(nombre);
+    setEditando(true);
+  }
+
+  function cancelar() {
+    setEditando(false);
+    setValor(nombre);
+  }
+
+  function guardar() {
+    const nuevo = valor.trim();
+    if (!nuevo || nuevo === nombre) {
+      cancelar();
+      return;
+    }
+    startTransition(async () => {
+      const res = await onGuardar(nuevo);
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+      setEditando(false);
+      toast.success('Nombre actualizado.');
+      router.refresh();
+    });
+  }
+
+  if (!editando) {
+    return (
+      <span className="inline-flex min-w-0 items-center gap-1">
+        <span className={`truncate ${textoClassName ?? ''}`}>{nombre}</span>
+        <button
+          type="button"
+          onClick={empezar}
+          aria-label={`Renombrar ${ariaLabel}`}
+          title={`Renombrar ${ariaLabel}`}
+          className="rounded-[6px] p-0.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-[#175861]"
+        >
+          <Pencil className={iconoClassName} />
+        </button>
+      </span>
+    );
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1">
+      <input
+        autoFocus
+        value={valor}
+        disabled={pending}
+        maxLength={60}
+        aria-label={`Nuevo nombre de ${ariaLabel}`}
+        onChange={(e) => setValor(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            guardar();
+          } else if (e.key === 'Escape') {
+            e.preventDefault();
+            cancelar();
+          }
+        }}
+        // Mismas clases de tokens que el Input de shadcn (CLAUDE.md regla 7),
+        // en tamaño compacto para la cabecera.
+        className="border-input focus-visible:border-ring focus-visible:ring-ring/50 h-6 w-40 rounded-md border bg-white px-1.5 text-xs text-[#101828] focus-visible:ring-[3px] focus-visible:outline-none disabled:opacity-50"
+      />
+      <button
+        type="button"
+        onClick={guardar}
+        disabled={pending}
+        aria-label="Guardar nombre"
+        title="Guardar"
+        className="rounded-[6px] p-0.5 text-[#175861] hover:bg-[#D9EBE9] disabled:opacity-50"
+      >
+        {pending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+      </button>
+      <button
+        type="button"
+        onClick={cancelar}
+        disabled={pending}
+        aria-label="Cancelar"
+        title="Cancelar"
+        className="rounded-[6px] p-0.5 text-gray-400 hover:bg-gray-100 disabled:opacity-50"
+      >
+        <X className="h-3 w-3" />
+      </button>
+    </span>
+  );
+}
+
 function DroppablePiso({
   pisoId,
   nombre,
@@ -1595,7 +1721,12 @@ function DroppablePiso({
   return (
     <div className="mb-3">
       <div className="mb-1 flex items-center justify-between gap-2">
-        <p className="text-[11px] text-gray-400">{nombre}</p>
+        <NombreEditable
+          nombre={nombre}
+          ariaLabel={`el piso ${nombre}`}
+          textoClassName="text-[11px] text-gray-400"
+          onGuardar={(nuevo) => renamePisoAction(pisoId, nuevo)}
+        />
         <button
           type="button"
           onClick={onDeletePiso}
