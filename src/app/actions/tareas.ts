@@ -228,7 +228,12 @@ export async function updateTareaEstadoAction(
   const gId = ctx.activeMembership.guarderiaId;
 
   const [current] = await db
-    .select({ id: tareas.id, estado: tareas.estado, porteriaEstado: porteria.estado })
+    .select({
+      id: tareas.id,
+      estado: tareas.estado,
+      esMarina: tareas.esMarina,
+      porteriaEstado: porteria.estado,
+    })
     .from(tareas)
     .leftJoin(porteria, eq(porteria.id, tareas.porteriaId))
     .where(and(eq(tareas.id, tareaId), eq(tareas.guarderiaId, gId)))
@@ -245,11 +250,27 @@ export async function updateTareaEstadoAction(
   // El socio canceló la salida antes de que el barco navegara (todavía en
   // salida_programada o preparar) — no se puede "avanzarla", queda fija hasta
   // que sale del tablero. Si ya estaba navegando, sí se puede mover a guardada.
-  if (
-    current.porteriaEstado === 'revocado' &&
-    (current.estado === 'salida_programada' || current.estado === 'preparar')
-  ) {
-    return { error: 'El socio canceló esta salida antes de zarpar — no se puede mover.' };
+  //
+  // EXCEPCIÓN marina (2026-09-22): ahí `preparar` significa "la lancha ya está
+  // en el agua, sale a navegar", y puede venir de una consolidación que borró
+  // la tarea `navegando` de la salida anterior (ver
+  // marina_consolidar_salida_repetida). Si el socio cancela en ese punto, el
+  // marinero se quedaba sin ninguna tarea por la que marcar la lancha guardada
+  // — y el socio tampoco la iba a confirmar navegando, porque la salida está
+  // revocada. Se permite UNA sola transición manual, a `guardada`. Nunca
+  // automática: la decisión sigue siendo del marinero/admin.
+  if (current.porteriaEstado === 'revocado') {
+    const congelada =
+      current.estado === 'salida_programada' ||
+      (current.estado === 'preparar' && !current.esMarina);
+    if (congelada) {
+      return { error: 'El socio canceló esta salida antes de zarpar — no se puede mover.' };
+    }
+    if (current.estado === 'preparar' && current.esMarina && estado !== 'guardada') {
+      return {
+        error: 'La salida está cancelada: la lancha solo se puede marcar como guardada.',
+      };
+    }
   }
 
   await db

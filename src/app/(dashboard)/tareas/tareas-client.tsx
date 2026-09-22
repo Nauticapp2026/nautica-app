@@ -293,13 +293,22 @@ function TareaCard({
   // Salida programada o Preparar) — no tiene sentido "avanzarla", queda fija
   // hasta que desaparece del tablero al otro día. Si ya estaba Navegando
   // cuando canceló, el barco sí salió y "Mover a Guardada" sigue aplicando.
-  const cancelActiva =
+  const canceladaAntesDeZarpar =
     tarea.salidaCancelada && (tarea.estado === 'salida_programada' || tarea.estado === 'preparar');
+  // Excepción marina (2026-09-22): en marina `preparar` es "sale a navegar",
+  // la lancha ya está en el agua (y puede venir de una consolidación que borró
+  // la tarea navegando anterior). Cancelada ahí, la única acción que tiene
+  // sentido es marcarla Guardada, y alguien tiene que poder hacerlo. El server
+  // valida lo mismo (updateTareaEstadoAction).
+  const soloGuardada = canceladaAntesDeZarpar && tarea.estado === 'preparar' && tarea.esMarina;
+  const cancelActiva = canceladaAntesDeZarpar && !soloGuardada;
   const puedeMoverEstado = !esTerminal && !cancelActiva && (canEditAll || (isOperario && esMia));
   const puedeCambiarOperario = canEditAll || (isOperario && sinAsignar);
   const puedeEditarLavado = canEditAll || (isOperario && esMia);
 
-  const draggable = puedeMoverEstado && dndEnabled;
+  // Sin arrastre en el caso "solo guardada": soltarla en Navegando fallaría en
+  // el server. El select ofrece únicamente Guardada.
+  const draggable = puedeMoverEstado && !soloGuardada && dndEnabled;
 
   return (
     <div
@@ -377,7 +386,10 @@ function TareaCard({
             disabled={!puedeMoverEstado || pending}
           >
             <option value="">Mover a…</option>
-            {ESTADOS_TAREA.filter((e) => e !== tarea.estado).map((e) => (
+            {(soloGuardada
+              ? (['guardada'] as EstadoTarea[])
+              : ESTADOS_TAREA.filter((e) => e !== tarea.estado)
+            ).map((e) => (
               <option key={e} value={e}>
                 {estadoLabelFor(e, tarea.esMarina)}
               </option>

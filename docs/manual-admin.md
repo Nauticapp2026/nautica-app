@@ -453,6 +453,8 @@ Muestra **todas** las tareas y solicitudes de lavado, mezcladas en una sola tabl
 Desde la tarjeta de la tarea, usá el selector **Mover a...** para cambiar la columna.
 
 > **Si el socio canceló la salida antes de que el barco navegara** (la tarea todavía estaba en Salida programada o Preparar), la tarjeta queda de **solo lectura**: no aparece el selector "Mover a..." y no se puede arrastrar. Va a desaparecer sola del tablero al día siguiente, sin que haga falta tocarla. Si en cambio la cancelación llegó estando ya en **Navegando** (el barco sí llegó a salir), la tarjeta se sigue pudiendo mover normalmente hasta Guardada.
+>
+> **Excepción en marina.** Si la salida se cancela con la tarjeta en **Sale a navegar**, la lancha ya está en el agua (a veces desde una salida anterior que nunca se marcó guardada) y el socio ya no va a confirmar que navega. Para que el ciclo pueda cerrarse, esa tarjeta ofrece **una sola acción: Mover a Guardada**, tanto en el tablero como en la app del marinero. No se arrastra y no se puede llevar a Navegando. Nada pasa solo: la marca el marinero o el administrador cuando la lancha está amarrada.
 
 ### Asignar o reasignar un operario
 
