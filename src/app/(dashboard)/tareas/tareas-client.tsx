@@ -45,7 +45,7 @@ export type Tarea = {
   fechaHora: string | null;
   createdAt: string;
   updatedAt: string;
-  // true = barco en marina (marinero): el estado 'preparar' se rotula "Preparada".
+  // true = barco en marina (marinero): el estado 'preparar' se rotula "Sale a navegar".
   esMarina: boolean;
   operarioId: string | null;
   operarioNombre: string | null;
@@ -148,12 +148,14 @@ const ESTADO_LABEL: Record<EstadoTarea, string> = {
   lavado: 'Lavado',
 };
 
-// En marina el estado 'preparar' significa "lista para salir" → se muestra como
-// "Preparada". En nave sigue siendo "Preparar" (en preparación). El resto de los
-// estados no cambia. `esMarina` viene por tarea; para labels sin tarjeta (header
-// de columna, stat card) se pasa el contexto de la vista (ver `vistaMarina`).
+// En marina el estado 'preparar' significa "la lancha ya está en el agua, lista
+// para salir" → se muestra como "Sale a navegar" (era "Preparada"; pedido del
+// cliente 2026-09-22, SOLO en el admin — la app mobile no cambia). En nave
+// sigue siendo "Preparar" (en preparación). El resto de los estados no cambia.
+// `esMarina` viene por tarea; para labels sin tarjeta (header de columna, stat
+// card) se pasa el contexto de la vista (ver `vistaMarina`).
 function estadoLabelFor(estado: EstadoTarea, esMarina: boolean): string {
-  if (estado === 'preparar') return esMarina ? 'Preparada' : 'Preparar';
+  if (estado === 'preparar') return esMarina ? 'Sale a navegar' : 'Preparar';
   return ESTADO_LABEL[estado];
 }
 

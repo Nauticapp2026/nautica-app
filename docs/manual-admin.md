@@ -402,6 +402,8 @@ La sección Tareas tiene dos vistas: **Tablero** (kanban operativo del día a d�
 | Guardada          | Embarcación de regreso y guardada    |
 | Lavado            | Solicitudes de lavado                |
 
+> En **marina** la lancha ya está en el agua, así que no hay nada que preparar: ese mismo estado se rotula **Sale a navegar** en la columna, en la card de conteo y en cada tarjeta. En **nave** sigue diciendo **Preparar**. Cuando el tablero mezcla tareas de los dos tipos, el título de la columna dice Preparar y cada tarjeta lleva el rótulo que le corresponde.
+
 Arriba del tablero hay una card por columna con la cantidad de tareas activas. Las tareas **canceladas** (ver más abajo) siguen visibles en el tablero con su badge, pero **no suman** en el número de la card.
 
 ### Qué muestra cada tarjeta

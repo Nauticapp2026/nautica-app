@@ -187,7 +187,7 @@ export default async function TareasPage() {
     createdAt: t.createdAt.toISOString(),
     updatedAt: t.updatedAt.toISOString(),
     // true = barco en marina (marinero) → el estado 'preparar' se muestra como
-    // "Preparada" (lista para salir), no "Preparar".
+    // "Sale a navegar" (la lancha ya está en el agua), no "Preparar".
     esMarina: t.esMarina,
     operarioId: t.operarioId,
     operarioNombre:
