@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { and, asc, desc, eq, inArray, isNull } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import {
@@ -154,6 +154,10 @@ export async function createAreaAction(
           areaId: area.id,
           marinaId: marina.id,
           nomenclatura: String(j),
+          // `orden` explícito: sin esto quedaban todos en 0 y, al empatar
+          // también el created_at del mismo insert, la lista salía en orden
+          // arbitrario (reporte del cliente 2026-09-22).
+          orden: j - 1,
           estado: 'disponible' as const,
         });
       }
@@ -227,6 +231,8 @@ export async function createAreaAction(
           ladoId: lado.id,
           pisoId: piso.id,
           nomenclatura: String(numeracion),
+          // Ver el comentario del mismo campo en el alta de peines.
+          orden: k,
           estado: 'disponible' as const,
         });
       }
@@ -940,6 +946,23 @@ function nextNomenclatura(existentes: { nomenclatura: string | null }[]): string
   return String(max + 1);
 }
 
+/**
+ * Próximo `orden` dentro de un piso o peine: el último + 1.
+ *
+ * Sin esto el espacio nuevo se insertaba con `orden = 0` (el default) y, en un
+ * contenedor que el admin ya había reordenado a mano, aparecía PRIMERO en vez
+ * de último — que es lo que reportó el cliente el 2026-09-22. Como la
+ * nomenclatura nueva es siempre la más alta (`nextNomenclatura` es max+1),
+ * mandarlo al final es lo que deja la lista correlativa.
+ */
+async function nextOrden(columna: 'pisoId' | 'marinaId', id: string): Promise<number> {
+  const [row] = await db
+    .select({ max: sql<number | null>`max(${espacios.orden})` })
+    .from(espacios)
+    .where(eq(columna === 'pisoId' ? espacios.pisoId : espacios.marinaId, id));
+  return (row?.max ?? -1) + 1;
+}
+
 export async function addEspacioToMarinaAction(
   marinaId: string,
 ): Promise<{ error?: string; id?: string }> {
@@ -968,6 +991,7 @@ export async function addEspacioToMarinaAction(
       areaId: m.areaId,
       marinaId,
       nomenclatura: nextNomenclatura(existentes),
+      orden: await nextOrden('marinaId', marinaId),
       estado: 'disponible',
     })
     .returning({ id: espacios.id });
@@ -1017,6 +1041,7 @@ export async function addEspacioToPisoAction(
       ladoId: p.ladoId,
       pisoId,
       nomenclatura: nextNomenclatura(existentesLado),
+      orden: await nextOrden('pisoId', pisoId),
       estado: 'disponible',
     })
     .returning({ id: espacios.id });

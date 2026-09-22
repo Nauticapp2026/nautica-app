@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 // Forzar dynamic rendering para que siempre traiga data fresca después de un
 // reorder de espacios (evita caches RSC).
 export const dynamic = 'force-dynamic';
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, sql } from 'drizzle-orm';
 
 import { getActiveMarina } from '@/lib/auth/session';
 import { db } from '@/lib/db';
@@ -117,7 +117,19 @@ export default async function EspaciosPage() {
       })
       .from(espacios)
       .where(eq(espacios.guarderiaId, guarderiaId))
-      .orderBy(asc(espacios.orden), asc(espacios.createdAt)),
+      // 1) `orden`: el reorden manual del admin (drag-and-drop) manda.
+      // 2) Número de la nomenclatura: cuando `orden` empata —el caso normal,
+      //    porque hasta el 2026-09-22 nada lo seteaba y quedaban todos en 0—
+      //    la lista salía en orden arbitrario (el `createdAt` también empata
+      //    entre los espacios del mismo insert masivo). Con este criterio
+      //    quedan correlativos de menor a mayor, que es lo que pidió el
+      //    cliente. Los que no tienen dígitos van al final, por nombre.
+      .orderBy(
+        asc(espacios.orden),
+        sql`nullif(regexp_replace(coalesce(${espacios.nomenclatura}, ''), '[^0-9]', '', 'g'), '')::bigint asc nulls last`,
+        asc(espacios.nomenclatura),
+        asc(espacios.createdAt),
+      ),
 
     db
       .select({

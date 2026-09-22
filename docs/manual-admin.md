@@ -544,6 +544,8 @@ Al **borrar una embarcación** que tenía un espacio asignado, el espacio se lib
 
 Podés arrastrar los espacios dentro de un peine o piso para cambiar el orden de visualización. El nuevo orden se guarda automáticamente.
 
+Si nunca reordenaste un piso o peine, los espacios se muestran **de menor a mayor según su número**. Al agregar un espacio nuevo, toma el número siguiente y queda al final de la fila.
+
 ### Carga masiva de áreas
 
 1. Hacé clic en **Importar áreas**.
