@@ -386,6 +386,7 @@ export default async function SocioPage({
         comprobanteInterno: socioServicios.comprobanteInterno,
         debitoAutomatico: socioServicios.debitoAutomatico,
         cantidadDias: socioServicios.cantidadDias,
+        bonificacionPct: socioServicios.bonificacionPct,
       })
       .from(socioServicios)
       .innerJoin(serviciosTable, eq(serviciosTable.id, socioServicios.servicioId))
@@ -777,6 +778,7 @@ export default async function SocioPage({
         comprobanteInterno: s.comprobanteInterno,
         debitoAutomatico: s.debitoAutomatico,
         cantidadDias: s.cantidadDias,
+        bonificacionPct: s.bonificacionPct,
         tieneCargo: contratosConCargo.has(s.id),
       }))}
       navegantes={navegantesList.map((n) => ({

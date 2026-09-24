@@ -1796,6 +1796,10 @@ export const socioServicios = pgTable(
     // = 'diaria'): cantidad de días contratados, tipeada al cargar el
     // servicio. El cargo único del cron = precio diario × cantidad de días.
     cantidadDias: integer('cantidad_dias'),
+    // Bonificación de ESTE contrato (%), sobre el precio del tarifario. NULL =
+    // sin descuento. Se aplica al emitir, en lib/pendientes-facturar.ts, que
+    // es el único lugar donde el precio se convierte en cargo. Mig 0158.
+    bonificacionPct: numeric('bonificacion_pct', { precision: 5, scale: 2 }),
     createdBy: uuid('created_by').references(() => profiles.id, { onDelete: 'set null' }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),

@@ -766,6 +766,9 @@ const updateSocioServicioSchema = z.object({
   concepto: z.string().nullable(),
   comprobanteInterno: z.boolean(),
   debitoAutomatico: z.boolean(),
+  // Bonificación (%) del contrato. null = sin descuento. Mismo rango que al
+  // cargar: más de 0 y hasta 100.
+  bonificacionPct: z.number().gt(0).max(100).nullable(),
   cobro: z.object({ monto: z.string(), concepto: z.string() }).nullable(),
 });
 
@@ -777,7 +780,8 @@ export async function updateSocioServicioAction(input: unknown): Promise<{ error
 
   const parsed = updateSocioServicioSchema.safeParse(input);
   if (!parsed.success) return { error: 'Datos inválidos' };
-  const { id, fechaInicio, fechaBaja, concepto, comprobanteInterno, cobro } = parsed.data;
+  const { id, fechaInicio, fechaBaja, concepto, comprobanteInterno, cobro, bonificacionPct } =
+    parsed.data;
   let { debitoAutomatico } = parsed.data;
   const guarderiaId = ctx.activeMembership.guarderiaId;
 
@@ -828,6 +832,10 @@ export async function updateSocioServicioAction(input: unknown): Promise<{ error
         concepto: concepto?.trim() || null,
         comprobanteInterno,
         debitoAutomatico,
+        // Solo afecta los cargos que se emitan de acá en más: los ya emitidos
+        // quedan como salieron (modelo "los cargos nacen al emitir").
+        bonificacionPct:
+          bonificacionPct != null ? (Math.round(bonificacionPct * 100) / 100).toFixed(2) : null,
         updatedAt: new Date(),
       })
       .where(eq(socioServicios.id, id));

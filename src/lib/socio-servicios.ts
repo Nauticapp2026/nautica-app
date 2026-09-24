@@ -81,6 +81,9 @@ export async function crearSocioServicio(
     concepto?: string | null;
     // Solo para tarifas Variable diaria: días contratados.
     cantidadDias?: number | null;
+    // Descuento (%) de este contrato sobre el precio del tarifario. null/0 =
+    // sin bonificación. Lo valida la action; acá solo se persiste.
+    bonificacionPct?: number | null;
     createdBy: string;
   },
 ): Promise<{ id: string; numeroOperacion: number }> {
@@ -144,6 +147,10 @@ export async function crearSocioServicio(
       debitoAutomatico,
       concepto: params.concepto ?? null,
       cantidadDias: params.cantidadDias ?? null,
+      bonificacionPct:
+        params.bonificacionPct != null && params.bonificacionPct > 0
+          ? params.bonificacionPct.toFixed(2)
+          : null,
       createdBy: params.createdBy,
     })
     .returning({ id: socioServicios.id });

@@ -203,7 +203,7 @@ Cada embarcación tiene su **propio espacio asignado**. Dentro de la tarjeta de 
 
 #### Pestaña Servicios Contratados
 
-Lista los servicios que el socio tiene contratados. Es un **contrato**, no un historial de cargos: cada servicio ocupa su propia fila, con su categoría, un badge **Fijo** o **Variable** según su tarifa, el tipo de comprobante (**Interno / Fiscal**), la columna **Débito autom.** (Sí/No — si el servicio entra al débito automático Payway, ver capítulo 14), el precio con y sin IVA, la fecha de inicio, la fecha de baja (si tiene) y su **estado**:
+Lista los servicios que el socio tiene contratados. Es un **contrato**, no un historial de cargos: cada servicio ocupa su propia fila, con su categoría, un badge **Fijo** o **Variable** según su tarifa, el tipo de comprobante (**Interno / Fiscal**), la columna **Bonif.** (el porcentaje de descuento del contrato, si tiene — al pasar el mouse muestra el precio que queda), la columna **Débito autom.** (Sí/No — si el servicio entra al débito automático Payway, ver capítulo 14), el precio con y sin IVA, la fecha de inicio, la fecha de baja (si tiene) y su **estado**:
 
 - **Vigente** — el contrato está activo y se sigue facturando.
 - **Concluido** — servicio **Variable** que ya se facturó: los Variables se cobran una sola vez y el contrato se cierra solo. Para volver a cobrarlo, cargalo de nuevo.
@@ -217,19 +217,20 @@ Lista los servicios que el socio tiene contratados. Es un **contrato**, no un hi
 2. Elegí el servicio en el buscador (agrupado por categoría, igual que en el Tarifario — solo aparecen tarifas **Activas**).
 3. Completá el **Detalle del servicio** (texto libre, opcional) y la **Fecha de inicio** del servicio (obligatoria). La **Fecha de baja** es opcional — dejala vacía si el servicio sigue vigente.
 4. Si el servicio elegido es **Variable con tarifa diaria** (en el buscador su precio aparece como "por día"), aparece un campo más: **Cantidad de días** (obligatorio). El cargo va a ser el precio diario multiplicado por esos días — el total se muestra abajo del campo antes de confirmar, y la cantidad queda visible en la fila del contrato (por ej. "5 días").
-5. Elegí el **tipo de comprobante**:
+5. Si el socio tiene un descuento para este servicio, tildá **Bonificación** e ingresá el **porcentaje** (más de 0 y hasta 100; con 100 el servicio queda bonificado por completo). Abajo del campo se muestra el precio que queda. La bonificación es **de este contrato**: la tarifa sigue valiendo lo mismo para el resto de los socios, y se aplica a **cada cargo que se emita** de ese servicio (mensual, proporcional, adelanto o por días). En el comprobante, el concepto lleva el sufijo "(bonif. 20%)" para que quede claro.
+6. Elegí el **tipo de comprobante**:
    - **Fiscal (ARCA)** — el cargo se va a facturar por ARCA cuando corresponda (manual o automático).
    - **Interno** — el cargo queda excluido de toda facturación por ARCA; se consolida después en un comprobante interno desde **Ventas** (ver sección Comprobantes internos). La opción solo está disponible si el club tiene medios habilitados en **Mi perfil → Gestión de cobranza**.
-6. Si el socio está **adherido al Cobro Automático Payway** (con tarjeta cargada), aparece además el tilde **"Incluir este servicio en el débito automático"**, marcado por defecto. Destildalo si este servicio en particular se va a cobrar por otro medio.
+7. Si el socio está **adherido al Cobro Automático Payway** (con tarjeta cargada), aparece además el tilde **"Incluir este servicio en el débito automático"**, marcado por defecto. Destildalo si este servicio en particular se va a cobrar por otro medio.
 
    > Con el comprobante en **Interno**, este tilde queda **bloqueado** si el club no admite **Débito automático** entre los medios de la **Gestión de cobranza (comprobantes internos)** — por ejemplo, si solo admite Efectivo. Para poder tildarlo, habilitá ese medio en Mi perfil → Datos Impositivos.
 
-7. Confirmá. El sistema muestra: _"Servicio contratado. Todavía no aparece en la cuenta corriente — va a impactar recién cuando corresponda facturarlo."_
+8. Confirmá. El sistema muestra: _"Servicio contratado. Todavía no aparece en la cuenta corriente — va a impactar recién cuando corresponda facturarlo."_
 
 **Editar un servicio contratado:**
 
 1. Hacé clic en el ícono de **lápiz** de la fila del servicio.
-2. En el modal podés modificar: **Fecha de inicio**, **Fecha de baja**, **Detalle del servicio**, el tipo de **Comprobante** (Interno / Fiscal) y el tilde **"Incluir este servicio en el débito automático"** (solo tiene efecto si el socio está adherido al Cobro Automático Payway con tarjeta cargada; con comprobante **Interno** queda bloqueado si el club no admite Débito automático en la Gestión de cobranza).
+2. En el modal podés modificar: **Fecha de inicio**, **Fecha de baja**, **Detalle del servicio**, la **Bonificación** (tilde y porcentaje — el cambio vale para los cargos que se emitan de ahí en más; los ya emitidos no se tocan), el tipo de **Comprobante** (Interno / Fiscal) y el tilde **"Incluir este servicio en el débito automático"** (solo tiene efecto si el socio está adherido al Cobro Automático Payway con tarjeta cargada; con comprobante **Interno** queda bloqueado si el club no admite Débito automático en la Gestión de cobranza).
 3. Si es la **primera vez** que le ponés fecha de baja a ese contrato, aparece un bloque adicional: un checkbox **"Cobrar por esta baja"** con el monto sugerido según la **política de baja anticipada** configurada en la tarifa (mes completo o proporcional al uso) — podés editar ese monto antes de guardar (con techo en el precio de un mes completo). Si lo tildás, el cobro queda **pendiente de facturar** y se incluye en el **próximo comprobante** que se le emita al socio (manual o automático) — recién ahí aparece en la Cuenta Corriente. Si no lo tildás (o si solo estás editando una baja ya cargada antes), no se genera ningún cobro.
 4. Hacé clic en **Guardar**.
 

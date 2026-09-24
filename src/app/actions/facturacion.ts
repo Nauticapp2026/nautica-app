@@ -1715,6 +1715,9 @@ export type CargarServicioData = {
   // Incluir el contrato en el débito automático Payway. undefined = default
   // según la adhesión general del socio (tilde en Datos Impositivos).
   debitoAutomatico?: boolean;
+  // Bonificación (%) de este contrato sobre el precio del tarifario.
+  // null/undefined = sin descuento. Se aplica al emitir (pendientes-facturar).
+  bonificacionPct?: number | null;
 };
 
 export async function cargarServicioAction(data: CargarServicioData): Promise<{
@@ -1797,6 +1800,17 @@ export async function cargarServicioAction(data: CargarServicioData): Promise<{
   }
   const cantidadDias = esDiaria ? (data.cantidadDias ?? null) : null;
 
+  // Bonificación: opcional; si viene, tiene que ser un porcentaje real entre
+  // 0 (exclusive) y 100 (inclusive). Se guarda con 2 decimales.
+  let bonificacionPct: number | null = null;
+  if (data.bonificacionPct != null) {
+    const pct = Number(data.bonificacionPct);
+    if (!Number.isFinite(pct) || pct <= 0 || pct > 100) {
+      return { error: 'La bonificación debe ser un porcentaje mayor a 0 y hasta 100.' };
+    }
+    bonificacionPct = Math.round(pct * 100) / 100;
+  }
+
   const conceptoFinal = data.concepto.trim() || null;
 
   await db.transaction(async (tx) => {
@@ -1810,6 +1824,7 @@ export async function cargarServicioAction(data: CargarServicioData): Promise<{
       debitoAutomatico,
       concepto: conceptoFinal,
       cantidadDias,
+      bonificacionPct,
       createdBy: ctx.profile.id,
     });
   });

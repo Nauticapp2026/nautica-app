@@ -135,13 +135,40 @@ function sufijoProporcional(diasRestantes: number, diasMes: number): string {
 }
 
 /**
- * Importe a cobrar por un servicio: el precio del tarifario tal cual, que ya
- * es el precio final con IVA incluido (ver lib/iva.ts). El IVA se discrimina
- * hacia adentro recién al emitir el comprobante, así que acá no se suma ni se
- * resta nada — y da igual si el contrato es interno o fiscal.
+ * Importe a cobrar por un servicio: el precio del tarifario, que ya es el
+ * precio final con IVA incluido (ver lib/iva.ts), menos la bonificación del
+ * contrato si la tiene. El IVA se discrimina hacia adentro recién al emitir el
+ * comprobante, así que acá no se suma ni se resta nada más — y da igual si el
+ * contrato es interno o fiscal.
+ *
+ * La bonificación (%) vive en `socio_servicios.bonificacion_pct` (mig 0158) y
+ * se aplica ACÁ, y solo acá, porque este módulo es el único lugar donde el
+ * precio se convierte en cargo: así llega igual a la emisión manual, al lote,
+ * a los comprobantes internos y al cron. Se redondea a 2 decimales como el
+ * proporcional (lib/movimientos-mensuales.ts). Cuando el ítem además se
+ * prorratea, el prorrateo trabaja sobre el importe ya bonificado: puede
+ * diferir en un centavo de bonificar después de prorratear — aceptable.
  */
-function importeFinal(precioFinal: number): number {
-  return precioFinal;
+function importeFinal(precioFinal: number, bonificacionPct = 0): number {
+  if (!(bonificacionPct > 0)) return precioFinal;
+  return Math.round(precioFinal * (1 - bonificacionPct / 100) * 100) / 100;
+}
+
+/** Porcentaje de bonificación saneado: 0 si no hay, tope 100. */
+function pctBonificacion(v: string | number | null | undefined): number {
+  const n = v == null ? 0 : Number(v);
+  return Number.isFinite(n) && n > 0 ? Math.min(n, 100) : 0;
+}
+
+/**
+ * Sufijo del concepto cuando hay bonificación, p. ej. " (bonif. 20%)". Va en
+ * el concepto base del contrato, así aparece también en las variantes
+ * (proporcional, adelanto, por días) y en el comprobante que ve el socio.
+ */
+function sufijoBonificacion(pct: number): string {
+  if (!(pct > 0)) return '';
+  const txt = String(Number(pct.toFixed(2))).replace('.', ',');
+  return ` (bonif. ${txt}%)`;
 }
 
 export async function listarPendientesFacturar(
@@ -176,6 +203,7 @@ export async function listarPendientesFacturar(
       concepto: socioServicios.concepto,
       comprobanteInterno: socioServicios.comprobanteInterno,
       cantidadDias: socioServicios.cantidadDias,
+      bonificacionPct: socioServicios.bonificacionPct,
       servicioNombre: servicios.nombre,
       servicioTipo: servicios.tipo,
       servicioPrecio: servicios.precio,
@@ -238,6 +266,7 @@ export async function listarPendientesFacturar(
       contratoConcepto: socioServicios.concepto,
       contratoInterno: socioServicios.comprobanteInterno,
       contratoFechaInicio: socioServicios.fechaInicio,
+      contratoBonificacion: socioServicios.bonificacionPct,
     })
     .from(espacios)
     .innerJoin(servicios, eq(servicios.id, espacios.servicioId))
@@ -409,7 +438,8 @@ export async function listarPendientesFacturar(
 
     const precioNeto = c.servicioPrecio != null ? Number(c.servicioPrecio) : 0;
     const alicuotaIva = c.servicioAlicuotaIva != null ? Number(c.servicioAlicuotaIva) : 0;
-    const conceptoBase = c.concepto ?? c.servicioNombre;
+    const bonif = pctBonificacion(c.bonificacionPct);
+    const conceptoBase = `${c.concepto ?? c.servicioNombre}${sufijoBonificacion(bonif)}`;
 
     if (c.tipoCobro === 'variable') {
       // One-shot: pendiente desde fechaInicio hasta que se emita.
@@ -425,7 +455,8 @@ export async function listarPendientesFacturar(
       if (yaLegacy) continue;
 
       const dias = c.tarifaVariable === 'diaria' ? c.cantidadDias : null;
-      const importe = dias != null ? importeFinal(precioNeto * dias) : importeFinal(precioNeto);
+      const importe =
+        dias != null ? importeFinal(precioNeto * dias, bonif) : importeFinal(precioNeto, bonif);
       items.push({
         key: { origen: 'contrato', contratoId: c.contratoId, periodo: null },
         origen: 'contrato',
@@ -459,7 +490,7 @@ export async function listarPendientesFacturar(
       // que el tarifario diga 'mes_completo': esa política manda también en el
       // alta, no solo en la baja anticipada.
       const inicioEnMesActual = c.fechaInicio.slice(0, 8) === periodoActual.slice(0, 8);
-      let importe = importeFinal(precioNeto);
+      let importe = importeFinal(precioNeto, bonif);
       let concepto = conceptoBase;
       let esProporcional = false;
       if (
@@ -515,7 +546,7 @@ export async function listarPendientesFacturar(
           contratoId: c.contratoId,
           espacioId: null,
           concepto: `${conceptoBase} (adelanto ${etiquetaMes(periodoSig)})`,
-          importe: importeFinal(precioNeto),
+          importe: importeFinal(precioNeto, bonif),
           alicuotaIva,
           plazoPagoDias: c.servicioPlazoPagoDias,
           servicioTipo: c.servicioTipo,
@@ -547,8 +578,11 @@ export async function listarPendientesFacturar(
     const precioNeto = f.servicioPrecio != null ? Number(f.servicioPrecio) : 0;
     const alicuotaIva = f.servicioAlicuotaIva != null ? Number(f.servicioAlicuotaIva) : 0;
     const interno = f.contratoInterno ?? f.socioTildeInterno ?? false;
-    const conceptoBase = f.contratoConcepto ?? f.servicioNombre;
-    const importeMes = importeFinal(precioNeto);
+    // La bonificación cuelga de la fila espejo en socio_servicios; una
+    // asignación legacy sin fila espejo no tiene bonificación.
+    const bonif = pctBonificacion(f.contratoBonificacion);
+    const conceptoBase = `${f.contratoConcepto ?? f.servicioNombre}${sufijoBonificacion(bonif)}`;
+    const importeMes = importeFinal(precioNeto, bonif);
     const primerCiclo = !espacioPairConCargo.has(pair);
     // Fecha de alta efectiva para el prorrateo del primer ciclo.
     const alta = f.contratoFechaInicio

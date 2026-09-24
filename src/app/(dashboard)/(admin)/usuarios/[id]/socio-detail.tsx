@@ -234,10 +234,25 @@ type ServicioContratado = {
   debitoAutomatico: boolean;
   // Solo para contratos de tarifa Variable diaria: días contratados.
   cantidadDias: number | null;
+  // Bonificación (%) del contrato sobre el precio del tarifario. null = sin
+  // descuento. Viene como string porque la columna es numeric.
+  bonificacionPct: string | null;
   // true = el contrato ya tiene al menos un cargo emitido. Distingue
   // "Concluido" (Variable facturada, se cerró sola) de "Dado de baja".
   tieneCargo: boolean;
 };
+
+/** Precio final de un contrato: tarifa menos bonificación, 2 decimales. */
+function precioBonificado(precio: number, bonificacionPct: number | null | undefined): number {
+  const pct = bonificacionPct ?? 0;
+  if (!(pct > 0)) return precio;
+  return Math.round(precio * (1 - pct / 100) * 100) / 100;
+}
+
+/** "20%" / "12,5%" para mostrar. */
+function fmtPct(pct: number): string {
+  return `${String(Number(pct.toFixed(2))).replace('.', ',')}%`;
+}
 
 type Navegante = {
   id: string;
@@ -699,6 +714,9 @@ function AgregarServicioModal({
   );
   const [debito, setDebito] = useState(debitoDefault);
   const [cantidadDias, setCantidadDias] = useState('');
+  // Bonificación (pedido del cliente 2026-09-24): tilde + porcentaje.
+  const [bonificar, setBonificar] = useState(false);
+  const [bonificacionPct, setBonificacionPct] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -707,13 +725,18 @@ function AgregarServicioModal({
   const esDiaria = esTarifaDiaria(seleccionado);
   const diasNum = Number(cantidadDias);
   const diasValidos = Number.isInteger(diasNum) && diasNum >= 1;
+  const pctNum = Number(bonificacionPct.replace(',', '.'));
+  const pctValido = Number.isFinite(pctNum) && pctNum > 0 && pctNum <= 100;
+  const precioTarifa = seleccionado?.precio ? parseFloat(seleccionado.precio) : 0;
+  const precioBase = esDiaria && diasValidos ? precioTarifa * diasNum : precioTarifa;
 
   // Canal Interno sin 'Débito automático' entre los medios de la Gestión de
   // cobranza: el tilde de débito no se puede marcar (el club no admite ningún
   // medio compatible con cobro automático para comprobantes internos).
   const debitoBloqueado = comprobante === 'interno' && !debitoInternoHabilitado;
 
-  const isValid = Boolean(servicioId && fechaInicio) && (!esDiaria || diasValidos);
+  const isValid =
+    Boolean(servicioId && fechaInicio) && (!esDiaria || diasValidos) && (!bonificar || pctValido);
 
   function handleClose() {
     setServicioId('');
@@ -723,6 +746,8 @@ function AgregarServicioModal({
     setComprobante(comprobanteInternoDefault && internosHabilitados ? 'interno' : 'fiscal');
     setDebito(debitoDefault);
     setCantidadDias('');
+    setBonificar(false);
+    setBonificacionPct('');
     setError(null);
     setResult(false);
     onClose();
@@ -743,6 +768,7 @@ function AgregarServicioModal({
         // el server resuelve el default (false). Con el tilde bloqueado
         // (Interno sin débito habilitado) va false, esté como esté el estado.
         debitoAutomatico: debitoDefault ? (debitoBloqueado ? false : debito) : undefined,
+        bonificacionPct: bonificar && pctValido ? pctNum : null,
       });
       if (res.error) {
         setError(res.error);
@@ -879,6 +905,68 @@ function AgregarServicioModal({
                   </p>
                 </div>
               )}
+
+              {/* Bonificación: descuento de ESTE contrato sobre el precio del
+                  tarifario. Se aplica recién al emitir cada cargo, así que
+                  vale para todos los cargos futuros del contrato. */}
+              <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
+                <label className="flex items-start gap-2.5">
+                  <input
+                    type="checkbox"
+                    checked={bonificar}
+                    onChange={(e) => {
+                      setBonificar(e.target.checked);
+                      if (!e.target.checked) setBonificacionPct('');
+                    }}
+                    className="mt-0.5 h-4 w-4 cursor-pointer accent-[#175861]"
+                  />
+                  <span>
+                    <span className="block text-sm font-medium" style={{ color: '#101828' }}>
+                      Bonificación
+                    </span>
+                    <span className="block text-xs text-gray-500">
+                      Descuento en porcentaje sobre el precio del tarifario, solo para este socio y
+                      este servicio.
+                    </span>
+                  </span>
+                </label>
+                {bonificar && (
+                  <div className="mt-3">
+                    <label
+                      className="mb-1.5 block text-xs font-semibold"
+                      style={{ color: '#101828' }}
+                    >
+                      Porcentaje de descuento
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min={0.01}
+                        max={100}
+                        step={0.5}
+                        inputMode="decimal"
+                        className={`${inputCls} pr-8`}
+                        placeholder="Ej: 20"
+                        value={bonificacionPct}
+                        onChange={(e) => setBonificacionPct(e.target.value)}
+                        aria-label="Porcentaje de bonificación"
+                      />
+                      <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-sm text-gray-400">
+                        %
+                      </span>
+                    </div>
+                    <p className="mt-1.5 text-xs text-gray-400">
+                      {!bonificacionPct
+                        ? 'Entre 0 y 100. Con 100 el servicio queda bonificado por completo.'
+                        : !pctValido
+                          ? 'Ingresá un porcentaje mayor a 0 y hasta 100.'
+                          : precioBase > 0
+                            ? `Queda en ${fmt(precioBonificado(precioBase, pctNum))} (tarifa ${fmt(precioBase)} − ${fmtPct(pctNum)}). El descuento se aplica a cada cargo que se emita de este contrato.`
+                            : 'El descuento se aplica a cada cargo que se emita de este contrato.'}
+                    </p>
+                  </div>
+                )}
+              </div>
 
               <div>
                 <label className="mb-1.5 block text-xs font-semibold" style={{ color: '#101828' }}>
@@ -4422,6 +4510,7 @@ function ServiciosContratadosTab({
                 <th className="pr-4 pb-2">Categoría</th>
                 <th className="pr-4 pb-2">Comprobante</th>
                 <th className="pr-4 pb-2">Cobro</th>
+                <th className="pr-4 pb-2">Bonif.</th>
                 <th className="pr-4 pb-2">Débito autom.</th>
                 <th className="pr-4 pb-2">Fecha de asignación</th>
                 <th className="pr-4 pb-2">Nº de operación</th>
@@ -4476,6 +4565,27 @@ function ServiciosContratadosTab({
                               </span>
                             )}
                           </div>
+                        ) : (
+                          <span className="text-gray-400">—</span>
+                        )}
+                      </td>
+                      <td className="py-3 pr-4">
+                        {sc.bonificacionPct != null && Number(sc.bonificacionPct) > 0 ? (
+                          <span
+                            className="rounded-full bg-[#FFF4E6] px-2 py-0.5 text-[10px] font-semibold text-[#B45309]"
+                            title={
+                              sc.servicioPrecio
+                                ? `Precio con bonificación: ${fmt(
+                                    precioBonificado(
+                                      Number(sc.servicioPrecio),
+                                      Number(sc.bonificacionPct),
+                                    ),
+                                  )}`
+                                : undefined
+                            }
+                          >
+                            −{fmtPct(Number(sc.bonificacionPct))}
+                          </span>
                         ) : (
                           <span className="text-gray-400">—</span>
                         )}
@@ -4601,6 +4711,18 @@ function EditServicioContratadoModal({
     sc.comprobanteInterno ? 'interno' : 'fiscal',
   );
   const [debito, setDebito] = useState(sc.debitoAutomatico);
+  // Bonificación del contrato: arranca con lo guardado. Editarla solo afecta
+  // los cargos que se emitan de acá en más.
+  const [bonificar, setBonificar] = useState(
+    sc.bonificacionPct != null && Number(sc.bonificacionPct) > 0,
+  );
+  const [bonificacionPct, setBonificacionPct] = useState(
+    sc.bonificacionPct != null && Number(sc.bonificacionPct) > 0
+      ? String(Number(Number(sc.bonificacionPct).toFixed(2)))
+      : '',
+  );
+  const pctNum = Number(bonificacionPct.replace(',', '.'));
+  const pctValido = Number.isFinite(pctNum) && pctNum > 0 && pctNum <= 100;
   const [cobrar, setCobrar] = useState(true);
   const [montoOverride, setMontoOverride] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -4620,8 +4742,12 @@ function EditServicioContratadoModal({
     .sort((a, b) => (b.fecha! > a.fecha! ? 1 : -1))[0];
   const ultimoMonto = ultimoMov ? parseFloat(ultimoMov.debe ?? '0') || 0 : 0;
   // El precio del tarifario ya es el final (IVA incluido), igual para interno y
-  // fiscal.
-  const precioCompleto = sc.servicioPrecio != null ? Number(sc.servicioPrecio) : 0;
+  // fiscal. Si el contrato tiene bonificación, el mes completo que se sugiere
+  // cobrar por la baja es el precio ya bonificado.
+  const precioCompleto = precioBonificado(
+    sc.servicioPrecio != null ? Number(sc.servicioPrecio) : 0,
+    bonificar && pctValido ? pctNum : null,
+  );
   const proporcional = fechaBaja
     ? calcularProporcional(ultimoMonto || precioCompleto, fechaBaja, fechaInicio || null)
     : { monto: precioCompleto, diasUsados: 0, diasMes: 0 };
@@ -4647,6 +4773,7 @@ function EditServicioContratadoModal({
         concepto: concepto.trim() || null,
         comprobanteInterno: comprobante === 'interno',
         debitoAutomatico: debitoBloqueado ? false : debito,
+        bonificacionPct: bonificar && pctValido ? pctNum : null,
         cobro:
           esBajaNueva && cobrar
             ? {
@@ -4722,6 +4849,62 @@ function EditServicioContratadoModal({
               value={concepto}
               onChange={(e) => setConcepto(e.target.value)}
             />
+          </div>
+
+          <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
+            <label className="flex items-start gap-2.5">
+              <input
+                type="checkbox"
+                checked={bonificar}
+                onChange={(e) => {
+                  setBonificar(e.target.checked);
+                  if (!e.target.checked) setBonificacionPct('');
+                }}
+                className="mt-0.5 h-4 w-4 cursor-pointer accent-[#175861]"
+              />
+              <span>
+                <span className="block text-sm font-medium" style={{ color: '#101828' }}>
+                  Bonificación
+                </span>
+                <span className="block text-xs text-gray-500">
+                  Descuento en porcentaje sobre el precio del tarifario. Cambiarlo afecta solo los
+                  cargos que se emitan de ahora en más.
+                </span>
+              </span>
+            </label>
+            {bonificar && (
+              <div className="mt-3">
+                <label className="mb-1 block text-xs font-semibold" style={{ color: '#101828' }}>
+                  Porcentaje de descuento
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min={0.01}
+                    max={100}
+                    step={0.5}
+                    inputMode="decimal"
+                    className={`${inputCls} pr-8`}
+                    placeholder="Ej: 20"
+                    value={bonificacionPct}
+                    onChange={(e) => setBonificacionPct(e.target.value)}
+                    aria-label="Porcentaje de bonificación"
+                  />
+                  <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-sm text-gray-400">
+                    %
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-gray-400">
+                  {!bonificacionPct
+                    ? 'Entre 0 y 100. Con 100 el servicio queda bonificado por completo.'
+                    : !pctValido
+                      ? 'Ingresá un porcentaje mayor a 0 y hasta 100.'
+                      : sc.servicioPrecio
+                        ? `Queda en ${fmt(precioBonificado(Number(sc.servicioPrecio), pctNum))} (tarifa ${fmt(Number(sc.servicioPrecio))} − ${fmtPct(pctNum)}).`
+                        : ''}
+                </p>
+              </div>
+            )}
           </div>
 
           <div>
