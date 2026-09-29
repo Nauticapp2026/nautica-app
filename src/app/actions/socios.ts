@@ -6,6 +6,7 @@ import {
   cargosPendientes,
   documentos,
   embarcaciones,
+  espacios,
   guarderias,
   memberships,
   paywayTokens,
@@ -18,7 +19,7 @@ import { todayArg } from '@/lib/dates';
 import { getActiveMarina } from '@/lib/auth/session';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { translateInviteError } from '@/lib/auth/errors';
-import { and, eq, max, sql } from 'drizzle-orm';
+import { and, count, eq, gte, isNull, max, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 
@@ -419,10 +420,21 @@ export async function updateDatosFiscalesSocioAction(
 
 // ─── Eliminar socio (soft delete) ────────────────────────────────────────────
 
+function plural(n: number, singular: string, pluralForm: string): string {
+  return `${n} ${n === 1 ? singular : pluralForm}`;
+}
+
 /**
  * Soft delete: marca la membership del socio como 'removed' para esta guardería.
  * El listado de socios filtra por status='active', así que desaparece de la UI.
  * Se conserva todo el historial (movimientos, facturas, embarcaciones) intacto.
+ *
+ * Bloqueo (2026-09-29): no se elimina mientras el socio tenga un espacio ocupado
+ * o un servicio contratado vigente en este club. Un socio eliminado no aparece
+ * en ningún listado, pero sus contratos y su espacio seguían generando cargos
+ * en la facturación mensual (caso GRETA en Club Tester). La baja la hace el
+ * admin a conciencia (liberar espacio / dar de baja el servicio, donde además
+ * se decide si se cobra el mes completo), no el sistema por detrás.
  */
 export async function deleteSocioAction(socioId: string): Promise<{ error?: string }> {
   const ctx = await getActiveMarina();
@@ -431,6 +443,55 @@ export async function deleteSocioAction(socioId: string): Promise<{ error?: stri
   const gId = ctx.activeMembership.guarderiaId;
 
   try {
+    const hoy = todayArg();
+    const [[{ espaciosOcupados }], [{ serviciosVigentes }]] = await Promise.all([
+      db
+        .select({ espaciosOcupados: count() })
+        .from(espacios)
+        .where(and(eq(espacios.guarderiaId, gId), eq(espacios.ocupanteId, socioId))),
+      // Contratos vigentes que NO son la fila espejo de un espacio que el socio
+      // ocupa hoy: ese contrato se cierra solo al liberar el espacio, así que
+      // no se le pide al admin dos veces lo mismo.
+      db
+        .select({ serviciosVigentes: count() })
+        .from(socioServicios)
+        .leftJoin(
+          espacios,
+          and(eq(espacios.id, socioServicios.espacioId), eq(espacios.ocupanteId, socioId)),
+        )
+        .where(
+          and(
+            eq(socioServicios.guarderiaId, gId),
+            eq(socioServicios.socioId, socioId),
+            or(isNull(socioServicios.fechaBaja), gte(socioServicios.fechaBaja, hoy)),
+            isNull(espacios.id),
+          ),
+        ),
+    ]);
+
+    if (espaciosOcupados > 0 || serviciosVigentes > 0) {
+      const partes: string[] = [];
+      if (espaciosOcupados > 0) {
+        partes.push(plural(espaciosOcupados, 'espacio ocupado', 'espacios ocupados'));
+      }
+      if (serviciosVigentes > 0) {
+        partes.push(plural(serviciosVigentes, 'servicio vigente', 'servicios vigentes'));
+      }
+      const acciones: string[] = [];
+      if (espaciosOcupados > 0) {
+        acciones.push(espaciosOcupados === 1 ? 'Liberá el espacio' : 'Liberá los espacios');
+      }
+      if (serviciosVigentes > 0) {
+        acciones.push(
+          serviciosVigentes === 1 ? 'dá de baja el servicio' : 'dá de baja los servicios',
+        );
+      }
+      const accionesTxt = acciones.join(' y ');
+      return {
+        error: `Este socio tiene ${partes.join(' y ')}. ${accionesTxt.charAt(0).toUpperCase()}${accionesTxt.slice(1)} antes de eliminarlo.`,
+      };
+    }
+
     await db
       .update(memberships)
       .set({ status: 'removed' })

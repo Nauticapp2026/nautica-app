@@ -57,7 +57,7 @@ El Dashboard es la pantalla de inicio. Muestra el estado operativo del club en t
 
 ### Qué muestra
 
-- **Embarcaciones en guardería** — cantidad de embarcaciones actualmente activas.
+- **Embarcaciones en guardería** — cantidad de embarcaciones de los socios activos del club. Las embarcaciones de un socio eliminado dejan de contarse, igual que él deja de figurar en Socios.
 - **Socios activos** — total de socios con estado activo.
 - **Ingresos del mes** — monto **cobrado** (facturas ya cobradas) en el mes en curso.
 - **Socios con deuda 2+ meses** — socios con movimientos pendientes de cobro desde hace más de dos meses.
@@ -152,6 +152,7 @@ Mostrá y editá los datos personales: nombre, apellido, email, teléfono, docum
 
 - **Número de socio** — campo editable para asignar o modificar el número interno del socio. El número aparece como chip (#NNN) en la cabecera del perfil y en la lista de socios.
 - **Estado de membresía** — selector en la cabecera del perfil para cambiar el estado: **Activo** o **Inactivo**. Un socio Inactivo no puede acceder a la app (bloqueo al iniciar sesión). Para desvincular al socio del club existe por separado el botón **Eliminar socio** (más abajo, en la pestaña Generales), que lo oculta del listado conservando su historial.
+- **Eliminar socio no funciona mientras tenga un espacio ocupado o un servicio contratado vigente.** El sistema avisa, por ejemplo: "Este socio tiene 1 espacio ocupado y 1 servicio vigente. Liberá el espacio y dá de baja el servicio antes de eliminarlo". Es a propósito: un socio eliminado desaparece de todos los listados, pero si conserva su espacio o sus servicios, la facturación mensual le seguiría generando cargos sin que nadie los vea. Liberá el espacio desde **Espacios** (eso también cierra el servicio de guarda asociado) y dá de baja los demás servicios desde la pestaña **Servicios Contratados**, donde además se decide si se cobra el mes completo. Recién después se puede eliminar.
 
   Al elegir **Inactivo** se abre una ventana para cargar el **motivo** (opcional, hasta 500 caracteres) — por ejemplo "Vendió la embarcación" o "Deuda de 6 meses". Al confirmar, en la cabecera queda visible **"Inactivo desde DD/MM/AAAA · Motivo: …"**, con un botón para **editar el motivo** sin tocar la fecha. En la lista de socios, al pasar el mouse por el badge **Inactivo** se ve el motivo. Al volver a **Activo**, motivo y fecha se borran (describen la baja vigente, no un historial).
 
@@ -398,12 +399,12 @@ La sección Tareas tiene dos vistas: **Tablero** (kanban operativo del día a d�
 | Columna           | Qué representa                       |
 | ----------------- | ------------------------------------ |
 | Salida programada | Embarcaciones con salida planificada |
-| Preparar          | Tareas en preparación                |
+| Sale a navegar    | Embarcación lista para salir         |
 | Navegando         | Embarcación actualmente en el agua   |
 | Guardada          | Embarcación de regreso y guardada    |
 | Lavado            | Solicitudes de lavado                |
 
-> En **marina** la lancha ya está en el agua, así que no hay nada que preparar: ese mismo estado se rotula **Sale a navegar** en la columna, en la card de conteo y en cada tarjeta. En **nave** sigue diciendo **Preparar**. Cuando el tablero mezcla tareas de los dos tipos, el título de la columna dice Preparar y cada tarjeta lleva el rótulo que le corresponde.
+> **Sale a navegar** es el paso previo a Navegando: en marina la lancha ya está en el agua y en nave el operario la está bajando y preparando. En el panel web se llama igual en los dos casos. En la app mobile del operario ese mismo estado se sigue llamando **Preparada**.
 
 Arriba del tablero hay una card por columna con la cantidad de tareas activas. Las tareas **canceladas** (ver más abajo) siguen visibles en el tablero con su badge, pero **no suman** en el número de la card.
 
@@ -422,7 +423,7 @@ Cada tarjeta muestra:
 Nada se borra físicamente: una tarea que desaparece del tablero por los criterios de abajo sigue disponible en el **Historial**.
 
 - **Salida programada** — se muestran de hoy en adelante. Las sin fecha o de fecha ya pasada no aparecen en el tablero.
-- **Preparar** — se oculta del tablero si la fecha de salida ya pasó y la tarea nunca avanzó a Navegando (queda solo en el Historial).
+- **Sale a navegar** — se oculta del tablero si la fecha de salida ya pasó y la tarea nunca avanzó a Navegando (queda solo en el Historial).
 - **Navegando cancelada** — si el socio revocó la salida desde la app mobile con el barco ya afuera, la tarjeta se marca **Cancelada** (badge rojo) y se sigue viendo el resto del día; se oculta del tablero recién al día siguiente.
 - **Navegando — Ya llegó** — cuando el socio confirma "Ya llegué" desde el celular mientras la tarjeta sigue en Navegando, aparece un badge verde **Ya llegó**. Indica que el barco ya volvió y está esperando que el Operario/Marinero lo mueva a Guardada.
 - **Guardada** — solo se ven las del **día en curso**: a las **00:00 (medianoche)** la tarjeta desaparece del tablero (pasa a verse solo en el Historial).
@@ -453,7 +454,7 @@ Muestra **todas** las tareas y solicitudes de lavado, mezcladas en una sola tabl
 
 Desde la tarjeta de la tarea, usá el selector **Mover a...** para cambiar la columna.
 
-> **Si el socio canceló la salida antes de que el barco navegara** (la tarea todavía estaba en Salida programada o Preparar), la tarjeta queda de **solo lectura**: no aparece el selector "Mover a..." y no se puede arrastrar. Va a desaparecer sola del tablero al día siguiente, sin que haga falta tocarla. Si en cambio la cancelación llegó estando ya en **Navegando** (el barco sí llegó a salir), la tarjeta se sigue pudiendo mover normalmente hasta Guardada.
+> **Si el socio canceló la salida antes de que el barco navegara** (la tarea todavía estaba en Salida programada o, en nave, en Sale a navegar), la tarjeta queda de **solo lectura**: no aparece el selector "Mover a..." y no se puede arrastrar. Va a desaparecer sola del tablero al día siguiente, sin que haga falta tocarla. Si en cambio la cancelación llegó estando ya en **Navegando** (el barco sí llegó a salir), la tarjeta se sigue pudiendo mover normalmente hasta Guardada.
 >
 > **Excepción en marina.** Si la salida se cancela con la tarjeta en **Sale a navegar**, la lancha ya está en el agua (a veces desde una salida anterior que nunca se marcó guardada) y el socio ya no va a confirmar que navega. Para que el ciclo pueda cerrarse, esa tarjeta ofrece **una sola acción: Mover a Guardada**, tanto en el tablero como en la app del marinero. No se arrastra y no se puede llevar a Navegando. Nada pasa solo: la marca el marinero o el administrador cuando la lancha está amarrada.
 

@@ -171,9 +171,22 @@ export default async function DashboardPage() {
     morososRows,
     docsRows,
   ] = await Promise.all([
+    // Solo embarcaciones cuyo dueño sigue siendo socio activo del club. Eliminar
+    // un socio es baja blanda (la membresía pasa a 'removed' y sus barcos quedan
+    // en la tabla), así que sin este cruce la card contaba barcos de socios que
+    // ya no aparecen en ningún listado (caso Club Tester, 2026-09-25: 3 vs 2).
     db
       .select({ totalEmbarcaciones: count() })
       .from(embarcaciones)
+      .innerJoin(
+        memberships,
+        and(
+          eq(memberships.userId, embarcaciones.profileId),
+          eq(memberships.guarderiaId, embarcaciones.guarderiaId),
+          eq(memberships.rol, 'socio'),
+          eq(memberships.status, 'active'),
+        ),
+      )
       .where(eq(embarcaciones.guarderiaId, gId)),
 
     db

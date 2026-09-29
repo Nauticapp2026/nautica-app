@@ -112,7 +112,7 @@ const COLUMNAS: ColumnDef[] = [
   },
   {
     estado: 'preparar',
-    label: 'Preparar',
+    label: 'Sale a navegar',
     icon: Settings,
     header: 'bg-[#669999]',
     body: 'bg-[#F4F8F8]',
@@ -140,24 +140,17 @@ const COLUMNAS: ColumnDef[] = [
   },
 ];
 
+// El estado 'preparar' se rotula "Sale a navegar" en TODO el panel web (columna,
+// card de conteo, tarjetas, selects, historial), sea marina o nave: pedido del
+// cliente 2026-09-22, reafirmado el 2026-09-29 cuando lo vio como "Preparar" en
+// un club de naves. La app mobile no cambia (sigue "Preparada"/"Preparar").
 const ESTADO_LABEL: Record<EstadoTarea, string> = {
   salida_programada: 'Salida programada',
-  preparar: 'Preparar',
+  preparar: 'Sale a navegar',
   navegando: 'Navegando',
   guardada: 'Guardada',
   lavado: 'Lavado',
 };
-
-// En marina el estado 'preparar' significa "la lancha ya está en el agua, lista
-// para salir" → se muestra como "Sale a navegar" (era "Preparada"; pedido del
-// cliente 2026-09-22, SOLO en el admin — la app mobile no cambia). En nave
-// sigue siendo "Preparar" (en preparación). El resto de los estados no cambia.
-// `esMarina` viene por tarea; para labels sin tarjeta (header de columna, stat
-// card) se pasa el contexto de la vista (ver `vistaMarina`).
-function estadoLabelFor(estado: EstadoTarea, esMarina: boolean): string {
-  if (estado === 'preparar') return esMarina ? 'Sale a navegar' : 'Preparar';
-  return ESTADO_LABEL[estado];
-}
 
 const inputCls =
   'h-11 w-full rounded-[10px] border border-gray-200 bg-white px-4 text-sm text-[#101828] focus:border-[#175861] focus:outline-none focus:ring-1 focus:ring-[#175861]';
@@ -391,7 +384,7 @@ function TareaCard({
               : ESTADOS_TAREA.filter((e) => e !== tarea.estado)
             ).map((e) => (
               <option key={e} value={e}>
-                {estadoLabelFor(e, tarea.esMarina)}
+                {ESTADO_LABEL[e]}
               </option>
             ))}
           </select>
@@ -627,7 +620,7 @@ function TareaModal({
               >
                 {ESTADOS_TAREA.map((e) => (
                   <option key={e} value={e}>
-                    {estadoLabelFor(e, editing ? editing.esMarina : false)}
+                    {ESTADO_LABEL[e]}
                   </option>
                 ))}
               </select>
@@ -738,18 +731,6 @@ export function TareasClient({
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverState, setDragOverState] = useState<EstadoTarea | null>(null);
 
-  // Contexto marina/nave para los labels SIN tarjeta (header de columna, stat
-  // card): el marinero solo ve marina; si el admin filtra por una persona, se usa
-  // el rol de esa persona; sin filtro (admin ve marina+nave mezclados) → nave por
-  // defecto ("Preparar"). Los labels por-tarjeta usan `tarea.esMarina` directo.
-  const vistaMarina = useMemo(() => {
-    if (isMarinero) return true;
-    if (filterOperario) {
-      return operarios.find((o) => o.id === filterOperario)?.rol === 'marinero';
-    }
-    return false;
-  }, [isMarinero, filterOperario, operarios]);
-
   // Día actual en TZ Argentina (YYYY-MM-DD). Las tareas con estado
   // 'salida_programada' se filtran por este día — las del futuro no se
   // muestran hasta que llegue su fecha.
@@ -844,7 +825,7 @@ export function TareasClient({
             : '—'
           : cancelado
             ? 'Cancelada'
-            : estadoLabelFor(t.estado, t.esMarina);
+            : ESTADO_LABEL[t.estado];
         return {
           id: t.id,
           tipo: esLavado ? 'Lavado' : 'Salida',
@@ -996,7 +977,7 @@ export function TareasClient({
                 <div key={col.estado} className="rounded-2xl border border-gray-200 bg-white p-5">
                   <div className="flex items-center justify-between">
                     <p className="text-sm" style={{ color: '#669E9D' }}>
-                      {estadoLabelFor(col.estado, vistaMarina)}
+                      {col.label}
                     </p>
                     <Icon className="h-4 w-4" style={{ color: '#669E9D' }} />
                   </div>
@@ -1109,9 +1090,7 @@ export function TareasClient({
                       >
                         <div className="flex items-center gap-2">
                           <Icon className="h-4 w-4" />
-                          <span className="text-sm font-semibold">
-                            {estadoLabelFor(col.estado, vistaMarina)}
-                          </span>
+                          <span className="text-sm font-semibold">{col.label}</span>
                         </div>
                         <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-xs font-bold text-white">
                           {lista.length}
