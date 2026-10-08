@@ -77,6 +77,7 @@ const FORMA_COBRANZA_LABEL: Record<string, string> = {
 const ORIGEN_VUELTA: Record<string, { href: string; label: string }> = {
   cobranzas: { href: '/cobranzas', label: 'Volver a Cobranzas' },
   ventas: { href: '/ventas', label: 'Volver a Ventas' },
+  tesoreria: { href: '/tesoreria', label: 'Volver a Tesorería' },
 };
 const VUELTA_DEFAULT = ORIGEN_VUELTA.ventas;
 

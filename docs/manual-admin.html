@@ -236,7 +236,7 @@
 
 <h2>Índice</h2>
 
-<ol><li><a href="#1-primeros-pasos">Primeros pasos</a></li><li><a href="#2-dashboard">Dashboard</a></li><li><a href="#3-socios">Socios</a></li><li><a href="#4-carga-masiva">Carga masiva</a></li><li><a href="#5-solicitudes-de-membresía">Solicitudes de membresía</a></li><li><a href="#6-tareas">Tareas</a></li><li><a href="#7-espacios">Espacios</a></li><li><a href="#8-publicaciones">Publicaciones</a></li><li><a href="#9-comunicaciones">Comunicaciones</a></li><li><a href="#10-ventas">Ventas</a></li><li><a href="#11-cobranzas">Cobranzas</a></li><li><a href="#12-tarifario">Tarifario</a></li><li><a href="#13-mi-perfil">Mi perfil</a></li><li><a href="#14-débito-automático-payway">Débito automático (Payway)</a></li></ol>
+<ol><li><a href="#1-primeros-pasos">Primeros pasos</a></li><li><a href="#2-dashboard">Dashboard</a></li><li><a href="#3-socios">Socios</a></li><li><a href="#4-carga-masiva">Carga masiva</a></li><li><a href="#5-solicitudes-de-membresía">Solicitudes de membresía</a></li><li><a href="#6-tareas">Tareas</a></li><li><a href="#7-espacios">Espacios</a></li><li><a href="#8-publicaciones">Publicaciones</a></li><li><a href="#9-comunicaciones">Comunicaciones</a></li><li><a href="#10-ventas">Ventas</a></li><li><a href="#11-cobranzas">Cobranzas</a></li><li><a href="#12-tesorería">Tesorería</a></li><li><a href="#13-tarifario">Tarifario</a></li><li><a href="#14-mi-perfil">Mi perfil</a></li><li><a href="#15-débito-automático-payway">Débito automático (Payway)</a></li></ol>
 <hr>
 
 <h2>1. Primeros pasos</h2>
@@ -453,7 +453,7 @@
 <ul><li><strong>Subir documento</strong> — seleccioná el tipo de documento y adjuntá el archivo.</li><li>Los documentos subidos aparecen listados con tipo, fecha y enlace para verlos.</li><li>Podés eliminar documentos desde esta misma pestaña.</li></ul>
 <h4>Pestaña Débito automático</h4>
 
-<p>Registrá y gestioná la tarjeta de crédito o débito del socio para el cobro automático mensual. Ver sección 13 para el flujo completo.</p>
+<p>Registrá y gestioná la tarjeta de crédito o débito del socio para el cobro automático mensual. Ver sección 15 para el flujo completo.</p>
 
 <hr>
 
@@ -922,11 +922,34 @@
 
 <h3>Pestaña Débito automático</h3>
 
-<p>Historial de cobros automáticos por Payway (antes vivía en Ventas). Ver el capítulo <strong>14. Débito automático (Payway)</strong> para el detalle completo de estados y cómo reintentar un cobro fallido.</p>
+<p>Historial de cobros automáticos por Payway (antes vivía en Ventas). Ver el capítulo <strong>15. Débito automático (Payway)</strong> para el detalle completo de estados y cómo reintentar un cobro fallido.</p>
 
 <hr>
 
-<h2>12. Tarifario</h2>
+<h2>12. Tesorería</h2>
+
+<p>Tesorería es el <strong>libro de caja</strong> del club: muestra, por instrumento (efectivo, transferencia, cheque, tarjeta, Mercado Pago, débito automático), todo lo que entró y salió, con el saldo acumulado después de cada movimiento, y permite cerrar la caja del día en un PDF.</p>
+
+<h3>Cómo se ve la pantalla</h3>
+
+<ul><li><strong>Filtros arriba.</strong> Un buscador (lupa) para encontrar movimientos por detalle, número, rubro u observaciones; un rango de fechas <strong>Desde / Hasta</strong>; y los <strong>instrumentos</strong>, que vienen todos seleccionados y se pueden apagar de a uno (siempre tiene que quedar al menos uno). Al entrar, el filtro arranca en el <strong>día de hoy</strong>: si borrás la fecha Desde, se ven los movimientos desde el primero que tenga el club.</li><li><strong>Saldos por instrumento.</strong> Para cada instrumento elegido: saldo inicial (todo lo anterior al Desde), ingresos y egresos del período y saldo final. La última fila, <strong>Consolidado</strong>, suma todas las cajas.</li><li><strong>Movimientos.</strong> Una fila por movimiento, en orden cronológico: fecha, número, detalle, instrumento, rubro / subrubro, monto (en verde los ingresos, en rojo los egresos), <strong>saldo</strong> acumulado en ese momento y el adjunto si lo tiene. El número de un recibo es un <strong>link</strong> que abre el recibo en Ventas.</li></ul>
+<h3>De dónde salen los movimientos</h3>
+
+<ul><li><strong>Cobranzas, solas.</strong> Cada recibo de Cobranzas (RC- o RI-) entra como ingreso en el instrumento con el que se cobró. Si un recibo se cobró con dos formas de pago (por ejemplo, parte en efectivo y parte por transferencia), aparece una línea por cada una. Los cobros por débito automático entran en el instrumento <strong>Débito automático</strong>.</li><li><strong>Anulaciones.</strong> Cuando anulás un recibo, el ingreso original queda y aparece un <strong>egreso</strong> por el mismo importe en la fecha de la anulación, así el saldo vuelve a cerrar sin borrar historia.</li><li><strong>Movimientos manuales.</strong> Retiros, gastos, depósitos o ingresos que no son cobranzas se cargan con el botón <strong>Nuevo movimiento</strong>.</li></ul>
+<h3>Cargar un movimiento manual</h3>
+
+<ol><li>Hacé clic en <strong>Nuevo movimiento</strong>: se abre el formulario al pie de la pantalla.</li><li>Completá <strong>todos</strong> los campos: tipo (ingreso aumenta, egreso disminuye), fecha, instrumento, monto, rubro, subrubro, detalle, observaciones y el <strong>comprobante adjunto</strong> (PDF o imagen, hasta 8 MB). Rubro y subrubro sugieren los que ya usaste en el club.</li><li><strong>Guardar movimiento.</strong> El sistema le asigna un <strong>número correlativo</strong> del club y lo muestra en la tabla con su adjunto.</li></ol>
+<p>Por ahora un movimiento cargado <strong>no se edita ni se anula</strong> desde la pantalla; si te equivocaste, avisá para corregirlo. Esa función se va a sumar más adelante.</p>
+
+<h3>Cierre de caja en PDF</h3>
+
+<p>El botón <strong>Cierre de caja (PDF)</strong> genera el reporte del período filtrado: encabezado con el nombre y CUIT del club y la fecha de emisión, la tabla de saldos por instrumento con el consolidado, y abajo el detalle completo de movimientos. Para el cierre diario, dejá el filtro en el día (es como arranca la pantalla) y descargalo al terminar la jornada. El saldo final de un día es el saldo inicial del siguiente, sin cargar nada a mano.</p>
+
+<p><strong>Descargar Excel</strong> baja la lista de movimientos tal como se ve, respetando filtros y búsqueda.</p>
+
+<hr>
+
+<h2>13. Tarifario</h2>
 
 <p>Desde aquí definís los precios de los servicios que ofrece tu club.</p>
 
@@ -990,7 +1013,7 @@
 
 <hr>
 
-<h2>13. Mi perfil</h2>
+<h2>14. Mi perfil</h2>
 
 <p>Desde <strong>Mi perfil</strong> administrás los datos de tu club y las integraciones. Tiene hasta <strong>cinco pestañas</strong>:<table></p>
 
@@ -1122,7 +1145,7 @@
 
 <hr>
 
-<h2>14. Débito automático (Payway)</h2>
+<h2>15. Débito automático (Payway)</h2>
 
 <p>El débito automático permite cobrar los servicios contratados directamente desde la tarjeta de crédito del socio, sin necesidad de que el socio realice ninguna acción. El cobro se genera automáticamente el día de facturación de tu club.</p>
 

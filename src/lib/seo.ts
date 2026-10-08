@@ -31,6 +31,7 @@ export const RUTAS_PRIVADAS = [
   '/usuarios',
   '/ventas',
   '/cobranzas',
+  '/tesoreria',
   '/facturacion',
   '/espacios',
   '/tarifario',

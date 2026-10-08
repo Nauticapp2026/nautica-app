@@ -2109,3 +2109,45 @@ export type PlatformPublicidad = typeof platformPublicidades.$inferSelect;
 export type NewPlatformPublicidad = typeof platformPublicidades.$inferInsert;
 export type Publicacion = typeof publicaciones.$inferSelect;
 export type NewPublicacion = typeof publicaciones.$inferInsert;
+
+// ─── Tesorería ───────────────────────────────────────────────────────────────
+// Movimientos MANUALES de caja (retiros, gastos, depósitos, ingresos que no
+// son cobranzas). Los ingresos por cobranzas no se duplican acá: Tesorería los
+// lee de los recibos (facturacion RC-/RI- + formas de pago en datos_pago).
+// `numero` es correlativo por guardería. Mig 0159.
+export const tesoreriaMovimientos = pgTable(
+  'tesoreria_movimientos',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    guarderiaId: uuid('guarderia_id')
+      .notNull()
+      .references(() => guarderias.id, { onDelete: 'cascade' }),
+    numero: integer('numero').notNull(),
+    /** 'ingreso' | 'egreso' (check en la DB). */
+    tipo: text('tipo').notNull(),
+    fecha: date('fecha').notNull(),
+    /** Valores de INSTRUMENTOS (src/lib/tesoreria/instrumentos.ts). */
+    instrumento: text('instrumento').notNull(),
+    monto: numeric('monto', { precision: 12, scale: 2 }).notNull(),
+    rubro: text('rubro').notNull(),
+    subrubro: text('subrubro').notNull(),
+    detalle: text('detalle').notNull(),
+    observaciones: text('observaciones').notNull().default(''),
+    // Path en el bucket privado `documentos`; se firma al mostrar.
+    adjuntoPath: text('adjunto_path'),
+    adjuntoNombre: text('adjunto_nombre'),
+    // Reservado: la anulación se valida más adelante (sin UI todavía).
+    anulado: boolean('anulado').notNull().default(false),
+    anuladoAt: timestamp('anulado_at', { withTimezone: true }),
+    createdBy: uuid('created_by').references(() => profiles.id, { onDelete: 'set null' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex('tesoreria_movimientos_numero_unico').on(t.guarderiaId, t.numero),
+    index('tesoreria_movimientos_guarderia_fecha_idx').on(t.guarderiaId, t.fecha),
+  ],
+);
+
+export type TesoreriaMovimiento = typeof tesoreriaMovimientos.$inferSelect;
+export type NewTesoreriaMovimiento = typeof tesoreriaMovimientos.$inferInsert;

@@ -17,9 +17,10 @@ Guía paso a paso para gestionar tu club o guardería náutica desde el panel we
 9. [Comunicaciones](#9-comunicaciones)
 10. [Ventas](#10-ventas)
 11. [Cobranzas](#11-cobranzas)
-12. [Tarifario](#12-tarifario)
-13. [Mi perfil](#13-mi-perfil)
-14. [Débito automático (Payway)](#14-débito-automático-payway)
+12. [Tesorería](#12-tesorería)
+13. [Tarifario](#13-tarifario)
+14. [Mi perfil](#14-mi-perfil)
+15. [Débito automático (Payway)](#15-débito-automático-payway)
 
 ---
 
@@ -323,7 +324,7 @@ Historial de salidas y entradas de la embarcación. Las salidas que el socio fin
 
 #### Pestaña Débito automático
 
-Registrá y gestioná la tarjeta de crédito o débito del socio para el cobro automático mensual. Ver sección 13 para el flujo completo.
+Registrá y gestioná la tarjeta de crédito o débito del socio para el cobro automático mensual. Ver sección 15 para el flujo completo.
 
 ---
 
@@ -955,11 +956,43 @@ Un recibo **anulado** se exporta con importe **$0**, igual que se muestra en la 
 
 ### Pestaña Débito automático
 
-Historial de cobros automáticos por Payway (antes vivía en Ventas). Ver el capítulo **14. Débito automático (Payway)** para el detalle completo de estados y cómo reintentar un cobro fallido.
+Historial de cobros automáticos por Payway (antes vivía en Ventas). Ver el capítulo **15. Débito automático (Payway)** para el detalle completo de estados y cómo reintentar un cobro fallido.
 
 ---
 
-## 12. Tarifario
+## 12. Tesorería
+
+Tesorería es el **libro de caja** del club: muestra, por instrumento (efectivo, transferencia, cheque, tarjeta, Mercado Pago, débito automático), todo lo que entró y salió, con el saldo acumulado después de cada movimiento, y permite cerrar la caja del día en un PDF.
+
+### Cómo se ve la pantalla
+
+- **Filtros arriba.** Un buscador (lupa) para encontrar movimientos por detalle, número, rubro u observaciones; un rango de fechas **Desde / Hasta**; y los **instrumentos**, que vienen todos seleccionados y se pueden apagar de a uno (siempre tiene que quedar al menos uno). Al entrar, el filtro arranca en el **día de hoy**: si borrás la fecha Desde, se ven los movimientos desde el primero que tenga el club.
+- **Saldos por instrumento.** Para cada instrumento elegido: saldo inicial (todo lo anterior al Desde), ingresos y egresos del período y saldo final. La última fila, **Consolidado**, suma todas las cajas.
+- **Movimientos.** Una fila por movimiento, en orden cronológico: fecha, número, detalle, instrumento, rubro / subrubro, monto (en verde los ingresos, en rojo los egresos), **saldo** acumulado en ese momento y el adjunto si lo tiene. El número de un recibo es un **link** que abre el recibo en Ventas.
+
+### De dónde salen los movimientos
+
+- **Cobranzas, solas.** Cada recibo de Cobranzas (RC- o RI-) entra como ingreso en el instrumento con el que se cobró. Si un recibo se cobró con dos formas de pago (por ejemplo, parte en efectivo y parte por transferencia), aparece una línea por cada una. Los cobros por débito automático entran en el instrumento **Débito automático**.
+- **Anulaciones.** Cuando anulás un recibo, el ingreso original queda y aparece un **egreso** por el mismo importe en la fecha de la anulación, así el saldo vuelve a cerrar sin borrar historia.
+- **Movimientos manuales.** Retiros, gastos, depósitos o ingresos que no son cobranzas se cargan con el botón **Nuevo movimiento**.
+
+### Cargar un movimiento manual
+
+1. Hacé clic en **Nuevo movimiento**: se abre el formulario al pie de la pantalla.
+2. Completá **todos** los campos: tipo (ingreso aumenta, egreso disminuye), fecha, instrumento, monto, rubro, subrubro, detalle, observaciones y el **comprobante adjunto** (PDF o imagen, hasta 8 MB). Rubro y subrubro sugieren los que ya usaste en el club.
+3. **Guardar movimiento.** El sistema le asigna un **número correlativo** del club y lo muestra en la tabla con su adjunto.
+
+Por ahora un movimiento cargado **no se edita ni se anula** desde la pantalla; si te equivocaste, avisá para corregirlo. Esa función se va a sumar más adelante.
+
+### Cierre de caja en PDF
+
+El botón **Cierre de caja (PDF)** genera el reporte del período filtrado: encabezado con el nombre y CUIT del club y la fecha de emisión, la tabla de saldos por instrumento con el consolidado, y abajo el detalle completo de movimientos. Para el cierre diario, dejá el filtro en el día (es como arranca la pantalla) y descargalo al terminar la jornada. El saldo final de un día es el saldo inicial del siguiente, sin cargar nada a mano.
+
+**Descargar Excel** baja la lista de movimientos tal como se ve, respetando filtros y búsqueda.
+
+---
+
+## 13. Tarifario
 
 Desde aquí definís los precios de los servicios que ofrece tu club.
 
@@ -1036,7 +1069,7 @@ Cada tarifa tiene un acordeón **Historial de cambios** donde podés ver los pre
 
 ---
 
-## 13. Mi perfil
+## 14. Mi perfil
 
 Desde **Mi perfil** administrás los datos de tu club y las integraciones. Tiene hasta **cinco pestañas**:
 
@@ -1207,7 +1240,7 @@ Si confirmaste un cambio y querés cancelarlo antes de que se aplique, aparece u
 
 ---
 
-## 14. Débito automático (Payway)
+## 15. Débito automático (Payway)
 
 El débito automático permite cobrar los servicios contratados directamente desde la tarjeta de crédito del socio, sin necesidad de que el socio realice ninguna acción. El cobro se genera automáticamente el día de facturación de tu club.
 
