@@ -6,25 +6,38 @@ import { guarderias } from '@/lib/db/schema';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { todayArg } from '@/lib/dates';
 import { INSTRUMENTOS, INSTRUMENTO_VALUES, type Instrumento } from '@/lib/tesoreria/instrumentos';
-import { listarTesoreria } from '@/lib/tesoreria/movimientos';
+import { calcularTesoreria, cargarLineasTesoreria } from '@/lib/tesoreria/movimientos';
+import { PERIODO_CARGA_DEFAULT, esPeriodoCarga } from '@/lib/tesoreria/periodo-carga';
+import { PERIODO_EDICION_DEFAULT, esPeriodoEdicion } from '@/lib/tesoreria/periodo-edicion';
 
 import { TesoreriaClient, type LineaTesoreriaUI } from './tesoreria-client';
 
 const YMD = /^\d{4}-\d{2}-\d{2}$/;
+const TODOS = INSTRUMENTOS.map((i) => i.value as Instrumento);
 
 /**
- * Tesorería: libro de caja del club por instrumento.
+ * Tesorería: dos bloques independientes sobre el mismo libro de caja
+ * (pedido del cliente 2026-10-13).
  *
- * Los filtros viajan por la URL (desde, hasta, inst) para que refrescar o
- * compartir el link mantenga la vista y para que el server calcule los saldos
- * con el rango exacto. Sin `desde` en la URL se arranca en el día de hoy
- * (pedido del cliente: "desde el inicio del día actual"); `desde=` vacío
- * significa "desde el primer movimiento".
+ *  - Cierre de caja (params `desde`, `hasta`, `inst`): Desde y Hasta son
+ *    obligatorias y arrancan en el día de hoy; saldos por instrumento y PDF.
+ *  - Registro de Movimientos (params `rdesde`, `rhasta`, `rinst`): arranca
+ *    mostrando TODO el historial; fechas e instrumento son opcionales.
+ *
+ * Todo viaja por la URL para que refrescar o compartir el link mantenga la
+ * vista, y para que el server calcule los saldos con el rango exacto.
  */
 export default async function TesoreriaPage({
   searchParams,
 }: {
-  searchParams: Promise<{ desde?: string; hasta?: string; inst?: string }>;
+  searchParams: Promise<{
+    desde?: string;
+    hasta?: string;
+    inst?: string;
+    rdesde?: string;
+    rhasta?: string;
+    rinst?: string;
+  }>;
 }) {
   const sp = await searchParams;
   const ctx = await getActiveMarina();
@@ -32,30 +45,50 @@ export default async function TesoreriaPage({
   const gId = ctx.activeMembership.guarderiaId;
 
   const hoy = todayArg();
-  const desde = sp.desde === undefined ? hoy : YMD.test(sp.desde) ? sp.desde : null;
-  const hasta = sp.hasta && YMD.test(sp.hasta) ? sp.hasta : null;
+
+  // ── Cierre de caja: fechas obligatorias, instrumentos todos por defecto ──
+  const desde = sp.desde && YMD.test(sp.desde) ? sp.desde : hoy;
+  const hastaCrudo = sp.hasta && YMD.test(sp.hasta) ? sp.hasta : hoy;
+  const hasta = hastaCrudo < desde ? desde : hastaCrudo;
   const instElegidos = (sp.inst ?? '')
     .split(',')
     .filter((v) => INSTRUMENTO_VALUES.includes(v)) as Instrumento[];
-  const instrumentos =
-    instElegidos.length > 0 ? instElegidos : INSTRUMENTOS.map((i) => i.value as Instrumento);
+  const instrumentos = instElegidos.length > 0 ? instElegidos : TODOS;
 
-  const [resultado, [club]] = await Promise.all([
-    listarTesoreria(gId, { desde, hasta, instrumentos }),
+  // ── Registro de movimientos: todo por defecto, un instrumento o todos ────
+  const rdesde = sp.rdesde && YMD.test(sp.rdesde) ? sp.rdesde : null;
+  const rhastaCrudo = sp.rhasta && YMD.test(sp.rhasta) ? sp.rhasta : null;
+  const rhasta = rhastaCrudo && rdesde && rhastaCrudo < rdesde ? rdesde : rhastaCrudo;
+  const rinst =
+    sp.rinst && INSTRUMENTO_VALUES.includes(sp.rinst) ? (sp.rinst as Instrumento) : null;
+
+  const [todas, [club]] = await Promise.all([
+    cargarLineasTesoreria(gId),
     db
       .select({
         nombre: guarderias.nombre,
         razonSocial: guarderias.razonSocial,
         cuit: guarderias.cuit,
         direccion: guarderias.direccion,
+        ciudad: guarderias.ciudad,
+        periodoCargaTesoreria: guarderias.periodoCargaTesoreria,
+        periodoEdicionTesoreria: guarderias.periodoEdicionTesoreria,
       })
       .from(guarderias)
       .where(eq(guarderias.id, gId))
       .limit(1),
   ]);
 
-  // Adjuntos: el bucket es privado, se firman por una hora en un solo viaje.
-  const paths = resultado.lineas.map((l) => l.adjuntoPath).filter((p): p is string => !!p);
+  const cierre = calcularTesoreria(todas, { desde, hasta, instrumentos });
+  const registro = calcularTesoreria(todas, {
+    desde: rdesde,
+    hasta: rhasta,
+    instrumentos: rinst ? [rinst] : TODOS,
+  });
+
+  // Adjuntos (solo se listan en el registro): el bucket es privado, se firman
+  // por una hora en un solo viaje.
+  const paths = registro.lineas.map((l) => l.adjuntoPath).filter((p): p is string => !!p);
   const urls = new Map<string, string>();
   if (paths.length > 0) {
     const admin = createAdminClient();
@@ -64,24 +97,37 @@ export default async function TesoreriaPage({
       if (d.path && d.signedUrl) urls.set(d.path, d.signedUrl);
     }
   }
-  const lineas: LineaTesoreriaUI[] = resultado.lineas.map((l) => ({
+  const lineasRegistro: LineaTesoreriaUI[] = registro.lineas.map((l) => ({
     ...l,
     adjuntoUrl: l.adjuntoPath ? (urls.get(l.adjuntoPath) ?? null) : null,
   }));
 
   return (
     <TesoreriaClient
-      lineas={lineas}
-      resumen={resultado.resumen}
-      consolidado={resultado.consolidado}
-      rubros={resultado.rubros}
-      subrubros={resultado.subrubros}
+      lineas={cierre.lineas}
+      resumen={cierre.resumen}
+      consolidado={cierre.consolidado}
       filtros={{ desde, hasta, instrumentos }}
+      registro={{
+        lineas: lineasRegistro,
+        filtros: { desde: rdesde, hasta: rhasta, instrumento: rinst },
+      }}
       hoy={hoy}
+      periodoCarga={
+        esPeriodoCarga(club?.periodoCargaTesoreria)
+          ? club.periodoCargaTesoreria
+          : PERIODO_CARGA_DEFAULT
+      }
+      periodoEdicion={
+        esPeriodoEdicion(club?.periodoEdicionTesoreria)
+          ? club.periodoEdicionTesoreria
+          : PERIODO_EDICION_DEFAULT
+      }
       club={{
         nombre: club?.razonSocial?.trim() || club?.nombre || 'Club',
         cuit: club?.cuit ?? null,
         direccion: club?.direccion ?? null,
+        ciudad: club?.ciudad ?? null,
       }}
     />
   );

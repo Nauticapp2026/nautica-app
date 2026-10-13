@@ -966,9 +966,19 @@ Tesorería es el **libro de caja** del club: muestra, por instrumento (efectivo,
 
 ### Cómo se ve la pantalla
 
-- **Filtros arriba.** Un buscador (lupa) para encontrar movimientos por detalle, número, rubro u observaciones; un rango de fechas **Desde / Hasta**; y los **instrumentos**, que vienen todos seleccionados y se pueden apagar de a uno (siempre tiene que quedar al menos uno). Al entrar, el filtro arranca en el **día de hoy**: si borrás la fecha Desde, se ven los movimientos desde el primero que tenga el club.
-- **Saldos por instrumento.** Para cada instrumento elegido: saldo inicial (todo lo anterior al Desde), ingresos y egresos del período y saldo final. La última fila, **Consolidado**, suma todas las cajas.
-- **Movimientos.** Una fila por movimiento, en orden cronológico: fecha, número, detalle, instrumento, rubro / subrubro, monto (en verde los ingresos, en rojo los egresos), **saldo** acumulado en ese momento y el adjunto si lo tiene. El número de un recibo es un **link** que abre el recibo en Ventas.
+La pantalla tiene **dos bloques independientes**: arriba el **Cierre de caja** y abajo el **Registro de Movimientos**. Cada uno tiene sus propios filtros; lo que elegís en uno no cambia el otro.
+
+**Cierre de caja**
+
+- **Filtros.** Un rango de fechas **Desde / Hasta** con el botón **Buscar**, y los **instrumentos**, que vienen todos seleccionados y se pueden apagar de a uno (siempre tiene que quedar al menos uno). Las dos fechas son obligatorias y al entrar vienen en el **día de hoy**. Para cerrar otro período, cambiá Desde y Hasta y hacé clic en **Buscar** (o Enter): recién ahí se recalculan los saldos. Todo lo anterior al Desde queda resumido en el saldo inicial. **Limpiar** vuelve al día de hoy con todos los instrumentos.
+- **Saldos por instrumento.** Para cada instrumento elegido: saldo inicial (todo lo anterior al Desde), ingresos y egresos del período y saldo final. La última fila, **Consolidado**, suma todas las cajas. La fila **Efectivo (dólares)** muestra además, en gris, los mismos saldos **en USD**: suma el monto en dólares de cada movimiento (los recibos cobrados en dólares y los movimientos manuales en dólares). El cierre de caja en PDF lleva esa fila en USD debajo de la de pesos.
+- Debajo del cuadro, el período y la cantidad de movimientos que abarca, y el botón **Cierre de caja (PDF)**.
+
+**Registro de Movimientos**
+
+- Arranca mostrando **todos los movimientos registrados** del club, en orden cronológico. Se filtra con el buscador (lupa: detalle, número, rubro u observaciones), un desplegable de **instrumento** (todos o uno) y un rango de fechas **Desde / Hasta**, que acá son opcionales; los filtros se aplican con su propio botón **Buscar**. **Limpiar** vuelve a mostrar todo.
+- Una fila por movimiento: fecha, número, detalle, instrumento, rubro / subrubro, monto (en verde los ingresos, en rojo los egresos), **saldo** acumulado en ese momento sobre lo que estás viendo, y el adjunto si lo tiene. El número de un recibo (RC-/RI-) es un **link** que abre el recibo en Ventas; los movimientos manuales llevan código **MIC-** (ingreso de caja) o **MEC-** (egreso de caja).
+- Los botones **PDF** y **Excel** del registro exportan **solo los registros** que estás viendo (filtros y búsqueda incluidos), como un listado; no es el cierre de caja.
 
 ### De dónde salen los movimientos
 
@@ -979,16 +989,31 @@ Tesorería es el **libro de caja** del club: muestra, por instrumento (efectivo,
 ### Cargar un movimiento manual
 
 1. Hacé clic en **Nuevo movimiento**: se abre el formulario al pie de la pantalla.
-2. Completá **todos** los campos: tipo (ingreso aumenta, egreso disminuye), fecha, instrumento, monto, rubro, subrubro, detalle, observaciones y el **comprobante adjunto** (PDF o imagen, hasta 8 MB). Rubro y subrubro sugieren los que ya usaste en el club.
-3. **Guardar movimiento.** El sistema le asigna un **número correlativo** del club y lo muestra en la tabla con su adjunto.
+2. Completá los campos: tipo (**Ingreso (Caja)** suma, **Egreso (Caja)** resta), **Fecha de Registración** (nunca posterior a hoy, y hacia atrás hasta donde lo permita el **período de carga** que configuró el club en Mi perfil → Datos Impositivos; el formulario te dice desde qué día se puede), instrumento, **Monto Pesos**, rubro, subrubro, detalle y observaciones. El **comprobante adjunto** (PDF o imagen, hasta 8 MB) es opcional: si lo tenés, cargalo y queda a mano desde la tabla; si no, el movimiento se guarda igual. Rubro y subrubro se eligen de una lista fija (primero el rubro, después el subrubro que le corresponde); no se escriben a mano, así los cierres agrupan siempre igual. Según el **instrumento** aparecen los datos adicionales del medio, los mismos que pide Cobranzas: banco, titular, fecha y nº de operación para una transferencia; tarjeta, últimos 4 dígitos, cuotas y nº de transacción para una tarjeta; número, banco, titular y tipo para un cheque; cuenta y nº de operación para Mercado Pago; banco y CBU para débito automático; monto en dólares y tipo de cambio para dólares (el **Monto Pesos** se calcula solo y queda editable; vale para ingresos y egresos). Esos datos se ven debajo del detalle en la tabla y en una columna del Excel; en los movimientos en dólares la columna Monto muestra también el importe en USD.
+3. **Guardar movimiento.** El sistema le asigna un **código correlativo** del club según el tipo: **MIC-0001, MIC-0002…** para los ingresos de caja y **MEC-0001, MEC-0002…** para los egresos (cada serie lleva su propia numeración). Lo muestra en la tabla, con el adjunto si lo cargaste.
 
-Por ahora un movimiento cargado **no se edita ni se anula** desde la pantalla; si te equivocaste, avisá para corregirlo. Esa función se va a sumar más adelante.
+### Modificar o anular un movimiento
+
+En el Registro de Movimientos, cada movimiento manual (MIC-/MEC-) tiene a la derecha los botones **Editar** y **Anular**. Los recibos no: esos se anulan desde Cobranzas, como siempre.
+
+- **Editar** abre el mismo formulario con los datos cargados. Se puede cambiar todo menos el tipo (ingreso/egreso) y el código. Si no cargás un adjunto nuevo, se conserva el que tenía.
+- **Anular** pide confirmación en la misma fila. El movimiento **no se borra**: queda en el registro tachado y con la marca **Anulado**, pero deja de sumar en los saldos y no entra en el cierre de caja.
+- Las dos acciones respetan el **período de anulación y modificación de Tesorería** que configuró el club en Mi perfil → Datos Impositivos (misma lógica que el período de anulación de recibos, contado desde la fecha del movimiento). Fuera de ese período los botones aparecen deshabilitados y al pasar el mouse te dice por qué.
 
 ### Cierre de caja en PDF
 
-El botón **Cierre de caja (PDF)** genera el reporte del período filtrado: encabezado con el nombre y CUIT del club y la fecha de emisión, la tabla de saldos por instrumento con el consolidado, y abajo el detalle completo de movimientos. Para el cierre diario, dejá el filtro en el día (es como arranca la pantalla) y descargalo al terminar la jornada. El saldo final de un día es el saldo inicial del siguiente, sin cargar nada a mano.
+El botón **Cierre de caja (PDF)** abre un desplegable para elegir qué cerrar: **Resumen** genera el reporte de todos los instrumentos del filtro; cada **instrumento** por separado (Efectivo, Transferencia, Cheque…) genera el cierre de esa caja sola, con sus saldos y únicamente sus movimientos.
 
-**Descargar Excel** baja la lista de movimientos tal como se ve, respetando filtros y búsqueda.
+El documento se llama **Cierre y Movimientos de Caja** y tiene esta estructura:
+
+- **Membrete en todas las hojas**: nombre, CUIT y dirección del club a la izquierda, y la leyenda "Cierre y Movimientos de Caja" a la derecha. Todas las hojas van numeradas ("Página 1 de 3").
+- **Primera hoja**: el período, el campo **Instrumento** con lo que elegiste ("Resumen" o el nombre del instrumento) y la cantidad de movimientos. Debajo, la tabla de **saldos** (saldo inicial, ingresos, egresos y saldo final, con los importes alineados bajo su columna) y una última fila **Consolidado · <instrumento elegido>**. Si hay dólares, se agrega la fila "saldo en USD".
+- **Detalle de movimientos**: fecha, número, tipo, detalle, instrumento, rubro, subrubro, ingreso y egreso. No lleva columna de saldo. Al final, los **totales de Ingresos y Egresos** (y en dólares, si corresponde). Los movimientos anulados no aparecen.
+- **Última hoja solamente**: los espacios para **Nombre y Apellido** y **FIRMA** del **Responsable de Tesorería** (a la izquierda) y del **Responsable Aprobador** (a la derecha), un recuadro de **Observaciones** abajo a la izquierda, y abajo a la derecha la **Fecha** del día (sale sola) y el **Lugar** (la ciudad cargada en Mi perfil del club). Las firmas y las observaciones se completan a mano al imprimir.
+
+Para el cierre diario, dejá el filtro en el día (es como arranca la pantalla) y descargalo al terminar la jornada. El saldo final de un día es el saldo inicial del siguiente, sin cargar nada a mano.
+
+Para bajar una lista de movimientos (sin el cuadro de saldos) usá los botones **PDF** y **Excel** del bloque Registro de Movimientos: exportan exactamente lo que estás viendo ahí, con sus filtros y búsqueda.
 
 ---
 
@@ -1199,6 +1224,24 @@ Elegí una de las cuatro opciones y hacé clic en **Guardar configuración**:
 Los recibos que quedan fuera del período **siguen visibles en Cobranzas y se pueden consultar e imprimir** — lo único que no se puede es anularlos. En la tabla, el botón de anular aparece deshabilitado y al pasar el mouse te dice por qué.
 
 > El límite se calcula con la **fecha del recibo** y el calendario argentino. Cambiar la configuración no afecta anulaciones ya hechas.
+
+_Período de carga de movimientos de Tesorería:_
+
+Debajo está la sección **Período de carga de movimientos de Tesorería**: hasta qué fecha hacia atrás se puede cargar un movimiento manual en Tesorería (ver sección 12). Sirve para que no se toquen cajas ya cerradas. Hacia adelante no hay opción: **nunca se puede cargar con fecha posterior a hoy**.
+
+| Opción                | Qué fechas admite el movimiento                                               |
+| --------------------- | ----------------------------------------------------------------------------- |
+| **Solo hoy**          | Únicamente la fecha del día.                                                  |
+| **Misma semana**      | Desde el lunes de la semana en curso.                                         |
+| **Mismo mes**         | Desde el 1° del mes en curso.                                                 |
+| **Mes anterior**      | Desde el 1° del mes anterior. En agosto se puede cargar julio, pero no junio. |
+| **Sin restricciones** | Cualquier fecha pasada. Es como viene configurado de entrada.                 |
+
+Elegí una opción y hacé clic en **Guardar configuración**. Los movimientos ya cargados no cambian.
+
+_Período de anulación y modificación de movimientos de Tesorería:_
+
+Debajo está la sección **Período de anulación y modificación de movimientos de Tesorería**: hasta cuándo se puede anular o modificar un movimiento manual ya cargado en el Registro de Movimientos, contado desde la fecha del movimiento. Son las mismas cuatro opciones del período de anulación de recibos (Misma semana, Mismo mes, Mes anterior, Sin restricciones) y viene en Sin restricciones de entrada. Los movimientos que queden fuera siguen visibles; solo se deshabilitan sus botones Editar y Anular.
 
 ### Pestaña: Equipo
 

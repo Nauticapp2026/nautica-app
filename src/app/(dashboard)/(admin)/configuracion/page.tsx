@@ -3,6 +3,8 @@ import { eq, and, asc, desc, inArray } from 'drizzle-orm';
 
 import { getActiveMarina } from '@/lib/auth/session';
 import { PERIODO_ANULACION_DEFAULT, esPeriodoAnulacion } from '@/lib/periodo-anulacion';
+import { PERIODO_CARGA_DEFAULT, esPeriodoCarga } from '@/lib/tesoreria/periodo-carga';
+import { PERIODO_EDICION_DEFAULT, esPeriodoEdicion } from '@/lib/tesoreria/periodo-edicion';
 import { db } from '@/lib/db';
 import {
   guarderiaCentrosEmisores,
@@ -84,6 +86,8 @@ export default async function ConfiguracionPage({ searchParams }: Props) {
       paywayPrivateKey: guarderias.paywayPrivateKey,
       mediosCobroInternos: guarderias.mediosCobroInternos,
       periodoAnulacionRecibo: guarderias.periodoAnulacionRecibo,
+      periodoCargaTesoreria: guarderias.periodoCargaTesoreria,
+      periodoEdicionTesoreria: guarderias.periodoEdicionTesoreria,
     })
     .from(guarderias)
     .where(eq(guarderias.id, guarderiaId))
@@ -242,6 +246,16 @@ export default async function ConfiguracionPage({ searchParams }: Props) {
         esPeriodoAnulacion(guarderia?.periodoAnulacionRecibo)
           ? guarderia.periodoAnulacionRecibo
           : PERIODO_ANULACION_DEFAULT
+      }
+      periodoCargaTesoreria={
+        esPeriodoCarga(guarderia?.periodoCargaTesoreria)
+          ? guarderia.periodoCargaTesoreria
+          : PERIODO_CARGA_DEFAULT
+      }
+      periodoEdicionTesoreria={
+        esPeriodoEdicion(guarderia?.periodoEdicionTesoreria)
+          ? guarderia.periodoEdicionTesoreria
+          : PERIODO_EDICION_DEFAULT
       }
       centrosEmisores={centrosEmisores}
       payway={payway}

@@ -28,6 +28,8 @@ import {
   tesoreriaMovimientos,
 } from '@/lib/db/schema';
 import { PATRONES_RECIBO_COBRANZA } from '@/lib/recibo-codigos';
+import { codigoMovimiento } from './codigos';
+import { numeroDecimal } from './datos-instrumento';
 import { argYmd } from '@/lib/dates';
 import {
   INSTRUMENTOS,
@@ -58,8 +60,24 @@ export type LineaTesoreria = {
   observaciones: string | null;
   adjuntoPath: string | null;
   adjuntoNombre: string | null;
+  /** Datos adicionales del instrumento (solo manuales): banco, nº operación, etc. */
+  datos: Record<string, string> | null;
+  /** Solo "Efectivo (dólares)": el monto en USD (el `monto` es siempre en pesos). */
+  montoUsd: number | null;
+  /** Id de `tesoreria_movimientos` (solo manuales): para editar y anular. */
+  movimientoId: string | null;
+  /** Manual anulado: se lista tachado y no suma en los saldos. */
+  anulado: boolean;
+  anuladoAt: string | null;
   /** Saldo acumulado (instrumentos elegidos) después de esta línea. */
   saldo: number;
+};
+
+export type SaldosUsd = {
+  saldoInicial: number;
+  ingresos: number;
+  egresos: number;
+  saldoFinal: number;
 };
 
 export type ResumenInstrumento = {
@@ -68,6 +86,12 @@ export type ResumenInstrumento = {
   ingresos: number;
   egresos: number;
   saldoFinal: number;
+  /**
+   * Solo para "Efectivo (dólares)": los mismos saldos pero en USD, sumando el
+   * monto en dólares de cada movimiento (pedido del cliente 2026-10-13: "el
+   * cierre de caja me deberá mostrar saldo en dólares"). El resto va en null.
+   */
+  usd: SaldosUsd | null;
 };
 
 export type FiltrosTesoreria = {
@@ -83,12 +107,9 @@ export type ResultadoTesoreria = {
   /** Un resumen por instrumento elegido, en el orden de INSTRUMENTOS. */
   resumen: ResumenInstrumento[];
   consolidado: ResumenInstrumento;
-  /** Valores ya usados en movimientos manuales, para sugerir al cargar. */
-  rubros: string[];
-  subrubros: string[];
 };
 
-type LineaBase = Omit<LineaTesoreria, 'saldo'>;
+export type LineaBase = Omit<LineaTesoreria, 'saldo'>;
 
 function redondear(n: number): number {
   return Math.round(n * 100) / 100;
@@ -105,8 +126,13 @@ function nombreSocio(p: {
   return nombre || 'Socio';
 }
 
-/** Todas las líneas del club (sin filtrar), ordenadas por fecha y hora. */
-async function cargarLineas(gId: string): Promise<LineaBase[]> {
+/**
+ * Todas las líneas del club (sin filtrar), ordenadas por fecha y hora. Se
+ * cargan una sola vez por request y después se calculan dos vistas sobre el
+ * mismo arreglo: el cierre de caja y el registro de movimientos (filtros
+ * independientes, pedido del cliente 2026-10-13).
+ */
+export async function cargarLineasTesoreria(gId: string): Promise<LineaBase[]> {
   const [recibos, manuales] = await Promise.all([
     db
       .select({
@@ -143,7 +169,9 @@ async function cargarLineas(gId: string): Promise<LineaBase[]> {
       .select()
       .from(tesoreriaMovimientos)
       .where(
-        and(eq(tesoreriaMovimientos.guarderiaId, gId), eq(tesoreriaMovimientos.anulado, false)),
+        // Los anulados también se cargan: se listan tachados en el registro,
+        // pero no suman en los saldos (ver calcularTesoreria).
+        eq(tesoreriaMovimientos.guarderiaId, gId),
       )
       .orderBy(asc(tesoreriaMovimientos.fecha), asc(tesoreriaMovimientos.numero)),
   ]);
@@ -163,14 +191,27 @@ async function cargarLineas(gId: string): Promise<LineaBase[]> {
 
     // Formas de pago con plata. Recibos sin formas (débito automático Payway,
     // recibos viejos): una sola línea con el medio del recibo por el total.
-    const dp = r.datosPago as { formas?: { tipo: string; monto: string }[] } | null;
+    const dp = r.datosPago as {
+      formas?: { tipo: string; monto: string; datos?: Record<string, string> }[];
+    } | null;
     const formas = (dp?.formas ?? [])
-      .map((f) => ({ tipo: f.tipo, monto: parseFloat(f.monto) || 0 }))
+      .map((f) => ({
+        tipo: f.tipo,
+        monto: parseFloat(f.monto) || 0,
+        // Cobranzas guarda el monto en dólares y el tipo de cambio en `datos`.
+        usd: f.tipo === 'efectivo_usd' ? montoUsdDe(f.datos?.usd) : null,
+      }))
       .filter((f) => f.monto > 0.005);
     const partes =
       formas.length > 0
         ? formas
-        : [{ tipo: r.medioPago ?? 'otro', monto: parseFloat(r.importe ?? '0') || 0 }];
+        : [
+            {
+              tipo: r.medioPago ?? 'otro',
+              monto: parseFloat(r.importe ?? '0') || 0,
+              usd: null as number | null,
+            },
+          ];
 
     partes.forEach((f, i) => {
       if (f.monto <= 0.005) return;
@@ -190,6 +231,11 @@ async function cargarLineas(gId: string): Promise<LineaBase[]> {
         observaciones: null,
         adjuntoPath: null,
         adjuntoNombre: null,
+        datos: null,
+        montoUsd: f.usd,
+        movimientoId: null,
+        anulado: false,
+        anuladoAt: null,
       });
     });
 
@@ -214,19 +260,25 @@ async function cargarLineas(gId: string): Promise<LineaBase[]> {
           observaciones: null,
           adjuntoPath: null,
           adjuntoNombre: null,
+          datos: null,
+          montoUsd: f.usd,
+          movimientoId: null,
+          anulado: false,
+          anuladoAt: null,
         });
       });
     }
   }
 
   for (const m of manuales) {
+    const datosManual = (m.datosInstrumento as Record<string, string> | null) ?? null;
     lineas.push({
       id: `tm-${m.id}`,
       origen: 'manual',
       fecha: m.fecha,
       // La fecha la elige el admin; la hora de carga desempata dentro del día.
       orden: `${m.fecha}T${m.createdAt.toISOString().slice(11)}`,
-      numero: String(m.numero),
+      numero: codigoMovimiento(m.tipo === 'egreso' ? 'egreso' : 'ingreso', m.numero),
       detalle: m.detalle,
       instrumento: instrumentoDesde(m.instrumento),
       tipo: m.tipo === 'egreso' ? 'egreso' : 'ingreso',
@@ -237,6 +289,11 @@ async function cargarLineas(gId: string): Promise<LineaBase[]> {
       observaciones: m.observaciones || null,
       adjuntoPath: m.adjuntoPath,
       adjuntoNombre: m.adjuntoNombre,
+      datos: datosManual,
+      montoUsd: m.instrumento === 'efectivo_usd' ? montoUsdDe(datosManual?.usd) : null,
+      movimientoId: m.id,
+      anulado: m.anulado,
+      anuladoAt: m.anuladoAt ? m.anuladoAt.toISOString() : null,
     });
   }
 
@@ -254,21 +311,31 @@ function signo(l: { tipo: TipoMovimientoTesoreria; monto: number }): number {
   return l.tipo === 'ingreso' ? l.monto : -l.monto;
 }
 
+/** "1.234,56" / "1234.56" → 1234.56; sin valor o inválido → null. */
+function montoUsdDe(v: string | undefined): number | null {
+  const n = numeroDecimal(v);
+  return Number.isFinite(n) && n > 0 ? redondear(n) : null;
+}
+
+function sumarUsd(acc: SaldosUsd, l: LineaBase, campo: 'saldoInicial' | 'ingresos' | 'egresos') {
+  if (l.montoUsd == null) return;
+  if (campo === 'saldoInicial') acc.saldoInicial += l.tipo === 'ingreso' ? l.montoUsd : -l.montoUsd;
+  else acc[campo] += l.montoUsd;
+}
+
 export async function listarTesoreria(
   gId: string,
   filtros: FiltrosTesoreria,
 ): Promise<ResultadoTesoreria> {
-  const todas = await cargarLineas(gId);
-  const elegidos = new Set<string>(filtros.instrumentos);
+  return calcularTesoreria(await cargarLineasTesoreria(gId), filtros);
+}
 
-  // Sugerencias de rubro / subrubro: lo que ya se cargó a mano en este club.
-  const rubros = new Set<string>();
-  const subrubros = new Set<string>();
-  for (const l of todas) {
-    if (l.origen !== 'manual') continue;
-    if (l.rubro) rubros.add(l.rubro);
-    if (l.subrubro) subrubros.add(l.subrubro);
-  }
+/** Saldos por instrumento + líneas en rango con saldo acumulado, para un filtro. */
+export function calcularTesoreria(
+  todas: LineaBase[],
+  filtros: FiltrosTesoreria,
+): ResultadoTesoreria {
+  const elegidos = new Set<string>(filtros.instrumentos);
 
   const porInstrumento = new Map<Instrumento, ResumenInstrumento>();
   for (const i of INSTRUMENTOS) {
@@ -279,6 +346,10 @@ export async function listarTesoreria(
       ingresos: 0,
       egresos: 0,
       saldoFinal: 0,
+      usd:
+        i.value === 'efectivo_usd'
+          ? { saldoInicial: 0, ingresos: 0, egresos: 0, saldoFinal: 0 }
+          : null,
     });
   }
 
@@ -287,12 +358,18 @@ export async function listarTesoreria(
     const r = porInstrumento.get(l.instrumento);
     if (!r) continue;
     if (filtros.desde && l.fecha < filtros.desde) {
+      if (l.anulado) continue;
       r.saldoInicial += signo(l);
+      if (r.usd) sumarUsd(r.usd, l, 'saldoInicial');
       continue;
     }
     if (filtros.hasta && l.fecha > filtros.hasta) continue;
-    if (l.tipo === 'ingreso') r.ingresos += l.monto;
-    else r.egresos += l.monto;
+    // Un manual anulado se muestra en el registro pero no mueve la caja.
+    if (!l.anulado) {
+      if (l.tipo === 'ingreso') r.ingresos += l.monto;
+      else r.egresos += l.monto;
+      if (r.usd) sumarUsd(r.usd, l, l.tipo === 'ingreso' ? 'ingresos' : 'egresos');
+    }
     enRango.push(l);
   }
 
@@ -303,12 +380,19 @@ export async function listarTesoreria(
     ingresos: 0,
     egresos: 0,
     saldoFinal: 0,
+    usd: null,
   };
   for (const r of porInstrumento.values()) {
     r.saldoInicial = redondear(r.saldoInicial);
     r.ingresos = redondear(r.ingresos);
     r.egresos = redondear(r.egresos);
     r.saldoFinal = redondear(r.saldoInicial + r.ingresos - r.egresos);
+    if (r.usd) {
+      r.usd.saldoInicial = redondear(r.usd.saldoInicial);
+      r.usd.ingresos = redondear(r.usd.ingresos);
+      r.usd.egresos = redondear(r.usd.egresos);
+      r.usd.saldoFinal = redondear(r.usd.saldoInicial + r.usd.ingresos - r.usd.egresos);
+    }
     consolidado.saldoInicial += r.saldoInicial;
     consolidado.ingresos += r.ingresos;
     consolidado.egresos += r.egresos;
@@ -325,7 +409,7 @@ export async function listarTesoreria(
   // instrumentos elegidos, arrancando del saldo inicial consolidado.
   let acumulado = consolidado.saldoInicial;
   const lineas: LineaTesoreria[] = enRango.map((l) => {
-    acumulado = redondear(acumulado + signo(l));
+    if (!l.anulado) acumulado = redondear(acumulado + signo(l));
     return { ...l, saldo: acumulado };
   });
 
@@ -333,7 +417,5 @@ export async function listarTesoreria(
     lineas,
     resumen,
     consolidado,
-    rubros: [...rubros].sort((a, b) => a.localeCompare(b, 'es')),
-    subrubros: [...subrubros].sort((a, b) => a.localeCompare(b, 'es')),
   };
 }

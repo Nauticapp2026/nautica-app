@@ -25,6 +25,8 @@ import {
 import { CONDICION_IVA_API } from '@/lib/tusfacturas/mappers';
 import { MEDIO_PAGO_VALUES } from '@/lib/medios-pago';
 import { esPeriodoAnulacion } from '@/lib/periodo-anulacion';
+import { esPeriodoCarga } from '@/lib/tesoreria/periodo-carga';
+import { esPeriodoEdicion } from '@/lib/tesoreria/periodo-edicion';
 
 const DIAS = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'] as const;
 type Dia = (typeof DIAS)[number];
@@ -277,6 +279,52 @@ export async function savePeriodoAnulacionReciboAction(
 
   revalidatePath('/configuracion');
   revalidatePath('/cobranzas');
+  return {};
+}
+
+/**
+ * Guarda hasta qué fecha hacia atrás se pueden cargar movimientos manuales de
+ * Tesorería (mig 0161). Mismo esquema que el período de anulación.
+ */
+export async function savePeriodoCargaTesoreriaAction(
+  periodo: string,
+): Promise<{ error?: string }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+  if (!isAdmin(ctx)) return { error: 'Solo administradores pueden editar la configuración.' };
+
+  if (!esPeriodoCarga(periodo)) return { error: 'Período de carga inválido.' };
+
+  await db
+    .update(guarderias)
+    .set({ periodoCargaTesoreria: periodo, updatedAt: new Date() })
+    .where(eq(guarderias.id, ctx.activeMembership.guarderiaId));
+
+  revalidatePath('/configuracion');
+  revalidatePath('/tesoreria');
+  return {};
+}
+
+/**
+ * Guarda hasta cuándo se puede anular o modificar un movimiento manual de
+ * Tesorería (mig 0163). Mismas opciones que el período de anulación de recibos.
+ */
+export async function savePeriodoEdicionTesoreriaAction(
+  periodo: string,
+): Promise<{ error?: string }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+  if (!isAdmin(ctx)) return { error: 'Solo administradores pueden editar la configuración.' };
+
+  if (!esPeriodoEdicion(periodo)) return { error: 'Período inválido.' };
+
+  await db
+    .update(guarderias)
+    .set({ periodoEdicionTesoreria: periodo, updatedAt: new Date() })
+    .where(eq(guarderias.id, ctx.activeMembership.guarderiaId));
+
+  revalidatePath('/configuracion');
+  revalidatePath('/tesoreria');
   return {};
 }
 

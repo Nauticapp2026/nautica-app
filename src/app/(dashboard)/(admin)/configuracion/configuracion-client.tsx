@@ -28,6 +28,8 @@ import {
   renombrarCentroEmisorAction,
   saveMediosCobroInternosAction,
   savePeriodoAnulacionReciboAction,
+  savePeriodoCargaTesoreriaAction,
+  savePeriodoEdicionTesoreriaAction,
   savePuntoVentaAction,
   savePaywayCredsAction,
   solicitarCertificadoAfipAction,
@@ -50,6 +52,8 @@ import { normalizarBusqueda } from '@/lib/buscador';
 import { formatArgentinaDate, formatArgentinaDateTime } from '@/lib/dates';
 import { MEDIOS_PAGO } from '@/lib/medios-pago';
 import { PERIODO_ANULACION_OPCIONES, type PeriodoAnulacion } from '@/lib/periodo-anulacion';
+import { PERIODO_CARGA_OPCIONES, type PeriodoCarga } from '@/lib/tesoreria/periodo-carga';
+import { PERIODO_EDICION_OPCIONES, type PeriodoEdicion } from '@/lib/tesoreria/periodo-edicion';
 import { EmptyState } from '@/components/shared/empty-state';
 import { ImagesUploader } from '@/components/shared/images-uploader';
 
@@ -208,6 +212,8 @@ export function ConfiguracionClient({
   puntoVenta,
   mediosCobroInternos,
   periodoAnulacionRecibo,
+  periodoCargaTesoreria,
+  periodoEdicionTesoreria,
   centrosEmisores,
   payway,
   planes,
@@ -223,6 +229,8 @@ export function ConfiguracionClient({
   puntoVenta: PuntoVentaData;
   mediosCobroInternos: string[];
   periodoAnulacionRecibo: PeriodoAnulacion;
+  periodoCargaTesoreria: PeriodoCarga;
+  periodoEdicionTesoreria: PeriodoEdicion;
   centrosEmisores: CentroEmisor[];
   payway: PaywayData;
   planes: PlanInfo[];
@@ -295,6 +303,8 @@ export function ConfiguracionClient({
                 centros={centrosEmisores}
                 mediosCobroInternos={mediosCobroInternos}
                 periodoAnulacionRecibo={periodoAnulacionRecibo}
+                periodoCargaTesoreria={periodoCargaTesoreria}
+                periodoEdicionTesoreria={periodoEdicionTesoreria}
               />
             </div>
           )}
@@ -306,6 +316,8 @@ export function ConfiguracionClient({
           centros={centrosEmisores}
           mediosCobroInternos={mediosCobroInternos}
           periodoAnulacionRecibo={periodoAnulacionRecibo}
+          periodoCargaTesoreria={periodoCargaTesoreria}
+          periodoEdicionTesoreria={periodoEdicionTesoreria}
         />
       )}
       {activeTab === 'equipo' && (
@@ -1520,11 +1532,15 @@ function PuntoVentaTab({
   centros,
   mediosCobroInternos,
   periodoAnulacionRecibo,
+  periodoCargaTesoreria,
+  periodoEdicionTesoreria,
 }: {
   initial: PuntoVentaData;
   centros: CentroEmisor[];
   mediosCobroInternos: string[];
   periodoAnulacionRecibo: PeriodoAnulacion;
+  periodoCargaTesoreria: PeriodoCarga;
+  periodoEdicionTesoreria: PeriodoEdicion;
 }) {
   const [data, setData] = useState<PuntoVentaData>(initial);
   const [feedback, setFeedback] = useState<{ type: 'error' | 'success'; msg: string } | null>(null);
@@ -1711,6 +1727,14 @@ function PuntoVentaTab({
           <PeriodoAnulacionSection initial={periodoAnulacionRecibo} />
         </div>
 
+        <div className="mt-2 border-t border-gray-200 pt-6">
+          <PeriodoCargaTesoreriaSection initial={periodoCargaTesoreria} />
+        </div>
+
+        <div className="mt-2 border-t border-gray-200 pt-6">
+          <PeriodoEdicionTesoreriaSection initial={periodoEdicionTesoreria} />
+        </div>
+
         {yaConfigurado && <CentrosEmisoresSection centros={centros} />}
 
         {yaConfigurado && (
@@ -1890,6 +1914,132 @@ function PeriodoAnulacionSection({ initial }: { initial: PeriodoAnulacion }) {
             <input
               type="radio"
               name="periodo-anulacion"
+              className="h-4 w-4 accent-[#175861]"
+              checked={valor === o.value}
+              onChange={() => setValor(o.value)}
+            />
+            {o.label}
+          </label>
+        ))}
+      </div>
+
+      <div className="pt-4">
+        <button
+          type="button"
+          onClick={guardar}
+          disabled={pending}
+          className="rounded-[10px] bg-[#175861] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#0f4249] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {pending ? 'Guardando…' : 'Guardar configuración'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Hasta qué fecha hacia atrás se puede cargar un movimiento manual de
+// Tesorería (mig 0161). Misma estructura que el período de anulación.
+function PeriodoCargaTesoreriaSection({ initial }: { initial: PeriodoCarga }) {
+  const router = useRouter();
+  const [valor, setValor] = useState<PeriodoCarga>(initial);
+  const [pending, startTransition] = useTransition();
+
+  function guardar() {
+    startTransition(async () => {
+      const res = await savePeriodoCargaTesoreriaAction(valor);
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+      toast.success('Período de carga de Tesorería guardado.');
+      router.refresh();
+    });
+  }
+
+  return (
+    <div>
+      <h3 className="mb-1 text-sm font-bold" style={{ color: '#101828' }}>
+        Período de carga de movimientos de Tesorería
+      </h3>
+      <p className="mb-4 text-sm text-gray-500">
+        Hasta qué fecha hacia atrás se puede cargar un movimiento manual en Tesorería, para que no
+        se toquen cajas ya cerradas. Nunca se puede cargar con fecha posterior a hoy. &quot;Mes
+        anterior&quot; admite el mes en curso y el anterior: en agosto se puede cargar julio, pero
+        no junio.
+      </p>
+
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-5">
+        {PERIODO_CARGA_OPCIONES.map((o) => (
+          <label
+            key={o.value}
+            className="flex cursor-pointer items-center gap-2.5 rounded-[10px] border border-gray-200 px-4 py-2.5 text-sm text-[#101828] hover:bg-gray-50"
+          >
+            <input
+              type="radio"
+              name="periodo-carga-tesoreria"
+              className="h-4 w-4 accent-[#175861]"
+              checked={valor === o.value}
+              onChange={() => setValor(o.value)}
+            />
+            {o.label}
+          </label>
+        ))}
+      </div>
+
+      <div className="pt-4">
+        <button
+          type="button"
+          onClick={guardar}
+          disabled={pending}
+          className="rounded-[10px] bg-[#175861] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#0f4249] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {pending ? 'Guardando…' : 'Guardar configuración'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Hasta cuándo se puede anular o modificar un movimiento manual de Tesorería
+// (mig 0163). Mismas opciones y estructura que el período de anulación.
+function PeriodoEdicionTesoreriaSection({ initial }: { initial: PeriodoEdicion }) {
+  const router = useRouter();
+  const [valor, setValor] = useState<PeriodoEdicion>(initial);
+  const [pending, startTransition] = useTransition();
+
+  function guardar() {
+    startTransition(async () => {
+      const res = await savePeriodoEdicionTesoreriaAction(valor);
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+      toast.success('Período de modificación de Tesorería guardado.');
+      router.refresh();
+    });
+  }
+
+  return (
+    <div>
+      <h3 className="mb-1 text-sm font-bold" style={{ color: '#101828' }}>
+        Período de anulación y modificación de movimientos de Tesorería
+      </h3>
+      <p className="mb-4 text-sm text-gray-500">
+        Hasta cuándo se puede anular o modificar un movimiento manual ya cargado en el Registro de
+        Movimientos, contado desde la fecha del movimiento. Misma lógica que el período de anulación
+        de recibos: la semana va de lunes a domingo y &quot;Mes anterior&quot; admite el mes en
+        curso y el anterior. Los movimientos que queden fuera siguen visibles, solo no se tocan.
+      </p>
+
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-4">
+        {PERIODO_EDICION_OPCIONES.map((o) => (
+          <label
+            key={o.value}
+            className="flex cursor-pointer items-center gap-2.5 rounded-[10px] border border-gray-200 px-4 py-2.5 text-sm text-[#101828] hover:bg-gray-50"
+          >
+            <input
+              type="radio"
+              name="periodo-edicion-tesoreria"
               className="h-4 w-4 accent-[#175861]"
               checked={valor === o.value}
               onChange={() => setValor(o.value)}

@@ -415,6 +415,14 @@ export const guarderias = pgTable(
     // 'misma_semana' | 'mismo_mes' | 'mes_anterior' | 'sin_limite'. El criterio
     // vive en lib/periodo-anulacion.ts. Default 'sin_limite' = lo que había.
     periodoAnulacionRecibo: text('periodo_anulacion_recibo').notNull().default('sin_limite'),
+    // Hasta qué fecha hacia atrás se puede cargar un movimiento manual de
+    // Tesorería (mig 0161): 'solo_hoy' | 'misma_semana' | 'mismo_mes' |
+    // 'mes_anterior' | 'sin_limite'. Criterio en lib/tesoreria/periodo-carga.ts.
+    periodoCargaTesoreria: text('periodo_carga_tesoreria').notNull().default('sin_limite'),
+    // Hasta cuándo se puede anular o modificar un movimiento manual de
+    // Tesorería (mig 0163): mismas opciones que periodo_anulacion_recibo.
+    // Criterio en lib/tesoreria/periodo-edicion.ts.
+    periodoEdicionTesoreria: text('periodo_edicion_tesoreria').notNull().default('sin_limite'),
     mediosCobroInternos: text('medios_cobro_internos')
       .array()
       .notNull()
@@ -2122,6 +2130,7 @@ export const tesoreriaMovimientos = pgTable(
     guarderiaId: uuid('guarderia_id')
       .notNull()
       .references(() => guarderias.id, { onDelete: 'cascade' }),
+    /** Correlativo por club y tipo; se muestra como MIC-0001 / MEC-0001. */
     numero: integer('numero').notNull(),
     /** 'ingreso' | 'egreso' (check en la DB). */
     tipo: text('tipo').notNull(),
@@ -2133,18 +2142,25 @@ export const tesoreriaMovimientos = pgTable(
     subrubro: text('subrubro').notNull(),
     detalle: text('detalle').notNull(),
     observaciones: text('observaciones').notNull().default(''),
+    // Datos adicionales según instrumento (banco, nroOperacion, ultimos4,
+    // numeroCheque, usd, tc, ...). Mismas claves que datos_pago de Cobranzas.
+    // Mig 0160.
+    datosInstrumento: jsonb('datos_instrumento'),
     // Path en el bucket privado `documentos`; se firma al mostrar.
     adjuntoPath: text('adjunto_path'),
     adjuntoNombre: text('adjunto_nombre'),
-    // Reservado: la anulación se valida más adelante (sin UI todavía).
+    // Anulado desde el Registro de Movimientos (mig 0163): no se borra, deja
+    // de sumar en los saldos y se lista tachado.
     anulado: boolean('anulado').notNull().default(false),
     anuladoAt: timestamp('anulado_at', { withTimezone: true }),
+    anuladoPor: uuid('anulado_por').references(() => profiles.id, { onDelete: 'set null' }),
     createdBy: uuid('created_by').references(() => profiles.id, { onDelete: 'set null' }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [
-    uniqueIndex('tesoreria_movimientos_numero_unico').on(t.guarderiaId, t.numero),
+    // Correlativo por club Y tipo (mig 0162): MIC-0001 y MEC-0001 conviven.
+    uniqueIndex('tesoreria_movimientos_numero_unico').on(t.guarderiaId, t.tipo, t.numero),
     index('tesoreria_movimientos_guarderia_fecha_idx').on(t.guarderiaId, t.fecha),
   ],
 );
