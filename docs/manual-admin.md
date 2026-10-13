@@ -988,9 +988,25 @@ La pantalla tiene **dos bloques independientes**: arriba el **Cierre de caja** y
 
 ### Cargar un movimiento manual
 
-1. Hacé clic en **Nuevo movimiento**: se abre el formulario al pie de la pantalla.
+1. Hacé clic en **Nuevo movimiento** (arriba a la derecha): se abre una ventana con el formulario.
 2. Completá los campos: tipo (**Ingreso (Caja)** suma, **Egreso (Caja)** resta), **Fecha de Registración** (nunca posterior a hoy, y hacia atrás hasta donde lo permita el **período de carga** que configuró el club en Mi perfil → Datos Impositivos; el formulario te dice desde qué día se puede), instrumento, **Monto Pesos**, rubro, subrubro, detalle y observaciones. El **comprobante adjunto** (PDF o imagen, hasta 8 MB) es opcional: si lo tenés, cargalo y queda a mano desde la tabla; si no, el movimiento se guarda igual. Rubro y subrubro se eligen de una lista fija (primero el rubro, después el subrubro que le corresponde); no se escriben a mano, así los cierres agrupan siempre igual. Según el **instrumento** aparecen los datos adicionales del medio, los mismos que pide Cobranzas: banco, titular, fecha y nº de operación para una transferencia; tarjeta, últimos 4 dígitos, cuotas y nº de transacción para una tarjeta; número, banco, titular y tipo para un cheque; cuenta y nº de operación para Mercado Pago; banco y CBU para débito automático; monto en dólares y tipo de cambio para dólares (el **Monto Pesos** se calcula solo y queda editable; vale para ingresos y egresos). Esos datos se ven debajo del detalle en la tabla y en una columna del Excel; en los movimientos en dólares la columna Monto muestra también el importe en USD.
 3. **Guardar movimiento.** El sistema le asigna un **código correlativo** del club según el tipo: **MIC-0001, MIC-0002…** para los ingresos de caja y **MEC-0001, MEC-0002…** para los egresos (cada serie lleva su propia numeración). Lo muestra en la tabla, con el adjunto si lo cargaste.
+
+**Rubros y subrubros disponibles**
+
+| Rubro                | Subrubros                                                                                              |
+| -------------------- | ------------------------------------------------------------------------------------------------------ |
+| Ingresos varios      | Alquileres, Eventos, Venta de bienes, Intereses, Otros ingresos                                        |
+| Sueldos y honorarios | Sueldos, Cargas sociales, Honorarios, Viáticos                                                         |
+| Servicios            | Electricidad, Agua, Gas, Internet y telefonía, Seguridad, Limpieza                                     |
+| Mantenimiento        | Muelles y marinas, Naves y galpones, Grúas y maquinaria, Lanchas de servicio, Edificio e instalaciones |
+| Combustible          | Lanchas de servicio, Vehículos, Grúas y maquinaria                                                     |
+| Impuestos y tasas    | Municipales, Provinciales, Nacionales, Prefectura                                                      |
+| Proveedores          | Materiales, Repuestos, Insumos, Otros proveedores                                                      |
+| Bancos               | Depósito bancario, Extracción bancaria, Comisiones y gastos bancarios                                  |
+| Seguros              | Responsabilidad civil, Embarcaciones, Edificio, Personal                                               |
+| Caja                 | Retiro de caja, Aporte de caja, Cambio de moneda, Ajuste de caja                                       |
+| Otros                | Otros                                                                                                  |
 
 ### Modificar o anular un movimiento
 
