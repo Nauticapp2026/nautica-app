@@ -69,6 +69,12 @@ export type LineaTesoreria = {
   /** Manual anulado: se lista tachado y no suma en los saldos. */
   anulado: boolean;
   anuladoAt: string | null;
+  /** Día de la anulación en hora argentina (YYYY-MM-DD): para mostrarlo sin correrlo por UTC. */
+  anuladoFecha: string | null;
+  /** Motivo escrito al anular (null en anulados previos a la mig 0164). */
+  motivoAnulacion: string | null;
+  /** Día de la última modificación en hora argentina (YYYY-MM-DD); null si nunca se editó. */
+  editadoFecha: string | null;
   /** Saldo acumulado (instrumentos elegidos) después de esta línea. */
   saldo: number;
 };
@@ -236,6 +242,9 @@ export async function cargarLineasTesoreria(gId: string): Promise<LineaBase[]> {
         movimientoId: null,
         anulado: false,
         anuladoAt: null,
+        anuladoFecha: null,
+        motivoAnulacion: null,
+        editadoFecha: null,
       });
     });
 
@@ -265,6 +274,9 @@ export async function cargarLineasTesoreria(gId: string): Promise<LineaBase[]> {
           movimientoId: null,
           anulado: false,
           anuladoAt: null,
+          anuladoFecha: null,
+          motivoAnulacion: null,
+          editadoFecha: null,
         });
       });
     }
@@ -294,6 +306,9 @@ export async function cargarLineasTesoreria(gId: string): Promise<LineaBase[]> {
       movimientoId: m.id,
       anulado: m.anulado,
       anuladoAt: m.anuladoAt ? m.anuladoAt.toISOString() : null,
+      anuladoFecha: argYmd(m.anuladoAt),
+      motivoAnulacion: m.motivoAnulacion || null,
+      editadoFecha: argYmd(m.editadoAt),
     });
   }
 

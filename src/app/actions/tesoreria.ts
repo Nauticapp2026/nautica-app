@@ -36,6 +36,12 @@ const TIPOS_MIME_ADJUNTO = ['application/pdf', 'image/jpeg', 'image/png', 'image
 // bodySizeLimit de next.config.ts es 10 MB; dejamos margen para el resto del form.
 const MAX_ADJUNTO_BYTES = 8 * 1024 * 1024;
 
+const motivoAnulacionSchema = z
+  .string()
+  .trim()
+  .min(3, 'Escribí el motivo de la anulación.')
+  .max(500, 'El motivo puede tener hasta 500 caracteres.');
+
 const movimientoSchema = z.object({
   tipo: z.enum(['ingreso', 'egreso']),
   fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha inválida.'),
@@ -259,7 +265,7 @@ export async function editarMovimientoTesoreriaAction(
 ): Promise<CrearMovimientoTesoreriaResult> {
   const auth = await contextoAdmin();
   if ('error' in auth) return { error: auth.error };
-  const { gId } = auth;
+  const { ctx, gId } = auth;
 
   const encontrado = await movimientoDelClub(id, gId);
   if ('error' in encontrado) return { error: encontrado.error };
@@ -296,6 +302,9 @@ export async function editarMovimientoTesoreriaAction(
         datosInstrumento: Object.keys(datosInstrumento).length > 0 ? datosInstrumento : null,
         // Sin adjunto nuevo se conserva el que había.
         ...(file ? { adjuntoPath: path, adjuntoNombre: file.name } : {}),
+        // Queda grabada la fecha de la modificación (pedido del cliente 2026-10-14).
+        editadoAt: new Date(),
+        editadoPor: ctx.user.id,
         updatedAt: new Date(),
       })
       .where(and(eq(tesoreriaMovimientos.id, mov.id), eq(tesoreriaMovimientos.guarderiaId, gId)));
@@ -315,13 +324,21 @@ export async function editarMovimientoTesoreriaAction(
  * queda marcado, deja de sumar en los saldos y se ve tachado en el registro.
  * Solo dentro del período de modificación del club, contado desde la fecha
  * del movimiento. Los ingresos por recibos se anulan desde Cobranzas.
+ * El motivo es obligatorio (pedido del cliente 2026-10-14) y queda guardado
+ * junto con la fecha de anulación.
  */
 export async function anularMovimientoTesoreriaAction(
   id: string,
+  motivo: string,
 ): Promise<CrearMovimientoTesoreriaResult> {
   const auth = await contextoAdmin();
   if ('error' in auth) return { error: auth.error };
   const { ctx, gId } = auth;
+
+  const motivoParsed = motivoAnulacionSchema.safeParse(motivo);
+  if (!motivoParsed.success) {
+    return { error: motivoParsed.error.issues[0]?.message ?? 'Motivo inválido.' };
+  }
 
   const encontrado = await movimientoDelClub(id, gId);
   if ('error' in encontrado) return { error: encontrado.error };
@@ -335,7 +352,13 @@ export async function anularMovimientoTesoreriaAction(
   // Guarda atómica: si otra request lo anuló entre medio, acá no matchea.
   const marcado = await db
     .update(tesoreriaMovimientos)
-    .set({ anulado: true, anuladoAt: new Date(), anuladoPor: ctx.user.id, updatedAt: new Date() })
+    .set({
+      anulado: true,
+      anuladoAt: new Date(),
+      anuladoPor: ctx.user.id,
+      motivoAnulacion: motivoParsed.data,
+      updatedAt: new Date(),
+    })
     .where(
       and(
         eq(tesoreriaMovimientos.id, mov.id),

@@ -2154,6 +2154,11 @@ export const tesoreriaMovimientos = pgTable(
     anulado: boolean('anulado').notNull().default(false),
     anuladoAt: timestamp('anulado_at', { withTimezone: true }),
     anuladoPor: uuid('anulado_por').references(() => profiles.id, { onDelete: 'set null' }),
+    // Motivo escrito al anular (mig 0164). NULL en los anulados antes de esa mig.
+    motivoAnulacion: text('motivo_anulacion'),
+    // Última modificación desde el Registro (mig 0165). NULL si nunca se editó.
+    editadoAt: timestamp('editado_at', { withTimezone: true }),
+    editadoPor: uuid('editado_por').references(() => profiles.id, { onDelete: 'set null' }),
     createdBy: uuid('created_by').references(() => profiles.id, { onDelete: 'set null' }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),

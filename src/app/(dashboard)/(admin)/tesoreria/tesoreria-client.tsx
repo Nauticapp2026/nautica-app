@@ -130,18 +130,25 @@ export function TesoreriaClient({
   // 2026-10-13), con el mismo patrón inline de "Anular recibo" en Cobranzas.
   const [editando, setEditando] = useState<LineaTesoreriaUI | null>(null);
   const [anulandoId, setAnulandoId] = useState<string | null>(null);
+  // Motivo que escribe el admin al anular (obligatorio, pedido del cliente 2026-10-14).
+  const [motivoAnulacion, setMotivoAnulacion] = useState('');
   const [anulando, startAnular] = useTransition();
+
+  function cerrarAnulacion() {
+    setAnulandoId(null);
+    setMotivoAnulacion('');
+  }
 
   function anular(l: LineaTesoreriaUI) {
     if (!l.movimientoId) return;
     startAnular(async () => {
-      const res = await anularMovimientoTesoreriaAction(l.movimientoId!);
+      const res = await anularMovimientoTesoreriaAction(l.movimientoId!, motivoAnulacion);
       if (res.error) {
         toast.error(res.error);
         return;
       }
       toast.success(`Movimiento ${res.codigo} anulado.`);
-      setAnulandoId(null);
+      cerrarAnulacion();
       router.refresh();
     });
   }
@@ -259,6 +266,7 @@ export function TesoreriaClient({
           l.rubro ?? '',
           l.subrubro ?? '',
           l.observaciones ?? '',
+          l.motivoAnulacion ?? '',
           labelInstrumento(l.instrumento),
         ].join(' '),
       ).includes(q),
@@ -279,6 +287,8 @@ export function TesoreriaClient({
     'Saldo',
     'Observaciones',
     'Datos del instrumento',
+    'Modificación',
+    'Anulación',
   ];
   function filasExport(origen: LineaTesoreria[]): string[][] {
     return origen.map((l) => [
@@ -294,7 +304,16 @@ export function TesoreriaClient({
       fmtMoney(l.saldo),
       l.observaciones ?? '',
       resumenDatosInstrumento(l.instrumento, l.datos),
+      l.editadoFecha ? `Modificado el ${ymdALegible(l.editadoFecha)}` : '',
+      textoAnulacion(l),
     ]);
+  }
+
+  /** "Anulado el 14/10/2026 · Motivo: …" para el Excel/PDF del registro. */
+  function textoAnulacion(l: LineaTesoreria): string {
+    if (!l.anulado) return '';
+    const cuando = l.anuladoFecha ? `Anulado el ${ymdALegible(l.anuladoFecha)}` : 'Anulado';
+    return l.motivoAnulacion ? `${cuando} · Motivo: ${l.motivoAnulacion}` : cuando;
   }
 
   const [exportando, setExportando] = useState<'xlsx' | 'pdf' | 'listado' | null>(null);
@@ -339,18 +358,21 @@ export function TesoreriaClient({
         egresos: fmtMoney(r.egresos),
         saldoFinal: fmtMoney(r.saldoFinal),
       });
-      // Dólares: debajo de la fila en pesos va la misma fila en USD (pedido del
-      // cliente: el cierre tiene que mostrar el saldo en dólares).
+      // Dólares: primero el saldo en billetes (USD) y debajo su equivalente en
+      // pesos (pedido del cliente 2026-10-14: antes era al revés).
       const conUsd = (r: ResumenInstrumento) =>
         r.usd
           ? [
-              fila(r),
               {
-                instrumento: `${labelInstrumento(r.instrumento)} · saldo en USD`,
+                instrumento: `${labelInstrumento(r.instrumento)} · Saldo Dólares`,
                 saldoInicial: fmtUsd(r.usd.saldoInicial),
                 ingresos: fmtUsd(r.usd.ingresos),
                 egresos: fmtUsd(r.usd.egresos),
                 saldoFinal: fmtUsd(r.usd.saldoFinal),
+              },
+              {
+                ...fila(r),
+                instrumento: `${labelInstrumento(r.instrumento)} · equivalente en pesos`,
               },
             ]
           : [fila(r)];
@@ -537,27 +559,32 @@ export function TesoreriaClient({
                 <tr key={r.instrumento} className="border-b border-gray-100">
                   <td className="px-4 py-3 text-gray-700">
                     {labelInstrumento(r.instrumento)}
-                    {r.usd && <div className="text-xs text-gray-400">en dólares</div>}
-                  </td>
-                  <td className="px-4 py-3 text-right whitespace-nowrap text-gray-700">
-                    {fmtMoney(r.saldoInicial)}
                     {r.usd && (
-                      <div className="text-xs text-gray-400">{fmtUsd(r.usd.saldoInicial)}</div>
+                      <div className="text-xs text-gray-400">
+                        Saldo Dólares · equivalente en pesos
+                      </div>
+                    )}
+                  </td>
+                  {/* Dólares: arriba el saldo en billetes (USD), abajo el equivalente en pesos. */}
+                  <td className="px-4 py-3 text-right whitespace-nowrap text-gray-700">
+                    {r.usd ? fmtUsd(r.usd.saldoInicial) : fmtMoney(r.saldoInicial)}
+                    {r.usd && (
+                      <div className="text-xs text-gray-400">{fmtMoney(r.saldoInicial)}</div>
                     )}
                   </td>
                   <td className="px-4 py-3 text-right whitespace-nowrap text-[#175861]">
-                    {fmtMoney(r.ingresos)}
-                    {r.usd && <div className="text-xs text-gray-400">{fmtUsd(r.usd.ingresos)}</div>}
+                    {r.usd ? fmtUsd(r.usd.ingresos) : fmtMoney(r.ingresos)}
+                    {r.usd && <div className="text-xs text-gray-400">{fmtMoney(r.ingresos)}</div>}
                   </td>
                   <td className="px-4 py-3 text-right whitespace-nowrap text-red-600">
-                    {fmtMoney(r.egresos)}
-                    {r.usd && <div className="text-xs text-gray-400">{fmtUsd(r.usd.egresos)}</div>}
+                    {r.usd ? fmtUsd(r.usd.egresos) : fmtMoney(r.egresos)}
+                    {r.usd && <div className="text-xs text-gray-400">{fmtMoney(r.egresos)}</div>}
                   </td>
                   <td className="px-4 py-3 text-right font-semibold whitespace-nowrap text-gray-900">
-                    {fmtMoney(r.saldoFinal)}
+                    {r.usd ? fmtUsd(r.usd.saldoFinal) : fmtMoney(r.saldoFinal)}
                     {r.usd && (
                       <div className="text-xs font-semibold text-gray-500">
-                        {fmtUsd(r.usd.saldoFinal)}
+                        {fmtMoney(r.saldoFinal)}
                       </div>
                     )}
                   </td>
@@ -791,9 +818,7 @@ export function TesoreriaClient({
                         <span
                           className="ml-2 inline-flex rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-700 no-underline"
                           title={
-                            l.anuladoAt
-                              ? `Anulado el ${ymdALegible(l.anuladoAt.slice(0, 10))}`
-                              : 'Anulado'
+                            l.anuladoFecha ? `Anulado el ${ymdALegible(l.anuladoFecha)}` : 'Anulado'
                           }
                         >
                           Anulado
@@ -808,6 +833,45 @@ export function TesoreriaClient({
                       {l.datos && (
                         <div className="mt-0.5 text-xs text-gray-400">
                           {resumenDatosInstrumento(l.instrumento, l.datos)}
+                        </div>
+                      )}
+                      {l.editadoFecha && (
+                        <div className="mt-1">
+                          <span className="inline-block text-xs text-gray-500">
+                            Modificado el {ymdALegible(l.editadoFecha)}
+                          </span>
+                        </div>
+                      )}
+                      {l.anulado && (
+                        // inline-block: el tachado de la fila no se propaga a este texto.
+                        <div className="mt-1">
+                          <span className="inline-block text-xs text-red-600">
+                            {l.anuladoFecha
+                              ? `Anulado el ${ymdALegible(l.anuladoFecha)}`
+                              : 'Anulado'}
+                            {l.motivoAnulacion && ` · Motivo: ${l.motivoAnulacion}`}
+                          </span>
+                        </div>
+                      )}
+                      {anulandoId === l.id && (
+                        <div className="mt-2">
+                          <label
+                            htmlFor={`motivo-${l.id}`}
+                            className="mb-1 block text-xs font-medium text-gray-600"
+                          >
+                            Motivo de la anulación
+                          </label>
+                          <textarea
+                            id={`motivo-${l.id}`}
+                            value={motivoAnulacion}
+                            onChange={(e) => setMotivoAnulacion(e.target.value)}
+                            maxLength={500}
+                            rows={2}
+                            autoFocus
+                            disabled={anulando}
+                            placeholder="Explicá por qué se anula este movimiento"
+                            className="border-input placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 w-full min-w-[240px] rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-[3px] disabled:opacity-50"
+                          />
                         </div>
                       )}
                     </td>
@@ -858,14 +922,14 @@ export function TesoreriaClient({
                             <button
                               type="button"
                               onClick={() => anular(l)}
-                              disabled={anulando}
+                              disabled={anulando || motivoAnulacion.trim().length < 3}
                               className="rounded-[8px] bg-red-600 px-2.5 py-1.5 text-xs font-semibold text-white transition hover:bg-red-700 disabled:opacity-50"
                             >
                               {anulando ? 'Anulando…' : 'Confirmar'}
                             </button>
                             <button
                               type="button"
-                              onClick={() => setAnulandoId(null)}
+                              onClick={cerrarAnulacion}
                               disabled={anulando}
                               className="rounded-[8px] border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-600 transition hover:bg-gray-50"
                             >
@@ -892,7 +956,10 @@ export function TesoreriaClient({
                             </button>
                             <button
                               type="button"
-                              onClick={() => setAnulandoId(l.id)}
+                              onClick={() => {
+                                setAnulandoId(l.id);
+                                setMotivoAnulacion('');
+                              }}
                               disabled={!puedeEditarMovimiento(l.fecha, periodoEdicion)}
                               title={
                                 puedeEditarMovimiento(l.fecha, periodoEdicion)
