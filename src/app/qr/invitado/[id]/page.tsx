@@ -1,6 +1,12 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { GuestInvitadoQrView } from './guest-invitado-qr-view';
 
+type GuarderiaArt = {
+  nombre: string;
+  acceso_externo_art: boolean | null;
+  acceso_externo_art_condicion: string | null;
+};
+
 type InvitadoInfo = {
   invitadoFullName: string | null;
   cantidadAcompanantes: number;
@@ -9,6 +15,8 @@ type InvitadoInfo = {
   socioFullName: string | null;
   clubName: string | null;
   isExpired: boolean;
+  /** El club pide ART a los accesos externos: leyenda para quien recibe el QR. */
+  art: { condicion: string | null } | null;
 };
 
 async function getInvitadoInfo(bridgeId: string): Promise<InvitadoInfo | null> {
@@ -17,7 +25,7 @@ async function getInvitadoInfo(bridgeId: string): Promise<InvitadoInfo | null> {
     const { data, error } = await admin
       .from('porteria_invitados')
       .select(
-        'cantidad_acompanantes, es_tecnico, motivo_tecnico, invitado:invitado_id(nombre, apellido), porteria:porteria_id(estado, arribada_en, tipo, hasta, socio:socio_id(nombre, apellido), guarderia:guarderia_id(nombre))',
+        'cantidad_acompanantes, es_tecnico, motivo_tecnico, invitado:invitado_id(nombre, apellido), porteria:porteria_id(estado, arribada_en, tipo, hasta, socio:socio_id(nombre, apellido), guarderia:guarderia_id(nombre, acceso_externo_art, acceso_externo_art_condicion))',
       )
       .eq('id', bridgeId)
       .maybeSingle();
@@ -38,7 +46,7 @@ async function getInvitadoInfo(bridgeId: string): Promise<InvitadoInfo | null> {
         | { nombre: string; apellido: string | null }
         | { nombre: string; apellido: string | null }[]
         | null;
-      guarderia: { nombre: string } | { nombre: string }[] | null;
+      guarderia: GuarderiaArt | GuarderiaArt[] | null;
     } | null;
 
     const invitadoFullName = inv
@@ -51,7 +59,7 @@ async function getInvitadoInfo(bridgeId: string): Promise<InvitadoInfo | null> {
     const socioFullName = socio ? [socio.nombre, socio.apellido].filter(Boolean).join(' ') : null;
     const guarderia = (
       Array.isArray(porteria?.guarderia) ? porteria?.guarderia[0] : porteria?.guarderia
-    ) as { nombre: string } | null | undefined;
+    ) as GuarderiaArt | null | undefined;
     const clubName = guarderia?.nombre ?? null;
 
     const estado = porteria?.estado ?? null;
@@ -63,6 +71,13 @@ async function getInvitadoInfo(bridgeId: string): Promise<InvitadoInfo | null> {
     const isExpired =
       estado === 'revocado' || estado === 'usado' || arribadaEn != null || hastaVencido;
 
+    // La leyenda de ART aplica solo a los accesos externos (no a los invitados de
+    // una salida en barco).
+    const art =
+      tipo === 'acceso_externo' && guarderia?.acceso_externo_art
+        ? { condicion: guarderia.acceso_externo_art_condicion?.trim() || null }
+        : null;
+
     return {
       invitadoFullName,
       cantidadAcompanantes: data.cantidad_acompanantes ?? 0,
@@ -71,6 +86,7 @@ async function getInvitadoInfo(bridgeId: string): Promise<InvitadoInfo | null> {
       socioFullName,
       clubName,
       isExpired,
+      art,
     };
   } catch {
     return null;
@@ -95,6 +111,7 @@ export default async function GuestInvitadoQrPage({ params }: { params: Promise<
         socioFullName={info?.socioFullName ?? null}
         clubName={info?.clubName ?? null}
         isExpired={info?.isExpired ?? false}
+        art={info?.art ?? null}
       />
     </main>
   );

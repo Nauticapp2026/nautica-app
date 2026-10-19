@@ -412,7 +412,8 @@ export const guarderias = pgTable(
     // del set MEDIOS_PAGO (enum medio_pago). Vacío = comprobantes internos
     // deshabilitados en toda la app. Mig 0136.
     // Hasta cuándo se puede anular un recibo de cobranza (mig 0155):
-    // 'misma_semana' | 'mismo_mes' | 'mes_anterior' | 'sin_limite'. El criterio
+    // 'mismo_dia' | 'misma_semana' | 'mismo_mes' | 'mes_anterior' | 'sin_limite'
+    // ('mismo_dia' desde la mig 0168). El criterio
     // vive en lib/periodo-anulacion.ts. Default 'sin_limite' = lo que había.
     periodoAnulacionRecibo: text('periodo_anulacion_recibo').notNull().default('sin_limite'),
     // Hasta qué fecha hacia atrás se puede cargar un movimiento manual de
@@ -423,6 +424,14 @@ export const guarderias = pgTable(
     // Tesorería (mig 0163): mismas opciones que periodo_anulacion_recibo.
     // Criterio en lib/tesoreria/periodo-edicion.ts.
     periodoEdicionTesoreria: text('periodo_edicion_tesoreria').notNull().default('sin_limite'),
+    // Días que tiene que llevar vencida una factura para considerar moroso al socio
+    // (mig 0166). NULL = el club no usa el bloqueo de salidas; 0 = desde el día
+    // siguiente al vencimiento. Lo lee el trigger porteria_bloquear_moroso_trg.
+    diasMorosidad: smallint('dias_morosidad'),
+    // El club pide ART a quien ingresa por acceso externo (mig 0169). La condición es
+    // texto libre y opcional. Se avisa al socio al crear el acceso y al externo en su QR.
+    accesoExternoArt: boolean('acceso_externo_art').notNull().default(false),
+    accesoExternoArtCondicion: text('acceso_externo_art_condicion'),
     mediosCobroInternos: text('medios_cobro_internos')
       .array()
       .notNull()
@@ -910,8 +919,13 @@ export const documentos = pgTable(
     nombre: text('nombre').notNull(),
     tipo: tipoDocumentoAdjuntoEnum('tipo'),
     documentoUrl: text('documento_url'),
+    // Día calendario argentino anclado a las 12:00 UTC (fechaCalendariaArg). SEGURO: lo carga
+    // solo el club (un trigger impide que el socio lo escriba). CERTIFICADO NÁUTICO: lo carga
+    // y lo ve solo el socio; el club nunca lo lee. Ver lib/documentacion-vencimientos.ts.
     vencimiento: timestamp('vencimiento', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    // Documento "principal" de su tipo (mig mobile 0022). Cuando hay varios, manda este.
+    predeterminado: boolean('predeterminado').notNull().default(false),
   },
   (t) => [index('documentos_profile_idx').on(t.profileId)],
 );
@@ -1970,6 +1984,56 @@ export const terminosAceptaciones = pgTable(
   (t) => [
     index('terminos_aceptaciones_user_idx').on(t.userId, t.aceptadoEn),
     index('terminos_aceptaciones_user_version_idx').on(t.userId, t.version),
+  ],
+);
+
+// Reglamento de cada club (mig 0170). Una fila por versión publicada; la vigente es la
+// de mayor `version` de la guardería. El PDF vive en el bucket privado `documentos`.
+// No se borra una versión al publicar la siguiente: queda como historial.
+export const reglamentosClub = pgTable(
+  'reglamentos_club',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    guarderiaId: uuid('guarderia_id')
+      .notNull()
+      .references(() => guarderias.id, { onDelete: 'cascade' }),
+    version: integer('version').notNull(),
+    titulo: text('titulo').notNull(),
+    // Qué cambió respecto de la versión anterior (opcional). Se le muestra al socio.
+    novedades: text('novedades'),
+    archivoPath: text('archivo_path').notNull(),
+    archivoNombre: text('archivo_nombre').notNull(),
+    publicadoEn: timestamp('publicado_en', { withTimezone: true }).defaultNow().notNull(),
+    publicadoPor: uuid('publicado_por').references(() => profiles.id, { onDelete: 'set null' }),
+  },
+  (t) => [
+    unique('reglamentos_club_version_unica').on(t.guarderiaId, t.version),
+    index('reglamentos_club_guarderia_version_idx').on(t.guarderiaId, t.version),
+  ],
+);
+
+// Aceptación de una versión del reglamento por un socio (mig 0170). Inmutable. La
+// escribe la app mobile directo contra Supabase (RLS: solo a nombre propio y de un
+// reglamento de su club).
+export const reglamentoAceptaciones = pgTable(
+  'reglamento_aceptaciones',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    reglamentoId: uuid('reglamento_id')
+      .notNull()
+      .references(() => reglamentosClub.id, { onDelete: 'cascade' }),
+    guarderiaId: uuid('guarderia_id')
+      .notNull()
+      .references(() => guarderias.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    aceptadoEn: timestamp('aceptado_en', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    unique('reglamento_aceptaciones_unica').on(t.reglamentoId, t.userId),
+    index('reglamento_aceptaciones_guarderia_idx').on(t.guarderiaId, t.reglamentoId),
+    index('reglamento_aceptaciones_user_idx').on(t.userId),
   ],
 );
 

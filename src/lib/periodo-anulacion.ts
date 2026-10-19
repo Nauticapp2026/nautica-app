@@ -16,6 +16,7 @@
 const TZ_AR = 'America/Argentina/Buenos_Aires';
 
 export const PERIODOS_ANULACION = [
+  'mismo_dia',
   'misma_semana',
   'mismo_mes',
   'mes_anterior',
@@ -30,6 +31,11 @@ export const PERIODO_ANULACION_OPCIONES: Array<{
   label: string;
   detalle: string;
 }> = [
+  {
+    value: 'mismo_dia',
+    label: 'Mismo día',
+    detalle: 'Solo recibos emitidos hoy. Al terminar el día, ya no se pueden anular.',
+  },
   {
     value: 'misma_semana',
     label: 'Misma semana',
@@ -110,6 +116,12 @@ export function puedeAnularRecibo(
 
   const fecha = typeof emision === 'string' ? new Date(emision) : emision;
   if (Number.isNaN(fecha.getTime())) return true;
+
+  // Mismo día calendario argentino. Un recibo con fecha futura (carga
+  // adelantada) nunca queda fuera por "viejo": se compara como texto YYYY-MM-DD.
+  if (periodo === 'mismo_dia') {
+    return ymdArg(fecha) >= ymdArg(ahora);
+  }
 
   if (periodo === 'misma_semana') {
     return lunesDeLaSemanaArg(fecha) === lunesDeLaSemanaArg(ahora);

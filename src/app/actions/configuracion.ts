@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { and, eq, gt } from 'drizzle-orm';
+import { z } from 'zod';
 
 import { db } from '@/lib/db';
 import {
@@ -279,6 +280,64 @@ export async function savePeriodoAnulacionReciboAction(
 
   revalidatePath('/configuracion');
   revalidatePath('/cobranzas');
+  return {};
+}
+
+/**
+ * Guarda si el club exige ART a los accesos externos y la condición específica
+ * (mig 0169). La condición es texto libre y opcional: se guarda aunque el check
+ * esté apagado, para no perderla si se vuelve a prender.
+ */
+const accesoExternoArtSchema = z.object({
+  requiereArt: z.boolean(),
+  condicion: z.string().trim().max(500, 'La condición puede tener hasta 500 caracteres.'),
+});
+
+export async function saveAccesoExternoArtAction(data: {
+  requiereArt: boolean;
+  condicion: string;
+}): Promise<{ error?: string }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+  if (!isAdmin(ctx)) return { error: 'Solo administradores pueden editar la configuración.' };
+
+  const parsed = accesoExternoArtSchema.safeParse(data);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Datos inválidos.' };
+
+  await db
+    .update(guarderias)
+    .set({
+      accesoExternoArt: parsed.data.requiereArt,
+      accesoExternoArtCondicion: parsed.data.condicion === '' ? null : parsed.data.condicion,
+      updatedAt: new Date(),
+    })
+    .where(eq(guarderias.id, ctx.activeMembership.guarderiaId));
+
+  revalidatePath('/configuracion');
+  return {};
+}
+
+/**
+ * Guarda a partir de cuántos días de vencida una factura vuelve moroso al socio
+ * (mig 0166). `null` apaga el bloqueo de salidas. Tope de 365 días, igual que el
+ * CHECK de la tabla.
+ */
+const diasMorosidadSchema = z.number().int().min(0).max(365).nullable();
+
+export async function saveDiasMorosidadAction(dias: number | null): Promise<{ error?: string }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'No autenticado' };
+  if (!isAdmin(ctx)) return { error: 'Solo administradores pueden editar la configuración.' };
+
+  const parsed = diasMorosidadSchema.safeParse(dias);
+  if (!parsed.success) return { error: 'Ingresá un número entero de días entre 0 y 365.' };
+
+  await db
+    .update(guarderias)
+    .set({ diasMorosidad: parsed.data, updatedAt: new Date() })
+    .where(eq(guarderias.id, ctx.activeMembership.guarderiaId));
+
+  revalidatePath('/configuracion');
   return {};
 }
 

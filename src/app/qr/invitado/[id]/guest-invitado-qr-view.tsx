@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import QRCodeStyling from 'qr-code-styling';
-import { QrCode, UserPlus, Wrench, X } from 'lucide-react';
+import { FileCheck2, QrCode, UserPlus, Wrench, X } from 'lucide-react';
 
 const PRIMARY = '#175861';
 const HEADER = '#669999';
@@ -17,6 +17,7 @@ type Props = {
   socioFullName: string | null;
   clubName: string | null;
   isExpired: boolean;
+  art: { condicion: string | null } | null;
 };
 
 export function GuestInvitadoQrView({
@@ -28,6 +29,7 @@ export function GuestInvitadoQrView({
   socioFullName,
   clubName,
   isExpired,
+  art,
 }: Props) {
   const [showQr, setShowQr] = useState(false);
   const clubLabel = clubName || '—';
@@ -35,7 +37,9 @@ export function GuestInvitadoQrView({
   const socioLabel = socioFullName || '—';
 
   if (showQr) {
-    return <QrFullScreen id={id} onClose={() => setShowQr(false)} isExpired={isExpired} />;
+    return (
+      <QrFullScreen id={id} onClose={() => setShowQr(false)} isExpired={isExpired} art={art} />
+    );
   }
 
   return (
@@ -92,6 +96,8 @@ export function GuestInvitadoQrView({
         />
       )}
 
+      {art && <ArtAviso art={art} />}
+
       <button
         type="button"
         onClick={() => setShowQr(true)}
@@ -108,6 +114,31 @@ export function GuestInvitadoQrView({
         </p>
       )}
     </section>
+  );
+}
+
+// Leyenda de ART (pedido del cliente 2026-10-19): el club la pide a los accesos
+// externos y quien recibe el QR tiene que saberlo antes de llegar.
+function ArtAviso({ art }: { art: { condicion: string | null } }) {
+  return (
+    <div
+      className="flex items-start gap-3 rounded-2xl border px-4 py-3"
+      style={{ borderColor: '#E8C46B', background: '#FFF8E6', color: '#6B4A00' }}
+    >
+      <FileCheck2 size={20} className="mt-0.5 shrink-0" />
+      <div className="text-sm">
+        <p className="font-semibold">Se te va a solicitar la ART para ingresar</p>
+        <p className="mt-0.5 opacity-90">
+          Presentá tu ART (Aseguradora de Riesgos del Trabajo) vigente en la entrada.
+        </p>
+        {art.condicion && (
+          <p className="mt-1.5">
+            <span className="font-semibold">Condición: </span>
+            {art.condicion}
+          </p>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -130,10 +161,12 @@ function QrFullScreen({
   id,
   onClose,
   isExpired,
+  art,
 }: {
   id: string;
   onClose: () => void;
   isExpired: boolean;
+  art: { condicion: string | null } | null;
 }) {
   const qrRef = useRef<HTMLDivElement>(null);
 
@@ -201,7 +234,13 @@ function QrFullScreen({
           </div>
         </div>
 
-        <div className="text-center">
+        <div className="flex flex-col gap-3 text-center">
+          {art && (
+            <p className="text-xs" style={{ color: '#6B4A00' }}>
+              <span className="font-semibold">Recordá llevar tu ART.</span>
+              {art.condicion ? ` ${art.condicion}` : ''}
+            </p>
+          )}
           {isExpired && <p className="mt-3 text-xs text-red-500">Este código ya no está activo.</p>}
         </div>
       </div>

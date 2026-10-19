@@ -571,6 +571,9 @@ export default async function SocioPage({
       tipo: r.d.tipo ?? null,
       createdAt: r.d.createdAt.toISOString(),
       signedUrl,
+      // PRIVACIDAD: solo el vencimiento del SEGURO llega al club. La fecha del certificado
+      // náutico es del socio (la carga y la ve él) y se descarta acá, antes de salir del server.
+      vencimiento: r.d.tipo === 'seguro' ? argYmd(r.d.vencimiento) : null,
     };
   });
 

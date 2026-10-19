@@ -47,6 +47,7 @@ import {
   deleteSocioAction,
   deleteSocioDocumentoAction,
   toggleCobroAutomaticoPaywayAction,
+  actualizarVencimientoSeguroAction,
   toggleComprobanteInternoAction,
   toggleFacturaFiscalAction,
   updateNumeroSocioAction,
@@ -79,7 +80,13 @@ import {
 } from '@/lib/estado-cuenta-pdf';
 import { enviarEstadoCuentaAction } from '@/app/actions/estado-cuenta';
 import { calcularSaldoYEstado } from '@/lib/cuenta-corriente-saldo';
-import { formatArgentinaDate, formatArgentinaDateTime, formatNaiveDateTime } from '@/lib/dates';
+import {
+  formatArgentinaDate,
+  formatArgentinaDateTime,
+  formatNaiveDateTime,
+  todayArg,
+} from '@/lib/dates';
+import { estadoVencimiento, fechaLegible, textoVencimiento } from '@/lib/documentacion-fechas';
 import { escribirTabEnUrl, type SocioTabId } from '@/lib/tab-url';
 import { precioSinIva } from '@/lib/iva';
 import { ASTILLEROS } from '../astilleros';
@@ -1068,6 +1075,8 @@ export type DocumentoItem = {
   tipo: 'carnet_nautico' | 'matricula' | 'seguro' | null;
   createdAt: string;
   signedUrl: string | null;
+  /** Vencimiento 'YYYY-MM-DD'. Solo viene para SEGUROS: el del certificado náutico es del socio. */
+  vencimiento: string | null;
 };
 
 const TIPO_DOC_LABEL: Record<'carnet_nautico' | 'matricula' | 'seguro', string> = {
@@ -1750,6 +1759,114 @@ const TIPO_DOC_OPTS_DETAIL: { value: 'carnet_nautico' | 'matricula' | 'seguro'; 
     { value: 'seguro', label: 'Seguro' },
   ];
 
+// Vencimiento del SEGURO (pedido del cliente 2026-10-19): lo carga solo el club, a mano.
+// 7 días antes avisa en el Dashboard y le manda una notificación al socio. El certificado
+// náutico NO pasa por acá: su fecha es del socio.
+function VencimientoSeguro({
+  documentoId,
+  vencimiento,
+}: {
+  documentoId: string;
+  vencimiento: string | null;
+}) {
+  const router = useRouter();
+  const [editando, setEditando] = useState(false);
+  const [valor, setValor] = useState(vencimiento ?? '');
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+  const hoy = todayArg();
+
+  function guardar(nuevo: string | null) {
+    setError(null);
+    startTransition(async () => {
+      const res = await actualizarVencimientoSeguroAction(documentoId, nuevo);
+      if (res.error) {
+        setError(res.error);
+        return;
+      }
+      setEditando(false);
+      router.refresh();
+    });
+  }
+
+  if (editando) {
+    return (
+      <div className="mt-1.5 flex flex-wrap items-center gap-2">
+        <input
+          type="date"
+          value={valor}
+          onChange={(e) => setValor(e.target.value)}
+          aria-label="Fecha de vencimiento del seguro"
+          className="h-8 rounded-[6px] border border-gray-200 bg-white px-2 text-xs text-[#101828]"
+        />
+        <button
+          type="button"
+          onClick={() => guardar(valor)}
+          disabled={pending || !valor}
+          className="rounded-[8px] px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-40"
+          style={{ background: '#175861' }}
+        >
+          {pending ? 'Guardando…' : 'Guardar'}
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setEditando(false);
+            setValor(vencimiento ?? '');
+            setError(null);
+          }}
+          disabled={pending}
+          className="rounded-[8px] border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
+        >
+          Cancelar
+        </button>
+        {vencimiento && (
+          <button
+            type="button"
+            onClick={() => guardar(null)}
+            disabled={pending}
+            className="text-xs font-medium text-red-600 hover:underline disabled:opacity-40"
+          >
+            Quitar fecha
+          </button>
+        )}
+        {error && <span className="w-full text-xs text-red-600">{error}</span>}
+      </div>
+    );
+  }
+
+  const estado = vencimiento ? estadoVencimiento(vencimiento, hoy) : null;
+  return (
+    <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs">
+      {vencimiento ? (
+        <>
+          <span className="text-gray-700">Vence el {fechaLegible(vencimiento)}</span>
+          <span
+            className={`rounded-full px-2 py-0.5 font-medium ${
+              estado === 'vencido'
+                ? 'bg-red-50 text-red-700'
+                : estado === 'por_vencer'
+                  ? 'bg-amber-50 text-amber-700'
+                  : 'bg-gray-100 text-gray-600'
+            }`}
+          >
+            {textoVencimiento(vencimiento, hoy)}
+          </span>
+        </>
+      ) : (
+        <span className="text-gray-400">Sin fecha de vencimiento</span>
+      )}
+      <button
+        type="button"
+        onClick={() => setEditando(true)}
+        className="font-semibold text-[#175861] hover:underline"
+      >
+        {vencimiento ? 'Cambiar' : 'Cargar fecha'}
+      </button>
+    </div>
+  );
+}
+
 function DocumentacionTab({
   socioId,
   documentos,
@@ -1759,7 +1876,7 @@ function DocumentacionTab({
 }) {
   const router = useRouter();
   const [pendientes, setPendientes] = useState<
-    { file: File; tipo: 'carnet_nautico' | 'matricula' | 'seguro' }[]
+    { file: File; tipo: 'carnet_nautico' | 'matricula' | 'seguro'; vencimiento: string }[]
   >([]);
   const [progreso, setProgreso] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -1769,13 +1886,17 @@ function DocumentacionTab({
 
   function addFiles(files: FileList | null) {
     if (!files) return;
-    const next = Array.from(files).map((f) => ({ file: f, tipo: 'carnet_nautico' as const }));
+    const next = Array.from(files).map((f) => ({
+      file: f,
+      tipo: 'carnet_nautico' as const,
+      vencimiento: '',
+    }));
     setPendientes((prev) => [...prev, ...next]);
   }
 
   function updatePendiente(
     idx: number,
-    patch: Partial<{ tipo: 'carnet_nautico' | 'matricula' | 'seguro' }>,
+    patch: Partial<{ tipo: 'carnet_nautico' | 'matricula' | 'seguro'; vencimiento: string }>,
   ) {
     setPendientes((prev) => prev.map((p, i) => (i === idx ? { ...p, ...patch } : p)));
   }
@@ -1795,6 +1916,7 @@ function DocumentacionTab({
         fd.append('socioId', socioId);
         fd.append('tipo', p.tipo);
         fd.append('file', p.file);
+        if (p.tipo === 'seguro' && p.vencimiento) fd.append('vencimiento', p.vencimiento);
         const res = await uploadSocioDocumentoAction(fd);
         if (res.error) {
           setError(`Falló "${p.file.name}": ${res.error}`);
@@ -1878,6 +2000,18 @@ function DocumentacionTab({
                     </option>
                   ))}
                 </select>
+                {p.tipo === 'seguro' && (
+                  <label className="flex shrink-0 items-center gap-1.5 text-xs text-gray-500">
+                    Vence
+                    <input
+                      type="date"
+                      value={p.vencimiento}
+                      onChange={(e) => updatePendiente(idx, { vencimiento: e.target.value })}
+                      title="Fecha de vencimiento del seguro (opcional)"
+                      className="h-8 rounded-[6px] border border-gray-200 bg-white px-2 text-xs text-[#101828]"
+                    />
+                  </label>
+                )}
                 <button
                   type="button"
                   onClick={() => removePendiente(idx)}
@@ -1936,6 +2070,9 @@ function DocumentacionTab({
                     {d.tipo ? TIPO_DOC_LABEL[d.tipo] : 'Sin categoría'} ·{' '}
                     {formatArgentinaDate(d.createdAt)}
                   </p>
+                  {d.tipo === 'seguro' && (
+                    <VencimientoSeguro documentoId={d.id} vencimiento={d.vencimiento} />
+                  )}
                 </div>
                 {d.signedUrl ? (
                   <a

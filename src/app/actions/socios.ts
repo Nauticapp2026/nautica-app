@@ -15,7 +15,9 @@ import {
   socioServicios,
   socioServiciosCancelados,
 } from '@/lib/db/schema';
-import { todayArg } from '@/lib/dates';
+import { fechaCalendariaArg, todayArg } from '@/lib/dates';
+import { esFechaYmdValida } from '@/lib/documentacion-fechas';
+import { ADMIN_ROLES } from '@/config/roles';
 import { getActiveMarina } from '@/lib/auth/session';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { translateInviteError } from '@/lib/auth/errors';
@@ -545,6 +547,20 @@ export async function uploadSocioDocumentoAction(
     return { error: 'Formato no soportado. Usá PDF, JPG, PNG o WebP.' };
   }
 
+  // Fecha de vencimiento: SOLO del seguro y SOLO la carga el club (pedido del cliente
+  // 2026-10-19). El certificado náutico tiene su propia fecha, que es del socio: acá se
+  // ignora aunque venga en el formulario, para que el club nunca la escriba.
+  let vencimiento: Date | null = null;
+  const vencimientoRaw = String(formData.get('vencimiento') ?? '').trim();
+  if (tipo === 'seguro' && vencimientoRaw !== '') {
+    if (!ADMIN_ROLES.includes(ctx.activeMembership.rol)) {
+      return { error: 'Solo los administradores pueden cargar el vencimiento.' };
+    }
+    if (!esFechaYmdValida(vencimientoRaw))
+      return { error: 'La fecha de vencimiento no es válida.' };
+    vencimiento = fechaCalendariaArg(vencimientoRaw);
+  }
+
   // Validar que el socio pertenezca a la guardería activa.
   const guarderiaId = ctx.activeMembership.guarderiaId;
   const [membership] = await db
@@ -585,6 +601,7 @@ export async function uploadSocioDocumentoAction(
         // Guardamos el path del storage (no una URL pública). Se genera
         // signed URL al momento de mostrar el documento.
         documentoUrl: path,
+        vencimiento,
       })
       .returning({ id: documentos.id });
 
@@ -598,6 +615,67 @@ export async function uploadSocioDocumentoAction(
       .catch(() => null);
     return { error: err instanceof Error ? err.message : 'Error al guardar el documento.' };
   }
+}
+
+// ─── Vencimiento del seguro ──────────────────────────────────────────────────
+
+/**
+ * Carga, cambia o quita la fecha de vencimiento de un SEGURO de un socio (pedido del
+ * cliente 2026-10-19: la fecha del seguro la carga solamente el club, a mano). `null`
+ * la quita.
+ *
+ * Solo admins. Solo documentos de tipo 'seguro' de un socio ACTIVO de la guardería
+ * actual: el certificado náutico tiene su fecha propia, que es del socio y que el club
+ * no puede ver ni escribir. El socio no puede cambiar esta fecha desde la app: lo impide
+ * un trigger en la base (mig 0171).
+ */
+export async function actualizarVencimientoSeguroAction(
+  documentoId: string,
+  vencimiento: string | null,
+): Promise<{ error?: string }> {
+  const ctx = await getActiveMarina();
+  if (!ctx) return { error: 'Tu sesión expiró. Recargá la página e intentá de nuevo.' };
+  if (!ADMIN_ROLES.includes(ctx.activeMembership.rol)) {
+    return { error: 'Solo los administradores pueden cargar el vencimiento.' };
+  }
+  if (!z.string().uuid().safeParse(documentoId).success) return { error: 'Documento inválido.' };
+
+  let fecha: Date | null = null;
+  if (vencimiento !== null) {
+    const v = vencimiento.trim();
+    if (!esFechaYmdValida(v)) return { error: 'La fecha de vencimiento no es válida.' };
+    fecha = fechaCalendariaArg(v);
+  }
+
+  const guarderiaId = ctx.activeMembership.guarderiaId;
+  const [doc] = await db
+    .select({ id: documentos.id, profileId: documentos.profileId, tipo: documentos.tipo })
+    .from(documentos)
+    .innerJoin(
+      memberships,
+      and(
+        eq(memberships.userId, documentos.profileId),
+        eq(memberships.guarderiaId, guarderiaId),
+        eq(memberships.rol, 'socio'),
+        eq(memberships.status, 'active'),
+      ),
+    )
+    .where(eq(documentos.id, documentoId))
+    .limit(1);
+  if (!doc) return { error: 'Documento no pertenece a esta guardería.' };
+  if (doc.tipo !== 'seguro') {
+    return { error: 'Solo se puede cargar el vencimiento de un seguro.' };
+  }
+
+  try {
+    await db.update(documentos).set({ vencimiento: fecha }).where(eq(documentos.id, doc.id));
+  } catch {
+    return { error: 'No se pudo guardar el vencimiento.' };
+  }
+
+  revalidatePath(`/usuarios/${doc.profileId}`);
+  revalidatePath('/dashboard');
+  return {};
 }
 
 // ─── Eliminar documento de un socio ──────────────────────────────────────────

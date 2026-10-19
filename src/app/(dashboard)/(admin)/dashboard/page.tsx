@@ -17,6 +17,9 @@ import {
 import { and, asc, count, desc, eq, gte, inArray, lte, sql, sum } from 'drizzle-orm';
 
 import { contarSociosConFacturasVencidas } from '@/lib/vencimientos-socio';
+import { listarSegurosPorVencer } from '@/lib/documentacion-vencimientos';
+import { DIAS_AVISO_VENCIMIENTO, fechaLegible, textoVencimiento } from '@/lib/documentacion-fechas';
+import { todayArg } from '@/lib/dates';
 import { AlertasOperativasList, type AlertaOperativa } from './alertas-operativas';
 import { EmptyState } from '@/components/shared/empty-state';
 import {
@@ -359,6 +362,11 @@ export default async function DashboardPage() {
   // día después de que venció, mucho antes de que el socio sea moroso.
   const sociosFacturasVencidas = await contarSociosConFacturasVencidas(gId);
 
+  // Seguros que vencen en los próximos 7 días o ya vencieron (pedido del cliente
+  // 2026-10-19). Solo SEGUROS: el certificado náutico es del socio y no se le muestra al club.
+  const segurosPorVencer = await listarSegurosPorVencer(gId);
+  const hoyArg = todayArg();
+
   const alertasOperativas: AlertaOperativa[] = alertasOperativasRows.map((r) => ({
     id: r.id,
     tipo: r.tipo as 'retorno_proximo' | 'sin_respuesta',
@@ -489,6 +497,56 @@ export default async function DashboardPage() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* Documentación con vencimiento próximo — solo seguros, fecha cargada por el club */}
+      <div className="rounded-2xl border border-gray-200 bg-white p-4 md:p-6">
+        <div className="mb-1 flex items-center gap-2">
+          <FileText className="h-4 w-4" style={{ color: '#175861' }} />
+          <h2 className="text-base font-semibold" style={{ color: '#101828' }}>
+            Documentación con vencimiento próximo
+          </h2>
+        </div>
+        <p className="mb-4 text-xs text-gray-500">
+          Seguros de socios que vencen en los próximos {DIAS_AVISO_VENCIMIENTO} días o que ya
+          vencieron. La fecha se carga en la ficha de cada socio, en Documentación.
+        </p>
+        {segurosPorVencer.length === 0 ? (
+          <EmptyState
+            icon={<FileText className="h-7 w-7 opacity-40" />}
+            text={`No hay seguros por vencer en los próximos ${DIAS_AVISO_VENCIMIENTO} días.`}
+          />
+        ) : (
+          <div className="space-y-2">
+            {segurosPorVencer.map((s) => {
+              const nombre = [s.nombre, s.apellido].filter(Boolean).join(' ') || s.email || 'Socio';
+              const vencido = s.dias < 0;
+              return (
+                <Link
+                  key={s.documentoId}
+                  href={`/usuarios/${s.socioId}?tab=documentacion`}
+                  className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-[10px] border border-gray-100 bg-gray-50 px-4 py-3 transition hover:bg-gray-100"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium" style={{ color: '#101828' }}>
+                      {nombre}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      Seguro · vence el {fechaLegible(s.vencimiento)}
+                    </p>
+                  </div>
+                  <span
+                    className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                      vencido ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-700'
+                    }`}
+                  >
+                    {textoVencimiento(s.vencimiento, hoyArg)}
+                  </span>
+                </Link>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Comunicaciones recientes */}

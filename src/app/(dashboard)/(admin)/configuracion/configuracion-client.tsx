@@ -8,6 +8,7 @@ import {
   Check,
   CreditCard,
   Edit3,
+  FileText,
   FilterX,
   Minus,
   Plus,
@@ -17,6 +18,9 @@ import {
   X,
 } from 'lucide-react';
 import { toast } from 'sonner';
+
+import { publicarReglamentoAction } from '@/app/actions/reglamento';
+import { MAX_NOVEDADES_REGLAMENTO, MAX_TITULO_REGLAMENTO } from '@/lib/reglamento';
 
 import {
   agregarCentroEmisorAction,
@@ -29,6 +33,8 @@ import {
   saveMediosCobroInternosAction,
   savePeriodoAnulacionReciboAction,
   savePeriodoCargaTesoreriaAction,
+  saveAccesoExternoArtAction,
+  saveDiasMorosidadAction,
   savePeriodoEdicionTesoreriaAction,
   savePuntoVentaAction,
   savePaywayCredsAction,
@@ -57,13 +63,35 @@ import { PERIODO_EDICION_OPCIONES, type PeriodoEdicion } from '@/lib/tesoreria/p
 import { EmptyState } from '@/components/shared/empty-state';
 import { ImagesUploader } from '@/components/shared/images-uploader';
 
-export type TabKey = 'info' | 'impositivos' | 'equipo' | 'plan' | 'payway';
+export type TabKey = 'info' | 'impositivos' | 'reglamento' | 'equipo' | 'plan' | 'payway';
+
+export type ReglamentoVersionUI = {
+  id: string;
+  version: number;
+  titulo: string;
+  novedades: string | null;
+  archivoNombre: string;
+  publicadoEn: string;
+  url: string | null;
+  aceptaciones: number;
+};
+
+export type ReglamentoSocioUI = {
+  profileId: string;
+  nombre: string | null;
+  apellido: string | null;
+  email: string | null;
+  aceptadoEn: string | null;
+};
+
+export type ReglamentoData = { versiones: ReglamentoVersionUI[]; socios: ReglamentoSocioUI[] };
 
 export type PaywayData = SavePaywayCredsData;
 
 const TABS: { key: TabKey; label: string; icon: typeof Bell }[] = [
   { key: 'info', label: 'Información general', icon: Building2 },
   { key: 'impositivos', label: 'Datos impositivos', icon: Receipt },
+  { key: 'reglamento', label: 'Reglamento', icon: FileText },
   { key: 'equipo', label: 'Equipo', icon: Users },
   { key: 'plan', label: 'Plan', icon: CreditCard },
   { key: 'payway', label: 'Payway', icon: CreditCard },
@@ -214,6 +242,9 @@ export function ConfiguracionClient({
   periodoAnulacionRecibo,
   periodoCargaTesoreria,
   periodoEdicionTesoreria,
+  diasMorosidad,
+  accesoExternoArt,
+  reglamento,
   centrosEmisores,
   payway,
   planes,
@@ -231,6 +262,9 @@ export function ConfiguracionClient({
   periodoAnulacionRecibo: PeriodoAnulacion;
   periodoCargaTesoreria: PeriodoCarga;
   periodoEdicionTesoreria: PeriodoEdicion;
+  diasMorosidad: number | null;
+  accesoExternoArt: { requiereArt: boolean; condicion: string };
+  reglamento: ReglamentoData;
   centrosEmisores: CentroEmisor[];
   payway: PaywayData;
   planes: PlanInfo[];
@@ -296,6 +330,12 @@ export function ConfiguracionClient({
       {activeTab === 'info' && (
         <>
           <InfoGeneralForm initial={infoGeneral} />
+          <div className="mt-6">
+            <MorosidadSection initial={diasMorosidad} />
+          </div>
+          <div className="mt-6">
+            <AccesoExternoArtSection initial={accesoExternoArt} />
+          </div>
           {!showImpositivosTab && (
             <div className="mt-6">
               <PuntoVentaTab
@@ -320,6 +360,7 @@ export function ConfiguracionClient({
           periodoEdicionTesoreria={periodoEdicionTesoreria}
         />
       )}
+      {activeTab === 'reglamento' && <ReglamentoTab data={reglamento} />}
       {activeTab === 'equipo' && (
         <EquipoTab
           miembros={miembros}
@@ -332,6 +373,171 @@ export function ConfiguracionClient({
       )}
       {activeTab === 'payway' && <PaywayTab initial={payway} />}
     </div>
+  );
+}
+
+// Plazo para considerar moroso a un socio y bloquear la creación de salidas
+// (mig 0166). El corte real vive en la base (trigger sobre porteria); acá solo se
+// configura. Sin tildar = el club no usa el bloqueo.
+const DIAS_MOROSIDAD_SUGERIDO = 30;
+
+function MorosidadSection({ initial }: { initial: number | null }) {
+  const router = useRouter();
+  const [activo, setActivo] = useState(initial !== null);
+  const [dias, setDias] = useState<string>(String(initial ?? DIAS_MOROSIDAD_SUGERIDO));
+  const [pending, startTransition] = useTransition();
+
+  function guardar() {
+    let valor: number | null = null;
+    if (activo) {
+      const n = Number(dias);
+      if (dias.trim() === '' || !Number.isInteger(n) || n < 0 || n > 365) {
+        toast.error('Ingresá un número entero de días entre 0 y 365.');
+        return;
+      }
+      valor = n;
+    }
+    startTransition(async () => {
+      const res = await saveDiasMorosidadAction(valor);
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+      toast.success(
+        valor === null ? 'Bloqueo por morosidad desactivado.' : 'Plazo de morosidad guardado.',
+      );
+      router.refresh();
+    });
+  }
+
+  return (
+    <section className="rounded-2xl border border-gray-200 bg-white p-4 md:p-8">
+      <h2 className="text-base font-bold" style={{ color: '#101828' }}>
+        Morosidad de socios
+      </h2>
+      <p className="mt-1 mb-4 text-sm text-gray-500">
+        Elegí a partir de cuántos días de vencida una factura vuelve moroso a un socio. Un socio
+        moroso no puede crear una salida desde la app: en lugar del QR ve un aviso para que se
+        acerque a administración. Apenas regulariza el pago, vuelve a poder salir. Si no lo activás,
+        no se bloquea a nadie.
+      </p>
+
+      <label className="mb-3 flex cursor-pointer items-center gap-2">
+        <input
+          type="checkbox"
+          className="h-4 w-4 cursor-pointer rounded accent-[#175861]"
+          checked={activo}
+          onChange={(e) => setActivo(e.target.checked)}
+        />
+        <span className="text-sm text-gray-700">Bloquear las salidas de socios morosos</span>
+      </label>
+
+      {activo && (
+        <Field label="Días de vencida">
+          <input
+            className={inputCls}
+            type="number"
+            min={0}
+            max={365}
+            step={1}
+            value={dias}
+            onChange={(e) => setDias(e.target.value)}
+          />
+          <p className="mt-1 text-xs text-gray-500">
+            El socio es moroso cuando tiene una factura vencida hace más de estos días. Con 0, es
+            moroso desde el día siguiente al vencimiento. Cuentan facturas, notas de débito y
+            comprobantes con fecha de vencimiento que todavía no se cobraron.
+          </p>
+        </Field>
+      )}
+
+      <div className="pt-4">
+        <button
+          type="button"
+          onClick={guardar}
+          disabled={pending}
+          className="rounded-[10px] bg-[#175861] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#0f4249] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {pending ? 'Guardando…' : 'Guardar configuración'}
+        </button>
+      </div>
+    </section>
+  );
+}
+
+// Solicitud de ART a los accesos externos (mig 0169). La leyenda la ve el socio al
+// crear el acceso y la persona externa en el QR que recibe (web y mobile leen
+// estas dos columnas de guarderias).
+function AccesoExternoArtSection({
+  initial,
+}: {
+  initial: { requiereArt: boolean; condicion: string };
+}) {
+  const router = useRouter();
+  const [requiere, setRequiere] = useState(initial.requiereArt);
+  const [condicion, setCondicion] = useState(initial.condicion);
+  const [pending, startTransition] = useTransition();
+
+  function guardar() {
+    startTransition(async () => {
+      const res = await saveAccesoExternoArtAction({ requiereArt: requiere, condicion });
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+      toast.success(requiere ? 'Solicitud de ART guardada.' : 'Solicitud de ART desactivada.');
+      router.refresh();
+    });
+  }
+
+  return (
+    <section className="rounded-2xl border border-gray-200 bg-white p-4 md:p-8">
+      <h2 className="text-base font-bold" style={{ color: '#101828' }}>
+        Solicitud de acceso externo
+      </h2>
+      <p className="mt-1 mb-4 text-sm text-gray-500">
+        Si pedís ART a las personas que ingresan por acceso externo (técnicos, proveedores,
+        visitas), activalo acá. El socio ve el aviso cuando crea el acceso, y la persona externa lo
+        ve en el QR que recibe, así ya sabe que se lo van a pedir para ingresar.
+      </p>
+
+      <label className="mb-3 flex cursor-pointer items-center gap-2">
+        <input
+          type="checkbox"
+          className="h-4 w-4 cursor-pointer rounded accent-[#175861]"
+          checked={requiere}
+          onChange={(e) => setRequiere(e.target.checked)}
+        />
+        <span className="text-sm text-gray-700">Solicitar ART</span>
+      </label>
+
+      {requiere && (
+        <Field label="Condición específica (opcional)">
+          <textarea
+            className="border-input placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 min-h-[88px] w-full rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-[3px]"
+            maxLength={500}
+            value={condicion}
+            onChange={(e) => setCondicion(e.target.value)}
+            placeholder="Ej: Debe incluir cláusula de no repetición a nombre de…"
+          />
+          <p className="mt-1 text-xs text-gray-500">
+            Se muestra tal cual junto al aviso. Si lo dejás vacío, solo se avisa que se va a pedir
+            la ART.
+          </p>
+        </Field>
+      )}
+
+      <div className="pt-4">
+        <button
+          type="button"
+          onClick={guardar}
+          disabled={pending}
+          className="rounded-[10px] bg-[#175861] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#0f4249] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {pending ? 'Guardando…' : 'Guardar configuración'}
+        </button>
+      </div>
+    </section>
   );
 }
 
@@ -543,6 +749,300 @@ function InfoGeneralForm({ initial }: { initial: InfoGeneralData }) {
         </div>
       </div>
     </section>
+  );
+}
+
+// Reglamento del club (mig 0170): el club sube el PDF con sus términos y condiciones de
+// contratación y cada socio lo lee y lo acepta desde la app. Una actualización es una
+// versión nueva: las anteriores quedan como historial y todos vuelven a aceptar.
+const fmtFechaReglamento = (iso: string) =>
+  new Date(iso).toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' });
+
+function ReglamentoTab({ data }: { data: ReglamentoData }) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [formKey, setFormKey] = useState(0);
+  const [titulo, setTitulo] = useState('');
+  const [novedades, setNovedades] = useState('');
+  const [archivo, setArchivo] = useState<File | null>(null);
+  const [filtroEstado, setFiltroEstado] = useState<'todos' | 'pendientes' | 'aceptaron'>('todos');
+  const [busqueda, setBusqueda] = useState('');
+
+  const vigente = data.versiones[0] ?? null;
+  const aceptaron = data.socios.filter((s) => s.aceptadoEn).length;
+  const pendientes = data.socios.length - aceptaron;
+
+  const sociosFiltrados = useMemo(() => {
+    const q = normalizarBusqueda(busqueda.trim());
+    return data.socios.filter((s) => {
+      if (filtroEstado === 'pendientes' && s.aceptadoEn) return false;
+      if (filtroEstado === 'aceptaron' && !s.aceptadoEn) return false;
+      if (!q) return true;
+      return normalizarBusqueda(`${s.nombre ?? ''} ${s.apellido ?? ''} ${s.email ?? ''}`).includes(
+        q,
+      );
+    });
+  }, [data.socios, filtroEstado, busqueda]);
+
+  function publicar(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!archivo) {
+      toast.error('Elegí el PDF del reglamento.');
+      return;
+    }
+    const fd = new FormData();
+    fd.set('titulo', titulo);
+    fd.set('novedades', novedades);
+    fd.set('archivo', archivo);
+    startTransition(async () => {
+      const res = await publicarReglamentoAction(fd);
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+      toast.success(
+        res.version === 1
+          ? 'Reglamento publicado. Los socios ya pueden leerlo y aceptarlo desde la app.'
+          : `Versión ${res.version} publicada. Los socios van a tener que volver a aceptar.`,
+      );
+      setTitulo('');
+      setNovedades('');
+      setArchivo(null);
+      setFormKey((k) => k + 1);
+      router.refresh();
+    });
+  }
+
+  return (
+    <div className="space-y-6">
+      <section className="rounded-2xl border border-gray-200 bg-white p-4 md:p-8">
+        <h2 className="text-base font-bold" style={{ color: '#101828' }}>
+          Reglamento del club
+        </h2>
+        <p className="mt-1 mb-4 text-sm text-gray-500">
+          Cargá el reglamento con todos los términos y condiciones de contratación. Los socios lo
+          leen y lo aceptan desde la app. Si lo actualizás, subí una versión nueva: todos los socios
+          tienen que volver a aceptarla.
+        </p>
+
+        {vigente ? (
+          <div className="rounded-[10px] border border-gray-200 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold" style={{ color: '#101828' }}>
+                  {vigente.titulo}
+                </p>
+                <p className="text-xs text-gray-500">
+                  Versión {vigente.version} vigente · publicada el{' '}
+                  {fmtFechaReglamento(vigente.publicadoEn)}
+                </p>
+              </div>
+              {vigente.url && (
+                <a
+                  href={vigente.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-[10px] border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  Ver PDF
+                </a>
+              )}
+            </div>
+            {vigente.novedades && (
+              <p className="mt-3 text-sm text-gray-600">
+                <span className="font-semibold">Qué cambió: </span>
+                {vigente.novedades}
+              </p>
+            )}
+            <p className="mt-3 text-sm text-gray-700">
+              {aceptaron} de {data.socios.length}{' '}
+              {data.socios.length === 1 ? 'socio activo aceptó' : 'socios activos aceptaron'} esta
+              versión.
+            </p>
+          </div>
+        ) : (
+          <p className="rounded-[10px] border border-dashed border-gray-300 p-4 text-sm text-gray-500">
+            Todavía no cargaste el reglamento. Subilo abajo y los socios van a poder leerlo y
+            aceptarlo desde la app.
+          </p>
+        )}
+      </section>
+
+      <section className="rounded-2xl border border-gray-200 bg-white p-4 md:p-8">
+        <h3 className="text-sm font-bold" style={{ color: '#101828' }}>
+          {vigente ? 'Subir una actualización' : 'Cargar el reglamento'}
+        </h3>
+        <p className="mt-1 mb-4 text-sm text-gray-500">
+          {vigente
+            ? `Se publica como versión ${vigente.version + 1}. La versión actual queda guardada en el historial. Los socios van a ver un aviso en la app para leer y aceptar la nueva.`
+            : 'Subí el reglamento en PDF (hasta 8 MB).'}
+        </p>
+
+        <form key={formKey} onSubmit={publicar} className="space-y-4">
+          <Field label="Título" required>
+            <input
+              className={inputCls}
+              value={titulo}
+              maxLength={MAX_TITULO_REGLAMENTO}
+              onChange={(e) => setTitulo(e.target.value)}
+              placeholder="Ej: Reglamento de uso y contratación 2026"
+            />
+          </Field>
+          <Field label="Archivo PDF" required>
+            <input
+              type="file"
+              accept="application/pdf"
+              onChange={(e) => setArchivo(e.target.files?.[0] ?? null)}
+              className="block w-full text-sm text-gray-700 file:mr-3 file:rounded-[10px] file:border-0 file:bg-gray-100 file:px-4 file:py-2.5 file:text-sm file:font-medium file:text-gray-700 hover:file:bg-gray-200"
+            />
+          </Field>
+          {vigente && (
+            <Field label="Qué cambió (opcional)">
+              <textarea
+                className="border-input placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 min-h-[88px] w-full rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-[3px]"
+                maxLength={MAX_NOVEDADES_REGLAMENTO}
+                value={novedades}
+                onChange={(e) => setNovedades(e.target.value)}
+                placeholder="Ej: Se actualizaron las tarifas por mora y el horario de retiro de embarcaciones."
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Se le muestra al socio cuando tiene que volver a aceptar.
+              </p>
+            </Field>
+          )}
+          <button
+            type="submit"
+            disabled={pending}
+            className="rounded-[10px] bg-[#175861] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#0f4249] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {pending ? 'Publicando…' : vigente ? 'Publicar nueva versión' : 'Publicar reglamento'}
+          </button>
+        </form>
+      </section>
+
+      {vigente && (
+        <section className="rounded-2xl border border-gray-200 bg-white p-4 md:p-8">
+          <h3 className="text-sm font-bold" style={{ color: '#101828' }}>
+            Aceptaciones de la versión {vigente.version}
+          </h3>
+          <p className="mt-1 mb-4 text-sm text-gray-500">
+            {pendientes === 0
+              ? 'Todos los socios activos aceptaron la versión vigente.'
+              : `Faltan aceptar ${pendientes} ${pendientes === 1 ? 'socio' : 'socios'}.`}
+          </p>
+
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row">
+            <input
+              className={inputCls}
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              placeholder="Buscar por nombre o email"
+            />
+            <select
+              className="border-input focus-visible:border-ring focus-visible:ring-ring/50 h-11 rounded-[10px] border bg-transparent px-3 text-sm outline-none focus-visible:ring-[3px] sm:w-56"
+              value={filtroEstado}
+              onChange={(e) => setFiltroEstado(e.target.value as typeof filtroEstado)}
+            >
+              <option value="todos">Todos</option>
+              <option value="pendientes">Pendientes</option>
+              <option value="aceptaron">Aceptaron</option>
+            </select>
+          </div>
+
+          {sociosFiltrados.length === 0 ? (
+            <EmptyState
+              icon={<Users className="h-7 w-7 opacity-40" />}
+              text="No hay socios con ese filtro."
+            />
+          ) : (
+            <div className="overflow-x-auto rounded-xl border border-gray-200">
+              <table className="w-full min-w-[560px] text-sm">
+                <thead>
+                  <tr className="border-b border-gray-200 text-left text-xs font-medium text-gray-500">
+                    <th className="px-4 py-3">Socio</th>
+                    <th className="px-4 py-3">Email</th>
+                    <th className="px-4 py-3">Estado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sociosFiltrados.map((s) => (
+                    <tr key={s.profileId} className="border-b border-gray-100 last:border-0">
+                      <td className="px-4 py-3 text-gray-900">
+                        {[s.apellido, s.nombre].filter(Boolean).join(', ') || '—'}
+                      </td>
+                      <td className="px-4 py-3 text-gray-600">{s.email ?? '—'}</td>
+                      <td className="px-4 py-3">
+                        {s.aceptadoEn ? (
+                          <span className="text-[#175861]">
+                            Aceptó el {fmtFechaReglamento(s.aceptadoEn)}
+                          </span>
+                        ) : (
+                          <span className="text-amber-700">Pendiente</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      )}
+
+      {data.versiones.length > 0 && (
+        <section className="rounded-2xl border border-gray-200 bg-white p-4 md:p-8">
+          <h3 className="mb-4 text-sm font-bold" style={{ color: '#101828' }}>
+            Historial de versiones
+          </h3>
+          <div className="overflow-x-auto rounded-xl border border-gray-200">
+            <table className="w-full min-w-[560px] text-sm">
+              <thead>
+                <tr className="border-b border-gray-200 text-left text-xs font-medium text-gray-500">
+                  <th className="px-4 py-3">Versión</th>
+                  <th className="px-4 py-3">Título</th>
+                  <th className="px-4 py-3">Publicada</th>
+                  <th className="px-4 py-3 text-right">Aceptaciones</th>
+                  <th className="px-4 py-3 text-right">PDF</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.versiones.map((v, i) => (
+                  <tr key={v.id} className="border-b border-gray-100 last:border-0">
+                    <td className="px-4 py-3 whitespace-nowrap text-gray-900">
+                      {v.version}
+                      {i === 0 && (
+                        <span className="ml-2 rounded-full bg-teal-50 px-2 py-0.5 text-[11px] font-medium text-[#175861]">
+                          Vigente
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-gray-700">{v.titulo}</td>
+                    <td className="px-4 py-3 whitespace-nowrap text-gray-600">
+                      {fmtFechaReglamento(v.publicadoEn)}
+                    </td>
+                    <td className="px-4 py-3 text-right text-gray-700">{v.aceptaciones}</td>
+                    <td className="px-4 py-3 text-right">
+                      {v.url ? (
+                        <a
+                          href={v.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-medium text-[#175861] hover:underline"
+                        >
+                          Ver
+                        </a>
+                      ) : (
+                        <span className="text-gray-300">—</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+    </div>
   );
 }
 
@@ -1905,7 +2405,7 @@ function PeriodoAnulacionSection({ initial }: { initial: PeriodoAnulacion }) {
         siguen visibles en Cobranzas, solo no se pueden anular.
       </p>
 
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-4">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5">
         {PERIODO_ANULACION_OPCIONES.map((o) => (
           <label
             key={o.value}
@@ -2031,7 +2531,7 @@ function PeriodoEdicionTesoreriaSection({ initial }: { initial: PeriodoEdicion }
         curso y el anterior. Los movimientos que queden fuera siguen visibles, solo no se tocan.
       </p>
 
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-4">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5">
         {PERIODO_EDICION_OPCIONES.map((o) => (
           <label
             key={o.value}

@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { eq, and, asc, desc, inArray } from 'drizzle-orm';
+import { eq, and, asc, count, desc, inArray } from 'drizzle-orm';
 
 import { getActiveMarina } from '@/lib/auth/session';
 import { PERIODO_ANULACION_DEFAULT, esPeriodoAnulacion } from '@/lib/periodo-anulacion';
@@ -13,7 +13,11 @@ import {
   memberships,
   pricingPlans,
   profiles,
+  reglamentoAceptaciones,
+  reglamentosClub,
 } from '@/lib/db/schema';
+import { BUCKET_REGLAMENTO } from '@/lib/reglamento';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { getAllPlanFeatures } from '@/lib/pricing/config';
 
 import type { GuarderiaFeatures } from '@/app/actions/configuracion';
@@ -26,12 +30,13 @@ import {
   type PaywayData,
   type PlanInfo,
   type PuntoVentaData,
+  type ReglamentoData,
   type TabKey,
 } from './configuracion-client';
 
 const DIAS = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'] as const;
 
-const VALID_TABS: TabKey[] = ['info', 'equipo', 'plan', 'payway'];
+const VALID_TABS: TabKey[] = ['info', 'reglamento', 'equipo', 'plan', 'payway'];
 
 type Props = {
   searchParams: Promise<{ tab?: string; nuevo?: string }>;
@@ -88,6 +93,9 @@ export default async function ConfiguracionPage({ searchParams }: Props) {
       periodoAnulacionRecibo: guarderias.periodoAnulacionRecibo,
       periodoCargaTesoreria: guarderias.periodoCargaTesoreria,
       periodoEdicionTesoreria: guarderias.periodoEdicionTesoreria,
+      diasMorosidad: guarderias.diasMorosidad,
+      accesoExternoArt: guarderias.accesoExternoArt,
+      accesoExternoArtCondicion: guarderias.accesoExternoArtCondicion,
     })
     .from(guarderias)
     .where(eq(guarderias.id, guarderiaId))
@@ -234,6 +242,92 @@ export default async function ConfiguracionPage({ searchParams }: Props) {
     certificadoAfipOk: guarderia?.certificadoAfipOk ?? false,
   };
 
+  // ── Reglamento del club (mig 0170). Todo scopeado por la guardería del usuario. ──
+  const versionesRows = await db
+    .select({
+      id: reglamentosClub.id,
+      version: reglamentosClub.version,
+      titulo: reglamentosClub.titulo,
+      novedades: reglamentosClub.novedades,
+      archivoPath: reglamentosClub.archivoPath,
+      archivoNombre: reglamentosClub.archivoNombre,
+      publicadoEn: reglamentosClub.publicadoEn,
+    })
+    .from(reglamentosClub)
+    .where(eq(reglamentosClub.guarderiaId, guarderiaId))
+    .orderBy(desc(reglamentosClub.version));
+
+  const conteos = await db
+    .select({ reglamentoId: reglamentoAceptaciones.reglamentoId, n: count() })
+    .from(reglamentoAceptaciones)
+    .where(eq(reglamentoAceptaciones.guarderiaId, guarderiaId))
+    .groupBy(reglamentoAceptaciones.reglamentoId);
+  const aceptacionesPorVersion = new Map(conteos.map((c) => [c.reglamentoId, Number(c.n)]));
+
+  // Links firmados de una hora para que el admin pueda abrir cada PDF.
+  const urlsReglamento = new Map<string, string>();
+  if (versionesRows.length > 0) {
+    const { data: firmadas } = await createAdminClient()
+      .storage.from(BUCKET_REGLAMENTO)
+      .createSignedUrls(
+        versionesRows.map((v) => v.archivoPath),
+        60 * 60,
+      );
+    for (const f of firmadas ?? []) {
+      if (f.path && f.signedUrl) urlsReglamento.set(f.path, f.signedUrl);
+    }
+  }
+
+  // Quién aceptó la versión vigente: los socios activos del club, con su aceptación si la hay.
+  const vigente = versionesRows[0] ?? null;
+  const sociosReglamentoRows = vigente
+    ? await db
+        .select({
+          profileId: profiles.id,
+          nombre: profiles.nombre,
+          apellido: profiles.apellido,
+          email: profiles.email,
+          aceptadoEn: reglamentoAceptaciones.aceptadoEn,
+        })
+        .from(memberships)
+        .innerJoin(profiles, eq(profiles.id, memberships.userId))
+        .leftJoin(
+          reglamentoAceptaciones,
+          and(
+            eq(reglamentoAceptaciones.userId, memberships.userId),
+            eq(reglamentoAceptaciones.reglamentoId, vigente.id),
+          ),
+        )
+        .where(
+          and(
+            eq(memberships.guarderiaId, guarderiaId),
+            eq(memberships.rol, 'socio'),
+            eq(memberships.status, 'active'),
+          ),
+        )
+        .orderBy(asc(profiles.apellido), asc(profiles.nombre))
+    : [];
+
+  const reglamento: ReglamentoData = {
+    versiones: versionesRows.map((v) => ({
+      id: v.id,
+      version: v.version,
+      titulo: v.titulo,
+      novedades: v.novedades,
+      archivoNombre: v.archivoNombre,
+      publicadoEn: v.publicadoEn.toISOString(),
+      url: urlsReglamento.get(v.archivoPath) ?? null,
+      aceptaciones: aceptacionesPorVersion.get(v.id) ?? 0,
+    })),
+    socios: sociosReglamentoRows.map((s) => ({
+      profileId: s.profileId,
+      nombre: s.nombre,
+      apellido: s.apellido,
+      email: s.email,
+      aceptadoEn: s.aceptadoEn ? s.aceptadoEn.toISOString() : null,
+    })),
+  };
+
   return (
     <ConfiguracionClient
       infoGeneral={infoGeneral}
@@ -257,6 +351,12 @@ export default async function ConfiguracionPage({ searchParams }: Props) {
           ? guarderia.periodoEdicionTesoreria
           : PERIODO_EDICION_DEFAULT
       }
+      diasMorosidad={guarderia?.diasMorosidad ?? null}
+      reglamento={reglamento}
+      accesoExternoArt={{
+        requiereArt: guarderia?.accesoExternoArt ?? false,
+        condicion: guarderia?.accesoExternoArtCondicion ?? '',
+      }}
       centrosEmisores={centrosEmisores}
       payway={payway}
       planes={planes}

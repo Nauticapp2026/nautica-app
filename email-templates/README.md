@@ -31,7 +31,7 @@ Los templates usan variables que Supabase reemplaza al enviar:
    todo el contenido y pegarlo en el editor.
 3. Ajustar también el "Subject" (sugerencias):
    - Confirm signup: `Confirmá tu email — NauticApp`
-   - Invite user: `Te sumaron a NauticApp`
+   - Invite user: `Tu cuenta de NauticApp ya está creada`
    - Magic Link: `Tu link de acceso a NauticApp`
    - Change Email: `Confirmá tu nuevo email`
    - Reset Password: `Restablecé tu contraseña`

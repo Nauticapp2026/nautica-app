@@ -54,6 +54,9 @@ export async function middleware(request: NextRequest) {
   // /api/facturas/pdf: endpoint que consume la app mobile para regenerar el
   // link fresco del PDF de un comprobante fiscal del socio (el guardado en
   // `archivo` vence). Auth propia: Bearer JWT de Supabase; valida socio_id.
+  // /api/reglamento/url: endpoint que consume la app mobile para abrir el PDF del
+  // reglamento del club (link firmado). Auth propia: Bearer JWT de Supabase; valida
+  // que el usuario sea miembro activo del club dueño del reglamento.
   // /auth/*: páginas puente que abre el mail de Supabase (confirm signup,
   // callback OAuth/OTP/PKCE). El socio que se autorregistra desde mobile
   // llega acá desde el mail — si lo bloqueamos con Basic Auth, no puede
@@ -73,6 +76,7 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/api/tareas/notify-preparada') ||
     pathname.startsWith('/api/tareas/confirmar-navegando') ||
     pathname.startsWith('/api/facturas/pdf') ||
+    pathname.startsWith('/api/reglamento') ||
     pathname.startsWith('/auth/') ||
     pathname.startsWith('/api/delete-account') ||
     pathname.startsWith('/eliminar-cuenta') ||

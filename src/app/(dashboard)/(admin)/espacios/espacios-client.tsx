@@ -56,6 +56,8 @@ import {
   type CreateAreaInput,
 } from '@/app/actions/espacios';
 import { EmptyState } from '@/components/shared/empty-state';
+import { ExportarMenu } from '@/components/shared/exportar-menu';
+import { exportarTabla, type FormatoExportacion } from '@/lib/exportar-tabla';
 import { ImportAreasModal } from './import-areas-modal';
 
 export type EstadoEspacio = 'ocupado' | 'reservado' | 'disponible';
@@ -217,6 +219,19 @@ function countEspacios(a: AreaView): {
   return acc;
 }
 
+// Resumen de ocupación para el encabezado de cada área (pedido del cliente
+// 2026-10-19): "12 ocupados · 8 libres". Los reservados solo se nombran si hay, para
+// que la suma cierre con el total sin ensuciar el caso común.
+function resumenOcupacion(c: { ocupado: number; reservado: number; disponible: number }): string {
+  const partes = [
+    `${c.ocupado} ${c.ocupado === 1 ? 'ocupado' : 'ocupados'}`,
+    `${c.disponible} ${c.disponible === 1 ? 'libre' : 'libres'}`,
+  ];
+  if (c.reservado > 0)
+    partes.push(`${c.reservado} ${c.reservado === 1 ? 'reservado' : 'reservados'}`);
+  return partes.join(' · ');
+}
+
 // Marina asigna personal con rol "marinero"; Nave, con rol "operario" (son
 // roles distintos del enum, no una relabeling del mismo rol).
 function rolAreaLabel(tipo: 'marina' | 'nave', plural = true): string {
@@ -290,6 +305,7 @@ export function EspaciosClient({
   const espaciosFlat = useMemo(() => {
     const list: {
       cell: EspacioCell;
+      areaId: string;
       areaNombre: string;
       tipo: 'marina' | 'nave';
       lugar: LugarEspacio;
@@ -300,6 +316,7 @@ export function EspaciosClient({
         for (const e of p.espacios) {
           list.push({
             cell: e,
+            areaId: a.id,
             areaNombre: a.nombre,
             tipo: 'marina',
             lugar: { tipo: 'marina', peine: p.nombre },
@@ -312,6 +329,7 @@ export function EspaciosClient({
           for (const e of pi.espacios) {
             list.push({
               cell: e,
+              areaId: a.id,
               areaNombre: a.nombre,
               tipo: 'nave',
               lugar: { tipo: 'nave', lado: l.nombre, piso: pi.nombre },
@@ -670,6 +688,75 @@ export function EspaciosClient({
     });
   };
 
+  // ─── Exportar espacios (pedido del cliente 2026-10-19) ──────────────────────
+  // Todas las áreas o una sola. Sale en Excel, PDF o CSV con el mismo menú que
+  // Ventas y Cobranzas. Las medidas van con la unidad de la tarifa del espacio
+  // (metros o pies), igual que las ve el admin al editarlo.
+  const [exportArea, setExportArea] = useState<string>('todas');
+
+  async function exportarEspacios(formato: FormatoExportacion) {
+    const area = exportArea === 'todas' ? null : areas.find((a) => a.id === exportArea);
+    const lista = espaciosFlat.filter((e) => !area || e.areaId === area.id);
+    const nombreSocio = new Map(socios.map((s) => [s.id, s.nombre]));
+    const servicioPorId = new Map(serviciosEspacios.map((sv) => [sv.id, sv]));
+    const ESTADO: Record<EstadoEspacio, string> = {
+      ocupado: 'Ocupado',
+      reservado: 'Reservado',
+      disponible: 'Disponible',
+    };
+    const medida = (v: number | null, unidad: 'metros' | 'pies' | null | undefined) => {
+      if (v == null) return '';
+      const n = String(v).replace('.', ',');
+      return unidad ? `${n} ${unidad === 'metros' ? 'm' : 'ft'}` : n;
+    };
+
+    const filas = lista.map((e) => {
+      const sv = e.cell.servicioId ? servicioPorId.get(e.cell.servicioId) : undefined;
+      const ubicacion =
+        e.lugar.tipo === 'marina' ? e.lugar.peine : `${e.lugar.lado} · ${e.lugar.piso}`;
+      return [
+        e.areaNombre,
+        e.tipo === 'marina' ? 'Marina' : 'Nave',
+        ubicacion,
+        e.cell.nomenclatura,
+        ESTADO[e.cell.estado],
+        e.cell.ocupanteId ? (nombreSocio.get(e.cell.ocupanteId) ?? '—') : '',
+        e.cell.embarcacionNombre ?? '',
+        sv?.nombre ?? '',
+        medida(e.cell.eslora, sv?.unidadMetraje),
+        medida(e.cell.manga, sv?.unidadMetraje),
+        medida(e.cell.puntual, sv?.unidadMetraje),
+      ];
+    });
+
+    const slug = area
+      ? area.nombre
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '')
+      : '';
+    await exportarTabla(formato, {
+      nombre: slug ? `espacios-${slug}` : 'espacios',
+      titulo: area ? `Espacios · ${area.nombre}` : 'Espacios · Todas las áreas',
+      columnas: [
+        'Área',
+        'Tipo',
+        'Ubicación',
+        'Espacio',
+        'Estado',
+        'Cliente',
+        'Embarcación',
+        'Tarifa',
+        'Eslora',
+        'Manga',
+        'Puntual',
+      ],
+      filas,
+    });
+  }
+
   const totales = useMemo(() => {
     const t = { total: 0, ocupado: 0, reservado: 0, disponible: 0 };
     for (const a of areas) {
@@ -701,14 +788,29 @@ export function EspaciosClient({
 
   return (
     <div className="p-4 md:p-8">
-      <header className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <header className="mb-6 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <h1 className="page-title">Gestión de espacios</h1>
           <p className="page-subtitle mt-1">
             Creá áreas con peines y amarras, asigná clientes y embarcaciones
           </p>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <select
+            value={exportArea}
+            onChange={(e) => setExportArea(e.target.value)}
+            aria-label="Área a exportar"
+            title="Elegí qué área exportar"
+            className="border-input focus-visible:border-ring focus-visible:ring-ring/50 h-10 max-w-[200px] rounded-[10px] border bg-white px-3 text-sm text-gray-700 outline-none focus-visible:ring-[3px]"
+          >
+            <option value="todas">Todas las áreas</option>
+            {areas.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.nombre}
+              </option>
+            ))}
+          </select>
+          <ExportarMenu onExportar={exportarEspacios} disabled={areas.length === 0} />
           <button
             type="button"
             onClick={() => setImportModalOpen(true)}
@@ -1443,6 +1545,9 @@ function MarinaSection({
         <ChevronDown className={`h-4 w-4 transition-transform ${collapsed ? '-rotate-90' : ''}`} />
         <Building2 className="h-4 w-4" />
         {area.nombre}
+        <span className="ml-auto pl-3 text-xs font-normal text-white/85">
+          {resumenOcupacion(countEspacios(area))}
+        </span>
       </button>
       {collapsed ? null : (
         <div className="space-y-5 p-5">
@@ -1529,6 +1634,9 @@ function NaveSection({
         <ChevronDown className={`h-4 w-4 transition-transform ${collapsed ? '-rotate-90' : ''}`} />
         <Anchor className="h-4 w-4" />
         {area.nombre}
+        <span className="ml-auto pl-3 text-xs font-normal text-white/85">
+          {resumenOcupacion(countEspacios(area))}
+        </span>
       </button>
       {collapsed ? null : (
         <div className="p-5">

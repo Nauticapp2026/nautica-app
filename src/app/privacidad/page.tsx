@@ -1,6 +1,7 @@
 import { Header } from '@/components/landing/header';
 import { Footer } from '@/components/landing/footer';
 import { WhatsappFlotante } from '@/components/landing/whatsapp-flotante';
+import { EMAIL_CONTACTO } from '@/lib/contacto';
 
 export const metadata = {
   title: 'Política de Privacidad — NauticApp',
@@ -11,7 +12,7 @@ const sections = [
   {
     title: '1. Responsable del tratamiento',
     content: `NauticApp (en adelante "la Aplicación") es operada por NauticApp, con domicilio en Ciudad Autónoma de Buenos Aires, Argentina.
-Para consultas relacionadas con privacidad podés escribirnos a hola@nauticapp.com.`,
+Para consultas relacionadas con privacidad podés escribirnos a ${EMAIL_CONTACTO}.`,
   },
   {
     title: '2. Datos que recopilamos',
@@ -69,7 +70,7 @@ Todos los proveedores cuentan con políticas de privacidad propias y están obli
 • Solicitar la supresión de tus datos
 • Oponerte al tratamiento en determinados casos
 
-Para ejercer cualquiera de estos derechos, escribinos a hola@nauticapp.com indicando tu solicitud y los datos de contacto. Responderemos en el plazo legal vigente.
+Para ejercer cualquiera de estos derechos, escribinos a ${EMAIL_CONTACTO} indicando tu solicitud y los datos de contacto. Responderemos en el plazo legal vigente.
 
 La DNPDP (Dirección Nacional de Protección de Datos Personales) es el organismo de control competente en Argentina.`,
   },
@@ -88,7 +89,7 @@ La DNPDP (Dirección Nacional de Protección de Datos Personales) es el organism
   {
     title: '12. Contacto',
     content: `Para cualquier consulta sobre privacidad:
-📧 hola@nauticapp.com
+📧 ${EMAIL_CONTACTO}
 🌐 www.nauticapp.club`,
   },
 ];

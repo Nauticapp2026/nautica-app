@@ -260,8 +260,13 @@
 <h3>Qué muestra</h3>
 
 <ul><li><strong>Embarcaciones en guardería</strong> — cantidad de embarcaciones de los socios activos del club. Las embarcaciones de un socio eliminado dejan de contarse, igual que él deja de figurar en Socios.</li><li><strong>Socios activos</strong> — total de socios con estado activo.</li><li><strong>Ingresos del mes</strong> — monto <strong>cobrado</strong> (facturas ya cobradas) en el mes en curso.</li><li><strong>Socios con deuda 2+ meses</strong> — socios con movimientos pendientes de cobro desde hace más de dos meses.</li><li><strong>Socios con documentación incompleta</strong> — socios a los que les falta subir documentación.</li></ul>
-<p>Más abajo, el Dashboard también muestra un panel de <strong>Operarios / Marineros</strong> (lista al personal de ambos roles, con un badge que indica cuál es cada uno) y otro de <strong>Comunicaciones recientes</strong>.</p>
+<p>Más abajo, el Dashboard también muestra un panel de <strong>Operarios / Marineros</strong> (lista al personal de ambos roles, con un badge que indica cuál es cada uno), la sección <strong>Documentación con vencimiento próximo</strong> y un panel de <strong>Comunicaciones recientes</strong>.</p>
 
+<h3>Documentación con vencimiento próximo</h3>
+
+<p>Esta sección te avisa qué <strong>seguros</strong> de tus socios están por vencer. Lista a los socios activos cuyo seguro <strong>vence en los próximos 7 días</strong> o <strong>ya venció</strong>, con el nombre, la fecha de vencimiento y una etiqueta: ámbar ("Vence en 5 días", "Vence hoy") o roja ("Venció hace 3 días"). Al tocar una fila vas directo a la <strong>Documentación</strong> de ese socio.</p>
+
+<ul><li><strong>La fecha la cargás vos, a mano.</strong> En la ficha del socio, pestaña <strong>Documentación</strong>, al lado de cada seguro tenés <strong>Cargar fecha</strong> (ver más abajo). Un seguro sin fecha no aparece en esta lista.</li><li>Si el socio tiene más de un seguro cargado, cuenta el <strong>predeterminado</strong> y, si no hay, el <strong>más reciente</strong>. Así, cuando sube un seguro nuevo, el viejo ya vencido deja de generar el aviso.</li><li>Cuando cargás la nueva fecha de vencimiento (o el socio renueva), el socio sale de la lista.</li><li><strong>El socio también recibe un aviso</strong>: 7 días antes de que venza le llega una notificación en la app (campanita y push) avisándole que su seguro vence y que lo renueve. Se le avisa una sola vez por cada fecha de vencimiento; si renueva y carga una fecha nueva, se le vuelve a avisar cuando corresponda. Si cargás una fecha que ya está dentro de los 7 días, el aviso le llega en la próxima revisión diaria, que corre todos los días a las 8 de la mañana.</li><li>Esta sección muestra <strong>solo seguros</strong>. El certificado náutico tiene su propio vencimiento, que <strong>carga y ve únicamente el socio</strong> (ver más abajo): el club no lo ve.</li></ul>
 <h3>Alertas operativas</h3>
 
 <p>Las alertas aparecen cuando hay embarcaciones que salieron y no confirmaron su regreso dentro del horario prometido.</p>
@@ -450,7 +455,11 @@
 
 <h4>Pestaña Documentación</h4>
 
-<ul><li><strong>Subir documento</strong> — seleccioná el tipo de documento y adjuntá el archivo.</li><li>Los documentos subidos aparecen listados con tipo, fecha y enlace para verlos.</li><li>Podés eliminar documentos desde esta misma pestaña.</li></ul>
+<ul><li><strong>Subir documento</strong> — seleccioná el tipo de documento y adjuntá el archivo. Si el tipo es <strong>Seguro</strong>, aparece al lado un campo <strong>Vence</strong> para cargar la fecha de vencimiento (es opcional: podés subirlo sin fecha y cargarla después).</li><li>Los documentos subidos aparecen listados con tipo, fecha y enlace para verlos.</li><li>Podés eliminar documentos desde esta misma pestaña.</li></ul>
+<p><strong>Vencimiento del seguro.</strong> En cada seguro de la lista ves "Vence el 24/10/2026" con una etiqueta que te dice cuántos días faltan (en ámbar cuando faltan 7 o menos, en rojo si ya venció), o "Sin fecha de vencimiento". Con <strong>Cargar fecha</strong> o <strong>Cambiar</strong> abrís el campo de fecha y confirmás con <strong>Guardar</strong>; <strong>Quitar fecha</strong> la borra. <strong>La fecha del seguro la carga solamente el club</strong>: el socio puede subir o reemplazar su seguro desde la app, pero no puede cargar ni cambiar la fecha. Esa fecha alimenta la sección <strong>Documentación con vencimiento próximo</strong> del Dashboard (ver el capítulo 2) y el aviso que recibe el socio.</p>
+
+<p><strong>Certificado náutico.</strong> Su fecha de vencimiento es <strong>privada del socio</strong>: la carga él desde la app (en Mis documentos) y recibe su propio aviso 7 días antes. En el panel del club <strong>no se muestra ni se puede cargar</strong>, y no aparece en el Dashboard.</p>
+
 <h4>Pestaña Débito automático</h4>
 
 <p>Registrá y gestioná la tarjeta de crédito o débito del socio para el cobro automático mensual. Ver sección 15 para el flujo completo.</p>
@@ -580,6 +589,11 @@
 <p>Los espacios se muestran con colores:</p>
 
 <ul><li><strong>Teal</strong> — disponible</li><li><strong>Rojo</strong> — ocupado</li><li><strong>Amarillo</strong> — reservado</li></ul>
+<h3>Cuántos espacios hay libres y ocupados</h3>
+
+<p>Hay tres lugares donde ves la ocupación:</p>
+
+<ul><li>Las <strong>tarjetas de arriba</strong> muestran el total del club: espacios totales, ocupados, reservados y disponibles.</li><li>Cada tarjeta de la sección <strong>Áreas</strong> muestra los números de esa área.</li><li>La <strong>barra verde de cada área</strong> (la que abrís y cerrás para ver sus espacios) muestra a la derecha cuántos hay <strong>ocupados</strong> y cuántos <strong>libres</strong>, por ejemplo "12 ocupados · 8 libres". Si hay espacios reservados, se suman al final ("· 2 reservados"). Los números se actualizan solos cuando asignás, liberás o movés un espacio.</li></ul>
 <h3>Asignar operarios a un área</h3>
 
 <p>En la sección <strong>Áreas</strong> (arriba de Espacios), cada tarjeta de área tiene un botón <strong>Asignar</strong> junto a la lista de personal. Ahí elegís uno o más operarios para esa área. Esos operarios son los que van a ver y poder tomar las tareas de las embarcaciones ubicadas en esa área (lavados, salidas, etc.). También podés asignar operarios <strong>al crear el área</strong> (ver abajo); después los cambiás desde la tarjeta.</p>
@@ -616,6 +630,13 @@
 <h3>Renombrar peines y pisos</h3>
 
 <p>El sistema los crea como "Peine 1", "Piso 1", etc. Para ponerles el nombre que usás en el club, hacé clic en el <strong>lápiz</strong> al lado del nombre, escribí el nuevo y confirmá con <strong>Enter</strong> o el tilde. <strong>Escape</strong> o la cruz cancelan. El cambio impacta en todos los lugares donde aparece ese nombre (ficha del socio, tareas, exportaciones).</p>
+
+<h3>Exportar los espacios</h3>
+
+<p>Arriba a la derecha, junto a <strong>Importar áreas</strong>, hay un selector de área y el botón <strong>Exportar</strong>:</p>
+
+<ol><li>En el selector elegí <strong>Todas las áreas</strong> o <strong>una sola</strong> (por ejemplo, "Marina Norte").</li><li>Hacé clic en <strong>Exportar</strong> y elegí el formato: <strong>Excel</strong>, <strong>PDF</strong> o <strong>CSV</strong>.</li></ol>
+<p>El archivo trae una fila por espacio, con estas columnas: <strong>Área, Tipo</strong> (Marina o Nave), <strong>Ubicación</strong> (el peine, o el lado y el piso), <strong>Espacio, Estado</strong> (Disponible, Ocupado o Reservado), <strong>Cliente, Embarcación, Tarifa, Eslora, Manga y Puntual</strong>. Las medidas salen con su unidad (m o ft), la de la tarifa del espacio. Si exportás un área sola, el nombre del archivo lleva el nombre del área.</p>
 
 <h3>Carga masiva de áreas</h3>
 
@@ -1044,11 +1065,12 @@
 
 <h2>14. Mi perfil</h2>
 
-<p>Desde <strong>Mi perfil</strong> administrás los datos de tu club y las integraciones. Tiene hasta <strong>cinco pestañas</strong>:<table></p>
+<p>Desde <strong>Mi perfil</strong> administrás los datos de tu club y las integraciones. Tiene hasta <strong>seis pestañas</strong>:<table></p>
 
 <thead><table><tbody><tr><th>Pestaña</th><th>Qué hay ahí</th></tr></tbody></table></thead><tbody><table><tbody><tr><td>-----------------------</td><td>----------------------------------------------------------------------------------------------</td></tr>
 <tr><td><strong>Información general</strong></td><td>Datos del club, día de facturación, horarios de atención y fotos</td></tr>
 <tr><td><strong>Datos impositivos</strong></td><td>Punto de venta, certificado ARCA, centros emisores, gestión de cobranza y período de anulación</td></tr>
+<tr><td><strong>Reglamento</strong></td><td>Reglamento del club con sus términos y condiciones: carga, actualizaciones y quién lo aceptó</td></tr>
 <tr><td><strong>Equipo</strong></td><td>Personal del club con acceso al panel o a la app</td></tr>
 <tr><td><strong>Plan</strong></td><td>Plan actual y cambio de plan</td></tr>
 <tr><td><strong>Payway</strong></td><td>Credenciales para el débito automático (ver capítulo 14)</td></tr></tbody></table></tbody></table>
@@ -1069,6 +1091,26 @@
 <p>Podés subir fotos que se muestran en el perfil público del club.</p>
 
 <p>Hacé clic en <strong>Guardar cambios</strong> al terminar.</p>
+
+<p><strong>Morosidad de socios:</strong></p>
+
+<p>Debajo de los datos del club hay un cuadro propio, <strong>Morosidad de socios</strong>, con su botón <strong>Guardar configuración</strong>. Sirve para decidir a partir de cuándo un socio se considera moroso y frenarle la creación de salidas.</p>
+
+<ol><li>Tildá <strong>Bloquear las salidas de socios morosos</strong>. Si lo dejás sin tildar, el club no bloquea a nadie (es como arrancan todos los clubes).</li><li>En <strong>Días de vencida</strong> escribí un número entre 0 y 365. Un socio es moroso cuando tiene una factura vencida hace <strong>más</strong> de esos días. Con <strong>0</strong>, es moroso desde el día siguiente al vencimiento; con <strong>30</strong>, recién cuando la factura lleva más de 30 días vencida.</li><li>Hacé clic en <strong>Guardar configuración</strong>.</li></ol>
+<p>Qué pasa con un socio moroso: cuando intenta informar una salida desde la app, <strong>no se crea la salida ni se le da el QR</strong>. En su lugar le aparece el aviso "Tenés deuda vencida con el club. Acercate a administración para regularizar tu situación.". En cuanto el pago se registra y la factura queda cobrada, puede volver a informar su salida, sin que tengas que hacer nada más. El personal del club puede seguir creando salidas por el socio desde su lado.</p>
+
+<p>También en la portería: cuando el guardia escanea desde la app de Seguridad el QR de un socio moroso (el QR permanente del socio, el de una salida que ya tenía informada, o el de un invitado de ese socio), la pantalla muestra <strong>Socio con deuda vencida</strong> con la indicación de derivarlo a administración, y <strong>no le permite confirmar el ingreso</strong>. Eso alcanza también a las salidas que el socio había informado antes de volverse moroso. Las visitas y los accesos externos (técnicos, proveedores) no se controlan. Para que el guardia vea este aviso tiene que tener la versión actualizada de la app.</p>
+
+<p>Cuenta como deuda lo mismo que marca el punto rojo de la lista de Socios: facturas, notas de débito y comprobantes con fecha de vencimiento que todavía no se cobraron. No cuentan las anuladas, las rechazadas ni los recibos. La deuda se mira solo dentro de este club: si el socio también está en otro club, la deuda de ese otro no lo bloquea acá. Los comprobantes internos (CI-) no guardan fecha de vencimiento, así que por ahora no entran en este cálculo.</p>
+
+<blockquote>Esta regla es independiente de la etiqueta <strong>Moroso</strong> (deuda de 2 meses o más) que se ve en la lista de Socios: esa no cambia con este ajuste.</blockquote>
+
+<p><strong>Solicitud de acceso externo (ART):</strong></p>
+
+<p>Más abajo, el cuadro <strong>Solicitud de acceso externo</strong> sirve para avisar de antemano que el club pide la ART a las personas que ingresan por acceso externo (técnicos, proveedores, visitas).</p>
+
+<ol><li>Tildá <strong>Solicitar ART</strong>.</li><li>Si querés, completá <strong>Condición específica</strong> con lo que exige el club. Por ejemplo: "Debe incluir cláusula de no repetición a nombre de…". Es opcional: si lo dejás vacío, solo se avisa que se va a pedir la ART.</li><li>Hacé clic en <strong>Guardar configuración</strong>.</li></ol>
+<p>Desde ese momento el aviso se ve en dos lugares: cuando el <strong>socio crea el acceso externo</strong> desde la app, arriba del formulario, y en el <strong>QR que recibe la persona externa</strong> (tanto en el link que le comparte el socio como en la pantalla con el código), para que ya sepa que se la van a pedir para ingresar. El aviso aparece solo en los accesos externos; las salidas en barco y sus invitados no lo llevan. Si destildás <strong>Solicitar ART</strong>, el aviso desaparece de inmediato, también en los accesos que ya estaban creados. El club sigue siendo quien controla la ART en la entrada: la app solo la avisa.</p>
 
 <p><strong>Datos Impositivos:</strong></p>
 
@@ -1129,9 +1171,10 @@
 
 <p>Debajo de la Gestión de cobranza está la sección <strong>Período de anulación de recibo</strong>: hasta cuándo se puede anular un recibo de cobranza. Sirve para que no se anulen recibos de períodos ya cerrados.</p>
 
-<p>Elegí una de las cuatro opciones y hacé clic en <strong>Guardar configuración</strong>:<table></p>
+<p>Elegí una de las cinco opciones y hacé clic en <strong>Guardar configuración</strong>:<table></p>
 
 <thead><table><tbody><tr><th>Opción</th><th>Qué recibos se pueden anular</th></tr></tbody></table></thead><tbody><table><tbody><tr><td>---------------------</td><td>-----------------------------------------------------------------------------------</td></tr>
+<tr><td><strong>Mismo día</strong></td><td>Solo los emitidos hoy. Al terminar el día, ya no se pueden anular.</td></tr>
 <tr><td><strong>Misma semana</strong></td><td>Solo los de la semana en curso (de lunes a domingo).</td></tr>
 <tr><td><strong>Mismo mes</strong></td><td>Solo los del mes en curso. Al cambiar de mes, los del mes anterior quedan cerrados.</td></tr>
 <tr><td><strong>Mes anterior</strong></td><td>Los del mes en curso y los del anterior. En agosto se puede anular julio, no junio.</td></tr>
@@ -1154,8 +1197,29 @@
 
 <p><em>Período de anulación y modificación de movimientos de Tesorería:</em></p>
 
-<p>Debajo está la sección <strong>Período de anulación y modificación de movimientos de Tesorería</strong>: hasta cuándo se puede anular o modificar un movimiento manual ya cargado en el Registro de Movimientos, contado desde la fecha del movimiento. Son las mismas cuatro opciones del período de anulación de recibos (Misma semana, Mismo mes, Mes anterior, Sin restricciones) y viene en Sin restricciones de entrada. Los movimientos que queden fuera siguen visibles; solo se deshabilitan sus botones Editar y Anular.</p>
+<p>Debajo está la sección <strong>Período de anulación y modificación de movimientos de Tesorería</strong>: hasta cuándo se puede anular o modificar un movimiento manual ya cargado en el Registro de Movimientos, contado desde la fecha del movimiento. Son las mismas cinco opciones del período de anulación de recibos (Mismo día, Misma semana, Mismo mes, Mes anterior, Sin restricciones) y viene en Sin restricciones de entrada. Los movimientos que queden fuera siguen visibles; solo se deshabilitan sus botones Editar y Anular.</p>
 
+<h3>Pestaña: Reglamento</h3>
+
+<p>Acá cargás el <strong>reglamento del club con todos los términos y condiciones de contratación</strong>. Los socios lo leen y lo aceptan desde la app.</p>
+
+<p><strong>Cargar el reglamento por primera vez</strong></p>
+
+<ol><li>Completá el <strong>Título</strong> (por ejemplo: "Reglamento de uso y contratación 2026").</li><li>Elegí el <strong>archivo PDF</strong> (hasta 8 MB). Tiene que ser un PDF de verdad: otros formatos, o un archivo que solo cambió de extensión, se rechazan.</li><li>Hacé clic en <strong>Publicar reglamento</strong>.</li></ol>
+<p>Desde ese momento los socios activos ven en la app un aviso en el inicio ("El club cargó su reglamento") y una insignia en la opción <strong>Reglamento del club</strong> del menú. Entran, lo leen y tildan <strong>Leí y acepto el reglamento del club</strong>.</p>
+
+<p><strong>Subir una actualización</strong></p>
+
+<p>Cuando el reglamento cambia, no hace falta borrar nada: usá <strong>Subir una actualización</strong>, con el nuevo título y el nuevo PDF, y si querés completá <strong>Qué cambió</strong> para que el socio vea qué se modificó. Al publicar:</p>
+
+<ul><li>Se crea una <strong>versión nueva</strong> (la 2, la 3, y así). Las versiones anteriores <strong>quedan guardadas</strong> en el <strong>Historial de versiones</strong>, con su PDF y con la cantidad de aceptaciones que tuvo cada una.</li><li><strong>Todos los socios tienen que volver a aceptar</strong> la versión nueva. En la app vuelven a ver el aviso, ahora con "El club actualizó su reglamento" y lo que escribiste en "Qué cambió".</li></ul>
+<p><strong>Quién aceptó</strong></p>
+
+<p>El cuadro <strong>Aceptaciones de la versión vigente</strong> lista a los socios activos del club y marca quién ya aceptó (con la fecha) y quién está <strong>Pendiente</strong>. Podés buscar por nombre o email y filtrar por <strong>Pendientes</strong> o <strong>Aceptaron</strong>. Arriba, el resumen te dice cuántos socios aceptaron del total.</p>
+
+<p><strong>Cosas para tener en cuenta</strong></p>
+
+<ul><li>Una aceptación <strong>no se puede borrar ni modificar</strong>: queda como constancia de que el socio aceptó esa versión en esa fecha.</li><li>Solo los <strong>socios activos</strong> del club ven y aceptan el reglamento. Si un socio está en más de un club, ve el de cada club por separado.</li><li>El aviso en la app no bloquea el uso de los servicios del club: es un recordatorio hasta que el socio acepta.</li><li>Para ver el reglamento y el aviso, el socio tiene que tener la versión actualizada de la app.</li></ul>
 <h3>Pestaña: Equipo</h3>
 
 <p>Gestioná el personal del club que tiene acceso al panel web o a la app mobile.</p>
