@@ -102,6 +102,8 @@ Si necesitás compartir constantes / types / enums entre el cliente y un server 
 
 Se trabaja **directo en `main`**: commit local y, **solo cuando el usuario lo indica** ("commit y push", "subilo"), `git push`. Vercel deploya producción en cada push a `main` — no hay paso manual de deploy. No crear ramas ni PRs por iniciativa propia; si el usuario quiere una preview aparte, lo pide.
 
+**Excepción: tareas de Cambalache OS (`/tarea`).** Lo que se trabaja con el comando `/tarea` (tareas marcadas "Para agente" en Cambalache OS) va en una rama `tarea-<código>` y un PR, **nunca directo a `main`**. El agente no mergea ni pasa la tarea a hecha: el PR lo revisa y lo mergea una persona, y el preview de Vercel del PR sirve para probarlo antes de que llegue a producción. Todo lo demás sigue directo a `main`.
+
 Consecuencia: **un push es un deploy**. Antes de pushear, lo de la sección siguiente tiene que estar hecho, y los commits que muevan plata o datos (facturación, cobranzas, migraciones) tienen que dejar dicho en su mensaje qué se verificó y qué no.
 
 Las migraciones SQL se aplican a producción **antes** del push que las necesita (con un script `--use-system-ca` desde la raíz, o el SQL Editor), así el deploy nunca corre contra una base sin la columna.
