@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState, useSyncExternalStore } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -30,6 +30,10 @@ import {
   Contact,
   Truck,
   Wrench,
+  Ship,
+  Banknote,
+  Briefcase,
+  ChevronDown,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -50,6 +54,10 @@ const ROL_LABELS: Record<string, string> = {
 };
 
 type SidebarItem = { href: string; label: string; icon: LucideIcon };
+type SidebarGroup = { id: string; label: string; icon: LucideIcon; items: SidebarItem[] };
+type NavEntry = SidebarItem | SidebarGroup;
+
+const esGrupo = (e: NavEntry): e is SidebarGroup => 'items' in e;
 
 export type SidebarVariant = 'dashboard' | 'super-admin';
 
@@ -58,22 +66,54 @@ export type SidebarVariant = 'dashboard' | 'super-admin';
 // prop desde un Server Component a un Client Component (cruzar el bound
 // los serializa). Asi que en lugar de aceptar items por prop, recibimos
 // `variant` y resolvemos el nav aca adentro.
-const NAV_BY_VARIANT: Record<SidebarVariant, SidebarItem[]> = {
+//
+// El menú del club va en carpetas (grupos que se abren y se cierran) porque con
+// todas las secciones sueltas quedaba muy largo. Si agregás una sección nueva,
+// ponela en el grupo que corresponda; los items sueltos son los de uso diario.
+const NAV_BY_VARIANT: Record<SidebarVariant, NavEntry[]> = {
   dashboard: [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/usuarios', label: 'Socios', icon: Users },
-    { href: '/ventas', label: 'Ventas', icon: ShoppingCart },
-    { href: '/cobranzas', label: 'Cobranzas', icon: Wallet },
-    { href: '/tesoreria', label: 'Tesorería', icon: Landmark },
-    { href: '/solicitudes-socio', label: 'Solicitudes', icon: UserPlus },
-    { href: '/tareas', label: 'Tareas', icon: ClipboardList },
-    { href: '/personal', label: 'Personal', icon: Contact },
-    { href: '/proveedores', label: 'Proveedores', icon: Truck },
-    { href: '/bienes-de-uso', label: 'Bienes de uso', icon: Wrench },
-    { href: '/espacios', label: 'Espacios', icon: Anchor },
-    { href: '/publicaciones', label: 'Publicaciones', icon: Newspaper },
-    { href: '/comunicaciones', label: 'Comunicaciones', icon: MessageSquare },
-    { href: '/tarifario', label: 'Tarifario', icon: Tag },
+    {
+      id: 'operacion',
+      label: 'Operación',
+      icon: Ship,
+      items: [
+        { href: '/usuarios', label: 'Socios', icon: Users },
+        { href: '/solicitudes-socio', label: 'Solicitudes', icon: UserPlus },
+        { href: '/tareas', label: 'Tareas', icon: ClipboardList },
+        { href: '/espacios', label: 'Espacios', icon: Anchor },
+      ],
+    },
+    {
+      id: 'finanzas',
+      label: 'Finanzas',
+      icon: Banknote,
+      items: [
+        { href: '/ventas', label: 'Ventas', icon: ShoppingCart },
+        { href: '/cobranzas', label: 'Cobranzas', icon: Wallet },
+        { href: '/tesoreria', label: 'Tesorería', icon: Landmark },
+        { href: '/tarifario', label: 'Tarifario', icon: Tag },
+      ],
+    },
+    {
+      id: 'administracion',
+      label: 'Administración',
+      icon: Briefcase,
+      items: [
+        { href: '/personal', label: 'Personal', icon: Contact },
+        { href: '/proveedores', label: 'Proveedores', icon: Truck },
+        { href: '/bienes-de-uso', label: 'Bienes de uso', icon: Wrench },
+      ],
+    },
+    {
+      id: 'comunicacion',
+      label: 'Comunicación',
+      icon: Megaphone,
+      items: [
+        { href: '/publicaciones', label: 'Publicaciones', icon: Newspaper },
+        { href: '/comunicaciones', label: 'Comunicaciones', icon: MessageSquare },
+      ],
+    },
     { href: '/configuracion', label: 'Mi perfil', icon: Settings },
   ],
   'super-admin': [
@@ -89,6 +129,53 @@ const NAV_BY_VARIANT: Record<SidebarVariant, SidebarItem[]> = {
     { href: '/super-admin/terminos', label: 'Términos', icon: Scale },
   ],
 };
+
+function Badge({ n, active }: { n: number; active: boolean }) {
+  if (n <= 0) return null;
+  return (
+    <span
+      className={`flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-bold ${
+        active ? 'bg-white/25 text-white' : 'bg-red-500 text-white'
+      }`}
+    >
+      {n > 99 ? '99+' : n}
+    </span>
+  );
+}
+
+// Carpetas abiertas del menú, recordadas en este navegador. Es un "store" externo mínimo para
+// leer localStorage sin desfasar el render del servidor (que siempre arranca con todo cerrado)
+// del primero del navegador. Si localStorage no está disponible (modo privado), las carpetas
+// igual se abren y cierran: el valor queda en memoria mientras dure la pestaña.
+const CLAVE_GRUPOS = 'sidebar-grupos-abiertos';
+let gruposEnMemoria: string | null = null;
+const oyentesGrupos = new Set<() => void>();
+
+function leerGrupos(): string {
+  if (gruposEnMemoria !== null) return gruposEnMemoria;
+  try {
+    return localStorage.getItem(CLAVE_GRUPOS) ?? '[]';
+  } catch {
+    return '[]';
+  }
+}
+
+function suscribirGrupos(aviso: () => void): () => void {
+  oyentesGrupos.add(aviso);
+  return () => {
+    oyentesGrupos.delete(aviso);
+  };
+}
+
+function guardarGrupos(ids: string[]): void {
+  gruposEnMemoria = JSON.stringify(ids);
+  try {
+    localStorage.setItem(CLAVE_GRUPOS, gruposEnMemoria);
+  } catch {
+    // no se pudo recordar para la próxima vez: queda solo en memoria
+  }
+  oyentesGrupos.forEach((aviso) => aviso());
+}
 
 // El operario y el marinero solo acceden a Tareas desde el admin UI.
 const STAFF_TAREAS_ALLOWED = new Set(['/tareas']);
@@ -116,13 +203,67 @@ export function Sidebar({
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
-  const baseItems = NAV_BY_VARIANT[variant];
-  const items =
-    variant === 'dashboard'
-      ? baseItems.filter(({ href }) =>
-          STAFF_TAREAS_ROLES.has(rol) ? STAFF_TAREAS_ALLOWED.has(href) : true,
-        )
-      : baseItems;
+  // El operario y el marinero solo ven Tareas: se filtran los items y los grupos que quedan
+  // con uno solo se muestran sueltos (una carpeta de un solo item no tiene sentido).
+  const permitido = ({ href }: SidebarItem) =>
+    variant === 'dashboard' && STAFF_TAREAS_ROLES.has(rol) ? STAFF_TAREAS_ALLOWED.has(href) : true;
+  const entradas: NavEntry[] = NAV_BY_VARIANT[variant].flatMap((e): NavEntry[] => {
+    if (!esGrupo(e)) return permitido(e) ? [e] : [];
+    const visibles = e.items.filter(permitido);
+    if (visibles.length === 0) return [];
+    if (visibles.length === 1) return [visibles[0]];
+    return [{ ...e, items: visibles }];
+  });
+  const items: SidebarItem[] = entradas.flatMap((e) => (esGrupo(e) ? e.items : [e]));
+
+  // Carpetas abiertas: las que el usuario abrió (se recuerdan en este navegador) más la que
+  // contiene la pantalla actual, que siempre queda abierta para no perder de vista dónde estás.
+  const abiertosCrudo = useSyncExternalStore(suscribirGrupos, leerGrupos, () => '[]');
+  const abiertos = useMemo<string[]>(() => {
+    try {
+      const x = JSON.parse(abiertosCrudo);
+      return Array.isArray(x) ? x.filter((v): v is string => typeof v === 'string') : [];
+    } catch {
+      return [];
+    }
+  }, [abiertosCrudo]);
+  const alternarGrupo = (id: string) =>
+    guardarGrupos(abiertos.includes(id) ? abiertos.filter((x) => x !== id) : [...abiertos, id]);
+
+  // Si este item es prefijo de otro (ej. /super-admin con /super-admin/pricing), solo se
+  // activa con match exacto. Si no, matchea también subpaths para que /usuarios/123 deje
+  // /usuarios resaltado.
+  const estaActivo = (href: string) => {
+    const hasChildren = items.some(
+      (other) => other.href !== href && other.href.startsWith(href + '/'),
+    );
+    return hasChildren ? pathname === href : pathname === href || pathname.startsWith(href + '/');
+  };
+
+  const badgeDe = (href: string): number =>
+    href === '/solicitudes-socio'
+      ? (pendingSolicitudes ?? 0)
+      : href === '/dashboard'
+        ? (pendingAlertas ?? 0)
+        : 0;
+
+  const renderItem = ({ href, label, icon: Icon }: SidebarItem) => {
+    const active = estaActivo(href);
+    return (
+      <Link
+        key={href}
+        href={href}
+        onClick={() => setOpen(false)}
+        className={`flex items-center gap-3 rounded-[10px] px-3 py-2.5 text-sm font-medium transition-colors ${
+          active ? 'bg-[#175861] text-white' : 'text-[#364153] hover:bg-gray-100'
+        }`}
+      >
+        <Icon className="h-[18px] w-[18px] shrink-0" />
+        <span className="flex-1">{label}</span>
+        <Badge n={badgeDe(href)} active={active} />
+      </Link>
+    );
+  };
 
   return (
     <>
@@ -174,49 +315,38 @@ export function Sidebar({
 
         {/* Nav */}
         <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-2">
-          {items.map(({ href, label, icon: Icon }) => {
-            // Si este item es prefijo de otro (ej. /super-admin con
-            // /super-admin/pricing), solo se activa con match exacto. Si no,
-            // matchea también subpaths para que /usuarios/123 deje
-            // /usuarios resaltado.
-            const hasChildren = items.some(
-              (other) => other.href !== href && other.href.startsWith(href + '/'),
-            );
-            const active = hasChildren
-              ? pathname === href
-              : pathname === href || pathname.startsWith(href + '/');
+          {entradas.map((entrada) => {
+            if (!esGrupo(entrada)) return renderItem(entrada);
+            const contieneActivo = entrada.items.some((i) => estaActivo(i.href));
+            const expandido = contieneActivo || abiertos.includes(entrada.id);
+            const GrupoIcon = entrada.icon;
+            // Con la carpeta cerrada, los avisos de adentro (ej. solicitudes pendientes) se ven en el título.
+            const pendientes = entrada.items.reduce((acc, i) => acc + badgeDe(i.href), 0);
             return (
-              <Link
-                key={href}
-                href={href}
-                onClick={() => setOpen(false)}
-                className={`flex items-center gap-3 rounded-[10px] px-3 py-2.5 text-sm font-medium transition-colors ${
-                  active ? 'bg-[#175861] text-white' : 'text-[#364153] hover:bg-gray-100'
-                }`}
-              >
-                <Icon className="h-[18px] w-[18px] shrink-0" />
-                <span className="flex-1">{label}</span>
-                {href === '/solicitudes-socio' &&
-                  pendingSolicitudes != null &&
-                  pendingSolicitudes > 0 && (
-                    <span
-                      className={`flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-bold ${
-                        active ? 'bg-white/25 text-white' : 'bg-red-500 text-white'
-                      }`}
-                    >
-                      {pendingSolicitudes > 99 ? '99+' : pendingSolicitudes}
-                    </span>
-                  )}
-                {href === '/dashboard' && pendingAlertas != null && pendingAlertas > 0 && (
-                  <span
-                    className={`flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-bold ${
-                      active ? 'bg-white/25 text-white' : 'bg-red-500 text-white'
+              <div key={entrada.id}>
+                <button
+                  type="button"
+                  onClick={() => alternarGrupo(entrada.id)}
+                  aria-expanded={expandido}
+                  className={`flex w-full items-center gap-3 rounded-[10px] px-3 py-2.5 text-sm font-medium transition-colors ${
+                    contieneActivo ? 'text-[#175861]' : 'text-[#364153] hover:bg-gray-100'
+                  }`}
+                >
+                  <GrupoIcon className="h-[18px] w-[18px] shrink-0" />
+                  <span className="flex-1 text-left">{entrada.label}</span>
+                  {!expandido && <Badge n={pendientes} active={false} />}
+                  <ChevronDown
+                    className={`h-4 w-4 shrink-0 text-gray-400 transition-transform ${
+                      expandido ? 'rotate-180' : ''
                     }`}
-                  >
-                    {pendingAlertas > 99 ? '99+' : pendingAlertas}
-                  </span>
+                  />
+                </button>
+                {expandido && (
+                  <div className="mt-0.5 mb-1 ml-[22px] space-y-0.5 border-l border-gray-200 pl-2">
+                    {entrada.items.map((i) => renderItem(i))}
+                  </div>
                 )}
-              </Link>
+              </div>
             );
           })}
         </nav>

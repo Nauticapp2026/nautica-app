@@ -37,21 +37,26 @@ Guía paso a paso para gestionar tu club o guardería náutica desde el panel we
 
 ### Navegar por el panel
 
-El menú lateral izquierdo es la navegación principal. Desde ahí accedés a todas las secciones:
+El menú lateral izquierdo es la navegación principal. Está ordenado en **carpetas**: hacé clic en el nombre de una carpeta para abrirla o cerrarla. La carpeta de la pantalla en la que estás queda abierta sola, y el menú recuerda cuáles abriste. Si hay solicitudes de socios pendientes, el aviso rojo se ve en la carpeta **Operación** aunque esté cerrada.
 
 - **Dashboard** — resumen operativo del día
-- **Socios** — listado y perfil de los socios del club
-- **Ventas** — emisión y seguimiento de facturas y comprobantes internos
-- **Cobranzas** — registrar cobros y ver el historial de débito automático
-- **Solicitudes** — pedidos de nuevos socios desde la app mobile
-- **Tareas** — tablero operativo para el equipo (Operarios y Marineros)
-- **Espacios** — amarras, camas y ubicaciones
-- **Publicaciones** — avisos de amarras y camas en NautiShop
-- **Comunicaciones** — anuncios y novedades para socios
-- **Personal** — legajo, horarios y novedades del personal del club
-- **Proveedores** — maestro de proveedores, con sus datos fiscales, bancarios y documentación
-- **Bienes de uso** — maquinarias y equipos: mantenimiento, reparaciones y amortización
-- **Tarifario** — precios y servicios
+- **Operación**
+  - **Socios** — listado y perfil de los socios del club
+  - **Solicitudes** — pedidos de nuevos socios desde la app mobile
+  - **Tareas** — tablero operativo para el equipo (Operarios y Marineros)
+  - **Espacios** — amarras, camas y ubicaciones
+- **Finanzas**
+  - **Ventas** — emisión y seguimiento de facturas y comprobantes internos
+  - **Cobranzas** — registrar cobros y ver el historial de débito automático
+  - **Tesorería** — cierre de caja y registro de movimientos
+  - **Tarifario** — precios y servicios
+- **Administración**
+  - **Personal** — legajo, horarios y novedades del personal del club
+  - **Proveedores** — maestro de proveedores, con sus datos fiscales, bancarios y documentación
+  - **Bienes de uso** — maquinarias y equipos: mantenimiento, reparaciones y amortización
+- **Comunicación**
+  - **Publicaciones** — avisos de amarras y camas en NautiShop
+  - **Comunicaciones** — anuncios y novedades para socios
 - **Mi perfil** — datos del club, equipo, plan y datos impositivos
 
 En la parte inferior del menú encontrás el botón **¿Necesitás ayuda?** para contactar soporte por WhatsApp.
