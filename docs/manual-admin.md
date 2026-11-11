@@ -21,6 +21,9 @@ Guía paso a paso para gestionar tu club o guardería náutica desde el panel we
 13. [Tarifario](#13-tarifario)
 14. [Mi perfil](#14-mi-perfil)
 15. [Débito automático (Payway)](#15-débito-automático-payway)
+16. [Personal (legajo del personal)](#16-personal-legajo-del-personal)
+17. [Proveedores](#17-proveedores)
+18. [Bienes de uso](#18-bienes-de-uso)
 
 ---
 
@@ -45,6 +48,9 @@ El menú lateral izquierdo es la navegación principal. Desde ahí accedés a to
 - **Espacios** — amarras, camas y ubicaciones
 - **Publicaciones** — avisos de amarras y camas en NautiShop
 - **Comunicaciones** — anuncios y novedades para socios
+- **Personal** — legajo, horarios y novedades del personal del club
+- **Proveedores** — maestro de proveedores, con sus datos fiscales, bancarios y documentación
+- **Bienes de uso** — maquinarias y equipos: mantenimiento, reparaciones y amortización
 - **Tarifario** — precios y servicios
 - **Mi perfil** — datos del club, equipo, plan y datos impositivos
 
@@ -1530,6 +1536,165 @@ No. Se cobra el pendiente completo de los servicios incluidos, sin tope.
 
 **¿Qué pasa si el socio no tiene movimientos pendientes ese mes?**
 No se genera ningún cobro. El débito automático solo se dispara si el socio tiene cargos pendientes de servicios incluidos — no importa si tiene o no espacio asignado.
+
+---
+
+## 16. Personal (legajo del personal)
+
+En **Personal** llevás el legajo de cada persona que trabaja en el club, sus horarios y las novedades del mes para liquidar sueldos. Es información sensible (CUIL, CBU, salud, grupo familiar): **solo la ven y la editan los administradores** (Administrador, Administrativo y Contable).
+
+> El legajo es **una ficha propia**, no una cuenta de usuario. Hay personal que no usa el sistema, y el legajo se conserva aunque cambie o se elimine su cuenta. Si la persona sí tiene usuario, podés **vincularlo** (ver más abajo).
+
+### Dar de alta un legajo
+
+1. Entrá a **Personal** y hacé clic en **Nuevo legajo**.
+2. Completá lo mínimo: nombres, apellidos, tipo y número de documento, fecha de ingreso y, si querés, el puesto. El DNI se controla (6 a 9 números) y no puede repetirse dentro del club.
+3. Si la persona ya usa el sistema, elegí su usuario en **Vincular con su usuario**. Podés copiar su email y teléfono al legajo.
+4. **Crear legajo**. El sistema le asigna un **número de legajo** correlativo y te lleva a su ficha.
+
+El resto de los datos se completa después por solapas. Mientras falten datos, el legajo muestra **“Legajo incompleto: faltan N datos”** con un acceso directo a la solapa de cada uno. No impide guardar nada.
+
+### La lista de legajos
+
+Muestra número, nombre, documento, puesto, ingreso, estado y si el legajo está completo. Podés buscar por nombre, documento, puesto o número, y filtrar por estado (Activo, Licencia, Suspendido, Baja).
+
+### Solapas de la ficha
+
+- **Datos personales** — nombres, documento, **CUIL/CUIT** (se valida el dígito verificador), nacimiento, género, domicilio, teléfono, email y copia del documento. Abajo, el **usuario del sistema** vinculado (opcional).
+- **Laboral y horario** — fecha de ingreso (y de alta en ARCA con su constancia), tipo de contratación, puesto, tareas, área, **a quién reporta** (una o varias personas), sedes, ubicaciones, bienes de uso asignados, convenio y categoría, y **estado**. Si el estado es **Baja** se pide la fecha de egreso. Más abajo, el **horario laboral**: tildás los días que trabaja, cargás el horario de cada uno y el tipo de hora (normales, extras al 50% o al 100%, adicionales, nocturnas, feriado trabajado). Un día puede tener más de un tramo, y un tramo que termina antes de lo que empezó cruza la medianoche (22:00 a 06:00 son 8 horas). **Copiar el lunes a martes–viernes** agiliza la carga.
+- **Seguridad social y financiero** — obra social, ART, apto médico (con su archivo y vencimiento), fecha del último examen, banco, tipo de cuenta y **CBU/CVU** (22 dígitos, se validan los dígitos verificadores) con su constancia.
+- **Educación y familia** — nivel educativo, estado civil y el **grupo familiar a cargo** (parentesco, documento, nacimiento, si cobra asignación familiar o extensión de obra social).
+- **Documentación** — copia del documento, alta ARCA, apto médico y constancia de CBU, más la documentación operativa (licencia de conducir, autoelevadores) y náutica (habilitación de Marina Mercante, brevet, libreta de embarco). En la operativa y la náutica tildás **Posee** solo si la persona la necesita para su puesto; cada documento admite **vencimiento** y archivo.
+- **Licencias y vacaciones** — por año, los días que le corresponden, los períodos tomados (con fecha desde y hasta) y cuántos **restan**. Debajo, el historial de **licencias**: tipo, fecha de alta, fecha de incorporación (el primer día de vuelta), quién la aprobó y el certificado. Una licencia sin fecha de incorporación figura **En curso**.
+- **Horas y novedades** — cargás las horas reales de cada día (desde, hasta y tipo de hora) y novedades como enfermedad, licencia, vacaciones, ausencia o feriado. Las horas se calculan solas. **No se puede cargar nada anterior a la fecha de ingreso ni posterior a la de egreso.** Navegás de mes en mes.
+- **Historial** — quién cambió qué y cuándo (el CBU figura enmascarado).
+
+### Archivos adjuntos
+
+Se aceptan **PDF, JPG, PNG y WebP de hasta 8 MB**. El sistema verifica el contenido real del archivo, no solo la extensión. Se guardan en un espacio privado y el enlace **Ver** es temporal.
+
+### Listas desplegables
+
+Las listas (puestos, áreas, sedes, convenios, obras sociales, bancos, tipos de licencia, etc.) traen opciones sugeridas. Si falta una, elegí **＋ Agregar … nuevo** al final de la lista: queda disponible para todo el club. La sede sugiere el nombre del club y las ubicaciones, las áreas de **Espacios**.
+
+### Vincular un usuario
+
+En **Datos personales → Usuario del sistema** podés vincular o desvincular el usuario. Solo lo reconoce: **no cambia su acceso ni su rol** (eso sigue en Mi perfil → Equipo). Si das de baja un legajo vinculado a un usuario activo, el sistema te avisa que desactives su acceso en **Mi perfil → Equipo**: no lo hace solo.
+
+### Planilla semanal
+
+La vista **Planilla semanal** reemplaza a la planilla de turnos en Excel: por empleado y por día muestra las horas cargadas; donde no hay, el **horario previsto**; y marca las **vacaciones** y **licencias**. Cambiás de semana con las flechas y podés **exportar** a Excel, PDF o CSV.
+
+### Novedades del mes (para liquidación)
+
+La vista **Novedades del mes** resume por empleado los días trabajados, las horas por tipo de hora y los días de enfermedad, licencia, vacaciones, ausencia y feriado. Es lo que necesita el área de liquidación: lo **exportás** (Excel, PDF o CSV); el sistema no lo envía solo. Un mismo día no se cuenta dos veces.
+
+### Preguntas frecuentes sobre el legajo
+
+**¿Puedo borrar un legajo?**
+No. Se conserva por obligación de guardar la documentación laboral. Cuando la persona deja de trabajar, cambiá el estado a **Baja** y cargá la fecha de egreso.
+
+**¿Los socios o el personal de campo ven estos datos?**
+No. Solo los administradores del club. Los operarios, marineros y el personal de portería no tienen acceso a **Personal**.
+
+---
+
+## 17. Proveedores
+
+En **Proveedores** llevás el maestro de proveedores del club: sus datos fiscales, de ubicación, contables y bancarios, y la documentación que deben presentar para trabajar en el recinto. Es información sensible (CUIT, CBU, retenciones): **solo la ven y la editan los administradores** (Administrador, Administrativo y Contable).
+
+> Para no desalentar a los clubes chicos, **solo se piden dos datos para dar de alta** un proveedor: la razón social y el CUIT. Todo lo demás es opcional y se completa cuando lo necesites.
+
+### Dar de alta un proveedor
+
+1. Entrá a **Proveedores** y hacé clic en **Nuevo proveedor**.
+2. Escribí la **razón social** y el **CUIT** (con o sin guiones; se controla el dígito verificador). Si es un proveedor del exterior, tildá **Es un proveedor del exterior** y el CUIT pasa a ser opcional.
+3. **Crear proveedor**. El sistema le asigna un **código** correlativo (P-0001, P-0002…) y te lleva a su ficha.
+
+No puede haber dos proveedores con el mismo CUIT ni con el mismo código dentro del club.
+
+### La lista de proveedores
+
+Muestra código, razón social (y nombre comercial), CUIT, área, teléfono, estado y la situación de su documentación (requisitos pendientes o vencidos). Podés buscar por código, razón social, nombre comercial o CUIT, filtrar por estado y por área, y **exportar** a Excel, PDF o CSV lo que estás viendo.
+
+### Solapas de la ficha
+
+- **Identificación y fiscal** — código (editable), estado (Activo / Inactivo), razón social, nombre comercial, tipo de sujeto (Persona física, SRL, SA, SAS) y **área o sector** (para buscarlo y filtrarlo). En **Información fiscal**: CUIT, condición frente al IVA, Ingresos Brutos y actividad principal (podés elegir más de una) —los mismos datos impositivos que se cargan para un socio—, el adjunto del **legajo impositivo**, el **indicador de retención** (IVA, Ganancias, Ingresos Brutos, SUSS; sin ninguno tildado, no se le retiene) y el **certificado de exclusión de retenciones**: si el proveedor lo tiene, se piden la fecha desde, la fecha hasta y el **% de exclusión** (de 0 a 100), y se puede adjuntar el certificado.
+- **Ubicación y contacto** — dirección fiscal y dirección comercial (calle, número e interior), código postal, ciudad, país y provincia (lista de provincias argentinas; para otros países se escribe). En **Contacto y operación**: contacto principal, teléfono / celular, **correo electrónico de facturación** (para enviarle órdenes de compra y comprobantes de pago) y notas.
+- **Contable y financiero** — cuenta contable asociada (una o varias), moneda predeterminada, condiciones de pago (Contado, 30 días, 60 días…) y forma de pago preferida. En **Datos bancarios** podés cargar **varias cuentas** para el mismo proveedor: banco, tipo de cuenta, **CBU** (22 dígitos; se validan los dígitos verificadores), alias, número de cuenta y titular.
+- **Documentación requerida** — los requisitos que el proveedor debe presentar para ingresar o trabajar en el recinto (constancia de ARCA, ART, seguro de responsabilidad civil, etc.). Enumerás los que necesites: cada uno puede ser **obligatorio u opcional**, llevar **vencimiento** y archivo adjunto. Al adjuntar el archivo el requisito pasa a **presentado**. La lista de proveedores avisa cuántos requisitos obligatorios faltan o están vencidos.
+
+### Listas desplegables
+
+El área, la actividad, la cuenta contable, la condición y forma de pago y los requisitos traen opciones sugeridas. Si falta una, elegí **＋ Agregar otra opción…** al final de la lista: queda disponible para todo el club.
+
+### Archivos adjuntos
+
+Se aceptan **PDF, JPG, PNG y WebP de hasta 8 MB**. El sistema verifica el contenido real del archivo, no solo la extensión. Se guardan en un espacio privado y el enlace **Ver** es temporal.
+
+### Eliminar o inactivar un proveedor
+
+Un proveedor cargado por error se puede **eliminar** desde la solapa Identificación y fiscal. Si ya tiene reparaciones o mantenimientos registrados en **Bienes de uso**, no se puede borrar (se perdería el historial): pasalo a **Inactivo**. Los proveedores inactivos dejan de ofrecerse al registrar una nueva reparación.
+
+---
+
+## 18. Bienes de uso
+
+En **Bienes de uso** registrás los equipos del club (camionetas, autoelevadores, grúas, máquinas, lanchas de servicio…): sus datos técnicos, dónde y cuándo se usan, quién puede usarlos, su mantenimiento y reparaciones, y los datos contables para calcular la amortización. **Solo lo ven y lo editan los administradores.**
+
+### Dar de alta un bien
+
+1. Entrá a **Bienes de uso** y hacé clic en **Nuevo bien**.
+2. Completá el **nombre o descripción**, la **fecha de incorporación** y, si querés, el tipo de bien y la forma de adquisición.
+3. **Crear bien**. El **Nº de ID** lo asigna el sistema (número correlativo por club) y te lleva a su ficha.
+
+### La pantalla de consulta
+
+La lista muestra, para cada bien: ID, fecha de incorporación, estado, vida útil, fecha y motivo de baja, forma de adquisición, tipo, rubro, subrubro, Nº de guardería, nombre, marca, serie, año de fabricación, patente, ubicación actual, lugar de utilización, horario, empleados autorizados y seguro (con aviso si la póliza está vencida). Podés buscar por ID, nombre, marca, serie, patente o ubicación, filtrar por estado, tipo y rubro, y **exportar** a Excel, PDF o CSV.
+
+### Solapa Datos generales
+
+- **Identificación** — fecha de incorporación, **estado** (Activo, Inactivo, En reparación, Otro), forma de adquisición (Propia, Alquilado, Leasing, Donación, Otro), **vida útil**, tipo de bien, rubro, subrubro, Nº de guardería, nombre, marca, número de serie, año de fabricación y patente.
+- **Ubicación y utilización** — ubicación actual y lugar de utilización (más de una opción; las áreas de **Espacios** figuran como ubicaciones) y los **empleados autorizados** a utilizarlo (personal con legajo en **Personal**).
+- **Seguro** — aseguradora, número de póliza, vencimiento, detalle de la cobertura y el **comprobante** adjunto.
+- **Horario de utilización** — los días y franjas en que se usa, con la posibilidad de agregar más de un tramo por día. Si el bien no tiene horario fijo, tildá **No aplica**.
+- **Baja del bien** — ver más abajo.
+
+### Solapa Datos contables (amortización)
+
+Cargás el **valor de origen**, la **moneda**, el **inicio de la amortización** (por defecto, la fecha de incorporación) y el **valor residual** (lo que se estima que vale al final de su vida útil; 0 si no vale nada). La **vida útil** se define en Datos generales.
+
+Con eso el sistema calcula la **amortización lineal por meses**: reparte `valor de origen − valor residual` en cuotas mensuales iguales a lo largo de la vida útil. Se cuenta el mes de inicio completo. Muestra la cuota mensual y anual, la amortización acumulada a hoy, el **valor contable actual**, cuándo termina de amortizarse y el cronograma año por año. Si el bien se da de baja, la amortización deja de correr desde ese mes.
+
+> Es un cálculo de gestión, no una liquidación impositiva: no considera coeficientes ni tablas fiscales.
+
+### Solapa Mantenimiento y reparaciones
+
+- **Avisos y responsables** — los **correos electrónicos** a los que llegan los avisos de los planes de mantenimiento preventivo (hasta 10) y los **responsables de mantenimiento** (personal con legajo).
+- **Plan de mantenimiento preventivo** — una lista de revisiones periódicas: qué se revisa, cada cuántos **días, meses u horas de uso**, la fecha del último mantenimiento y la **fecha del próximo**. Si dejás vacía la próxima fecha pero cargaste la última, se calcula sola (días y meses). Cada plan muestra si está **próximo** (7 días o menos) o **vencido**.
+- **Avisos por mail** — todos los días el sistema revisa los planes activos: manda un mail a los correos de mantenimiento **cuando faltan 7 días o menos** y otro **el día del mantenimiento**. No repite el mismo aviso. Si cambiás la fecha del plan, avisa de nuevo para la fecha nueva. Los bienes dados de baja no avisan.
+- **Registro de intervenciones** — las reparaciones y mantenimientos hechos: fecha, tipo, descripción, **repuestos usados**, quién la hizo (un proveedor cargado en **Proveedores**), costo y comprobante. Si indicás **Cumple el plan preventivo**, el plan pasa a figurar con esa fecha como último mantenimiento y se **agenda el siguiente** automáticamente.
+- **Historial de fallas** — averías reportadas, acción correctiva y fecha de resolución (sin fecha = sigue abierta).
+- **Insumos y cambios periódicos** — aceites, filtros, neumáticos y demás insumos, con la fecha del último cambio y cada cuánto se cambian; muestra cuándo toca el próximo.
+- **Registro de inspecciones** — checklists diarios de los operadores, pruebas de seguridad y de emisiones, con su resultado (sin observaciones, con observaciones, no apto) y comprobante.
+
+### Dar de baja un bien
+
+En **Datos generales → Baja del bien** elegí la **fecha de baja** (no puede ser anterior a la incorporación ni futura), el **motivo** (de una lista: venta, fin de vida útil, siniestro, robo…) y un detalle opcional. El bien queda **Inactivo**, se conserva con todo su historial y se frena su amortización. Con **Reactivar bien** se borra la baja y vuelve a Activo.
+
+Un bien cargado por error se puede **eliminar**; si ya tiene planes, intervenciones, fallas o inspecciones, no se puede borrar: dalo de baja.
+
+### Archivos adjuntos y listas
+
+Los adjuntos (comprobante del seguro, comprobantes de reparaciones e inspecciones) son **PDF, JPG, PNG o WebP de hasta 8 MB**, en un espacio privado. Las listas (tipo, rubro, subrubro, marca, ubicación, aseguradora, tipos de intervención, falla, insumo e inspección, motivo de baja) traen sugerencias y se amplían con **＋ Agregar otra opción…**.
+
+### Preguntas frecuentes sobre bienes de uso
+
+**¿Los operarios pueden ver estos datos?**
+No. Solo los administradores. Los empleados autorizados a usar un bien son un dato informativo del legajo, no les da acceso al sistema.
+
+**¿Cómo registro la reparación hecha por un proveedor?**
+Primero cargá al proveedor en **Proveedores**. Después, en **Mantenimiento y reparaciones → Registro de intervenciones**, elegilo en **Realizada por** y cargá el costo.
 
 ---
 
