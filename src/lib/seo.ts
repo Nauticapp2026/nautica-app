@@ -40,6 +40,9 @@ export const RUTAS_PRIVADAS = [
   '/solicitudes-socio',
   '/configuracion',
   '/tareas',
+  '/personal',
+  '/proveedores',
+  '/bienes-de-uso',
   // plataforma y otros
   '/super-admin',
   '/onboarding',

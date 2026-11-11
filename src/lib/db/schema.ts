@@ -9,6 +9,7 @@ import {
   numeric,
   timestamp,
   date,
+  time,
   jsonb,
   primaryKey,
   unique,
@@ -1434,16 +1435,115 @@ export const proveedores = pgTable(
     guarderiaId: uuid('guarderia_id')
       .notNull()
       .references(() => guarderias.id, { onDelete: 'cascade' }),
+    /** Heredado, sin uso. */
     profileId: uuid('profile_id').references(() => profiles.id, { onDelete: 'set null' }),
+    /** Razón social / nombre legal (la columna se llamaba `nombre`, mig 0088). */
     nombre: text('nombre').notNull(),
+    /** Heredado, sin uso. */
     apellido: text('apellido'),
+    /** Correo de facturación del proveedor. */
     email: text('email'),
+    /** Teléfono / celular. */
     telefono: text('telefono'),
+    /** Heredado, sin uso (el área se elige de una lista del club: `areaSector`). */
     categoria: categoriaProveedorEnum('categoria'),
     estado: estadoProveedorEnum('estado').default('activo'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    // ── Maestro de proveedores (mig 0173) ──
+    /** Correlativo por club; el código visible es editable. */
+    numero: integer('numero'),
+    codigo: text('codigo'),
+    nombreComercial: text('nombre_comercial'),
+    /** persona_fisica | srl | sa | sas | otro. */
+    tipoSujeto: text('tipo_sujeto'),
+    areaSector: text('area_sector'),
+    cuit: text('cuit'),
+    condicionIva: condicionFrenteIvaEnum('condicion_iva'),
+    condicionIibb: condicionIibbEnum('condicion_iibb'),
+    actividades: text('actividades')
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
+    /** iva | ganancias | iibb | suss: impuestos que se le retienen. Vacío = no se retiene. */
+    retenciones: text('retenciones')
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
+    certificadoRetencion: boolean('certificado_retencion').notNull().default(false),
+    certRetDesde: date('cert_ret_desde'),
+    certRetHasta: date('cert_ret_hasta'),
+    certRetPorcentaje: numeric('cert_ret_porcentaje', { precision: 5, scale: 2 }),
+    dirFiscalCalle: text('dir_fiscal_calle'),
+    dirFiscalNumero: text('dir_fiscal_numero'),
+    dirFiscalInterior: text('dir_fiscal_interior'),
+    dirComercialCalle: text('dir_comercial_calle'),
+    dirComercialNumero: text('dir_comercial_numero'),
+    dirComercialInterior: text('dir_comercial_interior'),
+    codigoPostal: text('codigo_postal'),
+    ciudad: text('ciudad'),
+    provincia: text('provincia'),
+    pais: text('pais').notNull().default('Argentina'),
+    cuentasContables: text('cuentas_contables')
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
+    moneda: text('moneda').notNull().default('ARS'),
+    condicionPago: text('condicion_pago'),
+    formaPago: text('forma_pago'),
+    contactoNombre: text('contacto_nombre'),
+    notas: text('notas'),
+    createdBy: uuid('created_by').references(() => profiles.id, { onDelete: 'set null' }),
+    updatedBy: uuid('updated_by').references(() => profiles.id, { onDelete: 'set null' }),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [index('proveedores_guarderia_idx').on(t.guarderiaId)],
+);
+
+export const proveedorCuentasBancarias = pgTable(
+  'proveedor_cuentas_bancarias',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    guarderiaId: uuid('guarderia_id')
+      .notNull()
+      .references(() => guarderias.id, { onDelete: 'cascade' }),
+    proveedorId: uuid('proveedor_id')
+      .notNull()
+      .references(() => proveedores.id, { onDelete: 'cascade' }),
+    banco: text('banco'),
+    tipoCuenta: text('tipo_cuenta'),
+    nroCuenta: text('nro_cuenta'),
+    cbu: text('cbu'),
+    alias: text('alias'),
+    titular: text('titular'),
+    observaciones: text('observaciones'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [index('proveedor_cuentas_prov_idx').on(t.proveedorId)],
+);
+
+export const proveedorDocumentos = pgTable(
+  'proveedor_documentos',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    guarderiaId: uuid('guarderia_id')
+      .notNull()
+      .references(() => guarderias.id, { onDelete: 'cascade' }),
+    proveedorId: uuid('proveedor_id')
+      .notNull()
+      .references(() => proveedores.id, { onDelete: 'cascade' }),
+    /** 'legajo_impositivo' | 'cert_retencion' (adjuntos fijos) o null (requisito para ingresar). */
+    clave: text('clave'),
+    requisito: text('requisito').notNull(),
+    obligatorio: boolean('obligatorio').notNull().default(true),
+    presentado: boolean('presentado').notNull().default(false),
+    vencimiento: date('vencimiento'),
+    archivoPath: text('archivo_path'),
+    archivoNombre: text('archivo_nombre'),
+    notas: text('notas'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [index('proveedor_docs_prov_idx').on(t.proveedorId)],
 );
 
 // =============================================================================
@@ -2035,6 +2135,552 @@ export const reglamentoAceptaciones = pgTable(
     index('reglamento_aceptaciones_guarderia_idx').on(t.guarderiaId, t.reglamentoId),
     index('reglamento_aceptaciones_user_idx').on(t.userId),
   ],
+);
+
+// =============================================================================
+// LEGAJO DEL PERSONAL (mig 0172)
+//
+// `empleados` es una ENTIDAD PROPIA del club (no vive en `profiles`): el legajo guarda
+// CUIL, CBU, salud y grupo familiar, que no pueden quedar en una tabla global que otros
+// miembros del club pueden leer. `profile_id` es un vínculo OPCIONAL a un usuario
+// existente. Los valores de las listas desplegables se guardan como texto (el legajo es un
+// registro histórico: si el club renombra un puesto, el legajo conserva lo que decía).
+// Todo lo escribe el web con Drizzle (server actions con rol admin) y se scopea por
+// guarderia_id; la RLS solo deja leer al admin del club.
+// =============================================================================
+
+export const empleados = pgTable(
+  'empleados',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    guarderiaId: uuid('guarderia_id')
+      .notNull()
+      .references(() => guarderias.id, { onDelete: 'cascade' }),
+    /** Correlativo por club: el "ID de empleado" que se muestra como Legajo Nº. */
+    numero: integer('numero').notNull(),
+    /** Usuario del sistema vinculado (opcional, uno por legajo y por club). */
+    profileId: uuid('profile_id').references(() => profiles.id, { onDelete: 'set null' }),
+
+    // Datos personales
+    nombre: text('nombre').notNull(),
+    apellido: text('apellido').notNull(),
+    /** 'dni' | 'pasaporte' | 'cedula' */
+    tipoDocumento: text('tipo_documento').notNull().default('dni'),
+    nroDocumento: text('nro_documento').notNull(),
+    /** Normalizado con guiones: 20-40123456-2. */
+    cuilCuit: text('cuil_cuit'),
+    fechaNacimiento: date('fecha_nacimiento'),
+    /** 'masculino' | 'femenino' | 'no_binario_otro' */
+    genero: text('genero'),
+    direccion: text('direccion'),
+    localidad: text('localidad'),
+    provincia: text('provincia'),
+    telefono: text('telefono'),
+    email: text('email'),
+
+    // Laboral y contratación
+    fechaIngreso: date('fecha_ingreso').notNull(),
+    fechaIngresoArca: date('fecha_ingreso_arca'),
+    tipoContratacion: text('tipo_contratacion'),
+    puesto: text('puesto'),
+    tareas: text('tareas'),
+    area: text('area'),
+    sedes: text('sedes')
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
+    ubicaciones: text('ubicaciones')
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
+    bienesUso: text('bienes_uso')
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
+    convenio: text('convenio'),
+    categoria: text('categoria'),
+    /** 'activo' | 'licencia' | 'suspendido' | 'baja' */
+    estado: text('estado').notNull().default('activo'),
+    fechaEgreso: date('fecha_egreso'),
+    motivoEgreso: text('motivo_egreso'),
+
+    // Seguridad social, salud y seguros
+    obraSocial: text('obra_social'),
+    art: text('art'),
+    aptoMedico: boolean('apto_medico').notNull().default(false),
+    fechaUltimoExamen: date('fecha_ultimo_examen'),
+
+    // Datos financieros
+    banco: text('banco'),
+    cbu: text('cbu'),
+    /** 'caja_ahorro_sueldo' | 'caja_ahorro_comun' | 'cuenta_corriente' */
+    tipoCuenta: text('tipo_cuenta'),
+
+    // Educación y estado civil
+    nivelEducativo: text('nivel_educativo'),
+    estadoEducativo: text('estado_educativo'),
+    estadoCivil: text('estado_civil'),
+
+    notas: text('notas'),
+    createdBy: uuid('created_by').references(() => profiles.id, { onDelete: 'set null' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedBy: uuid('updated_by').references(() => profiles.id, { onDelete: 'set null' }),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex('empleados_numero_unico').on(t.guarderiaId, t.numero),
+    uniqueIndex('empleados_documento_unico').on(t.guarderiaId, t.tipoDocumento, t.nroDocumento),
+    uniqueIndex('empleados_profile_unico')
+      .on(t.guarderiaId, t.profileId)
+      .where(sql`${t.profileId} is not null`),
+    index('empleados_guarderia_estado_idx').on(t.guarderiaId, t.estado),
+  ],
+);
+
+export const empleadoReportaA = pgTable(
+  'empleado_reporta_a',
+  {
+    empleadoId: uuid('empleado_id')
+      .notNull()
+      .references(() => empleados.id, { onDelete: 'cascade' }),
+    jefeId: uuid('jefe_id')
+      .notNull()
+      .references(() => empleados.id, { onDelete: 'cascade' }),
+    guarderiaId: uuid('guarderia_id')
+      .notNull()
+      .references(() => guarderias.id, { onDelete: 'cascade' }),
+  },
+  (t) => [primaryKey({ columns: [t.empleadoId, t.jefeId] })],
+);
+
+export const empleadoHorarios = pgTable(
+  'empleado_horarios',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    guarderiaId: uuid('guarderia_id')
+      .notNull()
+      .references(() => guarderias.id, { onDelete: 'cascade' }),
+    empleadoId: uuid('empleado_id')
+      .notNull()
+      .references(() => empleados.id, { onDelete: 'cascade' }),
+    /** 1 = lunes … 7 = domingo. */
+    dia: smallint('dia').notNull(),
+    desde: time('desde').notNull(),
+    hasta: time('hasta').notNull(),
+    /** Valores de TIPOS_HORA (src/lib/legajo/constantes.ts). */
+    tipoHora: text('tipo_hora').notNull().default('normal'),
+  },
+  (t) => [index('empleado_horarios_empleado_idx').on(t.empleadoId, t.dia)],
+);
+
+export const empleadoFamiliares = pgTable(
+  'empleado_familiares',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    guarderiaId: uuid('guarderia_id')
+      .notNull()
+      .references(() => guarderias.id, { onDelete: 'cascade' }),
+    empleadoId: uuid('empleado_id')
+      .notNull()
+      .references(() => empleados.id, { onDelete: 'cascade' }),
+    /** 'hijo' | 'conyuge' | 'conviviente' | 'otro' */
+    parentesco: text('parentesco').notNull(),
+    nombre: text('nombre').notNull(),
+    apellido: text('apellido').notNull(),
+    nroDocumento: text('nro_documento'),
+    fechaNacimiento: date('fecha_nacimiento'),
+    aCargo: boolean('a_cargo').notNull().default(true),
+    asignacionFamiliar: boolean('asignacion_familiar').notNull().default(false),
+    extensionObraSocial: boolean('extension_obra_social').notNull().default(false),
+    observaciones: text('observaciones'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [index('empleado_familiares_empleado_idx').on(t.empleadoId)],
+);
+
+/** Un registro por tipo de documento (ver DOCUMENTOS_LEGAJO en src/lib/legajo/constantes.ts). */
+export const empleadoDocumentos = pgTable(
+  'empleado_documentos',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    guarderiaId: uuid('guarderia_id')
+      .notNull()
+      .references(() => guarderias.id, { onDelete: 'cascade' }),
+    empleadoId: uuid('empleado_id')
+      .notNull()
+      .references(() => empleados.id, { onDelete: 'cascade' }),
+    tipo: text('tipo').notNull(),
+    posee: boolean('posee').notNull().default(false),
+    vencimiento: date('vencimiento'),
+    /** Path en el bucket privado `documentos` (legajos/<club>/<empleado>/...). Se firma al mostrar. */
+    archivoPath: text('archivo_path'),
+    archivoNombre: text('archivo_nombre'),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [unique('empleado_documentos_unico').on(t.empleadoId, t.tipo)],
+);
+
+export const empleadoVacacionesAnuales = pgTable(
+  'empleado_vacaciones_anuales',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    guarderiaId: uuid('guarderia_id')
+      .notNull()
+      .references(() => guarderias.id, { onDelete: 'cascade' }),
+    empleadoId: uuid('empleado_id')
+      .notNull()
+      .references(() => empleados.id, { onDelete: 'cascade' }),
+    anio: integer('anio').notNull(),
+    diasTotales: integer('dias_totales').notNull().default(0),
+  },
+  (t) => [unique('empleado_vacaciones_anuales_unico').on(t.empleadoId, t.anio)],
+);
+
+export const empleadoVacacionesTomadas = pgTable(
+  'empleado_vacaciones_tomadas',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    guarderiaId: uuid('guarderia_id')
+      .notNull()
+      .references(() => guarderias.id, { onDelete: 'cascade' }),
+    empleadoId: uuid('empleado_id')
+      .notNull()
+      .references(() => empleados.id, { onDelete: 'cascade' }),
+    anio: integer('anio').notNull(),
+    desde: date('desde').notNull(),
+    hasta: date('hasta').notNull(),
+    dias: integer('dias').notNull(),
+    nota: text('nota'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [index('empleado_vacaciones_tomadas_empleado_idx').on(t.empleadoId, t.anio)],
+);
+
+export const empleadoLicencias = pgTable(
+  'empleado_licencias',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    guarderiaId: uuid('guarderia_id')
+      .notNull()
+      .references(() => guarderias.id, { onDelete: 'cascade' }),
+    empleadoId: uuid('empleado_id')
+      .notNull()
+      .references(() => empleados.id, { onDelete: 'cascade' }),
+    tipo: text('tipo').notNull(),
+    fechaAlta: date('fecha_alta').notNull(),
+    /** Día en que se reincorpora. NULL = licencia en curso. */
+    fechaIncorporacion: date('fecha_incorporacion'),
+    motivo: text('motivo'),
+    certificadoPath: text('certificado_path'),
+    certificadoNombre: text('certificado_nombre'),
+    /** Quien aprueba: un legajo O un usuario admin del club (nunca los dos). */
+    aprobadorEmpleadoId: uuid('aprobador_empleado_id').references(() => empleados.id, {
+      onDelete: 'set null',
+    }),
+    aprobadorProfileId: uuid('aprobador_profile_id').references(() => profiles.id, {
+      onDelete: 'set null',
+    }),
+    createdBy: uuid('created_by').references(() => profiles.id, { onDelete: 'set null' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [index('empleado_licencias_empleado_idx').on(t.empleadoId, t.fechaAlta)],
+);
+
+export const empleadoHoras = pgTable(
+  'empleado_horas',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    guarderiaId: uuid('guarderia_id')
+      .notNull()
+      .references(() => guarderias.id, { onDelete: 'cascade' }),
+    empleadoId: uuid('empleado_id')
+      .notNull()
+      .references(() => empleados.id, { onDelete: 'cascade' }),
+    fecha: date('fecha').notNull(),
+    desde: time('desde'),
+    hasta: time('hasta'),
+    horas: numeric('horas', { precision: 5, scale: 2 }).notNull().default('0'),
+    tipoHora: text('tipo_hora').notNull().default('normal'),
+    /** 'trabajado' | 'enfermedad' | 'licencia' | 'vacaciones' | 'ausencia' | 'feriado' */
+    novedad: text('novedad').notNull().default('trabajado'),
+    nota: text('nota'),
+    createdBy: uuid('created_by').references(() => profiles.id, { onDelete: 'set null' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index('empleado_horas_empleado_fecha_idx').on(t.empleadoId, t.fecha),
+    index('empleado_horas_guarderia_fecha_idx').on(t.guarderiaId, t.fecha),
+  ],
+);
+
+/** Respaldo: quién cambió qué campo del legajo y cuándo. */
+export const empleadoHistorial = pgTable(
+  'empleado_historial',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    guarderiaId: uuid('guarderia_id')
+      .notNull()
+      .references(() => guarderias.id, { onDelete: 'cascade' }),
+    empleadoId: uuid('empleado_id')
+      .notNull()
+      .references(() => empleados.id, { onDelete: 'cascade' }),
+    campo: text('campo').notNull(),
+    valorAnterior: text('valor_anterior'),
+    valorNuevo: text('valor_nuevo'),
+    cambiadoPor: uuid('cambiado_por').references(() => profiles.id, { onDelete: 'set null' }),
+    cambiadoEn: timestamp('cambiado_en', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [index('empleado_historial_empleado_idx').on(t.empleadoId, t.cambiadoEn)],
+);
+
+/** Valores que el club agrega a las listas desplegables del legajo (puestos, áreas, sedes…). */
+export const legajoCatalogo = pgTable(
+  'legajo_catalogo',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    guarderiaId: uuid('guarderia_id')
+      .notNull()
+      .references(() => guarderias.id, { onDelete: 'cascade' }),
+    tipo: text('tipo').notNull(),
+    valor: text('valor').notNull(),
+    createdBy: uuid('created_by').references(() => profiles.id, { onDelete: 'set null' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [unique('legajo_catalogo_unico').on(t.guarderiaId, t.tipo, t.valor)],
+);
+
+// =============================================================================
+// BIENES DE USO (mig 0174)
+// =============================================================================
+
+export const bienesUso = pgTable(
+  'bienes_uso',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    guarderiaId: uuid('guarderia_id')
+      .notNull()
+      .references(() => guarderias.id, { onDelete: 'cascade' }),
+    /** Next number automático por club. */
+    numero: integer('numero').notNull(),
+    fechaIncorporacion: date('fecha_incorporacion').notNull(),
+    /** activo | inactivo | en_reparacion | otro. */
+    estado: text('estado').notNull().default('activo'),
+    estadoDetalle: text('estado_detalle'),
+    /** propia | alquilado | leasing | donacion | otro. */
+    formaAdquisicion: text('forma_adquisicion'),
+    tipoBien: text('tipo_bien'),
+    rubro: text('rubro'),
+    subrubro: text('subrubro'),
+    nroGuarderia: text('nro_guarderia'),
+    nombre: text('nombre').notNull(),
+    marca: text('marca'),
+    nroSerie: text('nro_serie'),
+    anioFabricacion: integer('anio_fabricacion'),
+    patente: text('patente'),
+    ubicaciones: text('ubicaciones')
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
+    lugaresUtilizacion: text('lugares_utilizacion')
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
+    horarioNoAplica: boolean('horario_no_aplica').notNull().default(false),
+    seguroAseguradora: text('seguro_aseguradora'),
+    seguroPoliza: text('seguro_poliza'),
+    seguroVencimiento: date('seguro_vencimiento'),
+    seguroDetalle: text('seguro_detalle'),
+    seguroArchivoPath: text('seguro_archivo_path'),
+    seguroArchivoNombre: text('seguro_archivo_nombre'),
+    fechaBaja: date('fecha_baja'),
+    motivoBaja: text('motivo_baja'),
+    motivoBajaDetalle: text('motivo_baja_detalle'),
+    // Datos contables para amortización lineal.
+    vidaUtilAnios: integer('vida_util_anios'),
+    valorOrigen: numeric('valor_origen', { precision: 16, scale: 2 }),
+    moneda: text('moneda').notNull().default('ARS'),
+    fechaInicioAmortizacion: date('fecha_inicio_amortizacion'),
+    valorResidual: numeric('valor_residual', { precision: 16, scale: 2 }).notNull().default('0'),
+    /** A quién le llegan los avisos de los planes de mantenimiento preventivo. */
+    mantenimientoEmails: text('mantenimiento_emails')
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
+    notas: text('notas'),
+    createdBy: uuid('created_by').references(() => profiles.id, { onDelete: 'set null' }),
+    updatedBy: uuid('updated_by').references(() => profiles.id, { onDelete: 'set null' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex('bienes_uso_numero_unico').on(t.guarderiaId, t.numero),
+    index('bienes_uso_club_idx').on(t.guarderiaId, t.estado),
+  ],
+);
+
+export const bienUsoHorarios = pgTable(
+  'bien_uso_horarios',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    guarderiaId: uuid('guarderia_id')
+      .notNull()
+      .references(() => guarderias.id, { onDelete: 'cascade' }),
+    bienId: uuid('bien_id')
+      .notNull()
+      .references(() => bienesUso.id, { onDelete: 'cascade' }),
+    /** 1 = lunes … 7 = domingo. */
+    dia: smallint('dia').notNull(),
+    desde: time('desde').notNull(),
+    hasta: time('hasta').notNull(),
+  },
+  (t) => [index('bien_uso_horarios_bien_idx').on(t.bienId)],
+);
+
+export const bienUsoEmpleados = pgTable(
+  'bien_uso_empleados',
+  {
+    bienId: uuid('bien_id')
+      .notNull()
+      .references(() => bienesUso.id, { onDelete: 'cascade' }),
+    empleadoId: uuid('empleado_id')
+      .notNull()
+      .references(() => empleados.id, { onDelete: 'cascade' }),
+    guarderiaId: uuid('guarderia_id')
+      .notNull()
+      .references(() => guarderias.id, { onDelete: 'cascade' }),
+    /** autorizado | mantenimiento. */
+    rol: text('rol').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.bienId, t.empleadoId, t.rol] })],
+);
+
+export const bienUsoPlanes = pgTable(
+  'bien_uso_planes',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    guarderiaId: uuid('guarderia_id')
+      .notNull()
+      .references(() => guarderias.id, { onDelete: 'cascade' }),
+    bienId: uuid('bien_id')
+      .notNull()
+      .references(() => bienesUso.id, { onDelete: 'cascade' }),
+    descripcion: text('descripcion').notNull(),
+    /** dias | meses | horas. */
+    frecuenciaTipo: text('frecuencia_tipo').notNull(),
+    frecuenciaValor: integer('frecuencia_valor').notNull(),
+    proximaFecha: date('proxima_fecha'),
+    ultimaFecha: date('ultima_fecha'),
+    activo: boolean('activo').notNull().default(true),
+    notas: text('notas'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [index('bien_uso_planes_bien_idx').on(t.bienId)],
+);
+
+export const bienUsoAvisos = pgTable(
+  'bien_uso_avisos',
+  {
+    planId: uuid('plan_id')
+      .notNull()
+      .references(() => bienUsoPlanes.id, { onDelete: 'cascade' }),
+    fechaProgramada: date('fecha_programada').notNull(),
+    /** previo (hasta 7 días antes) | dia (el día del mantenimiento o vencido). */
+    etapa: text('etapa').notNull(),
+    enviadoEn: timestamp('enviado_en', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.planId, t.fechaProgramada, t.etapa] })],
+);
+
+export const bienUsoIntervenciones = pgTable(
+  'bien_uso_intervenciones',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    guarderiaId: uuid('guarderia_id')
+      .notNull()
+      .references(() => guarderias.id, { onDelete: 'cascade' }),
+    bienId: uuid('bien_id')
+      .notNull()
+      .references(() => bienesUso.id, { onDelete: 'cascade' }),
+    fecha: date('fecha').notNull(),
+    tipo: text('tipo'),
+    descripcion: text('descripcion'),
+    repuestos: text('repuestos'),
+    proveedorId: uuid('proveedor_id').references(() => proveedores.id, { onDelete: 'set null' }),
+    costo: numeric('costo', { precision: 16, scale: 2 }),
+    moneda: text('moneda').notNull().default('ARS'),
+    planId: uuid('plan_id').references(() => bienUsoPlanes.id, { onDelete: 'set null' }),
+    archivoPath: text('archivo_path'),
+    archivoNombre: text('archivo_nombre'),
+    createdBy: uuid('created_by').references(() => profiles.id, { onDelete: 'set null' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [index('bien_uso_interv_bien_idx').on(t.bienId, t.fecha)],
+);
+
+export const bienUsoFallas = pgTable(
+  'bien_uso_fallas',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    guarderiaId: uuid('guarderia_id')
+      .notNull()
+      .references(() => guarderias.id, { onDelete: 'cascade' }),
+    bienId: uuid('bien_id')
+      .notNull()
+      .references(() => bienesUso.id, { onDelete: 'cascade' }),
+    fecha: date('fecha').notNull(),
+    tipo: text('tipo'),
+    descripcion: text('descripcion'),
+    accionCorrectiva: text('accion_correctiva'),
+    fechaResolucion: date('fecha_resolucion'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [index('bien_uso_fallas_bien_idx').on(t.bienId, t.fecha)],
+);
+
+export const bienUsoInsumos = pgTable(
+  'bien_uso_insumos',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    guarderiaId: uuid('guarderia_id')
+      .notNull()
+      .references(() => guarderias.id, { onDelete: 'cascade' }),
+    bienId: uuid('bien_id')
+      .notNull()
+      .references(() => bienesUso.id, { onDelete: 'cascade' }),
+    tipo: text('tipo').notNull(),
+    descripcion: text('descripcion'),
+    ultimoCambio: date('ultimo_cambio'),
+    frecuenciaValor: integer('frecuencia_valor'),
+    /** dias | meses | horas. */
+    frecuenciaTipo: text('frecuencia_tipo'),
+    notas: text('notas'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [index('bien_uso_insumos_bien_idx').on(t.bienId)],
+);
+
+export const bienUsoInspecciones = pgTable(
+  'bien_uso_inspecciones',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    guarderiaId: uuid('guarderia_id')
+      .notNull()
+      .references(() => guarderias.id, { onDelete: 'cascade' }),
+    bienId: uuid('bien_id')
+      .notNull()
+      .references(() => bienesUso.id, { onDelete: 'cascade' }),
+    fecha: date('fecha').notNull(),
+    tipo: text('tipo'),
+    /** ok | observado | no_apto. */
+    resultado: text('resultado').notNull().default('ok'),
+    inspector: text('inspector'),
+    observaciones: text('observaciones'),
+    archivoPath: text('archivo_path'),
+    archivoNombre: text('archivo_nombre'),
+    createdBy: uuid('created_by').references(() => profiles.id, { onDelete: 'set null' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [index('bien_uso_inspec_bien_idx').on(t.bienId, t.fecha)],
 );
 
 // =============================================================================

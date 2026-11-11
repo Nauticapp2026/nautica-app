@@ -27,6 +27,9 @@ import {
   ShoppingCart,
   Wallet,
   Landmark,
+  Contact,
+  Truck,
+  Wrench,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -64,6 +67,9 @@ const NAV_BY_VARIANT: Record<SidebarVariant, SidebarItem[]> = {
     { href: '/tesoreria', label: 'Tesorería', icon: Landmark },
     { href: '/solicitudes-socio', label: 'Solicitudes', icon: UserPlus },
     { href: '/tareas', label: 'Tareas', icon: ClipboardList },
+    { href: '/personal', label: 'Personal', icon: Contact },
+    { href: '/proveedores', label: 'Proveedores', icon: Truck },
+    { href: '/bienes-de-uso', label: 'Bienes de uso', icon: Wrench },
     { href: '/espacios', label: 'Espacios', icon: Anchor },
     { href: '/publicaciones', label: 'Publicaciones', icon: Newspaper },
     { href: '/comunicaciones', label: 'Comunicaciones', icon: MessageSquare },

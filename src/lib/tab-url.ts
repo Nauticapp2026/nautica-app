@@ -31,6 +31,29 @@ export const SOCIO_TAB_IDS = [
 ] as const;
 export type SocioTabId = (typeof SOCIO_TAB_IDS)[number];
 
+export const LEGAJO_TAB_IDS = [
+  'personales',
+  'laboral',
+  'seguridad',
+  'familia',
+  'documentacion',
+  'licencias',
+  'horas',
+  'historial',
+] as const;
+export type LegajoTabId = (typeof LEGAJO_TAB_IDS)[number];
+
+export const PROVEEDOR_TAB_IDS = [
+  'identificacion',
+  'ubicacion',
+  'contable',
+  'documentacion',
+] as const;
+export type ProveedorTabId = (typeof PROVEEDOR_TAB_IDS)[number];
+
+export const BIEN_TAB_IDS = ['generales', 'contable', 'mantenimiento'] as const;
+export type BienTabId = (typeof BIEN_TAB_IDS)[number];
+
 export const VENTAS_TAB_IDS = ['afip', 'recibos'] as const;
 export type VentasTab = (typeof VENTAS_TAB_IDS)[number];
 
