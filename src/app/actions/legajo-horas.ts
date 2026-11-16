@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { db } from '@/lib/db';
 import { empleadoHoras, empleadoHorarios } from '@/lib/db/schema';
 import { contextoAdmin, esError } from '@/lib/auth/contexto-admin';
-import { empleadoDelClub } from '@/lib/legajo/acceso';
+import { MENSAJE_LEGAJO_BAJA, empleadoDelClub } from '@/lib/legajo/acceso';
 import { NOVEDADES_HORA, TIPOS_HORA } from '@/lib/legajo/constantes';
 import { enumReq, primerError, textoOpc, uuid, uuidOpc, ymdReq } from '@/lib/esquemas-comunes';
 import { calcularHoras, normalizarHora } from '@/lib/legajo/validaciones';
@@ -61,6 +61,7 @@ export async function guardarHorariosAction(
   const r = await conLegajo(empleadoId);
   if ('error' in r) return { error: r.error };
   const { c, e } = r;
+  if (e.estado === 'baja') return { error: MENSAJE_LEGAJO_BAJA };
 
   const parsed = horariosSchema.safeParse(input);
   if (!parsed.success) return { error: primerError(parsed.error) };
@@ -129,6 +130,7 @@ export async function guardarHoraAction(
   const r = await conLegajo(empleadoId);
   if ('error' in r) return { error: r.error };
   const { c, e } = r;
+  if (e.estado === 'baja') return { error: MENSAJE_LEGAJO_BAJA };
 
   const parsed = horaRealSchema.safeParse(input);
   if (!parsed.success) return { error: primerError(parsed.error) };

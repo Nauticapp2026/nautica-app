@@ -46,19 +46,26 @@ export function TabIdentificacion({
     areaSector: p.areaSector ?? '',
     estado: p.estado,
     cuit: p.cuit ?? '',
+    esExterior: p.esExterior,
     condicionIva: p.condicionIva ?? '',
     condicionIibb: p.condicionIibb ?? '',
+    nroIibb: p.nroIibb ?? '',
     actividades: p.actividades,
     retenciones: p.retenciones,
     certificadoRetencion: p.certificadoRetencion,
+    certRetImpuesto: p.certRetImpuesto ?? '',
     certRetDesde: p.certRetDesde ?? '',
     certRetHasta: p.certRetHasta ?? '',
     certRetPorcentaje: p.certRetPorcentaje ?? '',
   });
   const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF((x) => ({ ...x, [k]: v }));
 
-  const exterior = f.condicionIva === 'proveedor_exterior';
+  const exterior = f.esExterior;
   const cuit = !exterior && f.cuit.trim() !== '' ? validarCuil(f.cuit) : null;
+  // Todos los datos de identificación son obligatorios.
+  const identIncompleta = [f.codigo, f.nombre, f.nombreComercial, f.tipoSujeto, f.areaSector].some(
+    (v) => v.trim() === '',
+  );
 
   const guardar = () =>
     ejecutar(() => actualizarIdentificacionAction(p.id, f), 'Datos del proveedor guardados.');
@@ -76,6 +83,12 @@ export function TabIdentificacion({
         descripcion="Cómo figura el proveedor en el sistema."
         acciones={botonGuardar}
       >
+        {identIncompleta && (
+          <p className="mb-4 text-sm text-gray-500">
+            Todos los datos de identificación son obligatorios: completá los campos marcados con{' '}
+            <span className="text-red-500">*</span>.
+          </p>
+        )}
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <Campo
             label="Código de proveedor"
@@ -107,6 +120,7 @@ export function TabIdentificacion({
           </Campo>
           <Campo
             label="Nombre comercial"
+            requerido
             ayuda="Marca o nombre de fantasía: facilita la búsqueda interna."
           >
             <input
@@ -116,14 +130,14 @@ export function TabIdentificacion({
               onChange={(e) => set('nombreComercial', e.target.value)}
             />
           </Campo>
-          <Campo label="Tipo de sujeto">
+          <Campo label="Tipo de sujeto" requerido>
             <Selector
               value={f.tipoSujeto}
               onChange={(v) => set('tipoSujeto', v)}
               opciones={TIPOS_SUJETO}
             />
           </Campo>
-          <Campo label="Área o sector del proveedor" ayuda="Para buscarlo y filtrarlo.">
+          <Campo label="Área o sector del proveedor" requerido ayuda="Para buscarlo y filtrarlo.">
             <CatalogoSelect
               tipo="prov_area"
               value={f.areaSector}
@@ -140,6 +154,17 @@ export function TabIdentificacion({
         acciones={botonGuardar}
       >
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <label className="flex cursor-pointer items-center gap-2 md:col-span-2">
+            <input
+              type="checkbox"
+              className="h-4 w-4 cursor-pointer rounded accent-[#175861]"
+              checked={f.esExterior}
+              onChange={(e) => set('esExterior', e.target.checked)}
+            />
+            <span className="text-sm font-medium text-gray-800">
+              Es un proveedor del exterior (no tiene CUIT argentino)
+            </span>
+          </label>
           <Campo
             label={exterior ? 'Identificación fiscal (opcional)' : 'CUIT'}
             requerido={!exterior}
@@ -168,7 +193,19 @@ export function TabIdentificacion({
               opciones={CONDICIONES_IIBB}
             />
           </Campo>
-          <Campo label="Actividad principal" ayuda="Podés elegir más de una.">
+          <Campo label="Nº de Ingresos Brutos">
+            <input
+              className={inputCls}
+              value={f.nroIibb}
+              maxLength={30}
+              onChange={(e) => set('nroIibb', e.target.value)}
+            />
+          </Campo>
+          <Campo
+            label="Actividad principal"
+            ayuda="Podés elegir más de una."
+            className="md:col-span-2"
+          >
             <CatalogoMulti
               tipo="prov_actividad"
               value={f.actividades}
@@ -187,87 +224,103 @@ export function TabIdentificacion({
               adjunto={det.adjuntosFijos['legajo_impositivo']}
             />
           </div>
+        </div>
+      </Tarjeta>
 
-          <Campo
-            label="Indicador de retención"
-            ayuda="Impuestos que se le retienen al pagarle. Sin ninguno tildado, no se le retiene."
-            className="md:col-span-2"
-          >
-            <div className="flex flex-wrap gap-x-5 gap-y-2">
-              {RETENCIONES.map((r) => (
-                <label key={r.value} className="flex cursor-pointer items-center gap-2">
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 cursor-pointer rounded accent-[#175861]"
-                    checked={f.retenciones.includes(r.value)}
-                    onChange={(e) =>
-                      set(
-                        'retenciones',
-                        e.target.checked
-                          ? [...f.retenciones, r.value]
-                          : f.retenciones.filter((x) => x !== r.value),
-                      )
-                    }
-                  />
-                  <span className="text-sm text-gray-700">{r.label}</span>
-                </label>
-              ))}
-            </div>
-          </Campo>
-
-          <div className="md:col-span-2">
-            <label className="flex cursor-pointer items-center gap-2">
+      <Tarjeta
+        titulo="Pasible de Retenciones"
+        descripcion="Marcá aquellos impuestos sobre los que corresponde efectuar retenciones."
+        acciones={botonGuardar}
+      >
+        <div className="flex flex-wrap gap-x-6 gap-y-2">
+          {RETENCIONES.map((r) => (
+            <label key={r.value} className="flex cursor-pointer items-center gap-2">
               <input
                 type="checkbox"
                 className="h-4 w-4 cursor-pointer rounded accent-[#175861]"
-                checked={f.certificadoRetencion}
-                onChange={(e) => set('certificadoRetencion', e.target.checked)}
+                checked={f.retenciones.includes(r.value)}
+                onChange={(e) =>
+                  set(
+                    'retenciones',
+                    e.target.checked
+                      ? [...f.retenciones, r.value]
+                      : f.retenciones.filter((x) => x !== r.value),
+                  )
+                }
               />
-              <span className="text-sm font-medium text-gray-800">
-                Tiene certificado de exclusión de retenciones
-              </span>
+              <span className="text-sm text-gray-700">{r.label}</span>
             </label>
-            {f.certificadoRetencion && (
-              <div className="mt-3 grid grid-cols-1 gap-4 rounded-[10px] border border-gray-200 bg-gray-50/60 p-4 md:grid-cols-3">
-                <Campo label="Vigente desde" requerido>
-                  <input
-                    type="date"
-                    className={inputCls}
-                    value={f.certRetDesde}
-                    onChange={(e) => set('certRetDesde', e.target.value)}
-                  />
-                </Campo>
-                <Campo label="Vigente hasta" requerido>
-                  <input
-                    type="date"
-                    className={inputCls}
-                    value={f.certRetHasta}
-                    onChange={(e) => set('certRetHasta', e.target.value)}
-                  />
-                </Campo>
-                <Campo label="% de exclusión" requerido ayuda="De 0 a 100.">
-                  <input
-                    type="number"
-                    min={0}
-                    max={100}
-                    step="0.01"
-                    className={inputCls}
-                    value={f.certRetPorcentaje}
-                    onChange={(e) => set('certRetPorcentaje', e.target.value)}
-                  />
-                </Campo>
-                <div className="md:col-span-3">
-                  <AdjuntoFijo
-                    proveedorId={p.id}
-                    clave="cert_retencion"
-                    rotulo={ROTULO_DOCUMENTO_FIJO.cert_retencion}
-                    adjunto={det.adjuntosFijos['cert_retencion']}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
+          ))}
         </div>
+      </Tarjeta>
+
+      <Tarjeta
+        titulo="Certificado de exclusión de retenciones"
+        descripcion="Si el proveedor tiene certificado, indicá el impuesto, las fechas de vigencia y el porcentaje de exclusión."
+        acciones={botonGuardar}
+      >
+        <label className="flex cursor-pointer items-center gap-2">
+          <input
+            type="checkbox"
+            className="h-4 w-4 cursor-pointer rounded accent-[#175861]"
+            checked={f.certificadoRetencion}
+            onChange={(e) => set('certificadoRetencion', e.target.checked)}
+          />
+          <span className="text-sm font-medium text-gray-800">
+            Tiene certificado de exclusión de retenciones
+          </span>
+        </label>
+        {f.certificadoRetencion && (
+          <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+            <Campo
+              label="Tipo de Impuesto"
+              requerido
+              ayuda="Impuesto al que corresponde el certificado."
+            >
+              <Selector
+                value={f.certRetImpuesto}
+                onChange={(v) => set('certRetImpuesto', v)}
+                opciones={RETENCIONES}
+                placeholder="Elegí el impuesto"
+              />
+            </Campo>
+            <Campo label="% de exclusión" requerido ayuda="De 0 a 100.">
+              <input
+                type="number"
+                min={0}
+                max={100}
+                step="0.01"
+                className={inputCls}
+                value={f.certRetPorcentaje}
+                onChange={(e) => set('certRetPorcentaje', e.target.value)}
+              />
+            </Campo>
+            <Campo label="Vigente desde" requerido>
+              <input
+                type="date"
+                className={inputCls}
+                value={f.certRetDesde}
+                onChange={(e) => set('certRetDesde', e.target.value)}
+              />
+            </Campo>
+            <Campo label="Vigente hasta" requerido>
+              <input
+                type="date"
+                className={inputCls}
+                value={f.certRetHasta}
+                onChange={(e) => set('certRetHasta', e.target.value)}
+              />
+            </Campo>
+            <div className="md:col-span-2">
+              <AdjuntoFijo
+                proveedorId={p.id}
+                clave="cert_retencion"
+                rotulo={ROTULO_DOCUMENTO_FIJO.cert_retencion}
+                adjunto={det.adjuntosFijos['cert_retencion']}
+              />
+            </div>
+          </div>
+        )}
       </Tarjeta>
 
       <section className="rounded-2xl border border-gray-200 bg-white p-4 md:p-6">

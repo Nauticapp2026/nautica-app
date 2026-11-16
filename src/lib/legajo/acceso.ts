@@ -21,3 +21,7 @@ export async function empleadoDelClub(id: string, gId: string) {
     .limit(1);
   return e ?? null;
 }
+
+/** Mensaje cuando se intenta cargar horas, licencias o vacaciones a un legajo dado de baja. */
+export const MENSAJE_LEGAJO_BAJA =
+  'Este legajo está dado de baja: no se pueden cargar horas, licencias ni vacaciones. Si vuelve a trabajar, reactivalo cambiando el estado en Laboral y horario.';

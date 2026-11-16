@@ -24,7 +24,6 @@ import { exportarTabla, type FormatoExportacion } from '@/lib/exportar-tabla';
 import {
   ESTADOS_EMPLEADO,
   LABEL_ROL,
-  NOVEDADES_HORA,
   TIPOS_DOCUMENTO_PERSONA,
   TIPOS_HORA,
   labelDe,
@@ -67,7 +66,7 @@ type Props = {
 
 const VISTAS: { id: Vista; label: string }[] = [
   { id: 'legajos', label: 'Legajos' },
-  { id: 'semana', label: 'Planilla semanal' },
+  { id: 'semana', label: 'Planilla de Horarios Semanal' },
   { id: 'novedades', label: 'Novedades del mes' },
 ];
 
@@ -77,8 +76,8 @@ export function PersonalClient(props: Props) {
     <div className="p-4 md:p-8">
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="page-title">Personal</h1>
-          <p className="page-subtitle mt-1">Legajo, horarios y novedades del personal del club</p>
+          <h1 className="page-title">Legajo Personal</h1>
+          <p className="page-subtitle mt-1">Legajo, horarios y novedades</p>
         </div>
         <button type="button" className={botonPrimario} onClick={() => setCreando(true)}>
           <span className="inline-flex items-center gap-1.5">
@@ -140,6 +139,35 @@ function ListaLegajos({ filas }: { filas: FilaLegajo[] }) {
     });
   }, [filas, q, estado]);
 
+  // Se exporta lo que se está viendo: respeta el estado elegido y la búsqueda.
+  const exportar = (formato: FormatoExportacion) => {
+    const estadoLabel = ESTADOS_EMPLEADO.find((e) => e.value === estado)?.label;
+    return exportarTabla(formato, {
+      nombre: 'personal',
+      titulo: estadoLabel ? `Personal · ${estadoLabel}` : 'Personal',
+      columnas: [
+        'Nº',
+        'Apellido y nombre',
+        'Documento',
+        'Puesto',
+        'Área',
+        'Ingreso',
+        'Estado',
+        'Legajo',
+      ],
+      filas: visibles.map((f) => [
+        String(f.numero),
+        `${f.apellido}, ${f.nombre}`,
+        `${labelDe(TIPOS_DOCUMENTO_PERSONA, f.tipoDocumento)} ${f.nroDocumento}`,
+        f.puesto ?? '',
+        f.area ?? '',
+        fechaLegible(f.fechaIngreso),
+        labelDe(ESTADOS_EMPLEADO, f.estado),
+        f.estado === 'baja' ? '—' : f.faltan === 0 ? 'Completo' : `Faltan ${f.faltan}`,
+      ]),
+    });
+  };
+
   if (filas.length === 0) {
     return (
       <div className="rounded-2xl border border-gray-200 bg-white">
@@ -176,6 +204,11 @@ function ListaLegajos({ filas }: { filas: FilaLegajo[] }) {
             </option>
           ))}
         </select>
+        <ExportarMenu
+          onExportar={exportar}
+          disabled={visibles.length === 0}
+          className="inline-flex h-10 items-center gap-1.5 rounded-[10px] border border-gray-200 bg-white px-4 text-sm font-medium whitespace-nowrap text-gray-700 hover:bg-gray-50"
+        />
       </div>
 
       {visibles.length === 0 ? (
@@ -538,7 +571,7 @@ function PlanillaSemanal({
                 {semana.dias.map((d, i) => (
                   <th
                     key={d}
-                    className={`px-2 py-3 font-semibold ${d === todayArg() ? 'text-[#175861]' : ''}`}
+                    className={`px-2 py-3 text-center font-semibold ${d === todayArg() ? 'text-[#175861]' : ''}`}
                   >
                     {NOMBRE_DIA_CORTO[i]} {d.slice(8)}
                   </th>
@@ -562,7 +595,7 @@ function PlanillaSemanal({
                     <td key={i} className="px-1 py-1.5">
                       {c.texto && (
                         <div
-                          className={`rounded-md px-2 py-1 text-xs leading-tight ${CLASE_CELDA[c.tipo]}`}
+                          className={`rounded-md px-2 py-1 text-center text-xs leading-tight ${CLASE_CELDA[c.tipo]}`}
                         >
                           {c.texto}
                         </div>
@@ -666,10 +699,7 @@ function NovedadesMes({ datos }: { datos: NonNullable<Props['novedades']> }) {
       <div className="flex flex-col gap-3 border-b border-gray-100 p-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-sm font-semibold text-gray-900">{titulo}</p>
-          <p className="text-xs text-gray-500">
-            Resumen por empleado para el área de liquidación de sueldos. Se exporta; no se envía
-            solo.
-          </p>
+          <p className="text-xs text-gray-500">Resumen de Horario Laboral de Empleados</p>
         </div>
         <div className="flex items-center gap-1">
           <button
@@ -745,11 +775,6 @@ function NovedadesMes({ datos }: { datos: NonNullable<Props['novedades']> }) {
           </table>
         </div>
       )}
-      <p className="border-t border-gray-100 px-4 py-3 text-xs text-gray-500">
-        Los días de vacaciones y licencia salen de sus registros con fechas y de las novedades
-        cargadas día por día, sin contar dos veces el mismo día. Novedades posibles:{' '}
-        {NOVEDADES_HORA.map((n) => n.label.toLowerCase()).join(', ')}.
-      </p>
     </div>
   );
 }

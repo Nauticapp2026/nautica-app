@@ -1458,8 +1458,12 @@ export const proveedores = pgTable(
     tipoSujeto: text('tipo_sujeto'),
     areaSector: text('area_sector'),
     cuit: text('cuit'),
+    /** Proveedor del exterior (sin CUIT argentino): el CUIT no se valida (mig 0177). */
+    esExterior: boolean('es_exterior').notNull().default(false),
     condicionIva: condicionFrenteIvaEnum('condicion_iva'),
     condicionIibb: condicionIibbEnum('condicion_iibb'),
+    /** Número de inscripción en Ingresos Brutos (mig 0176). */
+    nroIibb: text('nro_iibb'),
     actividades: text('actividades')
       .array()
       .notNull()
@@ -1470,6 +1474,8 @@ export const proveedores = pgTable(
       .notNull()
       .default(sql`'{}'::text[]`),
     certificadoRetencion: boolean('certificado_retencion').notNull().default(false),
+    /** Impuesto al que corresponde el certificado: iva | ganancias | iibb | suss (mig 0175). */
+    certRetImpuesto: text('cert_ret_impuesto'),
     certRetDesde: date('cert_ret_desde'),
     certRetHasta: date('cert_ret_hasta'),
     certRetPorcentaje: numeric('cert_ret_porcentaje', { precision: 5, scale: 2 }),
@@ -2500,6 +2506,12 @@ export const bienesUso = pgTable(
     valorOrigen: numeric('valor_origen', { precision: 16, scale: 2 }),
     moneda: text('moneda').notNull().default('ARS'),
     fechaInicioAmortizacion: date('fecha_inicio_amortizacion'),
+    /** Cuándo el bien empezó a funcionar (mig 0178). */
+    fechaInicioMarcha: date('fecha_inicio_marcha'),
+    /** lineal | saldo_decreciente | unidades_producidas (mig 0178). */
+    metodoAmortizacion: text('metodo_amortizacion').notNull().default('lineal'),
+    /** A quién se le compró el bien (mig 0178). */
+    proveedorId: uuid('proveedor_id').references(() => proveedores.id, { onDelete: 'set null' }),
     valorResidual: numeric('valor_residual', { precision: 16, scale: 2 }).notNull().default('0'),
     /** A quién le llegan los avisos de los planes de mantenimiento preventivo. */
     mantenimientoEmails: text('mantenimiento_emails')

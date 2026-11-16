@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { and, eq, inArray, max, sql } from 'drizzle-orm';
+import { and, eq, inArray, max, ne, sql } from 'drizzle-orm';
 import { z } from 'zod';
 
 import { db } from '@/lib/db';
@@ -39,6 +39,7 @@ import {
   ymdReq,
 } from '@/lib/esquemas-comunes';
 import { calcularCambios } from '@/lib/legajo/historial';
+import { PROVINCIAS } from '@/lib/proveedores/constantes';
 import {
   esEmailValido,
   validarCbu,
@@ -216,14 +217,14 @@ const personalesSchema = z.object({
   apellido: textoReq(80, 'Escribí el apellido.'),
   tipoDocumento: enumReq(VALORES(TIPOS_DOCUMENTO_PERSONA), 'Elegí el tipo de documento.'),
   nroDocumento: textoReq(30, 'Escribí el número de documento.'),
-  cuilCuit: textoOpc(20),
-  fechaNacimiento: ymdOpc('La fecha de nacimiento no es válida.'),
-  genero: enumOpc(VALORES(GENEROS), 'Elegí un género de la lista.'),
-  direccion: textoOpc(200),
-  localidad: textoOpc(100),
-  provincia: textoOpc(100),
-  telefono: textoOpc(40),
-  email: textoOpc(120),
+  cuilCuit: textoReq(20, 'Escribí el CUIL o CUIT.'),
+  fechaNacimiento: ymdReq('Cargá la fecha de nacimiento.'),
+  genero: enumReq(VALORES(GENEROS), 'Elegí el género.'),
+  direccion: textoReq(200, 'Escribí el domicilio real actual.'),
+  localidad: textoReq(100, 'Escribí la localidad.'),
+  provincia: textoReq(100, 'Elegí la provincia.'),
+  telefono: textoReq(40, 'Escribí el teléfono de contacto.'),
+  email: textoReq(120, 'Escribí el email personal.'),
 });
 
 export async function actualizarPersonalesAction(
@@ -241,14 +242,15 @@ export async function actualizarPersonalesAction(
   const doc = validarDocumento(d.tipoDocumento, d.nroDocumento);
   if (!doc.ok) return { error: doc.error };
 
-  let cuil: string | null = null;
-  if (d.cuilCuit) {
-    const v = validarCuil(d.cuilCuit);
-    if (!v.ok) return { error: v.error };
-    cuil = v.valor;
+  const vCuil = validarCuil(d.cuilCuit);
+  if (!vCuil.ok) return { error: vCuil.error };
+  const cuil = vCuil.valor;
+  if (!esEmailValido(d.email)) return { error: 'El email personal no es válido.' };
+  // La provincia se elige de la lista; un legajo viejo con otro texto puede conservarlo tal cual.
+  if (d.provincia !== e.provincia && !PROVINCIAS.some((p) => p.value === d.provincia)) {
+    return { error: 'Elegí una provincia de la lista.' };
   }
-  if (d.email && !esEmailValido(d.email)) return { error: 'El email personal no es válido.' };
-  if (d.fechaNacimiento && d.fechaNacimiento > new Date().toISOString().slice(0, 10)) {
+  if (d.fechaNacimiento > new Date().toISOString().slice(0, 10)) {
     return { error: 'La fecha de nacimiento no puede ser futura.' };
   }
 
@@ -289,11 +291,11 @@ export async function actualizarPersonalesAction(
 
 const laboralSchema = z.object({
   fechaIngreso: ymdReq('La fecha de ingreso no es válida.'),
-  fechaIngresoArca: ymdOpc('La fecha de ingreso en ARCA no es válida.'),
-  tipoContratacion: textoOpc(100),
-  puesto: textoOpc(100),
-  tareas: textoOpc(2000),
-  area: textoOpc(100),
+  fechaIngresoArca: ymdReq('Cargá la fecha de ingreso en ARCA.'),
+  tipoContratacion: textoReq(100, 'Elegí el tipo de contratación.'),
+  puesto: textoReq(100, 'Elegí el puesto o cargo.'),
+  tareas: textoReq(2000, 'Escribí las tareas a cargo.'),
+  area: textoReq(100, 'Elegí el área o departamento.'),
   reportaA: z.array(uuid).max(20).default([]),
   sedes: listaTextos(),
   ubicaciones: listaTextos(),
@@ -329,6 +331,15 @@ export async function actualizarLaboralAction(
 
   // "Reporta a": solo legajos de este club y nunca el propio.
   const jefes = d.reportaA.filter((j) => j !== e.id);
+  if (jefes.length === 0) {
+    // Obligatoria, salvo que este sea el único legajo del club (no hay a quién reportar).
+    const [otro] = await db
+      .select({ id: empleados.id })
+      .from(empleados)
+      .where(and(eq(empleados.guarderiaId, c.gId), ne(empleados.id, e.id)))
+      .limit(1);
+    if (otro) return { error: 'Elegí a quién reporta (posición a reportar).' };
+  }
   if (jefes.length > 0) {
     const validos = await db
       .select({ id: empleados.id })

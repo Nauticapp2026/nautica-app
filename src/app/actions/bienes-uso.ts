@@ -17,10 +17,12 @@ import {
   bienUsoPlanes,
   bienesUso,
   empleados,
+  proveedores,
 } from '@/lib/db/schema';
 import {
   ESTADOS_BIEN,
   FORMAS_ADQUISICION,
+  METODOS_AMORTIZACION,
   ROLES_EMPLEADO_BIEN,
   VIDAS_UTILES,
 } from '@/lib/bienes-uso/constantes';
@@ -33,6 +35,7 @@ import {
   textoOpc,
   textoReq,
   uuid,
+  uuidOpc,
   ymdOpc,
   ymdReq,
 } from '@/lib/esquemas-comunes';
@@ -149,17 +152,16 @@ const generalesSchema = z.object({
   fechaIncorporacion: ymdReq('La fecha de incorporación no es válida.'),
   estado: enumReq(VALORES(ESTADOS_BIEN), 'Elegí un estado de la lista.'),
   estadoDetalle: textoOpc(120),
-  formaAdquisicion: enumOpc(
-    VALORES(FORMAS_ADQUISICION),
-    'Elegí una forma de adquisición de la lista.',
-  ),
-  vidaUtilAnios: enumOpc(VALORES(VIDAS_UTILES), 'Elegí una vida útil de la lista.'),
-  tipoBien: textoOpc(80),
-  rubro: textoOpc(80),
-  subrubro: textoOpc(80),
+  // Obligatorios al guardar los datos generales (el alta pide menos): forma de adquisición,
+  // vida útil, tipo, rubro, subrubro y marca.
+  formaAdquisicion: enumReq(VALORES(FORMAS_ADQUISICION), 'Elegí la forma de adquisición.'),
+  vidaUtilAnios: enumReq(VALORES(VIDAS_UTILES), 'Elegí la vida útil.'),
+  tipoBien: textoReq(80, 'Elegí el tipo de bien.'),
+  rubro: textoReq(80, 'Elegí el rubro.'),
+  subrubro: textoReq(80, 'Elegí el subrubro.'),
   nroGuarderia: textoOpc(30),
   nombre: textoReq(150, 'Escribí el nombre o la descripción del bien.'),
-  marca: textoOpc(80),
+  marca: textoReq(80, 'Elegí la marca.'),
   nroSerie: textoOpc(80),
   anioFabricacion: z.preprocess(
     (v) => (v === '' || v === null || v === undefined ? null : Number(v)),
@@ -171,8 +173,15 @@ const generalesSchema = z.object({
       .nullable(),
   ),
   patente: textoOpc(20),
-  ubicaciones: listaTextos(20, 80),
-  lugaresUtilizacion: listaTextos(20, 80),
+  // Obligatorios: al menos una ubicación, un lugar de utilización y un empleado autorizado.
+  ubicaciones: listaTextos(20, 80).refine(
+    (l) => l.length > 0,
+    'Elegí al menos una ubicación actual.',
+  ),
+  lugaresUtilizacion: listaTextos(20, 80).refine(
+    (l) => l.length > 0,
+    'Elegí al menos un lugar de utilización.',
+  ),
   autorizados: z.array(uuid).max(100).default([]),
   seguroAseguradora: textoOpc(80),
   seguroPoliza: textoOpc(60),
@@ -199,6 +208,20 @@ export async function actualizarGeneralesAction(
   }
   if (b.fechaBaja && d.fechaIncorporacion > b.fechaBaja) {
     return { error: 'La fecha de incorporación no puede ser posterior a la fecha de baja.' };
+  }
+
+  // Al menos un empleado autorizado. Si el club todavía no cargó personal, se le explica por dónde empezar.
+  if (autorizados.length === 0) {
+    const [hay] = await db
+      .select({ id: empleados.id })
+      .from(empleados)
+      .where(eq(empleados.guarderiaId, c.gId))
+      .limit(1);
+    return {
+      error: hay
+        ? 'Elegí al menos un empleado autorizado a utilizarlo.'
+        : 'Para elegir los empleados autorizados, primero cargá al personal en la sección Personal.',
+    };
   }
 
   // Los empleados autorizados tienen que ser legajos de ESTE club.
@@ -352,8 +375,13 @@ export async function quitarComprobanteSeguroAction(id: string): Promise<Resulta
 const contablesSchema = z.object({
   valorOrigen: importe('El valor de origen no es válido.'),
   moneda: enumReq(VALORES(MONEDAS), 'Elegí una moneda de la lista.'),
+  fechaInicioMarcha: ymdOpc('La fecha de inicio de marcha no es válida.'),
   fechaInicioAmortizacion: ymdOpc('La fecha de inicio de la amortización no es válida.'),
-  valorResidual: importe('El valor residual no es válido.'),
+  // La vida útil también se carga en Datos generales: es el mismo dato.
+  vidaUtilAnios: enumReq(VALORES(VIDAS_UTILES), 'Elegí la vida útil.'),
+  metodoAmortizacion: enumReq(VALORES(METODOS_AMORTIZACION), 'Elegí el método de amortización.'),
+  /** A quién se le compró el bien. */
+  proveedorId: uuidOpc,
 });
 
 export async function actualizarContablesAction(
@@ -367,12 +395,23 @@ export async function actualizarContablesAction(
   const parsed = contablesSchema.safeParse(input);
   if (!parsed.success) return { error: primerError(parsed.error) };
   const d = parsed.data;
-  const residual = d.valorResidual ?? 0;
-  if (d.valorOrigen !== null && residual > d.valorOrigen) {
-    return { error: 'El valor residual no puede ser mayor que el valor de origen.' };
+  // El valor residual ya no se pide en pantalla; si un bien tenía uno cargado de antes, el valor
+  // de origen no puede quedar por debajo.
+  const residual = Number(b.valorResidual);
+  if (residual > 0 && (d.valorOrigen === null || d.valorOrigen < residual)) {
+    return {
+      error: `El valor de origen no puede ser menor que el valor residual que ya tenía cargado (${residual}).`,
+    };
   }
-  if (d.valorOrigen === null && residual > 0) {
-    return { error: 'Para cargar un valor residual, cargá primero el valor de origen.' };
+
+  // El proveedor tiene que ser de ESTE club.
+  if (d.proveedorId) {
+    const [p] = await db
+      .select({ id: proveedores.id })
+      .from(proveedores)
+      .where(and(eq(proveedores.id, d.proveedorId), eq(proveedores.guarderiaId, c.gId)))
+      .limit(1);
+    if (!p) return { error: 'Ese proveedor no es de este club.' };
   }
 
   await db
@@ -380,8 +419,11 @@ export async function actualizarContablesAction(
     .set({
       valorOrigen: d.valorOrigen === null ? null : dosDecimales(d.valorOrigen),
       moneda: d.moneda,
+      fechaInicioMarcha: d.fechaInicioMarcha,
       fechaInicioAmortizacion: d.fechaInicioAmortizacion,
-      valorResidual: dosDecimales(residual),
+      vidaUtilAnios: Number(d.vidaUtilAnios),
+      metodoAmortizacion: d.metodoAmortizacion,
+      proveedorId: d.proveedorId,
       updatedBy: c.userId,
       updatedAt: new Date(),
     })

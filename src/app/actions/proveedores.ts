@@ -84,14 +84,14 @@ function mensajeDuplicado(err: unknown): string | null {
 
 const crearSchema = z.object({
   razonSocial: textoReq(150, 'Escribí la razón social o el nombre del proveedor.'),
+  /** Opcional y sin validar en el alta: se completa y se controla en Información fiscal. */
   cuit: textoOpc(20),
-  /** Proveedor del exterior: no tiene CUIT argentino. */
-  exterior: z.boolean().default(false),
 });
 
 /**
- * Crea un proveedor con lo mínimo: razón social y CUIT (salvo proveedor del exterior). Todo
- * lo demás es opcional y se completa después por solapas, para no desalentar a los clubes
+ * Crea un proveedor con lo mínimo: la razón social (el CUIT es opcional y no se valida acá: el
+ * tilde "proveedor del exterior" y el control del CUIT están en Información fiscal). Todo lo
+ * demás se completa después por solapas, para no desalentar a los clubes
  * chicos. El código es correlativo por club (P-0001…) y se puede cambiar después.
  */
 export async function crearProveedorAction(
@@ -104,14 +104,12 @@ export async function crearProveedorAction(
   if (!parsed.success) return { error: primerError(parsed.error) };
   const d = parsed.data;
 
-  let cuit: string | null = null;
-  if (d.exterior) {
-    cuit = d.cuit; // opcional, texto libre (id fiscal del exterior)
-  } else {
-    if (!d.cuit) return { error: 'Escribí el CUIT del proveedor.' };
+  // Si lo escribieron y es un CUIT válido se guarda con guiones; si no, tal cual lo escribieron
+  // (puede ser un proveedor del exterior): el control va en Información fiscal.
+  let cuit: string | null = d.cuit;
+  if (d.cuit) {
     const v = validarCuil(d.cuit);
-    if (!v.ok) return { error: v.error };
-    cuit = v.valor;
+    if (v.ok) cuit = v.valor;
   }
 
   for (let intento = 0; intento < 5; intento++) {
@@ -130,7 +128,6 @@ export async function crearProveedorAction(
             codigo: codigoPorNumero(numero),
             nombre: d.razonSocial,
             cuit,
-            condicionIva: d.exterior ? 'proveedor_exterior' : null,
             estado: 'activo',
             createdBy: c.userId,
             updatedBy: c.userId,
@@ -165,16 +162,20 @@ const porcentaje = z.preprocess(
 const identificacionSchema = z.object({
   codigo: textoReq(30, 'Escribí el código del proveedor.'),
   nombre: textoReq(150, 'Escribí la razón social.'),
-  nombreComercial: textoOpc(150),
-  tipoSujeto: enumOpc(VALORES(TIPOS_SUJETO), 'Elegí un tipo de sujeto de la lista.'),
-  areaSector: textoOpc(80),
+  nombreComercial: textoReq(150, 'Completá el nombre comercial.'),
+  tipoSujeto: enumReq(VALORES(TIPOS_SUJETO), 'Elegí el tipo de sujeto.'),
+  areaSector: textoReq(80, 'Elegí el área o sector del proveedor.'),
   estado: enumReq(VALORES(ESTADOS_PROVEEDOR), 'Elegí el estado.'),
   cuit: textoOpc(20),
+  /** Proveedor del exterior: el CUIT no se valida. */
+  esExterior: z.boolean().default(false),
   condicionIva: enumOpc(VALORES(CONDICIONES_IVA), 'Elegí una condición frente al IVA de la lista.'),
   condicionIibb: enumOpc(VALORES(CONDICIONES_IIBB), 'Elegí una condición de Ingresos Brutos.'),
+  nroIibb: textoOpc(30),
   actividades: listaTextos(20, 80),
   retenciones: z.array(enumReq(VALORES(RETENCIONES), 'Retención inválida.')).default([]),
   certificadoRetencion: z.boolean(),
+  certRetImpuesto: enumOpc(VALORES(RETENCIONES), 'Elegí un tipo de impuesto de la lista.'),
   certRetDesde: ymdOpc('La fecha desde del certificado no es válida.'),
   certRetHasta: ymdOpc('La fecha hasta del certificado no es válida.'),
   certRetPorcentaje: porcentaje,
@@ -192,21 +193,24 @@ export async function actualizarIdentificacionAction(
   if (!parsed.success) return { error: primerError(parsed.error) };
   const d = parsed.data;
 
-  // CUIT: obligatorio salvo proveedor del exterior; con la condición "del exterior" es texto libre.
-  const exterior = d.condicionIva === 'proveedor_exterior';
+  // CUIT: obligatorio y validado, salvo que esté tildado "proveedor del exterior" (texto libre).
   let cuit: string | null = d.cuit;
-  if (!exterior) {
+  if (!d.esExterior) {
     if (!d.cuit) return { error: 'El CUIT es obligatorio (salvo para un proveedor del exterior).' };
     const v = validarCuil(d.cuit);
     if (!v.ok) return { error: v.error };
     cuit = v.valor;
   }
 
-  // Certificado de exclusión de retenciones: si lo tiene, pide vigencia y porcentaje.
+  // Certificado de exclusión de retenciones: si lo tiene, pide el impuesto, la vigencia y el porcentaje.
+  let impuesto = null as string | null;
   let desde = null as string | null;
   let hasta = null as string | null;
   let pct = null as number | null;
   if (d.certificadoRetencion) {
+    if (!d.certRetImpuesto) {
+      return { error: 'Con certificado de retenciones, elegí el tipo de impuesto.' };
+    }
     if (!d.certRetDesde || !d.certRetHasta) {
       return { error: 'Con certificado de retenciones, completá la fecha desde y la fecha hasta.' };
     }
@@ -216,6 +220,7 @@ export async function actualizarIdentificacionAction(
     if (d.certRetPorcentaje === null) {
       return { error: 'Con certificado de retenciones, completá el porcentaje de exclusión.' };
     }
+    impuesto = d.certRetImpuesto;
     desde = d.certRetDesde;
     hasta = d.certRetHasta;
     pct = d.certRetPorcentaje;
@@ -232,11 +237,14 @@ export async function actualizarIdentificacionAction(
         areaSector: d.areaSector,
         estado: d.estado as 'activo' | 'inactivo',
         cuit,
+        esExterior: d.esExterior,
         condicionIva: d.condicionIva as (typeof proveedores.$inferInsert)['condicionIva'],
         condicionIibb: d.condicionIibb as (typeof proveedores.$inferInsert)['condicionIibb'],
+        nroIibb: d.nroIibb,
         actividades: d.actividades,
         retenciones: [...new Set(d.retenciones)],
         certificadoRetencion: d.certificadoRetencion,
+        certRetImpuesto: impuesto,
         certRetDesde: desde,
         certRetHasta: hasta,
         certRetPorcentaje: pct === null ? null : String(pct),
@@ -254,15 +262,23 @@ export async function actualizarIdentificacionAction(
 // ─── Solapa: ubicación y contacto ───────────────────────────────────────────
 
 const ubicacionSchema = z.object({
-  dirFiscalCalle: textoOpc(150),
-  dirFiscalNumero: textoOpc(20),
-  dirFiscalInterior: textoOpc(30),
-  dirComercialCalle: textoOpc(150),
-  dirComercialNumero: textoOpc(20),
-  dirComercialInterior: textoOpc(30),
-  codigoPostal: textoOpc(12),
-  ciudad: textoOpc(100),
-  provincia: textoOpc(100),
+  // Todos obligatorios (pedido del cliente). El interior (piso, depto, oficina) también: si el
+  // domicilio no tiene, se escribe "-".
+  dirFiscalCalle: textoReq(150, 'Completá la calle de la dirección fiscal.'),
+  dirFiscalNumero: textoReq(20, 'Completá el número de la dirección fiscal.'),
+  dirFiscalInterior: textoReq(
+    30,
+    'Completá el interior de la dirección fiscal (si no tiene, escribí "-").',
+  ),
+  dirComercialCalle: textoReq(150, 'Completá la calle de la dirección comercial.'),
+  dirComercialNumero: textoReq(20, 'Completá el número de la dirección comercial.'),
+  dirComercialInterior: textoReq(
+    30,
+    'Completá el interior de la dirección comercial (si no tiene, escribí "-").',
+  ),
+  codigoPostal: textoReq(12, 'Completá el código postal.'),
+  ciudad: textoReq(100, 'Completá la ciudad o municipio.'),
+  provincia: textoReq(100, 'Completá la provincia.'),
   pais: enumReq(VALORES(PAISES), 'Elegí un país de la lista.'),
   contactoNombre: textoOpc(120),
   telefono: textoOpc(40),

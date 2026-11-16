@@ -14,12 +14,20 @@ import { proveedorCuentasBancarias, proveedorDocumentos, proveedores } from '@/l
 
 // ─── Lista ──────────────────────────────────────────────────────────────────
 
+/** "Calle número, interior". El interior "-" (sin piso ni depto) no se muestra. */
+function domicilio(calle: string | null, numero: string | null, interior: string | null): string {
+  const base = [calle, numero].filter(Boolean).join(' ');
+  const int = interior && interior.trim() !== '-' ? interior.trim() : '';
+  return [base, int].filter(Boolean).join(', ');
+}
+
 export type FilaProveedor = {
   id: string;
   codigo: string;
   nombre: string;
   nombreComercial: string | null;
   cuit: string | null;
+  esExterior: boolean;
   tipoSujeto: string | null;
   areaSector: string | null;
   estado: string;
@@ -28,6 +36,35 @@ export type FilaProveedor = {
   email: string | null;
   ciudad: string | null;
   provincia: string | null;
+  // Resto de los datos del maestro (los usa la exportación a Excel/CSV).
+  condicionIibb: string | null;
+  nroIibb: string | null;
+  actividades: string[];
+  retenciones: string[];
+  certificadoRetencion: boolean;
+  certRetImpuesto: string | null;
+  certRetDesde: string | null;
+  certRetHasta: string | null;
+  certRetPorcentaje: string | null;
+  /** "Calle número, interior" ya armado. */
+  dirFiscal: string;
+  dirComercial: string;
+  codigoPostal: string | null;
+  pais: string;
+  contactoNombre: string | null;
+  cuentasContables: string[];
+  moneda: string;
+  condicionPago: string | null;
+  formaPago: string | null;
+  notas: string | null;
+  cuentasBancarias: {
+    banco: string | null;
+    tipoCuenta: string | null;
+    nroCuenta: string | null;
+    cbu: string | null;
+    alias: string | null;
+    titular: string | null;
+  }[];
   /** Requisitos obligatorios que todavía no presentó. */
   requisitosPendientes: number;
   /** Requisitos presentados cuyo vencimiento ya pasó. */
@@ -35,7 +72,7 @@ export type FilaProveedor = {
 };
 
 export async function listarProveedores(gId: string): Promise<FilaProveedor[]> {
-  const [provs, docs] = await Promise.all([
+  const [provs, docs, cuentas] = await Promise.all([
     db
       .select()
       .from(proveedores)
@@ -51,7 +88,26 @@ export async function listarProveedores(gId: string): Promise<FilaProveedor[]> {
       })
       .from(proveedorDocumentos)
       .where(eq(proveedorDocumentos.guarderiaId, gId)),
+    db
+      .select()
+      .from(proveedorCuentasBancarias)
+      .where(eq(proveedorCuentasBancarias.guarderiaId, gId))
+      .orderBy(asc(proveedorCuentasBancarias.createdAt)),
   ]);
+
+  const cuentasDe = new Map<string, FilaProveedor['cuentasBancarias']>();
+  for (const c of cuentas) {
+    const l = cuentasDe.get(c.proveedorId) ?? [];
+    l.push({
+      banco: c.banco,
+      tipoCuenta: c.tipoCuenta,
+      nroCuenta: c.nroCuenta,
+      cbu: c.cbu,
+      alias: c.alias,
+      titular: c.titular,
+    });
+    cuentasDe.set(c.proveedorId, l);
+  }
 
   const hoy = todayArg();
   const pendientes = new Map<string, number>();
@@ -72,6 +128,7 @@ export async function listarProveedores(gId: string): Promise<FilaProveedor[]> {
     nombre: p.nombre,
     nombreComercial: p.nombreComercial,
     cuit: p.cuit,
+    esExterior: p.esExterior,
     tipoSujeto: p.tipoSujeto,
     areaSector: p.areaSector,
     estado: p.estado ?? 'activo',
@@ -80,6 +137,26 @@ export async function listarProveedores(gId: string): Promise<FilaProveedor[]> {
     email: p.email,
     ciudad: p.ciudad,
     provincia: p.provincia,
+    condicionIibb: p.condicionIibb,
+    nroIibb: p.nroIibb,
+    actividades: p.actividades,
+    retenciones: p.retenciones,
+    certificadoRetencion: p.certificadoRetencion,
+    certRetImpuesto: p.certRetImpuesto,
+    certRetDesde: p.certRetDesde,
+    certRetHasta: p.certRetHasta,
+    certRetPorcentaje: p.certRetPorcentaje,
+    dirFiscal: domicilio(p.dirFiscalCalle, p.dirFiscalNumero, p.dirFiscalInterior),
+    dirComercial: domicilio(p.dirComercialCalle, p.dirComercialNumero, p.dirComercialInterior),
+    codigoPostal: p.codigoPostal,
+    pais: p.pais,
+    contactoNombre: p.contactoNombre,
+    cuentasContables: p.cuentasContables,
+    moneda: p.moneda,
+    condicionPago: p.condicionPago,
+    formaPago: p.formaPago,
+    notas: p.notas,
+    cuentasBancarias: cuentasDe.get(p.id) ?? [],
     requisitosPendientes: pendientes.get(p.id) ?? 0,
     requisitosVencidos: vencidos.get(p.id) ?? 0,
   }));
@@ -98,11 +175,14 @@ export type ProveedorDetalle = {
     areaSector: string | null;
     estado: string;
     cuit: string | null;
+    esExterior: boolean;
     condicionIva: string | null;
     condicionIibb: string | null;
+    nroIibb: string | null;
     actividades: string[];
     retenciones: string[];
     certificadoRetencion: boolean;
+    certRetImpuesto: string | null;
     certRetDesde: string | null;
     certRetHasta: string | null;
     certRetPorcentaje: string | null;
@@ -197,11 +277,14 @@ export async function obtenerProveedor(gId: string, id: string): Promise<Proveed
       areaSector: p.areaSector,
       estado: p.estado ?? 'activo',
       cuit: p.cuit,
+      esExterior: p.esExterior,
       condicionIva: p.condicionIva,
       condicionIibb: p.condicionIibb,
+      nroIibb: p.nroIibb,
       actividades: p.actividades,
       retenciones: p.retenciones,
       certificadoRetencion: p.certificadoRetencion,
+      certRetImpuesto: p.certRetImpuesto,
       certRetDesde: p.certRetDesde,
       certRetHasta: p.certRetHasta,
       certRetPorcentaje: p.certRetPorcentaje,

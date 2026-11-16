@@ -46,6 +46,13 @@ export function TabDocumentacion({
 
   const pendientes = det.requisitos.filter((r) => r.obligatorio && !r.presentado).length;
 
+  // Deja el archivo del formulario vacío: el estado Y el input del navegador, que si no
+  // conserva el archivo elegido antes aunque la pantalla diga "Adjuntar archivo".
+  function limpiarArchivo() {
+    setArchivo(null);
+    if (archivoNuevo.current) archivoNuevo.current.value = '';
+  }
+
   function agregar() {
     const fd = new FormData();
     fd.set('proveedorId', proveedorId);
@@ -59,7 +66,7 @@ export function TabDocumentacion({
       'Requisito agregado.',
       () => {
         setNuevo({ requisito: '', obligatorio: true, vencimiento: '' });
-        setArchivo(null);
+        limpiarArchivo();
       },
     );
   }
@@ -133,6 +140,15 @@ export function TabDocumentacion({
                   {archivo ? archivo.name : 'Adjuntar archivo'}
                 </span>
               </button>
+              {archivo && (
+                <button
+                  type="button"
+                  className="text-xs font-semibold text-gray-500 hover:text-red-600 hover:underline"
+                  onClick={limpiarArchivo}
+                >
+                  Quitar archivo
+                </button>
+              )}
             </div>
           </div>
           <div className="mt-4 flex justify-end">

@@ -137,7 +137,7 @@ export function BienesClient({
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="page-title">Bienes de uso</h1>
-          <p className="page-subtitle mt-1">Camionetas, máquinas, grúas y demás equipos del club</p>
+          <p className="page-subtitle mt-1">Equipos y Bienes Registrales</p>
         </div>
         <button type="button" className={botonPrimario} onClick={() => setCreando(true)}>
           <span className="inline-flex items-center gap-1.5">

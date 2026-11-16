@@ -117,7 +117,7 @@ export function BienDetail({
           hoy={hoy}
         />
       )}
-      {tab === 'contable' && <TabContable key={`c-${b.id}`} det={det} hoy={hoy} />}
+      {tab === 'contable' && <TabContable key={`c-${b.id}`} det={det} proveedores={proveedores} />}
       {tab === 'mantenimiento' && (
         <TabMantenimiento
           det={det}

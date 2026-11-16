@@ -26,6 +26,13 @@ export const VIDAS_UTILES: Opcion[] = [1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 15, 20, 2
   (n) => ({ value: String(n), label: n === 1 ? '1 año' : `${n} años` }),
 );
 
+/** Métodos de amortización (lista de la solapa Datos contables). */
+export const METODOS_AMORTIZACION: Opcion[] = [
+  { value: 'lineal', label: 'Lineal' },
+  { value: 'saldo_decreciente', label: 'Saldo decreciente' },
+  { value: 'unidades_producidas', label: 'Unidades producidas' },
+];
+
 export const FRECUENCIAS: Opcion[] = [
   { value: 'dias', label: 'Días' },
   { value: 'meses', label: 'Meses' },

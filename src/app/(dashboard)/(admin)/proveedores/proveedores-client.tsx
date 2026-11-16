@@ -18,9 +18,14 @@ import {
 import { normalizarBusqueda } from '@/lib/buscador';
 import { exportarTabla, type FormatoExportacion } from '@/lib/exportar-tabla';
 import { labelDe } from '@/lib/legajo/constantes';
-import { validarCuil } from '@/lib/legajo/validaciones';
 import type { FilaProveedor } from '@/lib/proveedores/consultas';
-import { CONDICIONES_IVA, ESTADOS_PROVEEDOR, TIPOS_SUJETO } from '@/lib/proveedores/constantes';
+import { ESTADOS_PROVEEDOR } from '@/lib/proveedores/constantes';
+import {
+  COLUMNAS_COMPLETAS,
+  COLUMNAS_RESUMEN,
+  filaCompleta,
+  filaResumen,
+} from '@/lib/proveedores/exportar';
 
 export function ProveedoresClient({ filas, areas }: { filas: FilaProveedor[]; areas: string[] }) {
   const [creando, setCreando] = useState(false);
@@ -46,40 +51,14 @@ export function ProveedoresClient({ filas, areas }: { filas: FilaProveedor[]; ar
     [areas, filas],
   );
 
+  // Excel y CSV llevan todos los datos del maestro; el PDF, solo las columnas principales
+  // (con más de 30 columnas no se podría leer).
   const exportar = (formato: FormatoExportacion) =>
     exportarTabla(formato, {
       nombre: 'proveedores',
       titulo: 'Proveedores',
-      columnas: [
-        'Código',
-        'Razón social',
-        'Nombre comercial',
-        'Tipo de sujeto',
-        'Área',
-        'CUIT',
-        'Condición IVA',
-        'Estado',
-        'Teléfono',
-        'Email de facturación',
-        'Ciudad',
-        'Provincia',
-        'Requisitos pendientes',
-      ],
-      filas: visibles.map((f) => [
-        f.codigo,
-        f.nombre,
-        f.nombreComercial ?? '',
-        labelDe(TIPOS_SUJETO, f.tipoSujeto),
-        f.areaSector ?? '',
-        f.cuit ?? '',
-        labelDe(CONDICIONES_IVA, f.condicionIva),
-        labelDe(ESTADOS_PROVEEDOR, f.estado),
-        f.telefono ?? '',
-        f.email ?? '',
-        f.ciudad ?? '',
-        f.provincia ?? '',
-        String(f.requisitosPendientes),
-      ]),
+      columnas: formato === 'pdf' ? COLUMNAS_RESUMEN : COLUMNAS_COMPLETAS,
+      filas: visibles.map(formato === 'pdf' ? filaResumen : filaCompleta),
     });
 
   return (
@@ -87,7 +66,7 @@ export function ProveedoresClient({ filas, areas }: { filas: FilaProveedor[]; ar
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="page-title">Proveedores</h1>
-          <p className="page-subtitle mt-1">Maestro de proveedores del club</p>
+          <p className="page-subtitle mt-1">Maestro de Proveedores</p>
         </div>
         <button type="button" className={botonPrimario} onClick={() => setCreando(true)}>
           <span className="inline-flex items-center gap-1.5">
@@ -234,14 +213,12 @@ function NuevoProveedor({ onCerrar }: { onCerrar: () => void }) {
   const { pending, ejecutar } = useAccion();
   const [razonSocial, setRazonSocial] = useState('');
   const [cuit, setCuit] = useState('');
-  const [exterior, setExterior] = useState(false);
-  const v = !exterior && cuit.trim() !== '' ? validarCuil(cuit) : null;
 
   function crear() {
     let nuevoId: string | undefined;
     ejecutar(
       async () => {
-        const res = await crearProveedorAction({ razonSocial, cuit, exterior });
+        const res = await crearProveedorAction({ razonSocial, cuit });
         nuevoId = res.id;
         return res;
       },
@@ -266,7 +243,7 @@ function NuevoProveedor({ onCerrar }: { onCerrar: () => void }) {
               Nuevo proveedor
             </h2>
             <p className="mt-0.5 text-sm text-gray-500">
-              Alcanza con la razón social y el CUIT. El resto es opcional.
+              Alcanza con la razón social. El resto se completa por solapas.
             </p>
           </div>
           <button
@@ -290,32 +267,16 @@ function NuevoProveedor({ onCerrar }: { onCerrar: () => void }) {
             />
           </Campo>
           <Campo
-            label={exterior ? 'Identificación fiscal (opcional)' : 'CUIT'}
-            requerido={!exterior}
-            ayuda={exterior ? undefined : 'Con o sin guiones. Se controla el dígito verificador.'}
+            label="CUIT"
+            ayuda="Opcional. Se controla en la solapa Información fiscal, donde también se marca si es un proveedor del exterior."
           >
             <input
               className={inputCls}
               value={cuit}
               maxLength={20}
-              inputMode={exterior ? 'text' : 'numeric'}
-              placeholder={exterior ? '' : '30-12345678-1'}
               onChange={(e) => setCuit(e.target.value)}
             />
-            {v && !v.ok && <p className="mt-1 text-xs text-red-600">{v.error}</p>}
-            {v?.ok && <p className="mt-1 text-xs text-[#175861]">CUIT válido.</p>}
           </Campo>
-          <label className="flex cursor-pointer items-center gap-2">
-            <input
-              type="checkbox"
-              className="h-4 w-4 cursor-pointer rounded accent-[#175861]"
-              checked={exterior}
-              onChange={(e) => setExterior(e.target.checked)}
-            />
-            <span className="text-sm text-gray-700">
-              Es un proveedor del exterior (no tiene CUIT argentino)
-            </span>
-          </label>
         </div>
 
         <div className="mt-5 flex justify-end gap-2">
@@ -325,7 +286,7 @@ function NuevoProveedor({ onCerrar }: { onCerrar: () => void }) {
           <button
             type="button"
             className={botonPrimario}
-            disabled={pending || !razonSocial.trim() || (!exterior && !cuit.trim())}
+            disabled={pending || !razonSocial.trim()}
             onClick={crear}
           >
             {pending ? 'Creando…' : 'Crear proveedor'}

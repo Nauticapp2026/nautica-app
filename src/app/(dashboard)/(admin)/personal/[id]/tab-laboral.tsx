@@ -10,6 +10,7 @@ import { DIAS_SEMANA, ESTADOS_EMPLEADO, TIPOS_HORA } from '@/lib/legajo/constant
 import type { LegajoDetalle, PersonaSelector } from '@/lib/legajo/consultas';
 import { calcularHoras, formatearHoras } from '@/lib/legajo/validaciones';
 
+import { BloqueoPorBaja } from './aviso-baja';
 import { AdjuntoInline } from './documentos-ui';
 import {
   Campo,
@@ -87,6 +88,7 @@ export function TabLaboral({
           </Campo>
           <Campo
             label="Fecha de ingreso en ARCA"
+            requerido
             ayuda="Alta temprana. Podés adjuntar la constancia."
           >
             <input
@@ -100,7 +102,7 @@ export function TabLaboral({
             <AdjuntoInline empleadoId={e.id} tipo="alta_arca" doc={det.documentos['alta_arca']} />
           </div>
 
-          <Campo label="Tipo de contratación">
+          <Campo label="Tipo de contratación" requerido>
             <CatalogoSelect
               tipo="tipo_contratacion"
               value={f.tipoContratacion}
@@ -108,7 +110,7 @@ export function TabLaboral({
               opciones={catalogos.tipo_contratacion}
             />
           </Campo>
-          <Campo label="Puesto o cargo" ayuda="Rol o función dentro del club.">
+          <Campo label="Puesto o cargo" requerido ayuda="Rol o función dentro del club.">
             <CatalogoSelect
               tipo="puesto"
               value={f.puesto}
@@ -118,6 +120,7 @@ export function TabLaboral({
           </Campo>
           <Campo
             label="Tareas a cargo"
+            requerido
             ayuda="Detalle de las tareas que realiza."
             className="md:col-span-2"
           >
@@ -128,7 +131,7 @@ export function TabLaboral({
               onChange={(x) => set('tareas', x.target.value)}
             />
           </Campo>
-          <Campo label="Área o departamento">
+          <Campo label="Área o departamento" requerido>
             <CatalogoSelect
               tipo="area"
               value={f.area}
@@ -136,7 +139,11 @@ export function TabLaboral({
               opciones={catalogos.area}
             />
           </Campo>
-          <Campo label="Posición a reportar" ayuda="Una o varias personas a quienes reporta.">
+          <Campo
+            label="Posición a reportar"
+            requerido={jefesPosibles.length > 0}
+            ayuda="Una o varias personas a quienes reporta."
+          >
             <PersonasMulti
               value={f.reportaA}
               onChange={(v) => set('reportaA', v)}
@@ -239,7 +246,9 @@ export function TabLaboral({
         </div>
       </Tarjeta>
 
-      <HorarioEditor empleadoId={e.id} inicial={det.horarios} />
+      <BloqueoPorBaja baja={e.estado === 'baja'}>
+        <HorarioEditor empleadoId={e.id} inicial={det.horarios} />
+      </BloqueoPorBaja>
     </div>
   );
 }

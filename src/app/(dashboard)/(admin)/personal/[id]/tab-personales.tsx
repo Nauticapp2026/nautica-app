@@ -7,6 +7,7 @@ import { actualizarPersonalesAction, vincularUsuarioAction } from '@/app/actions
 import { GENEROS, LABEL_ROL, TIPOS_DOCUMENTO_PERSONA } from '@/lib/legajo/constantes';
 import type { LegajoDetalle, UsuarioVinculable } from '@/lib/legajo/consultas';
 import { validarCuil } from '@/lib/legajo/validaciones';
+import { PROVINCIAS } from '@/lib/proveedores/constantes';
 
 import { AdjuntoInline } from './documentos-ui';
 import {
@@ -44,6 +45,12 @@ export function TabPersonales({
   });
   const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF((p) => ({ ...p, [k]: v }));
 
+  // Un legajo cargado antes con otro texto conserva su provincia hasta que se elija una de la lista.
+  const opcionesProvincia =
+    f.provincia && !PROVINCIAS.some((x) => x.value === f.provincia)
+      ? [{ value: f.provincia, label: f.provincia }, ...PROVINCIAS]
+      : PROVINCIAS;
+
   // Aviso en vivo del CUIL: el servidor es la validación real.
   const cuil = f.cuilCuit.trim() === '' ? null : validarCuil(f.cuilCuit);
 
@@ -51,7 +58,7 @@ export function TabPersonales({
     <div className="space-y-6">
       <Tarjeta
         titulo="Datos personales"
-        descripcion="Tal como figuran en el documento de identidad del trabajador."
+        descripcion="Tal como figuran en el documento de identidad del trabajador. Todos los campos son obligatorios."
         acciones={
           <button
             type="button"
@@ -99,7 +106,11 @@ export function TabPersonales({
               onChange={(x) => set('nroDocumento', x.target.value)}
             />
           </Campo>
-          <Campo label="CUIL / CUIT" ayuda="Con o sin guiones. Se controla el dígito verificador.">
+          <Campo
+            label="CUIL / CUIT"
+            requerido
+            ayuda="Con o sin guiones. Se controla el dígito verificador."
+          >
             <input
               className={inputCls}
               value={f.cuilCuit}
@@ -110,7 +121,7 @@ export function TabPersonales({
             {cuil && !cuil.ok && <p className="mt-1 text-xs text-red-600">{cuil.error}</p>}
             {cuil?.ok && <p className="mt-1 text-xs text-[#175861]">CUIL/CUIT válido.</p>}
           </Campo>
-          <Campo label="Fecha de nacimiento">
+          <Campo label="Fecha de nacimiento" requerido>
             <input
               type="date"
               className={inputCls}
@@ -118,10 +129,10 @@ export function TabPersonales({
               onChange={(x) => set('fechaNacimiento', x.target.value)}
             />
           </Campo>
-          <Campo label="Género" ayuda="Para los registros previsionales.">
+          <Campo label="Género" requerido ayuda="Para los registros previsionales.">
             <Selector value={f.genero} onChange={(v) => set('genero', v)} opciones={GENEROS} />
           </Campo>
-          <Campo label="Teléfono de contacto" ayuda="Celular o fijo, con código de área.">
+          <Campo label="Teléfono de contacto" requerido ayuda="Celular o fijo, con código de área.">
             <input
               className={inputCls}
               value={f.telefono}
@@ -131,6 +142,7 @@ export function TabPersonales({
           </Campo>
           <Campo
             label="Domicilio real actual"
+            requerido
             ayuda="Calle, número, piso y departamento."
             className="md:col-span-2"
           >
@@ -141,7 +153,7 @@ export function TabPersonales({
               onChange={(x) => set('direccion', x.target.value)}
             />
           </Campo>
-          <Campo label="Localidad">
+          <Campo label="Localidad" requerido>
             <input
               className={inputCls}
               value={f.localidad}
@@ -149,16 +161,17 @@ export function TabPersonales({
               onChange={(x) => set('localidad', x.target.value)}
             />
           </Campo>
-          <Campo label="Provincia">
-            <input
-              className={inputCls}
+          <Campo label="Provincia" requerido>
+            <Selector
               value={f.provincia}
-              maxLength={100}
-              onChange={(x) => set('provincia', x.target.value)}
+              onChange={(v) => set('provincia', v)}
+              opciones={opcionesProvincia}
+              placeholder="Elegí la provincia"
             />
           </Campo>
           <Campo
             label="Email personal"
+            requerido
             ayuda="Para el envío de recibos digitales y avisos."
             className="md:col-span-2"
           >

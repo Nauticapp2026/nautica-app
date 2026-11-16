@@ -893,6 +893,10 @@ function diasEnRango(desde: string, hasta: string, lo: string, hi: string): stri
  * licencia, vacaciones, ausencia y feriado. Es lo que el área de liquidación necesita para
  * calcular. Las vacaciones y licencias salen de sus propios registros (con fechas) y de las
  * novedades cargadas día por día, sin contar dos veces el mismo día.
+ *
+ * Los días del mes sin nada cargado día por día (ni horas, ni una novedad) y sin vacaciones ni
+ * licencia se completan con el horario laboral previsto del legajo, igual que la planilla
+ * semanal: así lo cargado en "Laboral y horario" se refleja acá sin tener que repetirlo.
  */
 export async function novedadesDelPeriodo(gId: string, mes: string): Promise<FilaNovedades[]> {
   const { desde, hasta } = rangoDelMes(mes);
@@ -908,7 +912,7 @@ export async function novedadesDelPeriodo(gId: string, mes: string): Promise<Fil
   if (vigentes.length === 0) return [];
   const ids = vigentes.map((e) => e.id);
 
-  const [horas, vacas, lics] = await Promise.all([
+  const [horas, horarios, vacas, lics] = await Promise.all([
     db
       .select()
       .from(empleadoHoras)
@@ -920,6 +924,10 @@ export async function novedadesDelPeriodo(gId: string, mes: string): Promise<Fil
           lte(empleadoHoras.fecha, hasta),
         ),
       ),
+    db
+      .select()
+      .from(empleadoHorarios)
+      .where(and(eq(empleadoHorarios.guarderiaId, gId), inArray(empleadoHorarios.empleadoId, ids))),
     db
       .select()
       .from(empleadoVacacionesTomadas)
@@ -967,6 +975,24 @@ export async function novedadesDelPeriodo(gId: string, mes: string): Promise<Fil
       // Cubre hasta el día anterior a la reincorporación; sin fecha de vuelta, sigue en curso.
       const fin = l.fechaIncorporacion ? addDiasYmd(l.fechaIncorporacion, -1) : hasta;
       for (const d of diasEnRango(l.fechaAlta, fin, desde, hasta)) sets.licencia.add(d);
+    }
+    // Horario previsto en los días que no tienen nada cargado, dentro de la relación laboral.
+    const cargados = new Set(horas.filter((x) => x.empleadoId === e.id).map((x) => x.fecha));
+    const previstos = horarios.filter((p) => p.empleadoId === e.id);
+    if (previstos.length > 0) {
+      const ini = e.fechaIngreso > desde ? e.fechaIngreso : desde;
+      const fin = e.fechaEgreso && e.fechaEgreso < hasta ? e.fechaEgreso : hasta;
+      for (const dia of diasEnRango(ini, fin, ini, fin)) {
+        if (cargados.has(dia) || sets.vacaciones.has(dia) || sets.licencia.has(dia)) continue;
+        const delDia = previstos.filter((p) => p.dia === diaDeSemana(dia));
+        if (delDia.length === 0) continue;
+        sets.trabajado.add(dia);
+        for (const p of delDia) {
+          horasPorTipo[p.tipoHora] =
+            Math.round(((horasPorTipo[p.tipoHora] ?? 0) + calcularHoras(p.desde, p.hasta)) * 100) /
+            100;
+        }
+      }
     }
     const total = Object.values(horasPorTipo).reduce((a, b) => a + b, 0);
     return {

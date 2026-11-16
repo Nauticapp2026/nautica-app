@@ -192,6 +192,9 @@ export type BienDetalle = {
     valorOrigen: number | null;
     moneda: string;
     fechaInicioAmortizacion: string | null;
+    fechaInicioMarcha: string | null;
+    metodoAmortizacion: string;
+    proveedorId: string | null;
     valorResidual: number;
     mantenimientoEmails: string[];
     notas: string | null;
@@ -342,6 +345,9 @@ export async function obtenerBien(gId: string, id: string): Promise<BienDetalle 
       valorOrigen: num(b.valorOrigen),
       moneda: b.moneda,
       fechaInicioAmortizacion: b.fechaInicioAmortizacion,
+      fechaInicioMarcha: b.fechaInicioMarcha,
+      metodoAmortizacion: b.metodoAmortizacion,
+      proveedorId: b.proveedorId,
       valorResidual: Number(b.valorResidual),
       mantenimientoEmails: b.mantenimientoEmails,
       notas: b.notas,

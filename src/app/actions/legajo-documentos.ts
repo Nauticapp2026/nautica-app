@@ -15,7 +15,7 @@ import {
 } from '@/lib/db/schema';
 import { borrarArchivo, subirArchivo, validarArchivo } from '@/lib/archivos-privados';
 import { contextoAdmin, esError } from '@/lib/auth/contexto-admin';
-import { empleadoDelClub } from '@/lib/legajo/acceso';
+import { MENSAJE_LEGAJO_BAJA, empleadoDelClub } from '@/lib/legajo/acceso';
 import { ROLES_ADMIN_LICENCIA, TIPOS_DOCUMENTO_LEGAJO } from '@/lib/legajo/constantes';
 import { anioDe, primerError, textoOpc, uuid, ymdOpc, ymdReq } from '@/lib/esquemas-comunes';
 import { diasCorridos } from '@/lib/legajo/validaciones';
@@ -200,6 +200,7 @@ export async function crearLicenciaAction(formData: FormData): Promise<Resultado
   const r = await conLegajo(String(formData.get('empleadoId') ?? ''));
   if ('error' in r) return { error: r.error };
   const { c, e } = r;
+  if (e.estado === 'baja') return { error: MENSAJE_LEGAJO_BAJA };
 
   const parsed = licenciaSchema.safeParse({
     tipo: formData.get('tipo') ?? '',
@@ -257,6 +258,7 @@ export async function actualizarLicenciaAction(formData: FormData): Promise<Resu
   const r = await conLegajo(String(formData.get('empleadoId') ?? ''));
   if ('error' in r) return { error: r.error };
   const { c, e } = r;
+  if (e.estado === 'baja') return { error: MENSAJE_LEGAJO_BAJA };
 
   const licenciaId = String(formData.get('licenciaId') ?? '');
   if (!uuid.safeParse(licenciaId).success) return { error: 'Dato inválido.' };
@@ -362,6 +364,7 @@ export async function guardarVacacionesAnualesAction(
   const r = await conLegajo(empleadoId);
   if ('error' in r) return { error: r.error };
   const { c, e } = r;
+  if (e.estado === 'baja') return { error: MENSAJE_LEGAJO_BAJA };
 
   const parsed = anualSchema.safeParse(input);
   if (!parsed.success) return { error: primerError(parsed.error) };
@@ -394,6 +397,7 @@ export async function agregarVacacionesTomadasAction(
   const r = await conLegajo(empleadoId);
   if ('error' in r) return { error: r.error };
   const { c, e } = r;
+  if (e.estado === 'baja') return { error: MENSAJE_LEGAJO_BAJA };
 
   const parsed = tomadasSchema.safeParse(input);
   if (!parsed.success) return { error: primerError(parsed.error) };

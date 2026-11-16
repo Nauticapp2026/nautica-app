@@ -25,8 +25,11 @@ function Domicilio({
   onCalle,
   onNumero,
   onInterior,
+  accion,
 }: {
   titulo: string;
+  /** Botón opcional a la derecha del título (ej. copiar la dirección fiscal). */
+  accion?: React.ReactNode;
   calle: string;
   numero: string;
   interior: string;
@@ -36,9 +39,12 @@ function Domicilio({
 }) {
   return (
     <div>
-      <p className="mb-2 text-sm font-semibold text-gray-800">{titulo}</p>
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <p className="text-sm font-semibold text-gray-800">{titulo}</p>
+        {accion}
+      </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-[2fr_1fr_1fr]">
-        <Campo label="Calle">
+        <Campo label="Calle" requerido>
           <input
             className={inputCls}
             value={calle}
@@ -46,7 +52,7 @@ function Domicilio({
             onChange={(e) => onCalle(e.target.value)}
           />
         </Campo>
-        <Campo label="Número">
+        <Campo label="Número" requerido>
           <input
             className={inputCls}
             value={numero}
@@ -54,7 +60,7 @@ function Domicilio({
             onChange={(e) => onNumero(e.target.value)}
           />
         </Campo>
-        <Campo label="Interior" ayuda="Piso, depto u oficina.">
+        <Campo label="Interior" requerido ayuda='Piso, depto u oficina. Si no tiene, escribí "-".'>
           <input
             className={inputCls}
             value={interior}
@@ -90,24 +96,40 @@ export function TabUbicacion({ det }: { det: ProveedorDetalle }) {
 
   const emailMal = f.email.trim() !== '' && !esEmailValido(f.email.trim());
   const esArgentina = f.pais === 'Argentina';
+  // Todos obligatorios (el interior también: si no tiene, se escribe "-").
+  const incompleto = [
+    f.dirFiscalCalle,
+    f.dirFiscalNumero,
+    f.dirFiscalInterior,
+    f.dirComercialCalle,
+    f.dirComercialNumero,
+    f.dirComercialInterior,
+    f.codigoPostal,
+    f.ciudad,
+    f.pais,
+    f.provincia,
+  ].some((v) => v.trim() === '');
+
+  const botonGuardar = (
+    <button
+      type="button"
+      className={botonPrimario}
+      disabled={pending || emailMal || incompleto}
+      onClick={() => ejecutar(() => actualizarUbicacionContactoAction(p.id, f), 'Datos guardados.')}
+    >
+      {pending ? 'Guardando…' : 'Guardar cambios'}
+    </button>
+  );
 
   return (
     <div className="space-y-6">
-      <Tarjeta
-        titulo="Ubicación y localización"
-        acciones={
-          <button
-            type="button"
-            className={botonPrimario}
-            disabled={pending || emailMal}
-            onClick={() =>
-              ejecutar(() => actualizarUbicacionContactoAction(p.id, f), 'Datos guardados.')
-            }
-          >
-            {pending ? 'Guardando…' : 'Guardar cambios'}
-          </button>
-        }
-      >
+      <Tarjeta titulo="Ubicación y localización" acciones={botonGuardar}>
+        {incompleto && (
+          <p className="mb-4 text-sm text-gray-500">
+            Todos los campos son obligatorios: completá los marcados con{' '}
+            <span className="text-red-500">*</span> para poder guardar.
+          </p>
+        )}
         <div className="space-y-5">
           <Domicilio
             titulo="Dirección fiscal"
@@ -126,9 +148,29 @@ export function TabUbicacion({ det }: { det: ProveedorDetalle }) {
             onCalle={(v) => set('dirComercialCalle', v)}
             onNumero={(v) => set('dirComercialNumero', v)}
             onInterior={(v) => set('dirComercialInterior', v)}
+            accion={
+              <button
+                type="button"
+                className="text-xs font-semibold text-[#175861] hover:underline"
+                onClick={() =>
+                  setF((x) => ({
+                    ...x,
+                    dirComercialCalle: x.dirFiscalCalle,
+                    dirComercialNumero: x.dirFiscalNumero,
+                    dirComercialInterior: x.dirFiscalInterior,
+                  }))
+                }
+              >
+                Copiar la dirección fiscal
+              </button>
+            }
           />
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <Campo label="Código postal" ayuda="Se usa para validar las facturas electrónicas.">
+            <Campo
+              label="Código postal"
+              requerido
+              ayuda="Se usa para validar las facturas electrónicas."
+            >
               <input
                 className={inputCls}
                 value={f.codigoPostal}
@@ -136,7 +178,7 @@ export function TabUbicacion({ det }: { det: ProveedorDetalle }) {
                 onChange={(e) => set('codigoPostal', e.target.value)}
               />
             </Campo>
-            <Campo label="Ciudad / municipio">
+            <Campo label="Ciudad / municipio" requerido>
               <input
                 className={inputCls}
                 value={f.ciudad}
@@ -144,7 +186,7 @@ export function TabUbicacion({ det }: { det: ProveedorDetalle }) {
                 onChange={(e) => set('ciudad', e.target.value)}
               />
             </Campo>
-            <Campo label="País">
+            <Campo label="País" requerido>
               <Selector
                 value={f.pais}
                 onChange={(v) => set('pais', v)}
@@ -152,7 +194,10 @@ export function TabUbicacion({ det }: { det: ProveedorDetalle }) {
                 placeholder="Elegí el país"
               />
             </Campo>
-            <Campo label={esArgentina ? 'Provincia' : 'Estado / provincia / departamento'}>
+            <Campo
+              label={esArgentina ? 'Provincia' : 'Estado / provincia / departamento'}
+              requerido
+            >
               {esArgentina ? (
                 <Selector
                   value={f.provincia}
@@ -172,7 +217,7 @@ export function TabUbicacion({ det }: { det: ProveedorDetalle }) {
         </div>
       </Tarjeta>
 
-      <Tarjeta titulo="Contacto y operación">
+      <Tarjeta titulo="Contacto y operación" acciones={botonGuardar}>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <Campo
             label="Contacto principal"

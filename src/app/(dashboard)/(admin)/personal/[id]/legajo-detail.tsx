@@ -30,6 +30,7 @@ import { escribirTabEnUrl, type LegajoTabId } from '@/lib/tab-url';
 import { TabDocumentacion } from './tab-documentacion';
 import { TabFamilia } from './tab-familia';
 import { TabHistorial } from './tab-historial';
+import { BloqueoPorBaja } from './aviso-baja';
 import { TabHoras } from './tab-horas';
 import { TabLaboral } from './tab-laboral';
 import { TabLicencias } from './tab-licencias';
@@ -195,16 +196,20 @@ export function LegajoDetail({
       {tab === 'familia' && <TabFamilia key={`f-${e.id}`} det={det} />}
       {tab === 'documentacion' && <TabDocumentacion det={det} />}
       {tab === 'licencias' && (
-        <TabLicencias det={det} catalogos={catalogos} personal={personal} admins={admins} />
+        <BloqueoPorBaja baja={e.estado === 'baja'}>
+          <TabLicencias det={det} catalogos={catalogos} personal={personal} admins={admins} />
+        </BloqueoPorBaja>
       )}
       {tab === 'horas' && (
-        <TabHoras
-          key={`h-${mes}`}
-          empleadoId={e.id}
-          fechaIngreso={e.fechaIngreso}
-          mes={mes}
-          horas={horas}
-        />
+        <BloqueoPorBaja baja={e.estado === 'baja'}>
+          <TabHoras
+            key={`h-${mes}`}
+            empleadoId={e.id}
+            fechaIngreso={e.fechaIngreso}
+            mes={mes}
+            horas={horas}
+          />
+        </BloqueoPorBaja>
       )}
       {tab === 'historial' && <TabHistorial det={det} />}
     </div>

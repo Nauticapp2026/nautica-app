@@ -98,6 +98,17 @@ function DatosGenerales({
   const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF((x) => ({ ...x, [k]: v }));
   const dadoDeBaja = !!b.fechaBaja;
 
+  // Obligatorios al guardar (el alta pide menos): tipo, rubro, subrubro, forma de adquisición,
+  // vida útil y marca.
+  const incompleta = [
+    f.tipoBien,
+    f.rubro,
+    f.subrubro,
+    f.formaAdquisicion,
+    f.vidaUtilAnios,
+    f.marca,
+  ].some((v) => v.trim() === '');
+
   const guardar = () =>
     ejecutar(() => actualizarGeneralesAction(b.id, f), 'Datos del bien guardados.');
   const botonGuardar = (
@@ -109,6 +120,12 @@ function DatosGenerales({
   return (
     <>
       <Tarjeta titulo="Identificación del bien" acciones={botonGuardar}>
+        {incompleta && (
+          <p className="mb-4 text-sm text-gray-500">
+            Tipo de bien, rubro, subrubro, forma de adquisición, vida útil y marca son obligatorios:
+            completá los campos marcados con <span className="text-red-500">*</span>.
+          </p>
+        )}
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <Campo label="Nº de ID" ayuda="Lo asigna el sistema.">
             <input className={`${inputCls} bg-gray-50`} value={b.numero} readOnly />
@@ -152,7 +169,7 @@ function DatosGenerales({
               onChange={(e) => set('nombre', e.target.value)}
             />
           </Campo>
-          <Campo label="Tipo de bien">
+          <Campo label="Tipo de bien" requerido>
             <CatalogoSelect
               tipo="bu_tipo"
               value={f.tipoBien}
@@ -160,7 +177,7 @@ function DatosGenerales({
               opciones={catalogos.bu_tipo}
             />
           </Campo>
-          <Campo label="Rubro">
+          <Campo label="Rubro" requerido>
             <CatalogoSelect
               tipo="bu_rubro"
               value={f.rubro}
@@ -168,7 +185,7 @@ function DatosGenerales({
               opciones={catalogos.bu_rubro}
             />
           </Campo>
-          <Campo label="Subrubro">
+          <Campo label="Subrubro" requerido>
             <CatalogoSelect
               tipo="bu_subrubro"
               value={f.subrubro}
@@ -176,7 +193,7 @@ function DatosGenerales({
               opciones={catalogos.bu_subrubro}
             />
           </Campo>
-          <Campo label="Forma de adquisición">
+          <Campo label="Forma de adquisición" requerido>
             <Selector
               value={f.formaAdquisicion}
               onChange={(v) => set('formaAdquisicion', v)}
@@ -185,6 +202,7 @@ function DatosGenerales({
           </Campo>
           <Campo
             label="Vida útil"
+            requerido
             ayuda="Base del cálculo de amortización (solapa Datos contables)."
           >
             <Selector
@@ -201,7 +219,7 @@ function DatosGenerales({
               onChange={(e) => set('nroGuarderia', e.target.value)}
             />
           </Campo>
-          <Campo label="Marca">
+          <Campo label="Marca" requerido>
             <CatalogoSelect
               tipo="bu_marca"
               value={f.marca}
@@ -240,12 +258,13 @@ function DatosGenerales({
 
       <Tarjeta
         titulo="Ubicación y utilización"
-        descripcion="Dónde está y quién puede usarlo."
+        descripcion="Dónde está y quién puede usarlo. Todos los campos son obligatorios."
         acciones={botonGuardar}
       >
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <Campo
             label="Ubicación actual"
+            requerido
             ayuda="Sector, obra o planta donde opera. Las áreas de Espacios figuran acá."
           >
             <CatalogoMulti
@@ -256,7 +275,7 @@ function DatosGenerales({
               placeholder="Elegí una ubicación"
             />
           </Campo>
-          <Campo label="Lugar de utilización">
+          <Campo label="Lugar de utilización" requerido>
             <CatalogoMulti
               tipo="bu_lugar"
               value={f.lugaresUtilizacion}
@@ -267,6 +286,7 @@ function DatosGenerales({
           </Campo>
           <Campo
             label="Empleados autorizados a utilizarlo"
+            requerido
             ayuda="Personal con legajo. Podés elegir más de uno."
             className="md:col-span-2"
           >
