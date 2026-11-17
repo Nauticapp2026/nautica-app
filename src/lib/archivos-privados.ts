@@ -2,7 +2,7 @@
  * Adjuntos privados de los módulos de administración (solo servidor).
  *
  * Van al bucket privado `documentos`, bajo `<carpeta>/<club>/<dueño>/<uuid>.<ext>` (carpeta:
- * `legajos`, `proveedores`, `bienes`). Nunca se usa una URL pública: el admin los ve con un
+ * `legajos`, `proveedores`, `bienes`, `cuentas-a-pagar`). Nunca se usa una URL pública: el admin los ve con un
  * link firmado de una hora. El formato se reconoce por los primeros bytes del archivo, no por
  * lo que declara el navegador.
  */
@@ -14,7 +14,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 export const BUCKET_PRIVADO = 'documentos';
 export const MAX_BYTES_ARCHIVO = 8 * 1024 * 1024;
 
-export type CarpetaArchivos = 'legajos' | 'proveedores' | 'bienes';
+export type CarpetaArchivos = 'legajos' | 'proveedores' | 'bienes' | 'cuentas-a-pagar';
 
 type TipoArchivo = { mime: string; ext: string };
 

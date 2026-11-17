@@ -33,6 +33,8 @@ import {
   Ship,
   Banknote,
   Briefcase,
+  Receipt,
+  HandCoins,
   ChevronDown,
   type LucideIcon,
 } from 'lucide-react';
@@ -102,6 +104,8 @@ const NAV_BY_VARIANT: Record<SidebarVariant, NavEntry[]> = {
       items: [
         { href: '/personal', label: 'Personal', icon: Contact },
         { href: '/proveedores', label: 'Proveedores', icon: Truck },
+        { href: '/cuentas-a-pagar', label: 'Cuentas a pagar', icon: Receipt },
+        { href: '/circuito-de-pagos', label: 'Circuito de pagos', icon: HandCoins },
         { href: '/bienes-de-uso', label: 'Bienes de uso', icon: Wrench },
       ],
     },

@@ -2894,3 +2894,177 @@ export const tesoreriaMovimientos = pgTable(
 
 export type TesoreriaMovimiento = typeof tesoreriaMovimientos.$inferSelect;
 export type NewTesoreriaMovimiento = typeof tesoreriaMovimientos.$inferInsert;
+
+// =============================================================================
+// CUENTAS A PAGAR Y CIRCUITO DE PAGOS (migs 0179 y 0180) — solo administradores del club
+// =============================================================================
+
+/** Orden de pago a un proveedor. El saldo de los comprobantes sale de sus aplicaciones. */
+export const cpPagos = pgTable(
+  'cp_pagos',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    guarderiaId: uuid('guarderia_id')
+      .notNull()
+      .references(() => guarderias.id, { onDelete: 'cascade' }),
+    /** Next Number por club; se muestra como OP-000001. */
+    numero: integer('numero').notNull(),
+    proveedorId: uuid('proveedor_id')
+      .notNull()
+      .references(() => proveedores.id, { onDelete: 'restrict' }),
+    /** 'comprobantes' | 'anticipo' (check en la DB). */
+    tipo: text('tipo').notNull().default('comprobantes'),
+    fechaPago: date('fecha_pago').notNull(),
+    /** 'PES' | 'DOL'. */
+    moneda: text('moneda').notNull().default('PES'),
+    tipoCambio: numeric('tipo_cambio', { precision: 14, scale: 4 }),
+    montoComprobantes: numeric('monto_comprobantes', { precision: 14, scale: 2 })
+      .notNull()
+      .default('0'),
+    montoPagado: numeric('monto_pagado', { precision: 14, scale: 2 }).notNull(),
+    observaciones: text('observaciones'),
+    /** 'pagado' | 'anulado'. */
+    estado: text('estado').notNull().default('pagado'),
+    anuladoAt: timestamp('anulado_at', { withTimezone: true }),
+    anuladoPor: uuid('anulado_por').references(() => profiles.id, { onDelete: 'set null' }),
+    createdBy: uuid('created_by').references(() => profiles.id, { onDelete: 'set null' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex('cp_pagos_numero_unico').on(t.guarderiaId, t.numero),
+    index('cp_pagos_proveedor_idx').on(t.guarderiaId, t.proveedorId),
+  ],
+);
+
+export type LineaIvaCp = { neto: number; alicuota: number; iva: number };
+export type PercepcionIibbCp = { jurisdiccion: string; monto: number };
+
+/** Comprobante de un proveedor (o anticipo a proveedor). Importes siempre en positivo. */
+export const cpComprobantes = pgTable(
+  'cp_comprobantes',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    guarderiaId: uuid('guarderia_id')
+      .notNull()
+      .references(() => guarderias.id, { onDelete: 'cascade' }),
+    /** Next Number por club; se muestra como CP-000001. */
+    numero: integer('numero').notNull(),
+    /** 'manual' | 'anticipo' (check en la DB). */
+    origen: text('origen').notNull().default('manual'),
+    proveedorId: uuid('proveedor_id')
+      .notNull()
+      .references(() => proveedores.id, { onDelete: 'restrict' }),
+    condicionIvaProveedor: text('condicion_iva_proveedor'),
+    fechaEmision: date('fecha_emision').notNull(),
+    tipoComprobante: text('tipo_comprobante').notNull(),
+    puntoVenta: text('punto_venta'),
+    numeroComprobante: text('numero_comprobante'),
+    fechaContabilizacion: date('fecha_contabilizacion').notNull(),
+    fechaVencimiento: date('fecha_vencimiento'),
+    condicionPago: text('condicion_pago'),
+    moneda: text('moneda').notNull().default('PES'),
+    tipoCambio: numeric('tipo_cambio', { precision: 14, scale: 4 }),
+    /** Concepto = imputación contable. */
+    concepto: text('concepto'),
+    instrumentoPago: text('instrumento_pago'),
+    lineasIva: jsonb('lineas_iva').$type<LineaIvaCp[]>().notNull().default([]),
+    percepcionesIibb: jsonb('percepciones_iibb').$type<PercepcionIibbCp[]>().notNull().default([]),
+    netoGravado: numeric('neto_gravado', { precision: 14, scale: 2 }).notNull().default('0'),
+    iva: numeric('iva', { precision: 14, scale: 2 }).notNull().default('0'),
+    netoNoGravado: numeric('neto_no_gravado', { precision: 14, scale: 2 }).notNull().default('0'),
+    exento: numeric('exento', { precision: 14, scale: 2 }).notNull().default('0'),
+    otrosTributos: numeric('otros_tributos', { precision: 14, scale: 2 }).notNull().default('0'),
+    percepcionesIibbTotal: numeric('percepciones_iibb_total', { precision: 14, scale: 2 })
+      .notNull()
+      .default('0'),
+    monotributo: numeric('monotributo', { precision: 14, scale: 2 }).notNull().default('0'),
+    total: numeric('total', { precision: 14, scale: 2 }).notNull(),
+    /** H ingresado · A autorizado · P pagado · X anulado (check en la DB). */
+    estado: text('estado').notNull().default('H'),
+    autorizadoPor: uuid('autorizado_por').references(() => profiles.id, { onDelete: 'set null' }),
+    autorizadoAt: timestamp('autorizado_at', { withTimezone: true }),
+    fechaPago: date('fecha_pago'),
+    anuladoAt: timestamp('anulado_at', { withTimezone: true }),
+    anuladoPor: uuid('anulado_por').references(() => profiles.id, { onDelete: 'set null' }),
+    adjuntoPath: text('adjunto_path'),
+    adjuntoNombre: text('adjunto_nombre'),
+    observaciones: text('observaciones'),
+    /** Solo en los anticipos: la orden de pago que los generó (mig 0180). */
+    pagoOrigenId: uuid('pago_origen_id').references(() => cpPagos.id, { onDelete: 'restrict' }),
+    createdBy: uuid('created_by').references(() => profiles.id, { onDelete: 'set null' }),
+    updatedBy: uuid('updated_by').references(() => profiles.id, { onDelete: 'set null' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex('cp_comprobantes_numero_unico').on(t.guarderiaId, t.numero),
+    index('cp_comprobantes_proveedor_idx').on(t.guarderiaId, t.proveedorId),
+    index('cp_comprobantes_estado_idx').on(t.guarderiaId, t.estado),
+  ],
+);
+
+export const cpComprobantesHistorial = pgTable(
+  'cp_comprobantes_historial',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    guarderiaId: uuid('guarderia_id')
+      .notNull()
+      .references(() => guarderias.id, { onDelete: 'cascade' }),
+    comprobanteId: uuid('comprobante_id')
+      .notNull()
+      .references(() => cpComprobantes.id, { onDelete: 'cascade' }),
+    estadoDesde: text('estado_desde'),
+    estadoHasta: text('estado_hasta').notNull(),
+    usuarioId: uuid('usuario_id').references(() => profiles.id, { onDelete: 'set null' }),
+    detalle: text('detalle'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [index('cp_comprobantes_historial_idx').on(t.comprobanteId, t.createdAt)],
+);
+
+export const cpPagoAplicaciones = pgTable(
+  'cp_pago_aplicaciones',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    guarderiaId: uuid('guarderia_id')
+      .notNull()
+      .references(() => guarderias.id, { onDelete: 'cascade' }),
+    pagoId: uuid('pago_id')
+      .notNull()
+      .references(() => cpPagos.id, { onDelete: 'cascade' }),
+    comprobanteId: uuid('comprobante_id')
+      .notNull()
+      .references(() => cpComprobantes.id, { onDelete: 'restrict' }),
+    montoAplicado: numeric('monto_aplicado', { precision: 14, scale: 2 }).notNull(),
+    descuentoAjuste: numeric('descuento_ajuste', { precision: 14, scale: 2 })
+      .notNull()
+      .default('0'),
+    saldoPrevio: numeric('saldo_previo', { precision: 14, scale: 2 }).notNull(),
+  },
+  (t) => [
+    index('cp_pago_aplicaciones_pago_idx').on(t.pagoId),
+    index('cp_pago_aplicaciones_comprobante_idx').on(t.comprobanteId),
+  ],
+);
+
+export const cpPagoMedios = pgTable(
+  'cp_pago_medios',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    guarderiaId: uuid('guarderia_id')
+      .notNull()
+      .references(() => guarderias.id, { onDelete: 'cascade' }),
+    pagoId: uuid('pago_id')
+      .notNull()
+      .references(() => cpPagos.id, { onDelete: 'cascade' }),
+    /** transferencia | cheque_propio | cheque_terceros | efectivo. */
+    medio: text('medio').notNull(),
+    monto: numeric('monto', { precision: 14, scale: 2 }).notNull(),
+    datos: jsonb('datos').$type<Record<string, string>>().notNull().default({}),
+    orden: integer('orden').notNull().default(0),
+  },
+  (t) => [index('cp_pago_medios_pago_idx').on(t.pagoId)],
+);
+
+export type CpComprobante = typeof cpComprobantes.$inferSelect;
+export type CpPago = typeof cpPagos.$inferSelect;

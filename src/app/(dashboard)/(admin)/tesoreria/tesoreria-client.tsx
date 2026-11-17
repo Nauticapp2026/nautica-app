@@ -811,6 +811,13 @@ export function TesoreriaClient({
                         >
                           {l.numero}
                         </Link>
+                      ) : l.pagoId ? (
+                        <Link
+                          href={`/circuito-de-pagos/${l.pagoId}`}
+                          className="font-medium text-[#175861] hover:underline"
+                        >
+                          {l.numero}
+                        </Link>
                       ) : (
                         <span className="text-gray-700">{l.numero}</span>
                       )}

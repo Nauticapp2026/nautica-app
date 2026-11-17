@@ -8,6 +8,10 @@
  *    además aparece un EGRESO por cada forma en la fecha de la anulación — el
  *    ingreso original no se borra, igual que en el modelo Excel del cliente
  *    ("R8" y después "Anulación R8").
+ *  - Pagos a proveedores (Circuito de pagos, cp_pago_medios): cada medio de pago de una
+ *    orden de pago es un EGRESO en su instrumento en la fecha del pago. Si el pago se anula,
+ *    aparece el movimiento contrario (un INGRESO por cada medio) en la fecha de la
+ *    anulación; el egreso original no se borra, igual que con los recibos.
  *  - Movimientos manuales (tesoreria_movimientos): retiros, gastos, depósitos,
  *    ingresos que no son cobranzas.
  *
@@ -21,12 +25,22 @@
 import { and, asc, eq, like, or, sql } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
+import { codigoOp } from '@/lib/cuentas-a-pagar/constantes';
 import {
+  cpPagoMedios,
+  cpPagos,
   facturacion,
   movimientosCuentaCorriente,
   profiles,
+  proveedores,
   tesoreriaMovimientos,
 } from '@/lib/db/schema';
+import {
+  instrumentoDeMedio,
+  labelMedio,
+  resumenDatosMedio,
+  type MedioPago,
+} from '@/lib/pagos/medios';
 import { PATRONES_RECIBO_COBRANZA } from '@/lib/recibo-codigos';
 import { codigoMovimiento } from './codigos';
 import { numeroDecimal } from './datos-instrumento';
@@ -39,9 +53,9 @@ import {
 } from './instrumentos';
 
 export type LineaTesoreria = {
-  /** Único en la lista: `rc-{reciboId}-{n}`, `an-{reciboId}-{n}` o `tm-{id}`. */
+  /** Único en la lista: `rc-{reciboId}-{n}`, `an-{reciboId}-{n}`, `tm-{id}`, `op-{medioId}` o `anop-{medioId}`. */
   id: string;
-  origen: 'recibo' | 'anulacion' | 'manual';
+  origen: 'recibo' | 'anulacion' | 'manual' | 'pago' | 'anulacion_pago';
   /** Día calendario argentino, YYYY-MM-DD. */
   fecha: string;
   /** Marca de tiempo ISO para ordenar dentro del día. */
@@ -55,6 +69,8 @@ export type LineaTesoreria = {
   monto: number;
   /** Para el link al recibo (/ventas/recibo/{id}). */
   reciboId: string | null;
+  /** Para el link a la orden de pago (/circuito-de-pagos/{id}); solo pagos a proveedores. */
+  pagoId: string | null;
   rubro: string | null;
   subrubro: string | null;
   observaciones: string | null;
@@ -139,7 +155,7 @@ function nombreSocio(p: {
  * independientes, pedido del cliente 2026-10-13).
  */
 export async function cargarLineasTesoreria(gId: string): Promise<LineaBase[]> {
-  const [recibos, manuales] = await Promise.all([
+  const [recibos, manuales, medios] = await Promise.all([
     db
       .select({
         id: facturacion.id,
@@ -180,6 +196,36 @@ export async function cargarLineasTesoreria(gId: string): Promise<LineaBase[]> {
         eq(tesoreriaMovimientos.guarderiaId, gId),
       )
       .orderBy(asc(tesoreriaMovimientos.fecha), asc(tesoreriaMovimientos.numero)),
+
+    // Medios de pago de las órdenes de pago a proveedores (siempre acotados al club).
+    db
+      .select({
+        medioId: cpPagoMedios.id,
+        medio: cpPagoMedios.medio,
+        monto: cpPagoMedios.monto,
+        datos: cpPagoMedios.datos,
+        pagoId: cpPagos.id,
+        numero: cpPagos.numero,
+        tipo: cpPagos.tipo,
+        fechaPago: cpPagos.fechaPago,
+        moneda: cpPagos.moneda,
+        tipoCambio: cpPagos.tipoCambio,
+        creadoAt: cpPagos.createdAt,
+        estado: cpPagos.estado,
+        anuladoAt: cpPagos.anuladoAt,
+        provNombre: proveedores.nombre,
+      })
+      .from(cpPagoMedios)
+      .innerJoin(cpPagos, eq(cpPagos.id, cpPagoMedios.pagoId))
+      .innerJoin(proveedores, eq(proveedores.id, cpPagos.proveedorId))
+      .where(
+        and(
+          eq(cpPagoMedios.guarderiaId, gId),
+          eq(cpPagos.guarderiaId, gId),
+          eq(proveedores.guarderiaId, gId),
+        ),
+      )
+      .orderBy(asc(cpPagos.fechaPago), asc(cpPagos.numero), asc(cpPagoMedios.orden)),
   ]);
 
   const lineas: LineaBase[] = [];
@@ -232,6 +278,7 @@ export async function cargarLineasTesoreria(gId: string): Promise<LineaBase[]> {
         tipo: 'ingreso',
         monto: redondear(f.monto),
         reciboId: r.id,
+        pagoId: null,
         rubro: 'Cobranzas',
         subrubro: null,
         observaciones: null,
@@ -264,6 +311,7 @@ export async function cargarLineasTesoreria(gId: string): Promise<LineaBase[]> {
           tipo: 'egreso',
           monto: redondear(f.monto),
           reciboId: r.id,
+          pagoId: null,
           rubro: 'Cobranzas',
           subrubro: 'Anulación',
           observaciones: null,
@@ -282,6 +330,65 @@ export async function cargarLineasTesoreria(gId: string): Promise<LineaBase[]> {
     }
   }
 
+  for (const m of medios) {
+    const dolares = m.moneda === 'DOL';
+    const importe = parseFloat(m.monto) || 0;
+    if (importe <= 0.005) continue;
+    // Un pago en dólares: la línea va en pesos al tipo de cambio de la orden; en la caja de
+    // efectivo en dólares se guarda además el monto en USD.
+    const tc = dolares ? parseFloat(m.tipoCambio ?? '0') || 0 : 1;
+    const monto = redondear(importe * tc);
+    if (monto <= 0.005) continue;
+    const instrumento = instrumentoDesde(instrumentoDeMedio(m.medio, m.moneda));
+    const usd = instrumento === 'efectivo_usd' ? redondear(importe) : null;
+    const codigo = codigoOp(m.numero);
+    const subrubro = m.tipo === 'anticipo' ? 'Anticipo a proveedor' : 'Pago a proveedor';
+    const detalleMedio = resumenDatosMedio(m.medio as MedioPago, m.datos ?? {});
+    const base = {
+      numero: codigo,
+      instrumento,
+      monto,
+      reciboId: null,
+      pagoId: m.pagoId,
+      observaciones: [labelMedio(m.medio), detalleMedio].filter(Boolean).join(' · '),
+      adjuntoPath: null,
+      adjuntoNombre: null,
+      datos: null,
+      montoUsd: usd,
+      movimientoId: null,
+      anulado: false,
+      anuladoAt: null,
+      anuladoFecha: null,
+      motivoAnulacion: null,
+      editadoFecha: null,
+      rubro: 'Proveedores',
+    };
+    lineas.push({
+      ...base,
+      origen: 'pago',
+      id: `op-${m.medioId}`,
+      fecha: m.fechaPago,
+      orden: m.creadoAt.toISOString(),
+      detalle: `Pago ${codigo} · ${m.provNombre}`,
+      tipo: 'egreso',
+      subrubro,
+    });
+    // Pago anulado: se da vuelta el movimiento en la fecha de la anulación.
+    const fechaAnulacion = m.estado === 'anulado' && m.anuladoAt ? argYmd(m.anuladoAt) : null;
+    if (fechaAnulacion && m.anuladoAt) {
+      lineas.push({
+        ...base,
+        origen: 'anulacion_pago',
+        id: `anop-${m.medioId}`,
+        fecha: fechaAnulacion,
+        orden: m.anuladoAt.toISOString(),
+        detalle: `Anulación ${codigo} · ${m.provNombre}`,
+        tipo: 'ingreso',
+        subrubro: 'Anulación',
+      });
+    }
+  }
+
   for (const m of manuales) {
     const datosManual = (m.datosInstrumento as Record<string, string> | null) ?? null;
     lineas.push({
@@ -296,6 +403,7 @@ export async function cargarLineasTesoreria(gId: string): Promise<LineaBase[]> {
       tipo: m.tipo === 'egreso' ? 'egreso' : 'ingreso',
       monto: redondear(parseFloat(m.monto) || 0),
       reciboId: null,
+      pagoId: null,
       rubro: m.rubro,
       subrubro: m.subrubro,
       observaciones: m.observaciones || null,

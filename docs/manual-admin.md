@@ -24,6 +24,8 @@ Guía paso a paso para gestionar tu club o guardería náutica desde el panel we
 16. [Personal (legajo del personal)](#16-personal-legajo-del-personal)
 17. [Proveedores](#17-proveedores)
 18. [Bienes de uso](#18-bienes-de-uso)
+19. [Cuentas a pagar](#19-cuentas-a-pagar)
+20. [Circuito de pagos](#20-circuito-de-pagos)
 
 ---
 
@@ -54,6 +56,8 @@ El menú lateral izquierdo es la navegación principal. Está ordenado en **carp
   - **Personal** — legajo, horarios y novedades del personal del club
   - **Proveedores** — Maestro de Proveedores, con sus datos fiscales, bancarios y documentación
   - **Bienes de uso** — Equipos y Bienes Registrales: mantenimiento, reparaciones y datos contables
+  - **Cuentas a pagar** — comprobantes de proveedores, autorización y saldos
+  - **Circuito de pagos** — órdenes de pago a proveedores y pagos efectuados
 - **Comunicación**
   - **Publicaciones** — avisos de amarras y camas en NautiShop
   - **Comunicaciones** — anuncios y novedades para socios
@@ -1026,6 +1030,7 @@ La pantalla tiene **dos bloques independientes**: arriba el **Cierre de caja** y
 
 - **Cobranzas, solas.** Cada recibo de Cobranzas (RC- o RI-) entra como ingreso en el instrumento con el que se cobró. Si un recibo se cobró con dos formas de pago (por ejemplo, parte en efectivo y parte por transferencia), aparece una línea por cada una. Los cobros por débito automático entran en el instrumento **Débito automático**.
 - **Anulaciones.** Cuando anulás un recibo, el ingreso original queda y aparece un **egreso** por el mismo importe en la fecha de la anulación, así el saldo vuelve a cerrar sin borrar historia.
+- **Pagos a proveedores, solos.** Cada orden de pago del **Circuito de pagos** (capítulo 20) entra como **egreso** en el instrumento con el que se pagó: la transferencia, en **Transferencia**; los cheques (propios y de terceros), en **Cheque**; el efectivo, en **Efectivo** (o en **Efectivo (dólares)** si el pago es en dólares). Si se pagó con varios medios, hay una línea por cada uno. Llevan el rubro **Proveedores** (subrubro _Pago a proveedor_ o _Anticipo a proveedor_) y el número de la orden (OP-000001), que es un **link** a su detalle. Si el pago se anula, el egreso original queda y aparece el **movimiento contrario** (un ingreso) en la fecha de la anulación, igual que con los recibos.
 - **Movimientos manuales.** Retiros, gastos, depósitos o ingresos que no son cobranzas se cargan con el botón **Nuevo movimiento**.
 
 ### Cargar un movimiento manual
@@ -1707,6 +1712,123 @@ No. Solo los administradores. Los empleados autorizados a usar un bien son un da
 
 **¿Cómo registro la reparación hecha por un proveedor?**
 Primero cargá al proveedor en **Proveedores**. Después, en **Mantenimiento y reparaciones → Registro de intervenciones**, elegilo en **Realizada por** y cargá el costo.
+
+---
+
+## 19. Cuentas a pagar
+
+En **Cuentas a pagar** cargás los **comprobantes de tus proveedores** (facturas, notas de crédito y de débito, legales o no legales), los autorizás para que se puedan pagar y consultás cuánto se debe. **Solo lo ven y lo operan los administradores** (Administrador, Administrativo y Contable). Los pagos se hacen en el **Circuito de pagos** (capítulo 20).
+
+> Solo se puede cargar un comprobante de un **proveedor que exista en el Maestro de Proveedores** (capítulo 17). Si no está, primero dalo de alta ahí.
+
+### Estados de un comprobante
+
+| Estado | Significa                            | Cómo se llega                                                |
+| ------ | ------------------------------------ | ------------------------------------------------------------ |
+| **H**  | Ingresado, todavía no se puede pagar | Al cargarlo, o cuando se anula su pago, o con **Volver a H** |
+| **A**  | Autorizado, listo para pagar         | **Pasar a A** (queda registrado quién lo autorizó y cuándo)  |
+| **P**  | Pagado                               | Automático, cuando un pago lo cancela por completo           |
+| **X**  | Anulado                              | **Anular** (queda registrada la fecha)                       |
+
+Para pagar un comprobante tiene que estar en **A**. Un comprobante **solo se puede modificar en estado H** y mientras no tenga pagos aplicados; un comprobante **pagado no se puede anular** (primero hay que anular el pago en el Circuito de pagos, y el comprobante vuelve a H).
+
+### Cargar un comprobante
+
+1. Entrá a **Cuentas a pagar** → **Nuevo comprobante**.
+2. **Proveedor:** buscalo por código, razón social o CUIT y elegilo. La razón social, el CUIT y la condición ante el IVA se traen solos del maestro.
+3. **Datos del comprobante:** fecha de emisión, tipo de comprobante (lista con el código oficial de ARCA: _Factura A – 001_, _Factura B – 006_, _Nota de Crédito A – 003_… y, para lo que no tiene validez fiscal, **Movimiento positivo (no legal) – X1** y **Movimiento negativo (no legal) – T1**: el positivo suma como una factura y el negativo resta como una nota de crédito), punto de venta (hasta 5 dígitos) y número (hasta 8 dígitos); los ceros a la izquierda se completan solos. La **fecha de contabilización** es la de hoy y no se cambia.
+4. **Condición de pago, instrumento de pago y concepto (imputación contable)** vienen del proveedor, pero se pueden cambiar con la lista desplegable (y agregar opciones nuevas con **＋ Agregar otra opción…**). El **vencimiento** se calcula según la condición de pago (por ejemplo, _30 días_) y se puede corregir.
+5. **Moneda:** _PES_ (pesos) o _DOL_ (dólares). Con dólares el **tipo de cambio** es obligatorio; con pesos no se habilita.
+6. **Apertura de importes:**
+   - **Neto gravado, alícuota e IVA** (21 %, 10,5 %, 27 %…): se pueden agregar **varias líneas**. El IVA se calcula solo y se puede corregir unos centavos; si difiere más de $ 1 del cálculo, no deja guardar.
+   - **Neto no gravado**, **operaciones exentas** e **impuestos internos / otros tributos**.
+   - **Percepciones de Ingresos Brutos:** jurisdicción y monto; se pueden agregar varias.
+   - **Monotributo:** solo se habilita en facturas, notas de crédito y notas de débito **C**. En esos tipos **el resto de los importes queda deshabilitado**.
+   - El **importe total** es la suma de todo lo anterior y se calcula solo.
+7. Las **notas de crédito se cargan en positivo**: el sistema las muestra y las resta como negativas.
+8. **Adjunto** (opcional, también se puede agregar después) y observaciones. **Cargar comprobante.**
+
+Cada comprobante recibe un número correlativo propio del club (**CP-000001**, **CP-000002**…). El sistema **no permite cargar dos veces el mismo comprobante de un proveedor** (mismo tipo, punto de venta y número); si un comprobante se anuló, se puede volver a cargar. La fecha de emisión no puede ser futura.
+
+### La consulta de comprobantes
+
+La pantalla principal muestra, por comprobante: adjunto, número, proveedor (código, CUIT y razón social), fecha del comprobante, tipo, fecha de ingreso, número, monto neto, IVA, percepciones de IIBB, otros impuestos, monotributo, monto bruto, estado de pago (_Pendiente_ o _Pagado_), fecha de pago, imputación contable, **estado del comprobante** (H, A, P o X) y **saldo a pagar**.
+
+- El **saldo a pagar** es lo que falta pagar del comprobante (total o parcial). Si está pagado, o anulado, muestra **0**.
+- Las **facturas y notas de débito** se muestran **positivas**; las **notas de crédito y los anticipos a proveedores**, **negativos**.
+- **Todos los campos filtran**: la lupa busca por proveedor, CUIT, número de proveedor, número de comprobante o imputación; además filtrás por estado, estado de pago y, en **Más filtros**, por tipo, imputación contable, adjunto, rangos de fecha (comprobante, ingreso y pago) y de monto bruto. Debajo se ve el **saldo a pagar de lo que estás viendo**, útil para analizar la cuenta de un proveedor.
+- **Exportar** baja lo que estás viendo en **Excel** (todas las columnas), **PDF** (las columnas principales) o CSV.
+
+### Autorizar, volver atrás, modificar y anular
+
+- **Uno o varios a la vez:** tildá los comprobantes en la consulta y usá **Pasar a A (autorizar)** o **Volver a H**. Los que no estén en el estado correcto se saltean y el sistema te avisa cuántos.
+- **Desde el detalle** (clic en el número, _CP-000001_) también podés **Pasar a A**, **Volver a H**, **Modificar** (solo en H) y **Anular** (en H o A, sin pagos aplicados). En el detalle se ve el **historial**: quién hizo cada cambio de estado y cuándo.
+- **Adjuntar el comprobante** después de cargarlo: en el detalle, **Adjuntar archivo** (o **Reemplazar archivo**). Se aceptan **PDF, JPG, PNG y WebP de hasta 8 MB**, en un espacio privado; el enlace es temporal.
+
+### Anticipos a proveedores
+
+Un **anticipo** es plata entregada a un proveedor antes de tener el comprobante. Se paga desde el **Circuito de pagos** (**Nuevo pago → Anticipo a proveedor**) y aparece en Cuentas a pagar como un comprobante **negativo**, ya en estado **A**, con su saldo a favor. Se puede aplicar a comprobantes a pagar, sin ser obligatorio. No se modifica ni se anula desde acá: se anula anulando el pago que lo generó.
+
+---
+
+## 20. Circuito de pagos
+
+El **Circuito de pagos** es donde se **pagan** los comprobantes de Cuentas a pagar y donde ves los **pagos efectuados**. **Solo lo operan los administradores.** Cada pago genera una **orden de pago** con su propio número correlativo (**OP-000001**, **OP-000002**…).
+
+### Hacer un pago
+
+Entrá a **Circuito de pagos → Nuevo pago**.
+
+1. **Cabecera:** la fecha de emisión es la de hoy (automática). Elegí el **proveedor** del Maestro de Proveedores y la **moneda** (con dólares, el tipo de cambio es obligatorio).
+2. **Comprobantes a cancelar:** se muestra la **cuenta corriente del proveedor** (facturas, notas de crédito, notas de débito y anticipos con saldo, en la moneda del pago). **Solo se pueden pagar los comprobantes en estado A**; los que están en H aparecen bloqueados (hay que pasarlos a A en Cuentas a pagar). Tildá los que querés pagar:
+   - **Monto original / saldo pendiente:** el total del comprobante y lo que faltaba pagar antes de este pago.
+   - **Monto a aplicar:** cuánto de ese comprobante se cancela ahora (por defecto, el saldo completo; se puede poner menos para un **pago parcial**).
+   - **Descuento / ajuste:** un valor positivo es un descuento (por ejemplo, por pago anticipado: se paga menos); uno negativo es un recargo o diferencia de cambio (se paga más). Solo en facturas y notas de débito.
+   - En un mismo pago se pueden **pagar varios comprobantes** y **compensar facturas y notas de débito contra notas de crédito y anticipos**. Aplicar un anticipo no es obligatorio.
+3. **Medios de pago:** se puede pagar con **uno o varios** medios; la suma tiene que **coincidir con el total a pagar**. **Lo que falta** completa el monto con el saldo restante. Cada medio pide sus datos:
+
+   | Medio                      | Datos que pide                                                                                                                                                                      |
+   | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+   | **Transferencia bancaria** | Cuenta bancaria de origen (propia), CBU / alias de destino (podés elegir una de las cuentas del proveedor), número de referencia o transacción y gasto bancario asociado (opcional) |
+   | **Cheque propio**          | Banco emisor, número de cheque, fecha de emisión y fecha de vencimiento (si es pago diferido)                                                                                       |
+   | **Cheque de terceros**     | ID del cheque en cartera (para el endoso), banco original, número de cheque y fecha de vencimiento                                                                                  |
+   | **Caja efectivo**          | No pide datos                                                                                                                                                                       |
+
+4. **Registrar pago.** El sistema genera la **orden de pago** y lleva a su detalle, donde se puede **descargar en PDF**.
+
+Qué pasa con los comprobantes: los que quedan **cancelados por completo pasan a P (pagado)** en forma automática, con la fecha de pago; los **pagos parciales** siguen en A con el saldo que falta. Si las notas de crédito y los anticipos aplicados igualan a las facturas, el pago se compensa por completo y **no hace falta ningún medio de pago**. Las notas de crédito y los anticipos no se pueden pagar solos.
+
+### Anticipo a proveedor
+
+En **Nuevo pago** elegí **Anticipo a proveedor**: es un pago sin comprobantes previos. Elegí proveedor, moneda y los medios de pago. El anticipo queda como **saldo a favor** del proveedor (un comprobante negativo en estado A en Cuentas a pagar) y se puede aplicar después en un pago de comprobantes.
+
+### Pagos efectuados
+
+La pantalla principal del Circuito de pagos lista los pagos con: fecha de pago, número de proveedor, CUIT, razón social, **comprobantes cancelados**, monto pagado, **forma de pago** (los medios usados), **número de orden de pago**, **estado** (_Pagado_ o _Anulado_) y **fecha de anulación**. Se puede filtrar por cualquiera de esos campos (proveedor, orden de pago, comprobante, forma de pago, estado y rangos de fecha de pago y de anulación) y **exportar a Excel o PDF**. Un clic en el número de orden abre el detalle.
+
+### Anular un pago
+
+Con el botón **Anular** (en la lista o en el detalle, con confirmación). **Solo se anula el pago**: los comprobantes que cancelaba vuelven a **estado H** para empezar de nuevo el circuito (los anticipos aplicados recuperan su saldo y quedan en A). Queda la fecha de anulación. Si el pago era un anticipo y ese anticipo ya se aplicó a otro pago, primero hay que anular ese otro pago.
+
+### Qué pasa en Tesorería
+
+Cada pago genera automáticamente sus **egresos en el libro de caja de Tesorería** (capítulo 12), uno por cada medio de pago y en el instrumento correspondiente (transferencia, cheque o efectivo; un pago en dólares en efectivo va a la caja de **Efectivo (dólares)**, con su monto en USD). Si **anulás el pago**, Tesorería registra el **movimiento contrario** en la fecha de la anulación: el egreso original no se borra. Un pago que se compensa por completo entre comprobantes, sin medios de pago, no genera movimientos de caja.
+
+La **imputación contable** se carga solo al ingresar el comprobante en Cuentas a pagar; no se pide ni se muestra en el pago.
+
+### Preguntas frecuentes sobre cuentas a pagar y pagos
+
+**¿Por qué no puedo seleccionar un comprobante en el pago?**
+Porque no está en estado **A**. Pasalo a A desde **Cuentas a pagar**.
+
+**Cargué un comprobante con un error y ya está autorizado. ¿Cómo lo corrijo?**
+Volvelo a **H** (si no tiene pagos), modificalo y autorizalo de nuevo. Si ya está pagado, anulá el pago: el comprobante vuelve a H.
+
+**¿Las notas de crédito se cargan en negativo?**
+No: se cargan en positivo. El sistema las muestra y las resta como negativas.
+
+**¿Los pagos impactan en Tesorería?**
+Sí. Cada medio de pago genera un **egreso** en el instrumento correspondiente de **Tesorería**, y si el pago se anula, se da vuelta con un movimiento contrario en la fecha de la anulación.
 
 ---
 
