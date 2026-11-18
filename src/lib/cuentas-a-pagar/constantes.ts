@@ -68,6 +68,71 @@ export const OPCIONES_TIPO_COMPROBANTE: Opcion[] = TIPOS_COMPROBANTE.map((t) => 
   label: `${t.label} – ${t.value}`,
 }));
 
+// ─── Tipos de comprobante según la condición frente al IVA del proveedor ───
+
+/**
+ * Letras de comprobante legal que puede emitir un proveedor según su condición frente al IVA
+ * (pedido del cliente 2026-11-18): así solo se cargan comprobantes que correspondan. Los
+ * movimientos no legales (X1 y T1) se admiten siempre.
+ *
+ *  - Responsable Inscripto: A, B, M o E.
+ *  - Monotributo y Exento: C o E.
+ *  - Los demás no estaban en el pedido: IVA no alcanzado y consumidor final se tratan como
+ *    exento (C o E) y el proveedor del exterior solo admite E.
+ *  - Sin condición cargada en el Maestro: solo X1 y T1 hasta que se complete.
+ */
+const LETRAS_POR_CONDICION: Record<string, string[]> = {
+  responsable_inscripto: ['A', 'B', 'M', 'E'],
+  monotributo: ['C', 'E'],
+  exento: ['C', 'E'],
+  iva_no_alcanzado: ['C', 'E'],
+  consumidor_final: ['C', 'E'],
+  proveedor_exterior: ['E'],
+};
+
+/** Letras legales que admite esa condición (vacío si no tiene condición cargada). */
+export const letrasPermitidas = (condicionIva: string | null | undefined): string[] =>
+  (condicionIva && LETRAS_POR_CONDICION[condicionIva]) || [];
+
+/** Tipos que se pueden cargar a un proveedor con esa condición (siempre incluye X1 y T1). */
+export const tiposPermitidosPara = (
+  condicionIva: string | null | undefined,
+): TipoComprobanteCp[] => {
+  const letras = letrasPermitidas(condicionIva);
+  return TIPOS_COMPROBANTE.filter((t) => !t.legal || letras.includes(t.letra));
+};
+
+export const tipoPermitidoPara = (
+  condicionIva: string | null | undefined,
+  tipo: string | null | undefined,
+): boolean => tiposPermitidosPara(condicionIva).some((t) => t.value === tipo);
+
+/** Opciones del desplegable de carga para un proveedor: "Factura A – 001". */
+export const opcionesTipoPara = (condicionIva: string | null | undefined): Opcion[] =>
+  tiposPermitidosPara(condicionIva).map((t) => ({
+    value: t.value,
+    label: `${t.label} – ${t.value}`,
+  }));
+
+/**
+ * Mensaje cuando el tipo elegido no corresponde a la condición del proveedor.
+ * `condicionLabel` es el texto legible de la condición ("Responsable Monotributo").
+ */
+export function mensajeTipoNoPermitido(
+  condicionIva: string | null | undefined,
+  condicionLabel: string,
+): string {
+  const letras = letrasPermitidas(condicionIva);
+  if (letras.length === 0) {
+    return 'Ese proveedor no tiene cargada la condición frente al IVA, así que solo se pueden cargar movimientos X1 o T1. Completala en el Maestro de Proveedores (Información fiscal).';
+  }
+  const lista =
+    letras.length === 1
+      ? `la letra ${letras[0]}`
+      : `las letras ${letras.slice(0, -1).join(', ')} o ${letras[letras.length - 1]}`;
+  return `Un proveedor "${condicionLabel}" solo admite comprobantes con ${lista} (y movimientos X1 o T1). Elegí otro tipo de comprobante.`;
+}
+
 /** +1 o −1 según el tipo (un tipo desconocido se toma como positivo). */
 export const signoDe = (tipo: string | null | undefined): 1 | -1 =>
   tipoComprobante(tipo)?.signo ?? 1;

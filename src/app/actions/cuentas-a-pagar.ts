@@ -21,6 +21,8 @@ import {
   esTipoC,
   formatoNumeroComprobante,
   formatoPuntoVenta,
+  mensajeTipoNoPermitido,
+  tipoPermitidoPara,
 } from '@/lib/cuentas-a-pagar/constantes';
 import { aplicadoPorComprobante } from '@/lib/cuentas-a-pagar/consultas';
 import { todayArg } from '@/lib/dates';
@@ -28,6 +30,8 @@ import { db } from '@/lib/db';
 import { cpComprobantes, cpComprobantesHistorial, proveedores } from '@/lib/db/schema';
 import { esFechaYmdValida } from '@/lib/documentacion-fechas';
 import { primerError, uuid } from '@/lib/esquemas-comunes';
+import { labelDe } from '@/lib/legajo/constantes';
+import { CONDICIONES_IVA } from '@/lib/proveedores/constantes';
 
 export type ResultadoCp = { error?: string; aviso?: string };
 export type ResultadoCrearCp = ResultadoCp & { id?: string; codigo?: string };
@@ -170,6 +174,15 @@ async function proveedorActivo(gId: string, id: string) {
   return { p } as const;
 }
 
+/**
+ * El tipo de comprobante tiene que corresponder a la condición frente al IVA del proveedor
+ * (RI: A, B, M, E · Monotributo y Exento: C, E · y siempre X1 y T1). Null = está bien.
+ */
+function errorTipoParaProveedor(condicionIva: string | null, tipo: string): string | null {
+  if (tipoPermitidoPara(condicionIva, tipo)) return null;
+  return mensajeTipoNoPermitido(condicionIva, labelDe(CONDICIONES_IVA, condicionIva));
+}
+
 /** ¿Ya hay un comprobante vigente (no anulado) igual de ese proveedor? */
 async function buscarDuplicado(
   gId: string,
@@ -223,6 +236,9 @@ export async function crearComprobanteAction(formData: FormData): Promise<Result
 
   const prov = await proveedorActivo(c.gId, d.proveedorId);
   if ('error' in prov) return { error: prov.error };
+
+  const errorTipo = errorTipoParaProveedor(prov.p.condicionIva, d.tipoComprobante);
+  if (errorTipo) return { error: errorTipo };
 
   const dup = await buscarDuplicado(c.gId, d);
   if (dup) return { error: MSJ_DUPLICADO(dup) };
@@ -358,6 +374,13 @@ export async function editarComprobanteAction(
 
   const prov = await proveedorActivo(c.gId, d.proveedorId);
   if ('error' in prov) return { error: prov.error };
+
+  // Al modificar solo se vuelve a validar si cambió el tipo o el proveedor (un comprobante
+  // viejo no se bloquea porque después cambió la condición del proveedor).
+  if (d.tipoComprobante !== cp.tipoComprobante || d.proveedorId !== cp.proveedorId) {
+    const errorTipo = errorTipoParaProveedor(prov.p.condicionIva, d.tipoComprobante);
+    if (errorTipo) return { error: errorTipo };
+  }
 
   const dup = await buscarDuplicado(c.gId, d, cp.id);
   if (dup) return { error: MSJ_DUPLICADO(dup) };

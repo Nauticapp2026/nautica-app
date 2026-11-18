@@ -25,6 +25,9 @@ import {
   esTipoC,
   formatoImporte,
   formatoMoneda,
+  letrasPermitidas,
+  opcionesTipoPara,
+  tipoPermitidoPara,
   vencimientoSegunCondicion,
 } from '@/lib/cuentas-a-pagar/constantes';
 import type { DetalleComprobante, ProveedorSelector } from '@/lib/cuentas-a-pagar/consultas';
@@ -100,6 +103,24 @@ export function ComprobanteForm({
   const esC = esTipoC(tipo);
   const dolares = moneda === 'DOL';
 
+  // Tipos de comprobante que admite este proveedor según su condición frente al IVA. En una
+  // modificación, el tipo ya guardado sigue figurando aunque hoy no corresponda.
+  const opcionesTipo = (() => {
+    if (!proveedor) return [];
+    const base = opcionesTipoPara(proveedor.condicionIva);
+    if (tipo && !base.some((o) => o.value === tipo)) {
+      const actual = OPCIONES_TIPO_COMPROBANTE.find((o) => o.value === tipo);
+      if (actual) return [...base, actual];
+    }
+    return base;
+  })();
+  const letrasProveedor = proveedor ? letrasPermitidas(proveedor.condicionIva) : [];
+  const ayudaTipo = !proveedor
+    ? undefined
+    : letrasProveedor.length === 0
+      ? 'Este proveedor no tiene cargada la condición frente al IVA: solo se ofrecen X1 y T1. Completala en el Maestro de Proveedores.'
+      : `Según su condición frente al IVA: letras ${letrasProveedor.join(', ')} y movimientos X1 / T1.`;
+
   // Totales en vivo (los mismos que recalcula el servidor).
   const totales = useMemo(
     () =>
@@ -123,6 +144,9 @@ export function ComprobanteForm({
 
   function elegirProveedor(p: ProveedorSelector | null) {
     setProveedorId(p?.id ?? '');
+    // Si el tipo elegido no corresponde a la condición del nuevo proveedor, se limpia (al
+    // quitar el proveedor de una carga nueva también).
+    if (p ? !!tipo && !tipoPermitidoPara(p.condicionIva, tipo) : !inicial) setTipo('');
     if (!p) return;
     // Lo que trae del Maestro de Proveedores; se puede cambiar a mano.
     if (p.condicionPago) cambiarCondicion(p.condicionPago, fechaEmision, false);
@@ -269,12 +293,15 @@ export function ComprobanteForm({
               onChange={(e) => cambiarEmision(e.target.value)}
             />
           </Campo>
-          <Campo label="Tipo de comprobante" requerido className="lg:col-span-2">
+          <Campo label="Tipo de comprobante" requerido className="lg:col-span-2" ayuda={ayudaTipo}>
             <Selector
               value={tipo}
               onChange={setTipo}
-              opciones={OPCIONES_TIPO_COMPROBANTE}
-              placeholder="Elegí el tipo (ej. Factura A – 001)"
+              opciones={opcionesTipo}
+              disabled={!proveedor}
+              placeholder={
+                proveedor ? 'Elegí el tipo (ej. Factura A – 001)' : 'Elegí primero el proveedor'
+              }
             />
           </Campo>
           <Campo label="Fecha de contabilización" ayuda="Se completa sola con la fecha de hoy.">

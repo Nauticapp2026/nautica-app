@@ -1735,7 +1735,7 @@ Para pagar un comprobante tiene que estar en **A**. Un comprobante **solo se pue
 ### Cargar un comprobante
 
 1. Entrá a **Cuentas a pagar** → **Nuevo comprobante**.
-2. **Proveedor:** buscalo por código, razón social o CUIT y elegilo. La razón social, el CUIT y la condición ante el IVA se traen solos del maestro.
+2. **Proveedor:** buscalo por código, razón social o CUIT y elegilo. La razón social, el CUIT y la condición ante el IVA se traen solos del maestro. **Hasta que no elijas el proveedor, el tipo de comprobante queda bloqueado**, porque las opciones dependen de su condición frente al IVA (ver abajo).
 3. **Datos del comprobante:** fecha de emisión, tipo de comprobante (lista con el código oficial de ARCA: _Factura A – 001_, _Factura B – 006_, _Nota de Crédito A – 003_… y, para lo que no tiene validez fiscal, **Movimiento positivo (no legal) – X1** y **Movimiento negativo (no legal) – T1**: el positivo suma como una factura y el negativo resta como una nota de crédito), punto de venta (hasta 5 dígitos) y número (hasta 8 dígitos); los ceros a la izquierda se completan solos. La **fecha de contabilización** es la de hoy y no se cambia.
 4. **Condición de pago, instrumento de pago y concepto (imputación contable)** vienen del proveedor, pero se pueden cambiar con la lista desplegable (y agregar opciones nuevas con **＋ Agregar otra opción…**). El **vencimiento** se calcula según la condición de pago (por ejemplo, _30 días_) y se puede corregir.
 5. **Moneda:** _PES_ (pesos) o _DOL_ (dólares). Con dólares el **tipo de cambio** es obligatorio; con pesos no se habilita.
@@ -1747,6 +1747,18 @@ Para pagar un comprobante tiene que estar en **A**. Un comprobante **solo se pue
    - El **importe total** es la suma de todo lo anterior y se calcula solo.
 7. Las **notas de crédito se cargan en positivo**: el sistema las muestra y las resta como negativas.
 8. **Adjunto** (opcional, también se puede agregar después) y observaciones. **Cargar comprobante.**
+
+**Qué tipo de comprobante se puede cargar según el proveedor.** El sistema solo ofrece (y solo acepta) los tipos que corresponden a la condición frente al IVA que el proveedor tiene en el Maestro de Proveedores, para que no se carguen comprobantes incorrectos:
+
+| Condición del proveedor   | Comprobantes que se pueden cargar                                                                 |
+| ------------------------- | ------------------------------------------------------------------------------------------------- |
+| **Responsable Inscripto** | Facturas, notas de crédito y de débito **A, B, M o E**                                            |
+| **Monotributo**           | Facturas, notas de crédito y de débito **C o E**                                                  |
+| **Exento**                | Facturas, notas de crédito y de débito **C o E**                                                  |
+| Otras condiciones         | IVA no alcanzado y consumidor final, igual que Exento (C o E); proveedor del exterior, solo E     |
+| Sin condición cargada     | Solo los movimientos **X1 y T1**, hasta que se complete la condición en el Maestro de Proveedores |
+
+Los movimientos no legales **X1 (positivo) y T1 (negativo)** se pueden cargar a cualquier proveedor. Si cambiás de proveedor y el tipo elegido no le corresponde, el tipo se borra y hay que elegirlo de nuevo. Al **modificar** un comprobante ya cargado, el tipo solo se vuelve a controlar si lo cambiás (un comprobante viejo no queda bloqueado porque después cambió la condición del proveedor).
 
 Cada comprobante recibe un número correlativo propio del club (**CP-000001**, **CP-000002**…). El sistema **no permite cargar dos veces el mismo comprobante de un proveedor** (mismo tipo, punto de venta y número); si un comprobante se anuló, se puede volver a cargar. La fecha de emisión no puede ser futura.
 
