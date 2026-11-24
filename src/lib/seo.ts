@@ -48,6 +48,8 @@ export const RUTAS_PRIVADAS = [
   '/onboarding',
   '/no-access',
   '/qr/',
+  // borrador de diseño de la landing
+  '/v2',
 ] as const;
 
 /** `export const metadata = NOINDEX` en el layout de cada árbol privado. */
