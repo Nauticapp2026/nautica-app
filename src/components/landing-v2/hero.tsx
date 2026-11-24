@@ -1,34 +1,63 @@
 import Link from 'next/link';
 import Image from 'next/image';
+import { ArrowRight, ChevronDown } from 'lucide-react';
 
 import { DownloadAppButton } from './download-app-button';
+import { SplitWords } from './motion';
 
 export function Hero() {
   return (
-    <section className="relative isolate overflow-hidden bg-[#0e3d44] text-white">
-      <Image src="/landing/hero-bg.png" alt="" fill priority className="object-cover" />
-      <div className="absolute inset-0 bg-[#0e3d44]/45" />
+    <section className="relative isolate flex min-h-[100svh] items-center overflow-hidden bg-[#0b2f35] text-white">
+      <Image
+        src="/landing/hero-bg.png"
+        alt=""
+        fill
+        priority
+        sizes="100vw"
+        className="v2-hero-bg object-cover"
+      />
+      <div className="absolute inset-0 bg-gradient-to-b from-[#0b2f35]/70 via-[#0b2f35]/40 to-[#0b2f35]/75" />
 
-      <div className="relative z-10 mx-auto flex max-w-5xl flex-col items-center px-4 py-24 text-center md:py-32 lg:py-40">
-        <h1 className="text-4xl leading-[1.05] font-bold md:text-5xl lg:text-7xl">
-          Digitalizamos la
+      <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pt-28 pb-44 md:px-8 md:pb-52">
+        <h1 className="max-w-4xl text-5xl leading-[1.02] font-extrabold tracking-tight text-balance md:text-7xl lg:text-[5.5rem]">
+          <SplitWords text="Digitalizamos la" />
           <br />
-          experiencia náutica
+          <SplitWords text="experiencia" />
+          <span className="text-[#ABC2B3]">
+            <SplitWords text="náutica" />
+          </span>
         </h1>
-        <p className="mt-8 max-w-3xl text-base leading-snug font-bold text-white/90 md:text-lg lg:text-xl">
+
+        <p
+          className="v2-rise mt-8 max-w-2xl text-lg leading-relaxed font-semibold text-white/90 md:text-xl"
+          style={{ '--v2-delay': '1.1s' } as React.CSSProperties}
+        >
           La plataforma definitiva para administrar clubes náuticos y potenciar la vida en el río.
           Tecnología para el club. Confort para quienes navegan.
         </p>
-        <div className="mt-10 flex flex-col gap-3 sm:flex-row">
-          <Link
-            href="/onboarding"
-            className="rounded-lg bg-[#ABC2B3] px-6 py-3 text-sm font-bold text-white transition hover:bg-[#9bb5a3]"
-          >
+
+        <div
+          className="v2-rise mt-10 flex flex-col gap-3 sm:flex-row"
+          style={{ '--v2-delay': '1.35s' } as React.CSSProperties}
+        >
+          <Link href="/onboarding" className="v2-btn bg-[#ABC2B3] text-[#0b2f35] hover:bg-white">
             Registrá tu club
+            <ArrowRight className="size-4" aria-hidden />
           </Link>
-          <DownloadAppButton className="rounded-lg bg-[#669E9D] px-6 py-3 text-sm font-bold text-white transition hover:bg-[#588a89]" />
+          <DownloadAppButton className="v2-btn border border-white/40 text-white hover:bg-white/10" />
         </div>
       </div>
+
+      <div
+        className="v2-rise absolute bottom-28 left-1/2 z-10 hidden -translate-x-1/2 md:block"
+        style={{ '--v2-delay': '2s' } as React.CSSProperties}
+      >
+        <ChevronDown className="v2-cue size-6 text-white/70" aria-hidden />
+      </div>
+
+      <div className="v2-wave v2-wave-back" aria-hidden />
+      <div className="v2-wave v2-wave-mid" aria-hidden />
+      <div className="v2-wave v2-wave-front" aria-hidden />
     </section>
   );
 }

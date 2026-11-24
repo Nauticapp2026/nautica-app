@@ -1,0 +1,298 @@
+/* Landing v2 — "Marea". Movimiento 100% CSS + un observador de scroll. */
+
+.v2 {
+  --v2-deep: #0b2f35;
+  --v2-teal: #175861;
+  --v2-sea: #669e9d;
+  --v2-sage: #abc2b3;
+  --v2-foam: #eef5f2;
+  --v2-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  scroll-behavior: smooth;
+}
+
+.v2 ::selection {
+  background: var(--v2-sage);
+  color: var(--v2-deep);
+}
+
+.v2 :focus-visible {
+  outline: 3px solid var(--v2-sage);
+  outline-offset: 3px;
+}
+
+/* ---------- Revelado al hacer scroll ---------- */
+.v2-reveal[data-armed='true'] {
+  opacity: 0;
+  transform: translate3d(0, 28px, 0);
+  filter: blur(6px);
+  transition:
+    opacity 0.8s var(--v2-ease),
+    transform 0.9s var(--v2-ease),
+    filter 0.8s var(--v2-ease);
+  transition-delay: var(--v2-delay, 0ms);
+}
+.v2-reveal[data-armed='true'][data-dir='left'] {
+  transform: translate3d(-40px, 0, 0);
+}
+.v2-reveal[data-armed='true'][data-dir='right'] {
+  transform: translate3d(40px, 0, 0);
+}
+.v2-reveal[data-armed='true'][data-dir='zoom'] {
+  transform: scale(0.94);
+}
+.v2-reveal[data-armed='true'][data-visible='true'] {
+  opacity: 1;
+  transform: none;
+  filter: none;
+}
+
+/* ---------- Hero ---------- */
+@keyframes v2-drift {
+  from {
+    transform: scale(1.06) translate3d(0, 0, 0);
+  }
+  to {
+    transform: scale(1.16) translate3d(-1.5%, -1%, 0);
+  }
+}
+.v2-hero-bg {
+  animation: v2-drift 24s ease-in-out infinite alternate;
+}
+
+@keyframes v2-word {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 0.6em, 0);
+    filter: blur(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: blur(0);
+  }
+}
+.v2-word {
+  display: inline-block;
+  opacity: 0;
+  animation: v2-word 0.9s var(--v2-ease) forwards;
+  animation-delay: calc(0.15s + var(--i) * 0.09s);
+}
+
+@keyframes v2-rise {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 18px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.v2-rise {
+  opacity: 0;
+  animation: v2-rise 0.9s var(--v2-ease) forwards;
+  animation-delay: var(--v2-delay, 0.9s);
+}
+
+/* Olas: una tira SVG que se repite y se desplaza en bucle continuo. */
+@keyframes v2-wave-x {
+  to {
+    background-position-x: -1200px;
+  }
+}
+.v2-wave {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  background-repeat: repeat-x;
+  background-size: 1200px 100%;
+  animation: v2-wave-x var(--v2-speed, 18s) linear infinite;
+}
+.v2-wave-back {
+  height: 120px;
+  --v2-speed: 32s;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 120' preserveAspectRatio='none'%3E%3Cpath fill='%23ffffff' fill-opacity='.22' d='M0 60c100 40 200 40 300 0s200-40 300 0 200 40 300 0 200-40 300 0v60H0z'/%3E%3C/svg%3E");
+}
+.v2-wave-mid {
+  height: 96px;
+  --v2-speed: 22s;
+  animation-direction: reverse;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 120' preserveAspectRatio='none'%3E%3Cpath fill='%23ffffff' fill-opacity='.45' d='M0 70c150-50 250-50 400 0s250 50 400 0 250-50 400 0v50H0z'/%3E%3C/svg%3E");
+}
+.v2-wave-front {
+  height: 72px;
+  --v2-speed: 15s;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 120' preserveAspectRatio='none'%3E%3Cpath fill='%23ffffff' d='M0 50c100 45 200 45 300 0s200-45 300 0 200 45 300 0 200-45 300 0v70H0z'/%3E%3C/svg%3E");
+}
+
+/* Olas hacia la sección oscura (colores propios). */
+.v2-wave-to-deep {
+  height: 80px;
+  --v2-speed: 26s;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 120' preserveAspectRatio='none'%3E%3Cpath fill='%230b2f35' d='M0 60c100 40 200 40 300 0s200-40 300 0 200 40 300 0 200-40 300 0v60H0z'/%3E%3C/svg%3E");
+  bottom: auto;
+  top: -79px;
+  transform: scaleY(-1);
+}
+
+@keyframes v2-nudge {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(0, 7px, 0);
+  }
+}
+.v2-cue {
+  animation: v2-nudge 2.2s ease-in-out infinite;
+}
+
+/* ---------- Botones ---------- */
+.v2-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  overflow: hidden;
+  border-radius: 9999px;
+  padding: 0.95rem 1.6rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  transition:
+    transform 0.4s var(--v2-ease),
+    box-shadow 0.4s var(--v2-ease),
+    background-color 0.3s;
+}
+.v2-btn:hover {
+  transform: translate3d(0, -3px, 0);
+  box-shadow: 0 14px 28px -10px rgb(0 0 0 / 0.45);
+}
+.v2-btn:active {
+  transform: translate3d(0, 0, 0) scale(0.98);
+}
+.v2-btn svg {
+  transition: transform 0.4s var(--v2-ease);
+}
+.v2-btn:hover svg {
+  transform: translate3d(4px, 0, 0);
+}
+
+/* ---------- Header ---------- */
+.v2-header {
+  transition:
+    background-color 0.4s,
+    box-shadow 0.4s,
+    backdrop-filter 0.4s;
+}
+.v2-header[data-solid='true'] {
+  background-color: rgb(11 47 53 / 0.92);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 10px 30px -18px rgb(0 0 0 / 0.6);
+}
+
+.v2-link {
+  position: relative;
+}
+.v2-link::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -6px;
+  height: 2px;
+  background: var(--v2-sage);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.45s var(--v2-ease);
+}
+.v2-link:hover::after {
+  transform: scaleX(1);
+}
+
+/* ---------- Tarjetas / paneles ---------- */
+.v2-lift {
+  transition:
+    transform 0.6s var(--v2-ease),
+    box-shadow 0.6s var(--v2-ease);
+}
+.v2-lift:hover {
+  transform: translate3d(0, -8px, 0);
+  box-shadow: 0 30px 50px -28px rgb(11 47 53 / 0.55);
+}
+
+.v2-tile .v2-tile-icon {
+  transition: transform 0.7s var(--v2-ease);
+}
+.v2-tile:hover .v2-tile-icon {
+  transform: rotate(-8deg) scale(1.12);
+}
+
+/* Imagen con parallax por scroll donde el navegador lo soporta. */
+@supports (animation-timeline: view()) {
+  @keyframes v2-parallax {
+    from {
+      transform: translate3d(0, 6%, 0) scale(1.08);
+    }
+    to {
+      transform: translate3d(0, -6%, 0) scale(1.08);
+    }
+  }
+  .v2-parallax {
+    animation: v2-parallax linear both;
+    animation-timeline: view();
+    animation-range: cover 0% cover 100%;
+  }
+}
+
+@keyframes v2-float {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+  50% {
+    transform: translate3d(0, -14px, 0) rotate(0.6deg);
+  }
+}
+.v2-float {
+  animation: v2-float 7s ease-in-out infinite;
+}
+
+/* Subrayado que se dibuja al revelarse. */
+.v2-underline {
+  background-image: linear-gradient(var(--v2-sage), var(--v2-sage));
+  background-repeat: no-repeat;
+  background-position: 0 100%;
+  background-size: 0% 3px;
+  transition: background-size 1s var(--v2-ease) 0.3s;
+}
+[data-visible='true'] .v2-underline,
+[data-armed='false'] .v2-underline {
+  background-size: 100% 3px;
+}
+
+/* ---------- Movimiento reducido ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .v2 {
+    scroll-behavior: auto;
+  }
+  .v2 *,
+  .v2 *::before,
+  .v2 *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+  .v2-reveal[data-armed='true'] {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+  .v2-word,
+  .v2-rise {
+    opacity: 1;
+  }
+  .v2-underline {
+    background-size: 100% 3px;
+  }
+}

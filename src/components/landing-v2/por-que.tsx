@@ -1,6 +1,7 @@
 import Image from 'next/image';
 
 import { DownloadAppButton } from './download-app-button';
+import { Reveal } from './motion';
 
 const benefits = [
   'Solución 100% integrada y escalable.',
@@ -12,29 +13,41 @@ const benefits = [
 
 export function PorQue() {
   return (
-    <section className="bg-white py-20">
-      <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 md:grid-cols-2 md:px-8 lg:gap-16">
-        <div className="flex flex-col items-center text-center md:items-start md:text-left">
-          <h2 className="text-3xl leading-tight font-bold text-[#175861] md:text-4xl">
-            ¿Por qué NauticApp?
-          </h2>
-          <ul className="mt-8 space-y-3 text-lg leading-snug font-semibold text-[#175861]">
-            {benefits.map((b) => (
-              <li key={b}>{b}</li>
+    <section className="overflow-hidden bg-white py-24 md:py-32">
+      <div className="mx-auto grid max-w-6xl items-center gap-14 px-4 md:grid-cols-2 md:px-8 lg:gap-20">
+        <div>
+          <Reveal>
+            <h2 className="text-4xl leading-[1.05] font-extrabold tracking-tight text-[#0b2f35] md:text-6xl">
+              ¿Por qué <span className="v2-underline">NauticApp</span>?
+            </h2>
+          </Reveal>
+          <ul className="mt-10 divide-y divide-[#0b2f35]/10">
+            {benefits.map((b, i) => (
+              <li key={b}>
+                <Reveal delay={i * 90} direction="left">
+                  <p className="py-4 text-lg leading-snug font-bold text-[#175861] md:text-xl">
+                    {b}
+                  </p>
+                </Reveal>
+              </li>
             ))}
           </ul>
-          <DownloadAppButton className="mt-10 inline-flex rounded-lg bg-[#175861] px-6 py-3 text-sm font-bold text-white transition hover:bg-[#124a52]" />
+          <Reveal delay={500}>
+            <DownloadAppButton className="v2-btn mt-10 bg-[#0b2f35] text-white hover:bg-[#175861]" />
+          </Reveal>
         </div>
 
-        <div className="relative aspect-[5/6] w-full overflow-hidden md:order-last">
-          <Image
-            src="/landing/por-que.png"
-            alt="App NauticApp en uso"
-            fill
-            className="object-cover"
-            sizes="(max-width: 768px) 100vw, 50vw"
-          />
-        </div>
+        <Reveal direction="zoom" className="md:order-last">
+          <div className="v2-float relative aspect-[5/6] w-full overflow-hidden rounded-[2rem] shadow-[0_40px_60px_-30px_rgb(11_47_53/0.5)]">
+            <Image
+              src="/landing/por-que.png"
+              alt="App NauticApp en uso"
+              fill
+              className="object-cover"
+              sizes="(max-width: 768px) 100vw, 50vw"
+            />
+          </div>
+        </Reveal>
       </div>
     </section>
   );

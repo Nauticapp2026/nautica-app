@@ -1,17 +1,28 @@
+'use client';
+
 import Link from 'next/link';
 import Image from 'next/image';
+import { useEffect, useState } from 'react';
 
 const navLinks = [
   { href: '#caracteristicas', label: 'Características' },
   { href: '#modulos', label: 'Módulos' },
-  // { href: '#ecosistema', label: 'Servicios' }, // oculto momentáneamente junto con la sección
 ];
 
 export function Header() {
+  const [solid, setSolid] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setSolid(window.scrollY > 40);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
   return (
-    <header className="sticky top-0 z-50 border-b border-white/10 bg-[#0e3d44]/90 backdrop-blur">
+    <header className="v2-header fixed inset-x-0 top-0 z-50" data-solid={solid}>
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-6 px-4 py-4 md:px-8">
-        <Link href="/" className="flex items-center">
+        <Link href="/v2" className="flex items-center">
           <Image
             src="/landing/logoHeader.png"
             alt="NauticApp"
@@ -22,12 +33,12 @@ export function Header() {
           />
         </Link>
 
-        <nav className="hidden items-center gap-8 md:flex">
+        <nav className="hidden items-center gap-9 md:flex">
           {navLinks.map((link) => (
             <Link
               key={link.href}
               href={link.href}
-              className="text-sm font-bold text-white/90 transition hover:text-white"
+              className="v2-link text-sm font-bold text-white/90 transition-colors hover:text-white"
             >
               {link.label}
             </Link>
@@ -37,13 +48,13 @@ export function Header() {
         <div className="flex items-center gap-2">
           <Link
             href="/onboarding"
-            className="hidden rounded-lg bg-[#ABC2B3] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#9bb5a3] sm:inline-flex"
+            className="hidden rounded-full bg-[#ABC2B3] px-5 py-2.5 text-sm font-bold text-[#0b2f35] transition hover:bg-white sm:inline-flex"
           >
             Registrá tu club
           </Link>
           <Link
             href="/login"
-            className="rounded-lg bg-[#175861] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#124a52]"
+            className="rounded-full border border-white/40 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-white hover:text-[#0b2f35]"
           >
             Log in
           </Link>
