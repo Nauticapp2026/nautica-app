@@ -2708,7 +2708,7 @@ export function SocioDetail({
       </Link>
 
       {/* Avatar + name */}
-      <div className="mb-6 flex items-start justify-between gap-4">
+      <div className="mb-6 flex flex-col items-start gap-4 sm:flex-row sm:justify-between">
         <div className="flex items-center gap-4">
           <div
             className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-xl font-bold text-white"
@@ -2752,7 +2752,7 @@ export function SocioDetail({
             )}
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex items-center gap-2 sm:shrink-0">
           {/* "No facturar" es una marca aparte del estado, no un valor más del
               select: el socio sigue Activo (usa el club, se le puede cobrar lo
               que ya debe) y solo deja de aparecer para emitir comprobantes. */}
