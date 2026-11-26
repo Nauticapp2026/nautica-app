@@ -240,7 +240,7 @@ export function TabHoras({
           <p className="text-sm text-gray-500">No hay registros en este mes.</p>
         ) : (
           <>
-            <div className="overflow-x-auto">
+            <div className="scroll-x-hint overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-200 text-left text-xs tracking-wide text-gray-500 uppercase">

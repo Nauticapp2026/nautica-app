@@ -4639,7 +4639,7 @@ function ServiciosContratadosTab({
             Cargar Servicio
           </button>
         </div>
-        <div className="overflow-x-auto">
+        <div className="scroll-x-hint overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 text-left text-xs font-semibold text-gray-400 uppercase">

@@ -233,7 +233,7 @@ export function CobranzasTabsClient({
             className="rounded-2xl border border-gray-200 bg-white"
           />
         ) : (
-          <div className="overflow-x-auto rounded-2xl border border-gray-200 bg-white">
+          <div className="scroll-x-hint overflow-x-auto rounded-2xl border border-gray-200 bg-white">
             <table className="w-full min-w-[760px] text-sm">
               <thead>
                 <tr className="border-b border-gray-200 text-left text-xs font-medium text-gray-500">

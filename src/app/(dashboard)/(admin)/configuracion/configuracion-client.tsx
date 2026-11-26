@@ -955,7 +955,7 @@ function ReglamentoTab({ data }: { data: ReglamentoData }) {
               text="No hay socios con ese filtro."
             />
           ) : (
-            <div className="overflow-x-auto rounded-xl border border-gray-200">
+            <div className="scroll-x-hint overflow-x-auto rounded-xl border border-gray-200">
               <table className="w-full min-w-[560px] text-sm">
                 <thead>
                   <tr className="border-b border-gray-200 text-left text-xs font-medium text-gray-500">
@@ -994,7 +994,7 @@ function ReglamentoTab({ data }: { data: ReglamentoData }) {
           <h3 className="mb-4 text-sm font-bold" style={{ color: '#101828' }}>
             Historial de versiones
           </h3>
-          <div className="overflow-x-auto rounded-xl border border-gray-200">
+          <div className="scroll-x-hint overflow-x-auto rounded-xl border border-gray-200">
             <table className="w-full min-w-[560px] text-sm">
               <thead>
                 <tr className="border-b border-gray-200 text-left text-xs font-medium text-gray-500">

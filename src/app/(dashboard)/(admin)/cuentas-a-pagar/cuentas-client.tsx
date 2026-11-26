@@ -375,7 +375,7 @@ export function CuentasClient({ filas }: { filas: FilaComprobante[] }) {
               No hay comprobantes que coincidan con los filtros.
             </p>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="scroll-x-hint overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-200 text-left text-xs tracking-wide text-gray-500 uppercase">

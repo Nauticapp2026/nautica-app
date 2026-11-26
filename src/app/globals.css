@@ -103,6 +103,27 @@
     line-height: 1.4;
     color: #4a5565;
   }
+  /* Tablas anchas con scroll horizontal: una sombra suave en el borde que
+   * todavía tiene contenido escondido, para que en celular se note que se
+   * puede deslizar. Desaparece sola al llegar al final. */
+  .scroll-x-hint {
+    background-image:
+      linear-gradient(to right, #fff, #fff), linear-gradient(to left, #fff, #fff),
+      linear-gradient(to right, rgb(0 0 0 / 0.14), rgb(0 0 0 / 0)),
+      linear-gradient(to left, rgb(0 0 0 / 0.14), rgb(0 0 0 / 0));
+    background-position:
+      left center,
+      right center,
+      left center,
+      right center;
+    background-repeat: no-repeat;
+    background-size:
+      24px 100%,
+      24px 100%,
+      12px 100%,
+      12px 100%;
+    background-attachment: local, local, scroll, scroll;
+  }
 }
 
 /*

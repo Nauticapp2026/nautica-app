@@ -543,7 +543,71 @@ export function TesoreriaClient({
         </div>
 
         {/* ── Saldos por instrumento ────────────────────────────────────── */}
-        <div className="overflow-x-auto rounded-2xl border border-gray-200 bg-white">
+        {/* En celular: una tarjeta por instrumento, para ver los cuatro importes sin deslizar. */}
+        <div className="divide-y divide-gray-100 rounded-2xl border border-gray-200 bg-white sm:hidden">
+          {resumen.map((r) => (
+            <div key={r.instrumento} className="space-y-2 px-4 py-3">
+              <div className="text-sm font-medium text-gray-900">
+                {labelInstrumento(r.instrumento)}
+                {r.usd && (
+                  <div className="text-xs font-normal text-gray-400">
+                    Saldo Dólares · equivalente en pesos
+                  </div>
+                )}
+              </div>
+              <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                {[
+                  {
+                    k: 'Saldo inicial',
+                    usd: r.usd?.saldoInicial,
+                    ars: r.saldoInicial,
+                    cls: 'text-gray-700',
+                  },
+                  { k: 'Ingresos', usd: r.usd?.ingresos, ars: r.ingresos, cls: 'text-[#175861]' },
+                  { k: 'Egresos', usd: r.usd?.egresos, ars: r.egresos, cls: 'text-red-600' },
+                  {
+                    k: 'Saldo final',
+                    usd: r.usd?.saldoFinal,
+                    ars: r.saldoFinal,
+                    cls: 'font-semibold text-gray-900',
+                  },
+                ].map((f) => (
+                  <div key={f.k}>
+                    <dt className="text-xs text-gray-500">{f.k}</dt>
+                    <dd className={f.cls}>
+                      {r.usd ? fmtUsd(f.usd ?? 0) : fmtMoney(f.ars)}
+                      {r.usd && (
+                        <div className="text-xs font-normal text-gray-400">{fmtMoney(f.ars)}</div>
+                      )}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          ))}
+          <div className="space-y-2 rounded-b-2xl bg-[#F4F8F8] px-4 py-3">
+            <div className="text-sm font-semibold text-gray-900">Consolidado</div>
+            <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm font-semibold">
+              <div>
+                <dt className="text-xs font-normal text-gray-500">Saldo inicial</dt>
+                <dd className="text-gray-900">{fmtMoney(consolidado.saldoInicial)}</dd>
+              </div>
+              <div>
+                <dt className="text-xs font-normal text-gray-500">Ingresos</dt>
+                <dd className="text-[#175861]">{fmtMoney(consolidado.ingresos)}</dd>
+              </div>
+              <div>
+                <dt className="text-xs font-normal text-gray-500">Egresos</dt>
+                <dd className="text-red-600">{fmtMoney(consolidado.egresos)}</dd>
+              </div>
+              <div>
+                <dt className="text-xs font-normal text-gray-500">Saldo final</dt>
+                <dd className="text-gray-900">{fmtMoney(consolidado.saldoFinal)}</dd>
+              </div>
+            </dl>
+          </div>
+        </div>
+        <div className="scroll-x-hint hidden overflow-x-auto rounded-2xl border border-gray-200 bg-white sm:block">
           <table className="w-full min-w-[720px] text-sm">
             <thead>
               <tr className="border-b border-gray-200 text-left text-xs font-medium text-gray-500">
@@ -770,7 +834,7 @@ export function TesoreriaClient({
             </button>
           </div>
         </div>
-        <div className="overflow-x-auto rounded-2xl border border-gray-200 bg-white">
+        <div className="scroll-x-hint overflow-x-auto rounded-2xl border border-gray-200 bg-white">
           {filtradas.length === 0 ? (
             <EmptyState
               icon={<Landmark className="h-6 w-6" />}

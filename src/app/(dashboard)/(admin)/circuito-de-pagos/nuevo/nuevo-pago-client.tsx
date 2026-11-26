@@ -278,7 +278,7 @@ export function NuevoPagoClient({
             </p>
           ) : (
             <>
-              <div className="hidden overflow-x-auto md:block">
+              <div className="scroll-x-hint hidden overflow-x-auto md:block">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-gray-200 text-left text-xs tracking-wide text-gray-500 uppercase">

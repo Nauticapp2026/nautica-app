@@ -429,7 +429,7 @@ function TablaTarifas({
 }) {
   return (
     <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
-      <div className="overflow-x-auto">
+      <div className="scroll-x-hint overflow-x-auto">
         <table className="w-full min-w-[560px] table-fixed text-sm">
           {/* Anchos fijos para que las 3 tablas (Cuota, Servicios, Espacios) queden alineadas verticalmente. */}
           <colgroup>
