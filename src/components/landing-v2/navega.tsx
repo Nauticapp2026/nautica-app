@@ -55,14 +55,14 @@ export function Navega() {
         />
         <div className="absolute inset-0 bg-[#0b2f35]/[0.72]" />
       </div>
-      <div className="mx-auto max-w-6xl px-4 md:px-8">
+      <div className="mx-auto max-w-5xl px-4 md:px-8">
         <Reveal>
           <h2 className="text-4xl leading-[1.05] font-normal tracking-tight md:text-6xl">
             Navegá <span className="font-extrabold text-[#ABC2B3]">sin problemas</span>
           </h2>
         </Reveal>
 
-        <div className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-6">
+        <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
           {cards.map(({ icon: Icon, label, span, bg, fg, hover }, i) => (
             <Reveal
               key={label}
@@ -71,7 +71,7 @@ export function Navega() {
               className={`${span} sm:col-span-1`}
             >
               <div
-                className="v2-tile v2-lift flex h-full min-h-56 flex-col justify-between rounded-[2rem] p-8 md:p-10"
+                className="v2-tile v2-lift flex h-full min-h-44 flex-col justify-between rounded-[1.75rem] p-6 md:p-8"
                 style={
                   {
                     backgroundColor: bg,
@@ -81,9 +81,7 @@ export function Navega() {
                 }
               >
                 <Icon className="v2-tile-icon size-10" strokeWidth={1.75} aria-hidden />
-                <p className="mt-10 max-w-sm text-xl leading-snug font-medium md:text-2xl">
-                  {label}
-                </p>
+                <p className="mt-8 max-w-sm text-lg leading-snug font-medium md:text-xl">{label}</p>
               </div>
             </Reveal>
           ))}
