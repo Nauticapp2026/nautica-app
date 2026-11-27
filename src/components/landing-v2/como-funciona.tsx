@@ -20,7 +20,7 @@ const paneles = [
     ],
     fondo: '#0b2f35',
     direccion: 'left' as const,
-    posicion: 'object-[50%_20%]',
+    posicion: 'object-[50%_18%]',
   },
   {
     foto: '/landing/8.png',
@@ -38,14 +38,14 @@ const paneles = [
     ],
     fondo: '#175861',
     direccion: 'right' as const,
-    posicion: 'object-[50%_35%]',
+    posicion: 'object-[50%_30%]',
   },
 ];
 
 export function ComoFunciona() {
   return (
     <section id="caracteristicas" className="bg-white py-24 md:py-32">
-      <div className="mx-auto max-w-6xl px-4 md:px-8">
+      <div className="mx-auto max-w-7xl px-4 md:px-8">
         <Reveal>
           <h2 className="max-w-3xl text-4xl leading-[1.05] font-normal tracking-tight text-balance text-[#0b2f35] md:text-6xl">
             Cómo funciona nuestro <span className="font-extrabold text-[#ABC2B3]">sistema</span>
@@ -59,7 +59,7 @@ export function ComoFunciona() {
           {paneles.map((p, i) => (
             <Reveal key={p.titulo} direction={p.direccion} delay={i * 120}>
               <article
-                className="v2-lift group relative isolate flex min-h-[38rem] flex-col justify-end overflow-hidden rounded-[2rem] text-white md:min-h-[44rem]"
+                className="v2-lift group relative isolate flex min-h-[30rem] flex-col justify-end overflow-hidden rounded-[2rem] text-white md:min-h-[34rem]"
                 style={{ backgroundColor: p.fondo }}
               >
                 <Image
@@ -72,7 +72,7 @@ export function ComoFunciona() {
                 <div
                   className="absolute inset-0 -z-10"
                   style={{
-                    backgroundImage: `linear-gradient(to top, ${p.fondo} 8%, ${p.fondo}ee 38%, ${p.fondo}00 72%)`,
+                    backgroundImage: `linear-gradient(to top, ${p.fondo} 10%, ${p.fondo}ee 45%, ${p.fondo}00 85%)`,
                   }}
                 />
 
