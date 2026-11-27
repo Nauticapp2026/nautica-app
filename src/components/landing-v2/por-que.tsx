@@ -41,7 +41,7 @@ export function PorQue() {
         <Reveal direction="zoom" className="md:order-last">
           <div className="v2-float relative aspect-[5/6] w-full overflow-hidden rounded-[2rem] shadow-[0_40px_60px_-30px_rgb(11_47_53/0.5)]">
             <Image
-              src="/landing/por-que.png"
+              src="/landing/por-que-v2.jpg"
               alt="App NauticApp en uso"
               fill
               className="object-cover"
