@@ -37,15 +37,17 @@ export function GestionFeatures() {
               Sistema de gestión <span className="font-extrabold">administrativa integral.</span>
             </h2>
           </Reveal>
-          <ul className="mt-10 space-y-2">
+          <ul className="mt-8 grid gap-x-3 gap-y-0.5 sm:grid-cols-2">
             {features.map((feature, i) => (
               <li key={feature}>
-                <Reveal direction="right" delay={i * 70}>
-                  <div className="group flex items-center gap-4 rounded-2xl px-3 py-2.5 transition-colors duration-300 hover:bg-white">
-                    <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#175861] transition-transform duration-500 group-hover:scale-110 group-hover:rotate-[-8deg]">
-                      <Check className="size-4 text-white" strokeWidth={3} aria-hidden />
+                <Reveal direction="right" delay={i * 50}>
+                  <div className="group flex items-center gap-3 rounded-2xl px-2.5 py-2 transition-colors duration-300 hover:bg-white">
+                    <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-[#175861] transition-colors duration-500 group-hover:bg-[#669E9D]">
+                      <Check className="size-3.5 text-white" strokeWidth={2.5} aria-hidden />
                     </span>
-                    <span className="text-base font-medium text-[#0b2f35]">{feature}</span>
+                    <span className="text-[0.95rem] leading-snug font-medium text-[#0b2f35]">
+                      {feature}
+                    </span>
                   </div>
                 </Reveal>
               </li>
