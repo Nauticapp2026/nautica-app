@@ -45,7 +45,7 @@ export function GestionFeatures() {
                     <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#175861] transition-transform duration-500 group-hover:scale-110 group-hover:rotate-[-8deg]">
                       <Check className="size-4 text-white" strokeWidth={3} aria-hidden />
                     </span>
-                    <span className="text-base font-bold text-[#0b2f35] md:text-lg">{feature}</span>
+                    <span className="text-base font-medium text-[#0b2f35]">{feature}</span>
                   </div>
                 </Reveal>
               </li>

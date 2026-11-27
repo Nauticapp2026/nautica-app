@@ -48,7 +48,7 @@ export function ComoFunciona() {
       <div className="mx-auto max-w-6xl px-4 md:px-8">
         <Reveal>
           <h2 className="max-w-3xl text-4xl leading-[1.05] font-extrabold tracking-tight text-balance text-[#0b2f35] md:text-6xl">
-            Cómo funciona nuestro <span className="v2-underline">sistema</span>
+            Cómo funciona nuestro <span className="v2-underline text-[#669E9D]">sistema</span>
           </h2>
           <p className="mt-6 max-w-xl text-xl font-semibold text-[#175861]">
             Una solución simple, el socio navega, el club gestiona, todo fluye.
