@@ -47,11 +47,11 @@ export function Navega() {
       <div className="v2-wave v2-wave-from-foam" aria-hidden />
       <div className="absolute inset-0 -z-10 overflow-hidden" aria-hidden>
         <Image
-          src="/landing/navega-puerto.jpg"
+          src="/landing/navega-rio.jpg"
           alt=""
           fill
           sizes="100vw"
-          className="v2-parallax object-cover"
+          className="v2-parallax object-cover object-[35%_60%]"
         />
         <div className="absolute inset-0 bg-[#0b2f35]/[0.72]" />
       </div>
