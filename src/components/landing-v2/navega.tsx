@@ -74,7 +74,7 @@ export function Navega() {
                   className="v2-tile v2-lift flex h-full min-h-32 flex-col justify-between rounded-3xl p-4 md:min-h-44 md:rounded-[1.75rem] md:p-8"
                   style={
                     {
-                      backgroundColor: `${bg}e0`,
+                      backgroundColor: `${bg}cc`,
                       color: fg,
                       '--v2-icon-hover': hover,
                     } as React.CSSProperties
