@@ -34,9 +34,10 @@ export function Hero() {
 
       <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pt-28 pb-44 md:px-8 md:pb-52">
         <h1 className="max-w-4xl text-5xl leading-[1.02] font-extrabold tracking-tight text-balance md:text-7xl lg:text-[5.5rem]">
-          <SplitWords text="Digitalizamos la" />
+          <SplitWords text="Digitalizamos" />
           <br />
-          <SplitWords text="experiencia" />
+          <SplitWords text="la experiencia" />
+          <br />
           <span className="text-[#ABC2B3]">
             <SplitWords text="náutica" />
           </span>
