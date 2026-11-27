@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import { CloudSun, FileText, LifeBuoy, ShieldAlert } from 'lucide-react';
 
 import { Reveal } from './motion';
@@ -41,9 +42,19 @@ export function Navega() {
   return (
     <section
       id="modulos"
-      className="relative bg-[#0b2f35] pt-24 pb-24 text-white md:pt-32 md:pb-32"
+      className="relative isolate bg-[#0b2f35] pt-24 pb-24 text-white md:pt-32 md:pb-32"
     >
       <div className="v2-wave v2-wave-to-deep" aria-hidden />
+      <div className="absolute inset-0 -z-10 overflow-hidden" aria-hidden>
+        <Image
+          src="/landing/navega-puerto.jpg"
+          alt=""
+          fill
+          sizes="100vw"
+          className="v2-parallax object-cover"
+        />
+        <div className="absolute inset-0 bg-[#0b2f35]/[0.88]" />
+      </div>
       <div className="mx-auto max-w-6xl px-4 md:px-8">
         <Reveal>
           <h2 className="text-4xl leading-[1.05] font-extrabold tracking-tight md:text-6xl">
