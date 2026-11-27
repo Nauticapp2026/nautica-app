@@ -211,7 +211,7 @@ function PlanCard({
       >
         <p className="text-2xl font-semibold tracking-wider md:text-3xl">{plan.name}</p>
         <p className="mt-3 flex items-baseline justify-center gap-1.5">
-          <span className="text-4xl leading-none font-extrabold tracking-tight md:text-5xl">
+          <span className="text-3xl leading-none font-bold tracking-tight md:text-4xl">
             {price}
           </span>
           <span className="text-sm font-bold tracking-wide opacity-90">/MES</span>
