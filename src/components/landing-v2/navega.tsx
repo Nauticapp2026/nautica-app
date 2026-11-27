@@ -46,19 +46,21 @@ export function Navega() {
     >
       <div className="v2-wave v2-wave-from-foam" aria-hidden />
       <div className="absolute inset-0 -z-10 overflow-hidden" aria-hidden>
-        <div className="absolute inset-0 origin-[100%_60%] scale-[1.25]">
-          <Image
-            src="/landing/navega-rio.jpg"
-            alt=""
-            fill
-            sizes="100vw"
-            className="v2-parallax object-cover"
-          />
+        <div className="absolute inset-0 origin-[0%_60%] scale-[1.25]">
+          <div className="absolute inset-0 -scale-x-100">
+            <Image
+              src="/landing/navega-rio.jpg"
+              alt=""
+              fill
+              sizes="100vw"
+              className="v2-parallax object-cover"
+            />
+          </div>
         </div>
         <div className="absolute inset-0 bg-[#0b2f35]/[0.6]" />
       </div>
       <div className="mx-auto max-w-6xl px-4 md:px-8">
-        <div className="lg:ml-auto lg:max-w-3xl">
+        <div className="lg:max-w-3xl">
           <Reveal>
             <h2 className="text-4xl leading-[1.05] font-normal tracking-tight md:text-6xl">
               Navegá <span className="font-extrabold text-[#ABC2B3]">sin problemas</span>
