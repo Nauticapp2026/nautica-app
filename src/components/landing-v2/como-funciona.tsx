@@ -44,7 +44,7 @@ const paneles = [
 
 export function ComoFunciona() {
   return (
-    <section id="caracteristicas" className="bg-white py-24 md:py-32">
+    <section id="caracteristicas" className="bg-white pt-12 pb-24 md:pt-16 md:pb-32">
       <div className="mx-auto max-w-7xl px-4 md:px-8">
         <Reveal className="text-center">
           <h2 className="text-4xl leading-[1.05] font-normal tracking-tight text-balance text-[#0b2f35] md:text-6xl md:whitespace-nowrap">
