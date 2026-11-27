@@ -99,7 +99,8 @@ export function PricingClient({ plans, capacities, featuresByPlan }: Props) {
       <div className="mx-auto max-w-6xl px-4 md:px-8">
         <div className="text-center">
           <h2 className="text-3xl leading-tight font-normal text-[#175861] md:text-4xl">
-            ¿Cuántos espacios de guarda tiene tu club{' '}
+            ¿Cuántos espacios de guarda tiene tu club
+            <br />
             <span className="font-bold">entre amarras y camas?</span>
           </h2>
           <p className="mt-3 text-xl font-semibold text-[#175861]">
