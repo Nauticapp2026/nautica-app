@@ -8,6 +8,7 @@ import { SplitWords } from './motion';
 export function Hero() {
   return (
     <section className="relative isolate flex min-h-[100svh] items-center overflow-hidden bg-[#0b2f35] text-white">
+      {/* Foto de respaldo: se ve mientras carga el video, si falla, o con "reducir movimiento". */}
       <Image
         src="/landing/hero-bg.png"
         alt=""
@@ -16,7 +17,20 @@ export function Hero() {
         sizes="100vw"
         className="v2-hero-bg object-cover"
       />
-      <div className="absolute inset-0 bg-gradient-to-b from-[#0b2f35]/70 via-[#0b2f35]/40 to-[#0b2f35]/75" />
+      <video
+        className="v2-hero-video absolute inset-0 h-full w-full object-cover"
+        autoPlay
+        muted
+        loop
+        playsInline
+        preload="auto"
+        poster="/landing/hero-bg.png"
+        aria-hidden
+      >
+        <source src="/landing/hero-puerto.mp4" type="video/mp4" />
+      </video>
+      {/* Velo más liviano que antes para que se vean las camas y amarras; el texto sigue legible. */}
+      <div className="absolute inset-0 bg-gradient-to-b from-[#0b2f35]/65 via-[#0b2f35]/25 to-[#0b2f35]/70" />
 
       <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pt-28 pb-44 md:px-8 md:pb-52">
         <h1 className="max-w-4xl text-5xl leading-[1.02] font-extrabold tracking-tight text-balance md:text-7xl lg:text-[5.5rem]">

@@ -274,6 +274,9 @@
 
 /* ---------- Movimiento reducido ---------- */
 @media (prefers-reduced-motion: reduce) {
+  .v2-hero-video {
+    display: none;
+  }
   .v2 {
     scroll-behavior: auto;
   }
