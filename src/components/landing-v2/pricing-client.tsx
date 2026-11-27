@@ -108,7 +108,7 @@ export function PricingClient({ plans, capacities, featuresByPlan }: Props) {
           </p>
         </div>
 
-        <div className="mx-auto mt-12 max-w-4xl">
+        <div className="mx-auto mt-16 max-w-4xl rounded-3xl bg-white px-6 pt-20 pb-6 shadow-sm md:px-10">
           <div className="relative h-3.5 rounded-full bg-gradient-to-r from-white via-[#669E9D]/40 to-[#175861] ring-2 ring-gray-200">
             <div
               className="pointer-events-none absolute inset-y-0 left-0 rounded-l-full bg-gradient-to-r from-[#175861] to-[#669E9D]"
