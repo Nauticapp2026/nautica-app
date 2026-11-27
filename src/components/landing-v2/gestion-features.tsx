@@ -4,15 +4,15 @@ import { Check } from 'lucide-react';
 import { Reveal } from './motion';
 
 const features = [
-  'Ventas',
-  'Venta de amarras y camas',
-  'Sistema de roles',
-  'Visualización de tareas en tiempo real',
-  'Estado de embarcaciones',
-  'Comunicación',
-  'Control de ingresos',
-  'Integración de restaurante o buffet',
-  'Notificaciones automáticas',
+  'Ventas.',
+  'Venta de amarras y camas.',
+  'Sistema de roles.',
+  'Visualización de tareas en tiempo real.',
+  'Estado de embarcaciones.',
+  'Comunicación.',
+  'Control de ingresos.',
+  'Integración de restaurante o buffet.',
+  'Notificaciones automáticas.',
 ];
 
 export function GestionFeatures() {
