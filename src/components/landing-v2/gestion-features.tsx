@@ -23,9 +23,9 @@ export function GestionFeatures() {
           <div className="relative aspect-[5/6] w-full overflow-hidden rounded-[2rem] shadow-[0_40px_60px_-30px_rgb(11_47_53/0.5)]">
             <Image
               src="/landing/gestion-features-v2.jpg"
-              alt="Administradora del club trabajando con NauticApp frente a la marina"
+              alt="Panel de gestión de NauticApp en una laptop frente a la marina"
               fill
-              className="v2-parallax object-cover object-[40%_15%]"
+              className="v2-parallax object-cover object-[50%_45%]"
               sizes="(max-width: 768px) 100vw, 50vw"
             />
           </div>
