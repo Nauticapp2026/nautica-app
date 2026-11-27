@@ -47,8 +47,8 @@ const linkCls = 'text-sm font-bold transition hover:underline hover:opacity-100'
 
 /**
  * Firma del estudio. Va igual en todos los proyectos de Cambalache, así que
- * NO se adapta a la paleta del sitio: el corazón es terracota `#FF7046`
- * hardcodeado a propósito (excepción a la regla 7 de CLAUDE.md, que pide usar
+ * NO se adapta a la paleta del sitio: el corazón era terracota `#FF7046`
+ * hardcodeado a propósito (en /v2 va blanco por pedido del cliente) (excepción a la regla 7 de CLAUDE.md, que pide usar
  * los tokens del design system).
  *
  * Detalles que NO son decorativos:
@@ -109,12 +109,31 @@ function FirmaCambalache() {
         className="animate-latido"
       >
         {PIXELES_CORAZON.map(([x, y]) => (
-          <rect key={`${x}-${y}`} x={x} y={y} width="2" height="2" fill="#FF7046" />
+          <rect key={`${x}-${y}`} x={x} y={y} width="2" height="2" fill="#FFFFFF" />
         ))}
       </svg>
       <span className="sr-only">cariño</span>
       por Cambalache Studio
     </a>
+  );
+}
+
+function IconoInstagram({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className={className}
+    >
+      <rect x="3" y="3" width="18" height="18" rx="5" />
+      <circle cx="12" cy="12" r="4" />
+      <circle cx="17.2" cy="6.8" r="0.6" fill="currentColor" stroke="none" />
+    </svg>
   );
 }
 
@@ -137,6 +156,15 @@ export function Footer() {
             <p className="max-w-[14rem] text-sm font-bold opacity-80">
               Digitalizamos la experiencia náutica
             </p>
+            <a
+              href="https://www.instagram.com/nauticapp.club/"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="NauticApp en Instagram (se abre en otra pestaña)"
+              className="inline-flex size-11 items-center justify-center rounded-full border border-white/40 transition hover:scale-110 hover:bg-white hover:text-[#2A6F78]"
+            >
+              <IconoInstagram className="size-5" />
+            </a>
           </div>
 
           {columns.map((col) => (

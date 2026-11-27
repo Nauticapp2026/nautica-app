@@ -18,7 +18,7 @@ export function PorQue() {
         <div>
           <Reveal>
             <h2 className="text-4xl leading-[1.05] font-extrabold tracking-tight text-[#0b2f35] md:text-6xl">
-              ¿Por qué <span className="v2-underline">NauticApp</span>?
+              ¿Por qué <span className="v2-underline text-[#ABC2B3]">NauticApp</span>?
             </h2>
           </Reveal>
           <ul className="mt-10 divide-y divide-[#0b2f35]/10">

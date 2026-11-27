@@ -170,7 +170,7 @@ export function PricingClient({ plans, capacities, featuresByPlan }: Props) {
           ))}
         </div>
 
-        <div className="mt-12 space-y-1 text-center text-sm font-bold text-[#677B85]">
+        <div className="mt-12 space-y-1 text-center text-sm font-medium text-[#677B85]">
           <p>
             Las novedades y publicaciones del plan elegido no son acumulables y se renovarán de
             manera mensual.
