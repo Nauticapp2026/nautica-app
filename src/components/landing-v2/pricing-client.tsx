@@ -210,17 +210,20 @@ function PlanCard({
         style={{ backgroundColor: presentation.headerColor }}
       >
         <p className="text-2xl font-semibold tracking-wider md:text-3xl">{plan.name}</p>
-        <p className="mt-2 text-base">
-          <span className="font-semibold">{price}</span> <span className="font-bold">/MES</span>
+        <p className="mt-3 flex items-baseline justify-center gap-1.5">
+          <span className="text-4xl leading-none font-extrabold tracking-tight md:text-5xl">
+            {price}
+          </span>
+          <span className="text-sm font-bold tracking-wide opacity-90">/MES</span>
         </p>
       </div>
 
-      <div className="flex flex-1 flex-col gap-6 p-8">
-        <ul className="flex-1 space-y-4">
+      <div className="flex flex-1 flex-col gap-6 p-6 md:p-7">
+        <ul className="flex-1 space-y-2.5">
           {features.map((feature) => (
-            <li key={feature.text} className="flex items-start gap-3">
+            <li key={feature.text} className="flex items-start gap-2.5">
               <span
-                className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full"
+                className="mt-px flex size-[18px] shrink-0 items-center justify-center rounded-full"
                 style={{ backgroundColor: presentation.iconBg }}
               >
                 <Check
@@ -230,7 +233,7 @@ function PlanCard({
                 />
               </span>
               <span
-                className={`text-base text-[#175861] ${feature.bold ? 'font-bold' : 'font-normal'}`}
+                className={`text-sm leading-snug text-[#175861] ${feature.bold ? 'font-bold' : 'font-normal'}`}
               >
                 {feature.text}
               </span>

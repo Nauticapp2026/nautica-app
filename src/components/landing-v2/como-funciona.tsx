@@ -78,8 +78,8 @@ export function ComoFunciona() {
 
                 <div className="p-6 md:p-10">
                   <p.Icono
-                    className="mb-5 size-12 text-[#ABC2B3] transition-transform duration-700 group-hover:scale-110 group-hover:-rotate-6"
-                    strokeWidth={2.75}
+                    className="mb-5 size-10 text-white transition-transform duration-700 group-hover:scale-110 group-hover:-rotate-6"
+                    strokeWidth={1.75}
                     aria-hidden
                   />
                   <h3 className="text-3xl leading-[1.05] font-extrabold tracking-tight text-balance md:text-4xl">
