@@ -222,10 +222,10 @@
 }
 
 .v2-tile .v2-tile-icon {
-  transition: transform 0.7s var(--v2-ease);
+  transition: color 0.45s var(--v2-ease);
 }
 .v2-tile:hover .v2-tile-icon {
-  transform: rotate(-8deg) scale(1.12);
+  color: var(--v2-icon-hover);
 }
 
 /* Imagen con parallax por scroll donde el navegador lo soporta. */

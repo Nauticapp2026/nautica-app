@@ -78,7 +78,7 @@ export function ComoFunciona() {
 
                 <div className="p-6 md:p-10">
                   <p.Icono
-                    className="mb-5 size-10 text-white transition-transform duration-700 group-hover:scale-110 group-hover:-rotate-6"
+                    className="mb-5 size-10 text-white transition-colors duration-500 group-hover:text-[#ABC2B3]"
                     strokeWidth={1.75}
                     aria-hidden
                   />
