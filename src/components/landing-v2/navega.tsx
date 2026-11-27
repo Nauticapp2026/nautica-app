@@ -46,18 +46,18 @@ export function Navega() {
     >
       <div className="v2-wave v2-wave-from-foam" aria-hidden />
       <div className="absolute inset-0 -z-10 overflow-hidden" aria-hidden>
-        <div className="absolute inset-0 origin-[0%_60%] scale-[1.25]">
+        <div className="absolute inset-0 origin-[0%_60%] md:scale-[1.25]">
           <div className="absolute inset-0 -scale-x-100">
             <Image
               src="/landing/navega-rio.jpg"
               alt=""
               fill
               sizes="100vw"
-              className="v2-parallax object-cover"
+              className="v2-parallax object-cover object-[25%_50%] md:object-center"
             />
           </div>
         </div>
-        <div className="absolute inset-0 bg-[#0b2f35]/[0.6]" />
+        <div className="absolute inset-0 bg-[#0b2f35]/[0.45] md:bg-[#0b2f35]/[0.6]" />
       </div>
       <div className="mx-auto max-w-6xl px-4 md:px-8">
         <div className="lg:max-w-3xl">
@@ -67,16 +67,11 @@ export function Navega() {
             </h2>
           </Reveal>
 
-          <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
+          <div className="mt-10 grid grid-cols-2 gap-3 md:mt-12 md:gap-4 lg:grid-cols-6">
             {cards.map(({ icon: Icon, label, span, bg, fg, hover }, i) => (
-              <Reveal
-                key={label}
-                delay={i * 110}
-                direction="zoom"
-                className={`${span} sm:col-span-1`}
-              >
+              <Reveal key={label} delay={i * 110} direction="zoom" className={`${span} col-span-1`}>
                 <div
-                  className="v2-tile v2-lift flex h-full min-h-44 flex-col justify-between rounded-[1.75rem] p-6 md:p-8"
+                  className="v2-tile v2-lift flex h-full min-h-32 flex-col justify-between rounded-3xl p-4 md:min-h-44 md:rounded-[1.75rem] md:p-8"
                   style={
                     {
                       backgroundColor: bg,
@@ -85,8 +80,8 @@ export function Navega() {
                     } as React.CSSProperties
                   }
                 >
-                  <Icon className="v2-tile-icon size-10" strokeWidth={1.75} aria-hidden />
-                  <p className="mt-8 max-w-sm text-lg leading-snug font-medium md:text-xl">
+                  <Icon className="v2-tile-icon size-7 md:size-10" strokeWidth={1.75} aria-hidden />
+                  <p className="mt-5 max-w-sm text-sm leading-snug font-medium md:mt-8 md:text-xl">
                     {label}
                   </p>
                 </div>
