@@ -13,8 +13,8 @@ const benefits = [
 
 export function PorQue() {
   return (
-    <section className="overflow-hidden bg-[#0b2f35] py-24 text-white md:py-32 lg:[background:linear-gradient(to_right,#0b2f35_72%,#ffffff_72%)]">
-      <div className="mx-auto grid max-w-6xl items-center gap-14 px-4 md:grid-cols-2 md:px-8 lg:gap-20">
+    <section className="relative overflow-hidden bg-[#0b2f35] pt-24 text-white md:py-32">
+      <div className="relative z-10 mx-auto grid max-w-6xl items-center gap-14 px-4 md:grid-cols-2 md:px-8 lg:gap-20">
         <div>
           <Reveal>
             <h2 className="text-4xl leading-[1.05] font-normal tracking-tight text-white md:text-6xl">
@@ -37,18 +37,19 @@ export function PorQue() {
             <DownloadAppButton className="v2-btn mt-10 bg-[#ABC2B3] text-[#0b2f35] hover:bg-white" />
           </Reveal>
         </div>
+      </div>
 
-        <Reveal direction="zoom" className="md:order-last">
-          <div className="v2-float relative aspect-[5/6] w-full overflow-hidden rounded-[2rem] shadow-[0_40px_60px_-30px_rgb(11_47_53/0.5)]">
-            <Image
-              src="/landing/por-que-v2.jpg"
-              alt="App NauticApp en uso"
-              fill
-              className="object-cover"
-              sizes="(max-width: 768px) 100vw, 50vw"
-            />
-          </div>
-        </Reveal>
+      {/* Foto a sangre a la derecha: el verde del fondo se degrada hasta fundirse con ella. */}
+      <div className="relative mt-14 aspect-[4/5] w-full md:absolute md:inset-y-0 md:right-0 md:mt-0 md:aspect-auto md:w-[52%]">
+        <Image
+          src="/landing/por-que-v2.jpg"
+          alt="App NauticApp en uso"
+          fill
+          className="object-cover object-[50%_20%]"
+          sizes="(max-width: 768px) 100vw, 52vw"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#0b2f35] via-transparent to-transparent md:bg-gradient-to-r md:from-[#0b2f35] md:via-[#0b2f35]/45 md:to-transparent md:to-60%" />
+        <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#0b2f35]/70 to-transparent" />
       </div>
     </section>
   );
