@@ -1,4 +1,5 @@
 import Image from 'next/image';
+import { Share2, User } from 'lucide-react';
 
 import { Reveal } from './motion';
 
@@ -6,7 +7,7 @@ const paneles = [
   {
     foto: '/landing/2.png',
     fotoAlt: 'Panel de gestión del club en una computadora',
-    icono: '/landing/como-funciona/1.png',
+    Icono: Share2,
     titulo: 'El club gestiona todo automáticamente',
     bajada: 'El sistema sincroniza:',
     items: [
@@ -24,7 +25,7 @@ const paneles = [
   {
     foto: '/landing/8.png',
     fotoAlt: 'Socio usando la app NauticApp en el celular',
-    icono: '/landing/como-funciona/2.png',
+    Icono: User,
     titulo: 'El socio usa la App',
     bajada: 'Desde el celular puede:',
     items: [
@@ -75,17 +76,12 @@ export function ComoFunciona() {
                   }}
                 />
 
-                <div className="absolute top-6 left-6 flex size-14 items-center justify-center rounded-full bg-white shadow-lg transition-transform duration-700 group-hover:scale-110 group-hover:rotate-[-10deg] md:top-8 md:left-8">
-                  <Image
-                    src={p.icono}
-                    alt=""
-                    width={36}
-                    height={36}
-                    className="size-9 object-contain"
-                  />
-                </div>
-
                 <div className="p-6 md:p-10">
+                  <p.Icono
+                    className="mb-5 size-12 text-[#ABC2B3] transition-transform duration-700 group-hover:scale-110 group-hover:-rotate-6"
+                    strokeWidth={2.75}
+                    aria-hidden
+                  />
                   <h3 className="text-3xl leading-[1.05] font-extrabold tracking-tight text-balance md:text-4xl">
                     {p.titulo}
                   </h3>

@@ -1,16 +1,15 @@
-import Image from 'next/image';
-import { FileText } from 'lucide-react';
+import { CloudSun, FileText, LifeBuoy, ShieldAlert } from 'lucide-react';
 
 import { Reveal } from './motion';
 
 const cards = [
   {
-    src: '/landing/navega/1.png',
+    icon: CloudSun,
     label: 'Clima, mareas y sudestadas en tiempo real',
     span: 'lg:col-span-4',
   },
   {
-    src: '/landing/navega/2.png',
+    icon: ShieldAlert,
     label: 'Navegación segura con avisos y alertas',
     span: 'lg:col-span-2',
   },
@@ -20,7 +19,7 @@ const cards = [
     span: 'lg:col-span-2',
   },
   {
-    src: '/landing/navega/4.png',
+    icon: LifeBuoy,
     label: 'Contactos de emergencia y asistencia',
     span: 'lg:col-span-4',
   },
@@ -41,7 +40,7 @@ export function Navega() {
         </Reveal>
 
         <div className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-6">
-          {cards.map(({ src, icon: Icon, label, span }, i) => (
+          {cards.map(({ icon: Icon, label, span }, i) => (
             <Reveal
               key={label}
               delay={i * 110}
@@ -49,21 +48,11 @@ export function Navega() {
               className={`${span} sm:col-span-1`}
             >
               <div className="v2-tile v2-lift flex h-full min-h-56 flex-col justify-between rounded-[2rem] bg-[#175861] p-8 md:p-10">
-                <div className="v2-tile-icon relative flex size-16 items-center justify-center rounded-full bg-white">
-                  {Icon ? (
-                    <Icon className="size-8 text-[#175861]" strokeWidth={2} aria-hidden />
-                  ) : (
-                    src && (
-                      <Image
-                        src={src}
-                        alt=""
-                        width={40}
-                        height={40}
-                        className="size-10 object-contain"
-                      />
-                    )
-                  )}
-                </div>
+                <Icon
+                  className="v2-tile-icon size-14 text-[#ABC2B3]"
+                  strokeWidth={2.75}
+                  aria-hidden
+                />
                 <p className="mt-10 max-w-sm text-xl leading-snug font-bold md:text-2xl">{label}</p>
               </div>
             </Reveal>
