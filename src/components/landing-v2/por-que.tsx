@@ -13,19 +13,19 @@ const benefits = [
 
 export function PorQue() {
   return (
-    <section className="overflow-hidden bg-white py-24 md:py-32">
+    <section className="overflow-hidden bg-[#0b2f35] py-24 text-white md:py-32 lg:[background:linear-gradient(to_right,#0b2f35_72%,#ffffff_72%)]">
       <div className="mx-auto grid max-w-6xl items-center gap-14 px-4 md:grid-cols-2 md:px-8 lg:gap-20">
         <div>
           <Reveal>
-            <h2 className="text-4xl leading-[1.05] font-normal tracking-tight text-[#0b2f35] md:text-6xl">
+            <h2 className="text-4xl leading-[1.05] font-normal tracking-tight text-white md:text-6xl">
               ¿Por qué <span className="font-extrabold text-[#ABC2B3]">NauticApp</span>?
             </h2>
           </Reveal>
-          <ul className="mt-10 divide-y divide-[#0b2f35]/10">
+          <ul className="mt-10 divide-y divide-white/15">
             {benefits.map((b, i) => (
               <li key={b}>
                 <Reveal delay={i * 90} direction="left">
-                  <p className="flex items-center gap-4 py-4 text-lg leading-snug font-medium text-[#175861] md:text-xl">
+                  <p className="flex items-center gap-4 py-4 text-lg leading-snug font-medium text-white md:text-xl">
                     <span className="size-2.5 shrink-0 rounded-full bg-[#669E9D]" aria-hidden />
                     {b}
                   </p>
@@ -34,7 +34,7 @@ export function PorQue() {
             ))}
           </ul>
           <Reveal delay={500}>
-            <DownloadAppButton className="v2-btn mt-10 bg-[#0b2f35] text-white hover:bg-[#175861]" />
+            <DownloadAppButton className="v2-btn mt-10 bg-[#ABC2B3] text-[#0b2f35] hover:bg-white" />
           </Reveal>
         </div>
 
