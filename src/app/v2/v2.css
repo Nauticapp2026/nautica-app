@@ -273,6 +273,19 @@
   background-size: 100% 3px;
 }
 
+/* Pulso suave en el selector de espacios. */
+@keyframes v2-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgb(23 88 97 / 0.45);
+  }
+  100% {
+    box-shadow: 0 0 0 14px rgb(23 88 97 / 0);
+  }
+}
+.v2-pulse {
+  animation: v2-pulse 2.2s ease-out infinite;
+}
+
 /* ---------- Movimiento reducido ---------- */
 @media (prefers-reduced-motion: reduce) {
   .v2-hero-video {

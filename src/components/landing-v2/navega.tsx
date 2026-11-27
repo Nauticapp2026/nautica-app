@@ -46,45 +46,51 @@ export function Navega() {
     >
       <div className="v2-wave v2-wave-from-foam" aria-hidden />
       <div className="absolute inset-0 -z-10 overflow-hidden" aria-hidden>
-        <Image
-          src="/landing/navega-rio.jpg"
-          alt=""
-          fill
-          sizes="100vw"
-          className="v2-parallax object-cover object-[35%_60%]"
-        />
-        <div className="absolute inset-0 bg-[#0b2f35]/[0.72]" />
+        <div className="absolute inset-0 origin-[100%_60%] scale-[1.25]">
+          <Image
+            src="/landing/navega-rio.jpg"
+            alt=""
+            fill
+            sizes="100vw"
+            className="v2-parallax object-cover"
+          />
+        </div>
+        <div className="absolute inset-0 bg-[#0b2f35]/[0.6]" />
       </div>
-      <div className="mx-auto max-w-5xl px-4 md:px-8">
-        <Reveal>
-          <h2 className="text-4xl leading-[1.05] font-normal tracking-tight md:text-6xl">
-            Navegá <span className="font-extrabold text-[#ABC2B3]">sin problemas</span>
-          </h2>
-        </Reveal>
+      <div className="mx-auto max-w-6xl px-4 md:px-8">
+        <div className="lg:ml-auto lg:max-w-3xl">
+          <Reveal>
+            <h2 className="text-4xl leading-[1.05] font-normal tracking-tight md:text-6xl">
+              Navegá <span className="font-extrabold text-[#ABC2B3]">sin problemas</span>
+            </h2>
+          </Reveal>
 
-        <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
-          {cards.map(({ icon: Icon, label, span, bg, fg, hover }, i) => (
-            <Reveal
-              key={label}
-              delay={i * 110}
-              direction="zoom"
-              className={`${span} sm:col-span-1`}
-            >
-              <div
-                className="v2-tile v2-lift flex h-full min-h-44 flex-col justify-between rounded-[1.75rem] p-6 md:p-8"
-                style={
-                  {
-                    backgroundColor: bg,
-                    color: fg,
-                    '--v2-icon-hover': hover,
-                  } as React.CSSProperties
-                }
+          <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
+            {cards.map(({ icon: Icon, label, span, bg, fg, hover }, i) => (
+              <Reveal
+                key={label}
+                delay={i * 110}
+                direction="zoom"
+                className={`${span} sm:col-span-1`}
               >
-                <Icon className="v2-tile-icon size-10" strokeWidth={1.75} aria-hidden />
-                <p className="mt-8 max-w-sm text-lg leading-snug font-medium md:text-xl">{label}</p>
-              </div>
-            </Reveal>
-          ))}
+                <div
+                  className="v2-tile v2-lift flex h-full min-h-44 flex-col justify-between rounded-[1.75rem] p-6 md:p-8"
+                  style={
+                    {
+                      backgroundColor: bg,
+                      color: fg,
+                      '--v2-icon-hover': hover,
+                    } as React.CSSProperties
+                  }
+                >
+                  <Icon className="v2-tile-icon size-10" strokeWidth={1.75} aria-hidden />
+                  <p className="mt-8 max-w-sm text-lg leading-snug font-medium md:text-xl">
+                    {label}
+                  </p>
+                </div>
+              </Reveal>
+            ))}
+          </div>
         </div>
       </div>
     </section>

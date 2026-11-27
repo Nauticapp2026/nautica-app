@@ -1,8 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { Check } from 'lucide-react';
-import { useState } from 'react';
+import { ArrowRight, Check } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+
+import { Reveal } from './motion';
 
 // Presentación por plan (keyed por slug). Lo que cambia desde el panel super
 // admin (name, rate, features) viene por props; lo que es decisión de
@@ -18,23 +20,23 @@ const PLAN_PRESENTATION: Record<
   }
 > = {
   esencial: {
-    headerColor: '#677B85',
-    buttonColor: '#677B85',
-    iconColor: '#677B85',
-    iconBg: 'rgba(103, 123, 133, 0.10)',
+    headerColor: '#2A6F77',
+    buttonColor: '#2A6F77',
+    iconColor: '#ffffff',
+    iconBg: '#2A6F77',
   },
-  club: {
-    headerColor: '#669E9D',
-    buttonColor: '#669E9D',
-    iconColor: '#669E9D',
-    iconBg: 'rgba(102, 158, 157, 0.10)',
+  premium: {
+    headerColor: '#175861',
+    buttonColor: '#175861',
+    iconColor: '#ffffff',
+    iconBg: '#175861',
     highlighted: true,
   },
   elite: {
-    headerColor: '#ABC2B3',
-    buttonColor: '#ABC2B3',
-    iconColor: '#ABC2B3',
-    iconBg: 'rgba(171, 194, 179, 0.10)',
+    headerColor: '#0b2f35',
+    buttonColor: '#0b2f35',
+    iconColor: '#ffffff',
+    iconBg: '#0b2f35',
   },
 };
 
@@ -54,6 +56,32 @@ type Props = {
 
 function formatNumber(value: number) {
   return value.toLocaleString('es-AR');
+}
+
+/** Anima un número hacia su nuevo valor (sin animación si el usuario pidió menos movimiento). */
+function useTween(target: number) {
+  const [value, setValue] = useState(target);
+  const from = useRef(target);
+
+  useEffect(() => {
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const ms = reduce ? 0 : 550;
+    const start = performance.now();
+    const origin = from.current;
+    let raf = 0;
+    const tick = (now: number) => {
+      const p = ms === 0 ? 1 : Math.min(1, (now - start) / ms);
+      const eased = 1 - Math.pow(1 - p, 3);
+      const current = origin + (target - origin) * eased;
+      from.current = current;
+      setValue(current);
+      if (p < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [target]);
+
+  return Math.round(value);
 }
 
 export function PricingClient({ plans, capacities, featuresByPlan }: Props) {
@@ -122,7 +150,7 @@ export function PricingClient({ plans, capacities, featuresByPlan }: Props) {
               {formatNumber(clampedCapacity)} espacios
             </div>
             <div
-              className="pointer-events-none absolute -top-1 size-6 -translate-x-1/2 rounded-full border-2 border-white bg-[#175861] shadow-md"
+              className="v2-pulse pointer-events-none absolute -top-1 size-6 -translate-x-1/2 rounded-full border-2 border-white bg-[#175861] shadow-md"
               style={{ left: `${handlePercent}%` }}
             />
             <input
@@ -162,13 +190,14 @@ export function PricingClient({ plans, capacities, featuresByPlan }: Props) {
         </div>
 
         <div className="mt-16 grid gap-6 md:grid-cols-3 md:items-stretch">
-          {plans.map((plan) => (
-            <PlanCard
-              key={plan.slug}
-              plan={plan}
-              capacity={capacity}
-              features={featuresByPlan[plan.slug as 'esencial' | 'premium' | 'elite'] ?? []}
-            />
+          {plans.map((plan, i) => (
+            <Reveal key={plan.slug} delay={i * 130} direction="zoom" className="flex">
+              <PlanCard
+                plan={plan}
+                capacity={capacity}
+                features={featuresByPlan[plan.slug as 'esencial' | 'premium' | 'elite'] ?? []}
+              />
+            </Reveal>
           ))}
         </div>
 
@@ -197,26 +226,26 @@ function PlanCard({
   features: PlanFeatureLine[];
 }) {
   const presentation = PLAN_PRESENTATION[plan.slug] ?? PLAN_PRESENTATION.esencial;
-  const price = `$${formatNumber(plan.rate * capacity)}`;
+  const price = `$${formatNumber(useTween(plan.rate * capacity))}`;
 
   return (
     <div
-      className={`flex flex-col overflow-hidden rounded-2xl bg-white shadow-md transition-all duration-200 ease-out hover:scale-[1.02] hover:shadow-2xl hover:ring-2 hover:ring-[#669E9D] ${
+      className={`group flex w-full flex-col overflow-hidden rounded-[2rem] bg-white transition-all duration-500 ease-out hover:-translate-y-2 hover:shadow-[0_40px_60px_-30px_rgb(11_47_53/0.55)] ${
         presentation.highlighted
-          ? 'shadow-2xl ring-2 ring-[#669E9D] md:-my-4'
-          : 'ring-1 ring-gray-200'
+          ? 'shadow-[0_30px_60px_-30px_rgb(11_47_53/0.5)] ring-2 ring-[#669E9D] md:-my-4'
+          : 'shadow-md ring-1 ring-gray-200'
       }`}
     >
       <div
-        className="px-6 py-7 text-center text-white"
+        className="relative px-6 py-8 text-center text-white"
         style={{ backgroundColor: presentation.headerColor }}
       >
-        <p className="text-2xl font-semibold tracking-wider md:text-3xl">{plan.name}</p>
-        <p className="mt-3 flex items-baseline justify-center gap-1.5">
-          <span className="text-2xl leading-none font-semibold tracking-tight md:text-3xl">
+        <p className="text-xl font-semibold tracking-[0.2em] md:text-2xl">{plan.name}</p>
+        <p className="mt-4 flex items-baseline justify-center gap-1.5">
+          <span className="text-2xl leading-none font-semibold tracking-tight tabular-nums md:text-3xl">
             {price}
           </span>
-          <span className="text-sm font-bold tracking-wide opacity-90">/MES</span>
+          <span className="text-sm font-bold tracking-wide opacity-80">/MES</span>
         </p>
       </div>
 
@@ -225,7 +254,7 @@ function PlanCard({
           {features.map((feature) => (
             <li key={feature.text} className="flex items-start gap-2.5">
               <span
-                className="mt-px flex size-[18px] shrink-0 items-center justify-center rounded-full"
+                className="mt-px flex size-[18px] shrink-0 items-center justify-center rounded-full transition-transform duration-500 group-hover:scale-110"
                 style={{ backgroundColor: presentation.iconBg }}
               >
                 <Check
@@ -245,10 +274,11 @@ function PlanCard({
 
         <Link
           href="/onboarding"
-          className="block rounded-[10px] px-4 py-3 text-center text-base font-semibold text-white transition hover:opacity-90"
+          className="v2-btn w-full justify-center text-white hover:opacity-95"
           style={{ backgroundColor: presentation.buttonColor }}
         >
           Seleccionar plan
+          <ArrowRight className="size-4" aria-hidden />
         </Link>
       </div>
     </div>
