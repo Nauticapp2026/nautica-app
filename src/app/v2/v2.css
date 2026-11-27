@@ -126,13 +126,15 @@
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 120' preserveAspectRatio='none'%3E%3Cpath fill='%23ffffff' d='M0 50c100 45 200 45 300 0s200-45 300 0 200 45 300 0 200-45 300 0v70H0z'/%3E%3C/svg%3E");
 }
 
-/* Olas hacia la sección oscura (colores propios). */
-.v2-wave-to-deep {
+/* Ola de transición: el color de la sección clara de arriba "baja" sobre la
+   foto de la sección oscura, así la imagen llega hasta el borde de la ola. */
+.v2-wave-from-foam {
+  top: -1px;
+  bottom: auto;
   height: 80px;
   --v2-speed: 26s;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 120' preserveAspectRatio='none'%3E%3Cpath fill='%230b2f35' d='M0 60c100 40 200 40 300 0s200-40 300 0 200 40 300 0 200-40 300 0v60H0z'/%3E%3C/svg%3E");
-  bottom: auto;
-  top: -79px;
+  z-index: 1;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 120' preserveAspectRatio='none'%3E%3Cpath fill='%23eef5f2' d='M0 60c100 40 200 40 300 0s200-40 300 0 200 40 300 0 200-40 300 0V0H0z'/%3E%3C/svg%3E");
 }
 
 @keyframes v2-nudge {

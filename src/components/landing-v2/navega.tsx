@@ -44,7 +44,7 @@ export function Navega() {
       id="modulos"
       className="relative isolate bg-[#0b2f35] pt-24 pb-24 text-white md:pt-32 md:pb-32"
     >
-      <div className="v2-wave v2-wave-to-deep" aria-hidden />
+      <div className="v2-wave v2-wave-from-foam" aria-hidden />
       <div className="absolute inset-0 -z-10 overflow-hidden" aria-hidden>
         <Image
           src="/landing/navega-puerto.jpg"
@@ -53,7 +53,7 @@ export function Navega() {
           sizes="100vw"
           className="v2-parallax object-cover"
         />
-        <div className="absolute inset-0 bg-[#0b2f35]/[0.88]" />
+        <div className="absolute inset-0 bg-[#0b2f35]/[0.72]" />
       </div>
       <div className="mx-auto max-w-6xl px-4 md:px-8">
         <Reveal>
