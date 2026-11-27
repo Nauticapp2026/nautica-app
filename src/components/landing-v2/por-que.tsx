@@ -13,7 +13,7 @@ const benefits = [
 
 export function PorQue() {
   return (
-    <section className="relative overflow-hidden bg-[#0b2f35] pt-24 text-white md:py-32">
+    <section className="relative overflow-hidden bg-[#0b2f35] pt-16 text-white md:py-14">
       <div className="relative z-10 mx-auto grid max-w-6xl items-center gap-14 px-4 md:grid-cols-2 md:px-8 lg:gap-20">
         <div>
           <Reveal>
@@ -21,11 +21,11 @@ export function PorQue() {
               ¿Por qué <span className="font-extrabold text-[#ABC2B3]">NauticApp</span>?
             </h2>
           </Reveal>
-          <ul className="mt-10 divide-y divide-white/15">
+          <ul className="mt-7 divide-y divide-white/15">
             {benefits.map((b, i) => (
               <li key={b}>
                 <Reveal delay={i * 90} direction="left">
-                  <p className="flex items-center gap-4 py-4 text-lg leading-snug font-medium text-white md:text-xl">
+                  <p className="flex items-center gap-4 py-3 text-lg leading-snug font-medium text-white md:text-xl">
                     <span className="size-2.5 shrink-0 rounded-full bg-[#669E9D]" aria-hidden />
                     {b}
                   </p>
@@ -34,7 +34,7 @@ export function PorQue() {
             ))}
           </ul>
           <Reveal delay={500}>
-            <DownloadAppButton className="v2-btn mt-10 bg-[#ABC2B3] text-[#0b2f35] hover:bg-white" />
+            <DownloadAppButton className="v2-btn mt-8 bg-[#ABC2B3] text-[#0b2f35] hover:bg-white" />
           </Reveal>
         </div>
       </div>
@@ -45,7 +45,7 @@ export function PorQue() {
           src="/landing/por-que-v2.jpg"
           alt="App NauticApp en uso"
           fill
-          className="object-cover object-[50%_20%]"
+          className="object-cover object-[50%_55%]"
           sizes="(max-width: 768px) 100vw, 52vw"
         />
         <div className="absolute inset-0 bg-gradient-to-b from-[#0b2f35] via-transparent to-transparent md:bg-gradient-to-r md:from-[#0b2f35] md:via-[#0b2f35]/45 md:to-transparent md:to-60%" />
