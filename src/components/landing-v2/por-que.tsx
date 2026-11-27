@@ -25,7 +25,8 @@ export function PorQue() {
             {benefits.map((b, i) => (
               <li key={b}>
                 <Reveal delay={i * 90} direction="left">
-                  <p className="py-4 text-lg leading-snug font-medium text-[#175861] md:text-xl">
+                  <p className="flex items-center gap-4 py-4 text-lg leading-snug font-medium text-[#175861] md:text-xl">
+                    <span className="size-2.5 shrink-0 rounded-full bg-[#669E9D]" aria-hidden />
                     {b}
                   </p>
                 </Reveal>
