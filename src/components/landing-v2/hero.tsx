@@ -33,17 +33,17 @@ export function Hero() {
       <div className="absolute inset-0 bg-gradient-to-b from-[#0b2f35]/65 via-[#0b2f35]/25 to-[#0b2f35]/70" />
 
       <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pt-28 pb-44 md:px-8 md:pb-52">
-        <h1 className="max-w-4xl text-5xl leading-[1.02] font-extrabold tracking-tight text-balance md:text-7xl lg:text-[5.5rem]">
+        <h1 className="max-w-4xl text-5xl leading-[1.02] font-normal tracking-tight text-balance md:text-7xl lg:text-[5.5rem]">
           <SplitWords text="Digitalizamos la" />
           <br />
           <SplitWords text="experiencia" />
-          <span className="text-[#ABC2B3]">
+          <span className="font-extrabold text-[#ABC2B3]">
             <SplitWords text="náutica" />
           </span>
         </h1>
 
         <p
-          className="v2-rise mt-8 max-w-2xl text-lg leading-relaxed font-semibold text-white/90 md:text-xl"
+          className="v2-rise mt-8 max-w-2xl text-lg leading-relaxed font-medium text-white/90 md:text-xl"
           style={{ '--v2-delay': '1.1s' } as React.CSSProperties}
         >
           La plataforma definitiva para administrar clubes náuticos y potenciar la vida en el río.

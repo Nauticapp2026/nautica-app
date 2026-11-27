@@ -57,8 +57,8 @@ export function Navega() {
       </div>
       <div className="mx-auto max-w-6xl px-4 md:px-8">
         <Reveal>
-          <h2 className="text-4xl leading-[1.05] font-extrabold tracking-tight md:text-6xl">
-            Navegá <span className="text-[#ABC2B3]">sin problemas</span>
+          <h2 className="text-4xl leading-[1.05] font-normal tracking-tight md:text-6xl">
+            Navegá <span className="font-extrabold text-[#ABC2B3]">sin problemas</span>
           </h2>
         </Reveal>
 
@@ -81,7 +81,7 @@ export function Navega() {
                 }
               >
                 <Icon className="v2-tile-icon size-10" strokeWidth={1.75} aria-hidden />
-                <p className="mt-10 max-w-sm text-xl leading-snug font-semibold md:text-2xl">
+                <p className="mt-10 max-w-sm text-xl leading-snug font-medium md:text-2xl">
                   {label}
                 </p>
               </div>

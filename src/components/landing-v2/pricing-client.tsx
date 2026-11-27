@@ -98,8 +98,9 @@ export function PricingClient({ plans, capacities, featuresByPlan }: Props) {
     <section id="planes" className="bg-[#F3F4F6] py-20">
       <div className="mx-auto max-w-6xl px-4 md:px-8">
         <div className="text-center">
-          <h2 className="text-3xl leading-tight font-bold text-[#175861] md:text-4xl">
-            ¿Cuántos espacios de guarda tiene tu club entre amarras y camas?
+          <h2 className="text-3xl leading-tight font-normal text-[#175861] md:text-4xl">
+            ¿Cuántos espacios de guarda tiene tu club{' '}
+            <span className="font-bold">entre amarras y camas?</span>
           </h2>
           <p className="mt-3 text-xl font-semibold text-[#175861]">
             Planes autogestionables exclusivos para Clubes Náuticos

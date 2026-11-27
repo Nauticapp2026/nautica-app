@@ -33,8 +33,8 @@ export function GestionFeatures() {
 
         <div>
           <Reveal>
-            <h2 className="text-3xl leading-[1.08] font-extrabold tracking-tight text-balance text-[#0b2f35] md:text-5xl">
-              Sistema de gestión administrativa integral.
+            <h2 className="text-3xl leading-[1.08] font-normal tracking-tight text-balance text-[#0b2f35] md:text-5xl">
+              Sistema de gestión <span className="font-extrabold">administrativa integral.</span>
             </h2>
           </Reveal>
           <ul className="mt-10 space-y-2">

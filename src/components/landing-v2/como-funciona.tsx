@@ -47,10 +47,10 @@ export function ComoFunciona() {
     <section id="caracteristicas" className="bg-white py-24 md:py-32">
       <div className="mx-auto max-w-6xl px-4 md:px-8">
         <Reveal>
-          <h2 className="max-w-3xl text-4xl leading-[1.05] font-extrabold tracking-tight text-balance text-[#0b2f35] md:text-6xl">
-            Cómo funciona nuestro <span className="v2-underline text-[#ABC2B3]">sistema</span>
+          <h2 className="max-w-3xl text-4xl leading-[1.05] font-normal tracking-tight text-balance text-[#0b2f35] md:text-6xl">
+            Cómo funciona nuestro <span className="font-extrabold text-[#ABC2B3]">sistema</span>
           </h2>
-          <p className="mt-6 max-w-xl text-xl font-semibold text-[#175861]">
+          <p className="mt-6 max-w-xl text-xl font-medium text-[#175861]">
             Una solución simple, el socio navega, el club gestiona, todo fluye.
           </p>
         </Reveal>
@@ -82,15 +82,15 @@ export function ComoFunciona() {
                     strokeWidth={1.75}
                     aria-hidden
                   />
-                  <h3 className="text-3xl leading-[1.05] font-extrabold tracking-tight text-balance md:text-4xl">
+                  <h3 className="text-3xl leading-[1.05] font-semibold tracking-tight text-balance md:text-4xl">
                     {p.titulo}
                   </h3>
-                  <p className="mt-4 text-base font-semibold text-white/80">{p.bajada}</p>
+                  <p className="mt-4 text-base font-medium text-white/80">{p.bajada}</p>
                   <ul className="mt-4 flex flex-wrap gap-2">
                     {p.items.map((item, j) => (
                       <li key={item}>
                         <Reveal delay={300 + j * 70} direction="zoom">
-                          <span className="inline-block rounded-full border border-white/25 bg-white/10 px-4 py-2 text-sm font-bold transition-colors duration-300 hover:bg-white hover:text-[#0b2f35]">
+                          <span className="inline-block rounded-full border border-white/25 bg-white/10 px-4 py-2 text-sm font-normal transition-colors duration-300 hover:bg-white hover:text-[#0b2f35]">
                             {item}
                           </span>
                         </Reveal>
