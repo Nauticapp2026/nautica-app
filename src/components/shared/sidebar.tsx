@@ -271,9 +271,9 @@ export function Sidebar({
 
   return (
     <>
-      {/* Top bar mobile: solo visible <md. Es lo que toma el espacio del
+      {/* Top bar mobile y tablet: solo visible <lg. Es lo que toma el espacio del
           sidebar en el flex-col del layout (el aside abajo es fixed en mobile). */}
-      <div className="sticky top-0 z-30 flex items-center justify-between border-b border-gray-200 bg-white px-4 py-2.5 md:hidden">
+      <div className="sticky top-0 z-30 flex items-center justify-between border-b border-gray-200 bg-white px-4 py-2.5 lg:hidden">
         <button
           type="button"
           onClick={() => setOpen(true)}
@@ -290,22 +290,22 @@ export function Sidebar({
       {open && (
         <div
           onClick={() => setOpen(false)}
-          className="fixed inset-0 z-40 bg-black/40 md:hidden"
+          className="fixed inset-0 z-40 bg-black/40 lg:hidden"
           aria-hidden
         />
       )}
 
       {/* Aside: drawer fijo deslizable en mobile, sticky en desktop. */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-gray-200 bg-white transition-transform duration-200 md:sticky md:top-0 md:h-screen md:w-56 md:translate-x-0 ${
-          open ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+        className={`fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-gray-200 bg-white transition-transform duration-200 lg:sticky lg:top-0 lg:h-screen lg:w-56 lg:translate-x-0 ${
+          open ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         }`}
       >
         {/* Botón cerrar en mobile */}
         <button
           type="button"
           onClick={() => setOpen(false)}
-          className="absolute top-3 right-3 rounded-md p-1.5 text-gray-500 hover:bg-gray-100 md:hidden"
+          className="absolute top-3 right-3 rounded-md p-1.5 text-gray-500 hover:bg-gray-100 lg:hidden"
           aria-label="Cerrar menú"
         >
           <X className="h-5 w-5" />
@@ -313,7 +313,7 @@ export function Sidebar({
 
         {/* Logo + subtítulo */}
         <div className="px-4 pt-5 pb-3">
-          <Image src="/logo-nauticapp.png" alt="NauticApp" width={120} height={42} priority />
+          <Image src="/logo-nauticapp.png" alt="NauticApp" width={120} height={41} priority />
           <p className="mt-1.5 truncate text-xs text-gray-400">{subtitle}</p>
         </div>
 

@@ -1057,7 +1057,7 @@ export function TareasClient({
             const dndEnabled = tab === 'operativa';
             const gridCls =
               tab === 'operativa'
-                ? 'grid grid-cols-1 gap-4 md:grid-cols-4'
+                ? 'grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4'
                 : 'grid grid-cols-1 gap-4';
             return (
               <div className={gridCls}>
@@ -1199,7 +1199,7 @@ export function TareasClient({
             />
           ) : (
             <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
-              <div className="overflow-x-auto">
+              <div className="scroll-x-hint overflow-x-auto">
                 <table className="w-full min-w-[720px] text-sm">
                   <thead>
                     <tr className="bg-gray-50 text-left text-xs font-semibold text-gray-500">

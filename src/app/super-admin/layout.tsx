@@ -14,7 +14,7 @@ export default async function SuperAdminLayout({ children }: { children: React.R
   const userInitial = (profile.nombre?.[0] ?? profile.email[0]).toUpperCase();
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#F9FAFB] md:flex-row">
+    <div className="flex min-h-screen flex-col bg-[#F9FAFB] lg:flex-row">
       <Sidebar
         subtitle="Plataforma"
         userName={userName}

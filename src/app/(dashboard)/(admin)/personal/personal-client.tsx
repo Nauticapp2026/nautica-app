@@ -216,7 +216,7 @@ function ListaLegajos({ filas }: { filas: FilaLegajo[] }) {
           No hay legajos que coincidan con la búsqueda.
         </p>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="scroll-x-hint overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-200 text-left text-xs tracking-wide text-gray-500 uppercase">
@@ -563,7 +563,7 @@ function PlanillaSemanal({
           No hay personal vigente en esta semana.
         </p>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="scroll-x-hint overflow-x-auto">
           <table className="w-full min-w-[860px] text-sm">
             <thead>
               <tr className="border-b border-gray-200 text-left text-xs tracking-wide text-gray-500 uppercase">
@@ -738,7 +738,7 @@ function NovedadesMes({ datos }: { datos: NonNullable<Props['novedades']> }) {
           No hay personal vigente en este mes.
         </p>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="scroll-x-hint overflow-x-auto">
           <table className="w-full min-w-[1000px] text-sm">
             <thead>
               <tr className="border-b border-gray-200 text-left text-xs tracking-wide text-gray-500 uppercase">

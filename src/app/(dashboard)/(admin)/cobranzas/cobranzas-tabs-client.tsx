@@ -161,7 +161,7 @@ export function CobranzasTabsClient({
             className={`${inputCls} w-full pl-9`}
           />
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <label className="text-xs font-medium text-gray-500" htmlFor="cobranzas-desde">
             Desde
           </label>
@@ -197,12 +197,12 @@ export function CobranzasTabsClient({
         </div>
       </div>
 
-      <div className="flex gap-1 border-b border-gray-200">
+      <div className="flex gap-1 overflow-x-auto border-b border-gray-200">
         {tabs.map((t) => (
           <button
             key={t.key}
             onClick={() => cambiarTab(t.key)}
-            className={`px-4 py-2.5 text-sm font-semibold transition ${
+            className={`shrink-0 px-4 py-2.5 text-sm font-semibold whitespace-nowrap transition ${
               activeTab === t.key
                 ? 'border-b-2 border-[#175861] text-[#175861]'
                 : 'text-gray-500 hover:text-gray-700'
@@ -233,7 +233,7 @@ export function CobranzasTabsClient({
             className="rounded-2xl border border-gray-200 bg-white"
           />
         ) : (
-          <div className="overflow-x-auto rounded-2xl border border-gray-200 bg-white">
+          <div className="scroll-x-hint overflow-x-auto rounded-2xl border border-gray-200 bg-white">
             <table className="w-full min-w-[760px] text-sm">
               <thead>
                 <tr className="border-b border-gray-200 text-left text-xs font-medium text-gray-500">

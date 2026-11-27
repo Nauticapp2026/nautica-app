@@ -271,7 +271,7 @@ function PreviewStep({ rows, resumen }: { rows: ImportRowPreview[]; resumen: Pre
         <Stat label="Con error" value={resumen.conError} tone="error" />
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-gray-200">
+      <div className="scroll-x-hint overflow-x-auto rounded-xl border border-gray-200">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 text-left">
             <tr>

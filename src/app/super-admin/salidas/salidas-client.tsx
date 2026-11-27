@@ -235,7 +235,7 @@ export function SalidasClient({
       </p>
 
       <Card className="overflow-hidden p-0">
-        <div className="overflow-x-auto">
+        <div className="scroll-x-hint overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200 text-sm">
             <thead className="text-muted-foreground bg-gray-50 text-left text-xs font-semibold tracking-wider uppercase">
               <tr>

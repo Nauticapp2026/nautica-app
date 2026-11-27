@@ -76,7 +76,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   ]);
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#F9FAFB] md:flex-row">
+    <div className="flex min-h-screen flex-col bg-[#F9FAFB] lg:flex-row">
       <Sidebar
         subtitle={activeGuarderia.nombre}
         userName={userName}

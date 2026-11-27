@@ -928,7 +928,7 @@ export function EspaciosClient({
                 : `${searchResults.length} espacio${searchResults.length === 1 ? '' : 's'} encontrado${searchResults.length === 1 ? '' : 's'}.`}
             </p>
             {searchResults.length > 0 && (
-              <div className="overflow-x-auto rounded-[10px] border border-gray-100">
+              <div className="scroll-x-hint overflow-x-auto rounded-[10px] border border-gray-100">
                 <table className="w-full min-w-[640px] text-sm">
                   <thead>
                     <tr className="bg-gray-50 text-left text-xs font-semibold text-gray-500">

@@ -168,7 +168,7 @@ export function PaywayCobrosList({
             }
           />
         ) : (
-          <div className="overflow-x-auto">
+          <div className="scroll-x-hint overflow-x-auto">
             <table className="w-full min-w-[640px] text-sm">
               <thead>
                 <tr className="bg-gray-50 text-left text-xs font-semibold text-gray-500">

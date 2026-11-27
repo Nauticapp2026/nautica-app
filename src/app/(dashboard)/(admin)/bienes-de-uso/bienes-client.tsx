@@ -215,7 +215,7 @@ export function BienesClient({
               No hay bienes que coincidan con la búsqueda.
             </p>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="scroll-x-hint overflow-x-auto">
               <table className="w-full min-w-[2200px] text-sm">
                 <thead>
                   <tr className="border-b border-gray-200 text-left text-xs tracking-wide text-gray-500 uppercase">

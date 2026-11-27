@@ -278,7 +278,7 @@ function PreviewStep({
         <Stat label="Espacios totales" value={resumen.totalEspaciosACrear} tone="ok" />
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-gray-200">
+      <div className="scroll-x-hint overflow-x-auto rounded-xl border border-gray-200">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 text-left">
             <tr>
