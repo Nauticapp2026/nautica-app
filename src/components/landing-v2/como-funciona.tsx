@@ -59,7 +59,7 @@ export function ComoFunciona() {
           {paneles.map((p, i) => (
             <Reveal key={p.titulo} direction={p.direccion} delay={i * 120}>
               <article
-                className="v2-lift group relative isolate flex min-h-[30rem] flex-col justify-end overflow-hidden rounded-[2rem] text-white md:min-h-[34rem]"
+                className="v2-lift group relative isolate flex min-h-[33rem] flex-col justify-end overflow-hidden rounded-[2rem] text-white md:min-h-[38rem]"
                 style={{ backgroundColor: p.fondo }}
               >
                 <Image
